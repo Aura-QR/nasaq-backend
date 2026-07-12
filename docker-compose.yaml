@@ -1,0 +1,50 @@
+services:
+    bswsooo4okwkckc0swsgccog-040857959361:
+        image: 'bswsooo4okwkckc0swsgccog:5e38d89d2ba1b578c10a46e60ae6a29b542a2d99'
+        container_name: bswsooo4okwkckc0swsgccog-040857959361
+        restart: unless-stopped
+        expose:
+            - '3002'
+        networks:
+            coolify:
+                aliases:
+                    - bswsooo4okwkckc0swsgccog-040857959361
+        mem_limit: '0'
+        memswap_limit: '0'
+        mem_swappiness: 60
+        mem_reservation: '0'
+        cpus: 0.0
+        cpu_shares: 1024
+        env_file:
+            - .env
+        labels:
+            - traefik.enable=true
+            - traefik.http.middlewares.gzip.compress=true
+            - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+            - traefik.http.routers.http-0-bswsooo4okwkckc0swsgccog.entryPoints=http
+            - traefik.http.routers.http-0-bswsooo4okwkckc0swsgccog.middlewares=gzip
+            - 'traefik.http.routers.http-0-bswsooo4okwkckc0swsgccog.rule=Host(`backend.dev.185.170.196.120.sslip.io`) && PathPrefix(`/`)'
+            - traefik.http.routers.http-0-bswsooo4okwkckc0swsgccog.service=http-0-bswsooo4okwkckc0swsgccog
+            - traefik.http.services.http-0-bswsooo4okwkckc0swsgccog.loadbalancer.server.port=3002
+            - 'caddy_0.encode=zstd gzip'
+            - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3002}}'
+            - 'caddy_0.handle_path=/*'
+            - caddy_0.header=-Server
+            - 'caddy_0.try_files={path} /index.html /index.php'
+            - 'caddy_0=http://backend.dev.185.170.196.120.sslip.io'
+            - caddy_ingress_network=coolify
+            - coolify.managed=true
+            - coolify.version=4.0.0-beta.473
+            - coolify.applicationId=5
+            - coolify.type=application
+            - coolify.name=bswsooo4okwkckc0swsgccog
+            - coolify.resourceName=alpha-turbo-aura-school-system-backenddev-bswsooo4okwkckc0swsgccog
+            - coolify.projectName=aura
+            - coolify.serviceName=alpha-turbo-aura-school-system-backenddev-bswsooo4okwkckc0swsgccog
+            - coolify.environmentName=production
+            - coolify.pullRequestId=0
+networks:
+    coolify:
+        external: true
+        name: coolify
+        attachable: true
