@@ -8,7 +8,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   // Health check endpoint
-  @Get('health-check')
+  @Get(['health-check', 'api/v1/health-check'])
   @ApiOperation({ summary: 'Check server health status' })
   @ApiResponse({ status: 200, description: 'Server is healthy' })
   healthCheck(): string {
@@ -16,7 +16,7 @@ export class AppController {
   }
 
   // Test endpoint api/v1/test
-  @Get('test')
+  @Get(['test', 'api/v1/test'])
   @ApiOperation({ summary: 'Test endpoint to verify API functionality' })
   @ApiResponse({ status: 200, description: 'API is working' })
   test() {
