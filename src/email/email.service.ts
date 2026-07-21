@@ -22,7 +22,7 @@ export class EmailService {
     await this.transporter.sendMail({
       from: 'liom0771@gmail.com',
       to,
-      subject: 'كود تفعيل كلمة المرور - Aura School',
+      subject: 'كود تفعيل كلمة المرور - Nasaq School',
       html: `
         <div style="font-family: Arial, sans-serif; direction: rtl; text-align: right;">
           <h2>مرحباً،</h2>

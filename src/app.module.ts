@@ -21,6 +21,8 @@ import { PreparationModule } from './preparation/preparation.module';
 import { TasksModule } from './tasks/tasks.module';
 import { FinancialModule } from './financial/financial.module';
 import { ExpensesModule } from './expenses/expenses.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 
 
@@ -64,5 +66,7 @@ import { ExpensesModule } from './expenses/expenses.module';
     FinancialModule,
     ExpensesModule,
   ],
+  controllers: [AppController],
+  providers: [AppService],
 })
 export class AppModule {}

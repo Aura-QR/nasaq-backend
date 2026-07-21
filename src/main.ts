@@ -30,7 +30,7 @@ async function bootstrap() {
 
   // Swagger Configuration
   const config = new DocumentBuilder()
-    .setTitle('Aura School System API')
+    .setTitle('Nasaq School System API')
     .setDescription('API documentation for Aura School System')
     .setVersion('1.0')
     .addBearerAuth() // if you plan to add JWT authentication later

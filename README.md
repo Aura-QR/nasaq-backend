@@ -1,4 +1,4 @@
-# 🎓 Aura School System - Backend
+# 🎓 Nasaq School System - Backend
 
 A comprehensive school management system backend built with NestJS and MongoDB. This API provides robust endpoints for managing students, teachers, classes, subjects, and administrative operations.
 
