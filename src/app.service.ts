@@ -9,6 +9,7 @@ export class AppService {
   testApi() {
     return {
       status: 'success',
+      massage: 'API is working',
       timestamp: new Date().toISOString(),
       version: '1.0.0',
     };
