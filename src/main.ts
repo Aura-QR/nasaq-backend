@@ -12,9 +12,14 @@ app.enableCors({
   origin: [
     'http://nasaq.185.170.196.120.sslip.io',
     'http://localhost:5000',
+    'http://localhost:3000',
   ],
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  exposedHeaders: ['Authorization'],
   credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
 });
 
   // Global validation pipe
