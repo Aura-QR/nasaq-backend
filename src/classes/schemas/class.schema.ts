@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { GenderEnum } from '../enums/gender.enum';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } })
 export class Class extends Document {
@@ -41,17 +42,15 @@ export class Class extends Document {
   @Prop({ required: true, default: true })
   isActive: boolean;
 
-  // @Prop({ type: Date, required: false })
-  // startDate?: Date;
-
-  // @Prop({ type: Date, required: false })
-  // endDate?: Date;
-
   createdAt: Date;
   updatedAt: Date;
 }
 
 export const ClassSchema = SchemaFactory.createForClass(Class);
+ClassSchema.plugin(tenantScopedPlugin);
+
+ClassSchema.index({ schoolId: 1, createdAt: -1 });
+ClassSchema.index({ schoolId: 1, teacherInChargeId: 1 });
 
 ClassSchema.virtual('currentEnrollment').get(function() {
   return this.studentIds?.length || 0;

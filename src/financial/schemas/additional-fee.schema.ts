@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 export enum AdditionalFeeTarget {
   STUDENT = 'student',
@@ -34,3 +35,6 @@ export class AdditionalFee extends Document {
 }
 
 export const AdditionalFeeSchema = SchemaFactory.createForClass(AdditionalFee);
+AdditionalFeeSchema.plugin(tenantScopedPlugin);
+
+AdditionalFeeSchema.index({ schoolId: 1, targetType: 1 });

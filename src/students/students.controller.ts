@@ -21,6 +21,7 @@ import { SetPasswordDto } from './dto/set-password.dto';
 import { RequestPasswordSetupDto } from './dto/request-password-setup.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('students')
 @ApiTags('Students')
@@ -118,6 +119,7 @@ export class StudentsController {
   @ApiOperation({ summary: 'Request OTP to set password for first-time login' })
   @ApiResponse({ status: 200, description: 'OTP sent to email' })
   @ApiResponse({ status: 404, description: 'Email not found' })
+  @Public()
   @Post('request-password-setup')
   @HttpCode(HttpStatus.OK)
   async requestPasswordSetup(@Body() body: RequestPasswordSetupDto) {
@@ -127,6 +129,7 @@ export class StudentsController {
   @ApiOperation({ summary: 'Set password using OTP' })
   @ApiResponse({ status: 200, description: 'Password set successfully' })
   @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  @Public()
   @Post('set-password')
   @HttpCode(HttpStatus.OK)
   async setPassword(@Body() body: SetPasswordDto) {

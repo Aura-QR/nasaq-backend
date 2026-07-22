@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ timestamps: true })
 export class Library extends Document {
@@ -16,10 +17,13 @@ export class Library extends Document {
     required: false,
     default: null,
   })
-  subjectId?: mongoose.Types.ObjectId; // Optional: can be connected to a subject
+  subjectId?: mongoose.Types.ObjectId;
 
   @Prop({ required: false })
-  academicYear?: string; // Optional: academic year (e.g., "2024-2025")
+  academicYear?: string;
 }
 
 export const LibrarySchema = SchemaFactory.createForClass(Library);
+LibrarySchema.plugin(tenantScopedPlugin);
+
+LibrarySchema.index({ schoolId: 1, subjectId: 1 });

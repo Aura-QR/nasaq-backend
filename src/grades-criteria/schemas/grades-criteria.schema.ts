@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document } from 'mongoose';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ collection: 'gradesCriteria', timestamps: true })
 export class GradesCriteria extends Document {
@@ -40,4 +41,7 @@ export class GradesCriteria extends Document {
 
 }
 export const GradesCriteriaSchema = SchemaFactory.createForClass(GradesCriteria);
+GradesCriteriaSchema.plugin(tenantScopedPlugin);
+
+GradesCriteriaSchema.index({ schoolId: 1, subjectId: 1, academicYear: 1 });
 

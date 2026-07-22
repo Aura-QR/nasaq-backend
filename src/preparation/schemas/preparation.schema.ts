@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 export type PreparationDocument = Preparation & Document;
 
@@ -58,3 +59,6 @@ export class Preparation {
 }
 
 export const PreparationSchema = SchemaFactory.createForClass(Preparation);
+PreparationSchema.plugin(tenantScopedPlugin);
+
+PreparationSchema.index({ schoolId: 1, lecture: 1 });

@@ -2,6 +2,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document } from 'mongoose';
 import { ExamType } from '../enums/exam-type.enum';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ _id: true })
 export class Question {
@@ -74,6 +75,9 @@ export class Exam extends Document {
 }
 
 export const ExamSchema = SchemaFactory.createForClass(Exam);
+ExamSchema.plugin(tenantScopedPlugin);
 
-//index to prevent duplicate exams for the same class and exam type
-ExamSchema.index({ gradesCriteriaId: 1, examType: 1 });
+ExamSchema.index({ schoolId: 1, gradesCriteriaId: 1, examType: 1 });
+ExamSchema.index({ schoolId: 1, classIds: 1 });
+ExamSchema.index({ schoolId: 1, subjectId: 1 });
+ExamSchema.index({ schoolId: 1, createdAt: -1 });

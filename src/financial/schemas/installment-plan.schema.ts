@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ collection: 'installmentPlans', timestamps: true })
 export class InstallmentPlan extends Document {
@@ -31,3 +32,6 @@ export class InstallmentPlan extends Document {
 }
 
 export const InstallmentPlanSchema = SchemaFactory.createForClass(InstallmentPlan);
+InstallmentPlanSchema.plugin(tenantScopedPlugin);
+
+InstallmentPlanSchema.index({ schoolId: 1, createdAt: -1 });

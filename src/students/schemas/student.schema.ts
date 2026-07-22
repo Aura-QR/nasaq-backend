@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ timestamps: true })
 export class Student extends Document {
@@ -28,7 +29,7 @@ export class Student extends Document {
   @Prop({ required: true, index: true })
   phoneNumber: string;
 
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, index: true })
   email: string;
 
   @Prop({ required: true })
@@ -63,7 +64,7 @@ export class Student extends Document {
   @Prop({ index: true })
   name: string;
 
-  @Prop({ unique: true, index: true })
+  @Prop({ index: true })
   schoolEmail: string;
 
   @Prop({ default: 'STUDENT' })
@@ -83,13 +84,22 @@ export class Student extends Document {
 }
 
 export const StudentSchema = SchemaFactory.createForClass(Student);
+StudentSchema.plugin(tenantScopedPlugin);
 
+// Compound unique indexes scoped by schoolId
+StudentSchema.index({ schoolId: 1, email: 1 }, { unique: true });
+StudentSchema.index(
+  { schoolId: 1, schoolEmail: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { schoolEmail: { $exists: true, $type: 'string' } },
+  },
+);
 
 StudentSchema.pre('save', function(next) {
   this.name = `${this.firstName} ${this.fatherName} ${this.familyName}`;
   next();
 });
-
 
 StudentSchema.pre('findOneAndUpdate', async function(next) {
   const update = this.getUpdate() as any;

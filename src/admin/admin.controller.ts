@@ -13,11 +13,13 @@ import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { LoginAdminDto } from './dto/login-admin.dto';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
+  @Public()
   @Post('register')
   @ApiOperation({ summary: 'Register a new admin' })
   @ApiResponse({ status: 201, description: 'Admin registered successfully' })
@@ -33,6 +35,7 @@ export class AdminController {
   @ApiOperation({ summary: 'Login an admin' })
   @ApiResponse({ status: 200, description: 'Login successful' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(

@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { PaymentStatus, FeeStatus } from '../enums/payment-status.enum';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 @Schema({ _id: false })
 class DiscountSnapshot {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Discount', required: true })
@@ -202,6 +203,8 @@ export class StudentFinancialRecord extends Document {
 }
 
 export const StudentFinancialRecordSchema = SchemaFactory.createForClass(StudentFinancialRecord);
-StudentFinancialRecordSchema.index({ studentId: 1, academicYear: 1 }, { unique: true });
-StudentFinancialRecordSchema.index({ 'trips.tripTemplateId': 1 });
-StudentFinancialRecordSchema.index({ 'bus.enrolled': 1 });
+StudentFinancialRecordSchema.plugin(tenantScopedPlugin);
+
+StudentFinancialRecordSchema.index({ schoolId: 1, studentId: 1, academicYear: 1 }, { unique: true });
+StudentFinancialRecordSchema.index({ schoolId: 1, 'trips.tripTemplateId': 1 });
+StudentFinancialRecordSchema.index({ schoolId: 1, 'bus.enrolled': 1 });

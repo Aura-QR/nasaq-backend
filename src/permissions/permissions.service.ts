@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Permission } from './schemas/permission.schema';
 
 @Injectable()
@@ -13,103 +13,171 @@ export class PermissionsService {
     return this.permissionModel.find().lean();
   }
 
-  async getPermissionsByRole(role: string) {
-    let permission = await this.permissionModel.findOne({ role });
+  async getPermissionsByRole(role: string, schoolId?: string) {
+    let query: any = { role, userId: null };
+    if (schoolId) {
+      query.schoolId = new Types.ObjectId(schoolId);
+    } else {
+      query.schoolId = null;
+    }
+
+    let permission = await this.permissionModel.findOne(query).setOptions({ skipTenantScope: true });
 
     if (!permission) {
       const defaultPermissions = this.getDefaultPermissions(role);
       permission = await this.permissionModel.create({
         role,
+        schoolId: schoolId ? new Types.ObjectId(schoolId) : null,
+        userId: null,
         permissions: defaultPermissions,
       });
     }
 
     return permission?.permissions || null;
   }
-async updateAttendancePermissionByRole(role: string, data: any , entity : string ) {
-  const res = await this.permissionModel.updateOne(
-    { role },
-    {
-      $set: {
-         [`permissions.${entity}`]: data,
+
+  async getFlatPermissions(role: string, schoolId?: string, userId?: string): Promise<string[]> {
+    if (role === 'OWNER') {
+      return ['*'];
+    }
+
+    let permissionDoc: any = null;
+
+    if (userId) {
+      permissionDoc = await this.permissionModel.findOne({ userId })
+        .setOptions({ skipTenantScope: true });
+    }
+
+    if (!permissionDoc && schoolId) {
+      permissionDoc = await this.permissionModel.findOne({
+        schoolId: new Types.ObjectId(schoolId),
+        role,
+      }).setOptions({ skipTenantScope: true });
+    }
+
+    if (!permissionDoc) {
+      permissionDoc = await this.permissionModel.findOne({
+        schoolId: null,
+        userId: null,
+        role,
+      }).setOptions({ skipTenantScope: true });
+    }
+
+    if (!permissionDoc) {
+      const defaultPermissionsObj = this.getDefaultPermissions(role);
+      permissionDoc = await this.permissionModel.create({
+        role,
+        schoolId: null,
+        userId: null,
+        permissions: defaultPermissionsObj,
+      });
+    }
+
+    return this.convertPermissionsToStrings(permissionDoc.permissions);
+  }
+
+  private convertPermissionsToStrings(permissionsObj: any): string[] {
+    const list: string[] = [];
+    if (!permissionsObj) return list;
+
+    Object.entries(permissionsObj).forEach(([entity, perms]: [string, any]) => {
+      if (perms.read) list.push(`school.${entity}.read`);
+      if (perms.add) list.push(`school.${entity}.create`);
+      if (perms.edit) list.push(`school.${entity}.update`);
+      if (perms.delete) list.push(`school.${entity}.delete`);
+    });
+    return list;
+  }
+
+  async updateAttendancePermissionByRole(role: string, data: any, entity: string, schoolId?: string) {
+    const query: any = { role };
+    if (schoolId) {
+      query.schoolId = new Types.ObjectId(schoolId);
+    } else {
+      query.schoolId = null;
+    }
+
+    const res = await this.permissionModel.updateOne(
+      query,
+      {
+        $set: {
+          [`permissions.${entity}`]: data,
+        },
       },
-    },
-    { upsert: true },
-  );
-
-  const updatedPermission = await this.permissionModel.findOne({ role }).lean();
-
-  console.log('UPDATED PERMISSION:', updatedPermission);
-
-  return res;
-}
-
-
-async syncFinancialPermissions() {
-  const results = await Promise.all([
-    this.permissionModel.updateOne(
-      { role: 'ADMIN' },
-      { $set: { 'permissions.financial': { read: true, add: true, edit: true, delete: true } } },
       { upsert: true },
-    ),
-    this.permissionModel.updateOne(
-      { role: 'TEACHER' },
-      { $set: { 'permissions.financial': { read: false, add: false, edit: false, delete: false } } },
-      { upsert: true },
-    ),
-    this.permissionModel.updateOne(
-      { role: 'STUDENT' },
-      { $set: { 'permissions.financial': { read: false, add: false, edit: false, delete: false } } },
-      { upsert: true },
-    ),
-  ]);
+    );
 
-  return {
-    message: 'Financial permissions synced successfully',
-    data: {
-      ADMIN: results[0],
-      TEACHER: results[1],
-      STUDENT: results[2],
-    },
-  };
-}
+    const updatedPermission = await this.permissionModel.findOne(query).lean();
+    console.log('UPDATED PERMISSION:', updatedPermission);
+    return res;
+  }
 
-async setAllAdminPermissionsToTrue() {
-  const allTruePermissions = {
-    students: { read: true, add: true, edit: true, delete: true },
-    teachers: { read: true, add: true, edit: true, delete: true },
-    classes: { read: true, add: true, edit: true, delete: true },
-    subjects: { read: true, add: true, edit: true, delete: true },
-    lectures: { read: true, add: true, edit: true, delete: true },
-    library: { read: true, add: true, edit: true, delete: true },
-    attendance: { read: true, add: true, edit: true, delete: true },
-    gradesCriteria: { read: true, add: true, edit: true, delete: true },
-    exams: { read: true, add: true, edit: true, delete: true },
-    projects: { read: true, add: true, edit: true, delete: true },
-    grades: { read: true, add: true, edit: true, delete: true },
-    preparation: { read: true, add: true, edit: true, delete: true },
-    financial: { read: true, add: true, edit: true, delete: true },
-  };
+  async syncFinancialPermissions(schoolId?: string) {
+    const sId = schoolId ? new Types.ObjectId(schoolId) : null;
+    const results = await Promise.all([
+      this.permissionModel.updateOne(
+        { role: 'ADMIN', schoolId: sId },
+        { $set: { 'permissions.financial': { read: true, add: true, edit: true, delete: true } } },
+        { upsert: true },
+      ),
+      this.permissionModel.updateOne(
+        { role: 'TEACHER', schoolId: sId },
+        { $set: { 'permissions.financial': { read: false, add: false, edit: false, delete: false } } },
+        { upsert: true },
+      ),
+      this.permissionModel.updateOne(
+        { role: 'STUDENT', schoolId: sId },
+        { $set: { 'permissions.financial': { read: false, add: false, edit: false, delete: false } } },
+        { upsert: true },
+      ),
+    ]);
 
-  const res = await this.permissionModel.updateOne(
-    { role: 'ADMIN' },
-    {
-      $set: {
-        permissions: allTruePermissions,
+    return {
+      message: 'Financial permissions synced successfully',
+      data: {
+        ADMIN: results[0],
+        TEACHER: results[1],
+        STUDENT: results[2],
       },
-    },
-    { upsert: true },
-  );
+    };
+  }
 
-  console.log('TEMPORARY: All admin permissions set to true');
-  return res;
-}
+  async setAllAdminPermissionsToTrue(schoolId?: string) {
+    const sId = schoolId ? new Types.ObjectId(schoolId) : null;
+    const allTruePermissions = {
+      students: { read: true, add: true, edit: true, delete: true },
+      teachers: { read: true, add: true, edit: true, delete: true },
+      classes: { read: true, add: true, edit: true, delete: true },
+      subjects: { read: true, add: true, edit: true, delete: true },
+      lectures: { read: true, add: true, edit: true, delete: true },
+      library: { read: true, add: true, edit: true, delete: true },
+      attendance: { read: true, add: true, edit: true, delete: true },
+      gradesCriteria: { read: true, add: true, edit: true, delete: true },
+      exams: { read: true, add: true, edit: true, delete: true },
+      projects: { read: true, add: true, edit: true, delete: true },
+      grades: { read: true, add: true, edit: true, delete: true },
+      preparation: { read: true, add: true, edit: true, delete: true },
+      financial: { read: true, add: true, edit: true, delete: true },
+    };
 
+    const res = await this.permissionModel.updateOne(
+      { role: 'ADMIN', schoolId: sId },
+      {
+        $set: {
+          permissions: allTruePermissions,
+        },
+      },
+      { upsert: true },
+    );
 
+    console.log('TEMPORARY: All admin permissions set to true');
+    return res;
+  }
 
   private getDefaultPermissions(role: string) {
     switch (role) {
       case 'ADMIN':
+      case 'OWNER':
         return {
           students: { read: true, add: true, edit: true, delete: true },
           teachers: { read: true, add: true, edit: true, delete: true },

@@ -1,6 +1,6 @@
 # Aura School System — API Documentation
 
-> **Version:** 1.0  
+> **Version:** 2.0 (Multi-Tenant SaaS)  
 > **Framework:** NestJS + Mongoose (MongoDB)  
 > **Live Swagger UI:** `http://localhost:3000/api/docs`  
 > **Base URL:** `http://localhost:3000`  
@@ -15,6 +15,32 @@
 3. [Authentication & Authorization](#3-authentication--authorization)
 4. [Database Schemas Dictionary](#4-database-schemas-dictionary)
 5. [Complete API Endpoints Reference](#5-complete-api-endpoints-reference)
+   - [5.1 Platform & School Registration](#51-platform--school-registration)
+   - [5.2 Platform Administration (SUPER_ADMIN)](#52-platform-administration-super_admin)
+   - [5.3 Managers Management (OWNER Only)](#53-managers-management-owner-only)
+   - [5.4 Dashboards & Analytics](#54-dashboards--analytics)
+   - [5.5 Auth](#55-auth)
+   - [5.6 Admin](#56-admin)
+   - [5.7 Students](#57-students)
+   - [5.8 Teachers](#58-teachers)
+   - [5.9 Classes](#59-classes)
+   - [5.10 Subjects](#510-subjects)
+   - [5.11 Attendance](#511-attendance)
+   - [5.12 Lectures](#512-lectures)
+   - [5.13 Exams](#513-exams)
+   - [5.14 Grades Criteria](#514-grades-criteria)
+   - [5.15 Projects](#515-projects)
+   - [5.16 Preparation](#516-preparation)
+   - [5.17 Library](#517-library)
+   - [5.18 Financial — Records](#518-financial--records)
+   - [5.19 Financial — Fee Configs](#519-financial--fee-configs)
+   - [5.20 Financial — Installment Plans](#520-financial--installment-plans)
+   - [5.21 Financial — Discounts](#521-financial--discounts)
+   - [5.22 Financial — Additional Fees](#522-financial--additional-fees)
+   - [5.23 Financial — Bus Module](#523-financial--bus-module)
+   - [5.24 Financial — Trips Module](#524-financial--trips-module)
+   - [5.25 Expenses — Categories](#525-expenses--categories)
+   - [5.26 Expenses](#526-expenses)
 6. [Standard Response Envelope](#6-standard-response-envelope)
 7. [Environment Variables](#7-environment-variables)
 
@@ -44,12 +70,19 @@ The Aura School System is organized into the following NestJS feature modules:
 | **CASL** | Ability-based authorization (`@CheckAbilities`) |
 | **Tasks** | Background scheduled tasks |
 
+| **Tenancy (Core)** | Request-scoped tenant context (`AsyncLocalStorage`) & automated database scoping (`tenantScopedPlugin`) |
+| **Platform** | Platform Super Admin auth, school registration (`POST /schools/register`), & subscription controls |
+| **Managers** | School Owner manager management (create admin manager, promote/demote teacher manager, edit permissions) |
+| **Dashboards** | Single-school Owner dashboard, permission-filtered Manager dashboard, cross-tenant Super Admin dashboard |
+
 ### Role System
 
 ```
-ADMIN    → Full access to all resources
-TEACHER  → Read classes they teach; create/grade exams and projects
-STUDENT  → Read their own data (profile, grades, schedule, exams)
+SUPER_ADMIN → Platform Super Admin (cross-tenant management & platform analytics)
+OWNER       → School Owner (full administrative control within tenant, permissions: ['*'])
+MANAGER     → School Manager (delegated access with custom permission overrides array)
+TEACHER     → Teacher (classes taught, subject, lecture, attendance, exam, & project management)
+STUDENT     → Student (read-only access to own profile, schedule, grades, exams, & submissions)
 ```
 
 ---
@@ -58,6 +91,7 @@ STUDENT  → Read their own data (profile, grades, schedule, exams)
 
 | Setting | Value |
 |---|---|
+| **Multi-Tenancy** | Server-side scoping guarantee via `tenantScopedPlugin`. `schoolId` is derived from JWT and is NEVER accepted in request body |
 | **Validation** | `ValidationPipe` — `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true` |
 | **CORS** | Enabled for all origins (`*`) |
 | **Response Format** | Wrapped by a global `ResponseInterceptor` |
@@ -72,9 +106,10 @@ STUDENT  → Read their own data (profile, grades, schedule, exams)
 
 | Guard | Purpose |
 |---|---|
-| `JwtAuthGuard` | Verifies the JWT token; injects `@CurrentUser()` |
-| `AbilitiesGuard` | CASL-based resource/action authorization |
-| `RolesGuard` | Role-based guard used in some financial endpoints |
+| `JwtAuthGuard` | Verifies the JWT token signature; injects `@CurrentUser()` |
+| `TenantGuard` | Asserts active school status (`isActive: true`) and enforces platform vs school route boundaries |
+| `AbilitiesGuard` | CASL-based resource/action authorization driven by flat permission strings |
+| `RolesGuard` | Role-based guard used in administrative and financial endpoints |
 
 ### JWT Token
 
@@ -88,8 +123,11 @@ The token is obtained via `POST /auth/login` or `POST /admin/login`. It contains
 
 ```json
 {
-  "userId": "ObjectId",
-  "role": "ADMIN | TEACHER | STUDENT"
+  "sub": "6a5f678e25dec6ce6b8d3f58",
+  "email": "user@school.com",
+  "role": "OWNER | MANAGER | TEACHER | STUDENT | SUPER_ADMIN",
+  "schoolId": "6a5f678e25dec6ce6b8d3f58",
+  "permissions": ["school.students.read", "school.classes.manage"]
 }
 ```
 
@@ -385,7 +423,7 @@ Base path: `/auth`
 
 ---
 
-### 5.2 Admin
+### 5.6 Admin
 
 Base path: `/admin`
 
@@ -427,7 +465,7 @@ Base path: `/admin`
 
 ---
 
-### 5.3 Students
+### 5.7 Students
 
 Base path: `/students`
 
@@ -506,7 +544,7 @@ Base path: `/students`
 
 ---
 
-### 5.4 Teachers
+### 5.8 Teachers
 
 Base path: `/teachers`
 
@@ -556,7 +594,7 @@ Base path: `/teachers`
 
 ---
 
-### 5.5 Classes
+### 5.9 Classes
 
 Base path: `/classes`
 
@@ -592,7 +630,7 @@ Base path: `/classes`
 
 ---
 
-### 5.6 Subjects
+### 5.10 Subjects
 
 Base path: `/subjects`
 
@@ -619,7 +657,7 @@ Base path: `/subjects`
 
 ---
 
-### 5.7 Attendance
+### 5.11 Attendance
 
 Base path: `/attendance`
 
@@ -643,7 +681,7 @@ Base path: `/attendance`
 
 ---
 
-### 5.8 Lectures
+### 5.12 Lectures
 
 Base path: `/lectures`
 
@@ -678,7 +716,7 @@ Base path: `/lectures`
 
 ---
 
-### 5.9 Exams
+### 5.13 Exams
 
 Base path: `/exams`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
@@ -746,7 +784,7 @@ Base path: `/exams`
 
 ---
 
-### 5.10 Grades Criteria
+### 5.14 Grades Criteria
 
 Base path: `/gradesCriteria`
 
@@ -780,7 +818,7 @@ Base path: `/gradesCriteria`
 
 ---
 
-### 5.11 Projects
+### 5.15 Projects
 
 Base path: `/projects`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**  
@@ -834,7 +872,7 @@ Base path: `/projects`
 
 ---
 
-### 5.12 Preparation
+### 5.16 Preparation
 
 Base path: `/preparation`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**  
@@ -859,7 +897,7 @@ Base path: `/preparation`
 
 ---
 
-### 5.13 Library
+### 5.17 Library
 
 Base path: `/library`
 
@@ -884,7 +922,7 @@ Base path: `/library`
 
 ---
 
-### 5.14 Financial — Records
+### 5.18 Financial — Records
 
 Base path: `/financial/records`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
@@ -920,7 +958,7 @@ Base path: `/financial/records`
 
 ---
 
-### 5.15 Financial — Fee Configs
+### 5.19 Financial — Fee Configs
 
 Base path: `/financial/fee-configs`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
@@ -944,7 +982,7 @@ Base path: `/financial/fee-configs`
 
 ---
 
-### 5.16 Financial — Installment Plans
+### 5.20 Financial — Installment Plans
 
 Base path: `/financial/installment-plans`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
@@ -971,7 +1009,7 @@ Base path: `/financial/installment-plans`
 
 ---
 
-### 5.17 Financial — Discounts
+### 5.21 Financial — Discounts
 
 Base path: `/financial/discounts`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
@@ -998,7 +1036,7 @@ Base path: `/financial/discounts`
 
 ---
 
-### 5.18 Financial — Additional Fees
+### 5.22 Financial — Additional Fees
 
 Base path: `/financial/additional-fees`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
@@ -1013,7 +1051,7 @@ Base path: `/financial/additional-fees`
 
 ---
 
-### 5.19 Financial — Bus Module
+### 5.23 Financial — Bus Module
 
 Base path: `/financial/bus`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
@@ -1044,7 +1082,7 @@ Base path: `/financial/bus`
 
 ---
 
-### 5.20 Financial — Trips Module
+### 5.24 Financial — Trips Module
 
 Base path: `/financial/trips`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
@@ -1061,7 +1099,7 @@ Base path: `/financial/trips`
 
 ---
 
-### 5.21 Expenses — Categories
+### 5.25 Expenses — Categories
 
 Base path: `/expenses/categories`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
@@ -1082,7 +1120,7 @@ Base path: `/expenses/categories`
 
 ---
 
-### 5.22 Expenses
+### 5.26 Expenses
 
 Base path: `/expenses`  
 **All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**

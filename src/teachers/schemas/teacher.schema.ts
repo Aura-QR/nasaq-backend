@@ -1,16 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ timestamps: true })
 export class Teacher extends Document {
   @Prop({ required: true })
   name: string;
 
-  // @Prop({ required: true })
-  // lastName: string;
-
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, index: true })
   email: string;
 
   @Prop({ index: true })
@@ -21,7 +19,7 @@ export class Teacher extends Document {
     required: true,
     default: []
   })
-  subjectIds: mongoose.Types.ObjectId[]; // can teach multiple subjects
+  subjectIds: mongoose.Types.ObjectId[];
 
   @Prop()
   qualification?: string;
@@ -49,6 +47,17 @@ export class Teacher extends Document {
 
   @Prop({ required: true })
   password: string;
+
+  // Multi-tenant extension for Teacher promotion to Manager
+  @Prop({ default: false })
+  isManager: boolean;
+
+  @Prop({ type: [String], default: [] })
+  managerPermissions: string[];
 }
 
 export const TeacherSchema = SchemaFactory.createForClass(Teacher);
+TeacherSchema.plugin(tenantScopedPlugin);
+
+// Compound unique email scoped by schoolId
+TeacherSchema.index({ schoolId: 1, email: 1 }, { unique: true });

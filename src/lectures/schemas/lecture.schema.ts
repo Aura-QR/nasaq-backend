@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
 import { DayOfWeek } from '../enums/day-of-week.enum';
+import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 export type LectureDocument = Lecture & Document;
 
@@ -55,5 +56,9 @@ export class Lecture {
 }
 
 export const LectureSchema = SchemaFactory.createForClass(Lecture);
+LectureSchema.plugin(tenantScopedPlugin);
+
+LectureSchema.index({ schoolId: 1, classId: 1, dayOfWeek: 1, slot: 1 });
+LectureSchema.index({ schoolId: 1, teacherId: 1 });
 
 

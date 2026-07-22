@@ -22,7 +22,7 @@ export class TasksService {
     this.logger.log('Starting weekly preparation cleanup - Running every Friday at midnight');
 
     try {
-      const allPreparations = await this.preparationModel.find({}).exec();
+      const allPreparations = await this.preparationModel.find({}).setOptions({ skipTenantScope: true }).exec();
       const preparations = allPreparations.filter(prep => {
         const lectureValue = prep.lecture;
         if (!lectureValue) return false;
@@ -61,7 +61,7 @@ export class TasksService {
           await this.lectureModel.updateOne(
             { _id: lectureId },
             { $set: { preparation: [] } }
-          ).exec();
+          ).setOptions({ skipTenantScope: true }).exec();
           this.logger.debug(`Emptied preparation array for lecture ${lectureId}`);
         } catch (error) {
           this.logger.error(`Failed to empty preparation array for lecture ${lectureId}: ${error.message}`);
@@ -100,7 +100,7 @@ export class TasksService {
                 gender: classData?.gender || null,
               }
             }
-          ).exec();
+          ).setOptions({ skipTenantScope: true }).exec();
 
           cleanedCount++;
           this.logger.debug(`Cleaned preparation ${preparation._id}: replaced with data objects`);
