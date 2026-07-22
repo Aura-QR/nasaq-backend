@@ -31,7 +31,7 @@ services:
             - 'caddy_0.handle_path=/*'
             - caddy_0.header=-Server
             - 'caddy_0.try_files={path} /index.html /index.php'
-            - 'caddy_0=http://backend.dev.185.170.196.120.sslip.io'
+            - 'caddy_0=http://api.nasaq.185.170.196.120.sslip.io'
             - caddy_ingress_network=coolify
             - coolify.managed=true
             - coolify.version=4.0.0-beta.473
