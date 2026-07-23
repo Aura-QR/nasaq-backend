@@ -19,18 +19,18 @@ import { Public } from '../auth/decorators/public.decorator';
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
-  @Public()
-  @Post('register')
-  @ApiOperation({ summary: 'Register a new admin' })
-  @ApiResponse({ status: 201, description: 'Admin registered successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 409, description: 'Username or email already exists' })
-  @HttpCode(HttpStatus.CREATED)
-  async register(
-    @Body() createAdminDto: CreateAdminDto
-  ) {
-    return await this.adminService.register(createAdminDto)
-  }
+  // @Public()
+  // @Post('register')
+  // @ApiOperation({ summary: 'Register a new admin' })
+  // @ApiResponse({ status: 201, description: 'Admin registered successfully' })
+  // @ApiResponse({ status: 400, description: 'Bad request' })
+  // @ApiResponse({ status: 409, description: 'Username or email already exists' })
+  // @HttpCode(HttpStatus.CREATED)
+  // async register(
+  //   @Body() createAdminDto: CreateAdminDto
+  // ) {
+  //   return await this.adminService.register(createAdminDto)
+  // }
 
   @ApiOperation({ summary: 'Login an admin' })
   @ApiResponse({ status: 200, description: 'Login successful' })
