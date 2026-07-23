@@ -1,4 +1,4 @@
-import { IsArray, IsEmail, IsNotEmpty, IsString, Length } from 'class-validator';
+import { IsArray, IsEmail, IsNotEmpty, IsString, Length, IsOptional, IsIn } from 'class-validator';
 
 export class CreateManagerDto {
   @IsString()
@@ -18,6 +18,10 @@ export class CreateManagerDto {
   @IsArray()
   @IsString({ each: true })
   permissions: string[];
+
+  @IsOptional()
+  @IsIn(['MANAGER', 'SUPERVISOR'])
+  role?: 'MANAGER' | 'SUPERVISOR';
 }
 
 export class UpdateManagerPermissionsDto {

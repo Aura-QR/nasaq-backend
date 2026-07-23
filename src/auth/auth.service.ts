@@ -122,7 +122,7 @@ export class AuthService {
 
         // Fetch flat permissions
         let permissions: string[] = [];
-        if (role === 'OWNER') {
+        if (role === 'OWNER' || role === 'SUPERVISOR') {
             permissions = ['*'];
         } else if (role === 'MANAGER') {
             permissions = user.permissions || [];

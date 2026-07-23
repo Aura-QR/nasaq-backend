@@ -116,7 +116,7 @@ export class PermissionsService {
     const sId = schoolId ? new Types.ObjectId(schoolId) : null;
     const results = await Promise.all([
       this.permissionModel.updateOne(
-        { role: 'ADMIN', schoolId: sId },
+        { role: 'SUPERVISOR', schoolId: sId },
         { $set: { 'permissions.financial': { read: true, add: true, edit: true, delete: true } } },
         { upsert: true },
       ),
@@ -135,7 +135,7 @@ export class PermissionsService {
     return {
       message: 'Financial permissions synced successfully',
       data: {
-        ADMIN: results[0],
+        SUPERVISOR: results[0],
         TEACHER: results[1],
         STUDENT: results[2],
       },
@@ -161,7 +161,7 @@ export class PermissionsService {
     };
 
     const res = await this.permissionModel.updateOne(
-      { role: 'ADMIN', schoolId: sId },
+      { role: 'SUPERVISOR', schoolId: sId },
       {
         $set: {
           permissions: allTruePermissions,
@@ -170,13 +170,13 @@ export class PermissionsService {
       { upsert: true },
     );
 
-    console.log('TEMPORARY: All admin permissions set to true');
+    console.log('TEMPORARY: All supervisor permissions set to true');
     return res;
   }
 
   private getDefaultPermissions(role: string) {
     switch (role) {
-      case 'ADMIN':
+      case 'SUPERVISOR':
       case 'OWNER':
         return {
           students: { read: true, add: true, edit: true, delete: true },

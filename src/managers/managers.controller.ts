@@ -10,15 +10,18 @@ import { CreateManagerDto, UpdateManagerPermissionsDto } from './dto/managers.dt
 export class ManagersController {
   constructor(private readonly managersService: ManagersService) {}
 
-  private checkOwner(req: any) {
-    if (req.user?.role !== 'OWNER') {
-      throw new ForbiddenException('صلاحيات إدارة المدراء خاصة بمالك المدرسة فقط');
+  private checkOwnerOrSupervisor(req: any) {
+    if (req.user?.role !== 'OWNER' && req.user?.role !== 'SUPERVISOR') {
+      throw new ForbiddenException('صلاحيات إدارة المدراء خاصة بمالك أو مشرف المدرسة فقط');
     }
   }
 
   @Post()
   async create(@Req() req: any, @CurrentSchool() schoolId: string, @Body() dto: CreateManagerDto) {
-    this.checkOwner(req);
+    this.checkOwnerOrSupervisor(req);
+    if (dto.role === 'SUPERVISOR' && req.user?.role !== 'OWNER') {
+      throw new ForbiddenException('إنشاء مشرف جديد متاح لمالك المدرسة فقط');
+    }
     return this.managersService.createManagerAdmin(schoolId, dto);
   }
 
@@ -28,13 +31,13 @@ export class ManagersController {
     @Param('teacherId') teacherId: string,
     @Body() dto: UpdateManagerPermissionsDto,
   ) {
-    this.checkOwner(req);
+    this.checkOwnerOrSupervisor(req);
     return this.managersService.promoteTeacher(teacherId, dto.permissions);
   }
 
   @Patch('demote/:teacherId')
   async demote(@Req() req: any, @Param('teacherId') teacherId: string) {
-    this.checkOwner(req);
+    this.checkOwnerOrSupervisor(req);
     return this.managersService.demoteTeacher(teacherId);
   }
 
@@ -45,13 +48,13 @@ export class ManagersController {
     @Body() dto: UpdateManagerPermissionsDto,
     @Query('type') type: 'admin' | 'teacher',
   ) {
-    this.checkOwner(req);
-    return this.managersService.updatePermissions(id, type, dto.permissions);
+    this.checkOwnerOrSupervisor(req);
+    return this.managersService.updatePermissions(id, type, dto.permissions, req.user?.role);
   }
 
   @Get()
   async findAll(@Req() req: any) {
-    this.checkOwner(req);
+    this.checkOwnerOrSupervisor(req);
     return this.managersService.findAllManagers();
   }
 
@@ -61,7 +64,7 @@ export class ManagersController {
     @Param('id') id: string,
     @Query('type') type: 'admin' | 'teacher',
   ) {
-    this.checkOwner(req);
-    return this.managersService.removeManager(id, type);
+    this.checkOwnerOrSupervisor(req);
+    return this.managersService.removeManager(id, type, req.user?.role);
   }
 }

@@ -48,7 +48,7 @@ export class PreparationService {
       const teacher = await this.teacherModel.findById(userId);
       teacherId = userId;
       teacherName = teacher.name;
-    } else if (user?.role === 'ADMIN') {
+    } else if (user?.role === 'SUPERVISOR' || user?.role === 'OWNER') {
       const teacher = await this.teacherModel.findById(lecture.teacherId);
       if (!teacher) {
         throw new NotFoundException(

@@ -3,7 +3,7 @@ import { Document, Schema as MongooseSchema } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Permission extends Document {
-  @Prop({ required: true, enum: ['ADMIN', 'OWNER', 'MANAGER', 'TEACHER', 'STUDENT'] })
+  @Prop({ required: true, enum: ['SUPERVISOR', 'OWNER', 'MANAGER', 'TEACHER', 'STUDENT'] })
   role: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'School', default: null, index: true })

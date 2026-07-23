@@ -13,7 +13,7 @@ export class Admin extends Document {
   @Prop({ required: true })
   password: string;
 
-  @Prop({ default: 'OWNER', enum: ['OWNER', 'MANAGER', 'ADMIN'] })
+  @Prop({ default: 'OWNER', enum: ['OWNER', 'MANAGER', 'SUPERVISOR'] })
   role: string;
 
   @Prop({ type: [String], default: [] })

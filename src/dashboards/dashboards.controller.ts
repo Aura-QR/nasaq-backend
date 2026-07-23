@@ -16,8 +16,8 @@ export class DashboardsController {
   @Get('owner')
   @ApiOperation({ summary: 'Get single-school metrics for School Owner' })
   async getOwnerDashboard(@Req() req: any, @CurrentSchool() schoolId: string) {
-    if (req.user?.role !== 'OWNER' && req.user?.role !== 'ADMIN') {
-      throw new ForbiddenException('صلاحيات لوحة تحكم المالك خاصة بمالك المدرسة فقط');
+    if (req.user?.role !== 'OWNER' && req.user?.role !== 'SUPERVISOR') {
+      throw new ForbiddenException('صلاحيات لوحة تحكم المالك خاصة بمالك أو مشرف المدرسة فقط');
     }
     return this.dashboardsService.getOwnerDashboard(schoolId);
   }

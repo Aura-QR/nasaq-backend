@@ -16,8 +16,8 @@ export class PermissionsController {
   @Get()
   @ApiOperation({ summary: 'Get all permissions defaults for the school' })
   async findAll(@CurrentUser() user: any, @CurrentSchool() schoolId: string) {
-    if (user.role !== 'OWNER' && user.role !== 'ADMIN') {
-      throw new ForbiddenException('صلاحيات غير كافية، هذه العملية خاصة بمالك المدرسة فقط');
+    if (user.role !== 'OWNER' && user.role !== 'SUPERVISOR') {
+      throw new ForbiddenException('صلاحيات غير كافية، هذه العملية خاصة بمالك أو مشرف المدرسة فقط');
     }
     
     const teacher = await this.permissionsService.getPermissionsByRole('TEACHER', schoolId);
@@ -30,10 +30,10 @@ export class PermissionsController {
   }
 
   @Post('sync-financial')
-  @ApiOperation({ summary: 'Sync financial permissions for all roles (Owner only)' })
+  @ApiOperation({ summary: 'Sync financial permissions for all roles (Owner/Supervisor only)' })
   syncFinancialPermissions(@CurrentUser() user: any, @CurrentSchool() schoolId: string) {
-    if (user.role !== 'OWNER' && user.role !== 'ADMIN') {
-      throw new ForbiddenException('صلاحيات غير كافية، هذه العملية خاصة بمالك المدرسة فقط');
+    if (user.role !== 'OWNER' && user.role !== 'SUPERVISOR') {
+      throw new ForbiddenException('صلاحيات غير كافية، هذه العملية خاصة بمالك أو مشرف المدرسة فقط');
     }
     return this.permissionsService.syncFinancialPermissions(schoolId);
   }

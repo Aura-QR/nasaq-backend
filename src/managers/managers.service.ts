@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Admin } from 'src/admin/schemas/admin.schema';
@@ -16,6 +16,7 @@ export class ManagersService {
   async createManagerAdmin(schoolId: string, dto: CreateManagerDto) {
     const username = dto.username.trim();
     const email = dto.email.toLowerCase().trim();
+    const role = dto.role || 'MANAGER';
 
     // Check uniqueness globally to avoid conflicts
     const existingAdmin = await this.adminModel
@@ -32,8 +33,8 @@ export class ManagersService {
       username,
       email,
       password: hashedPassword,
-      role: 'MANAGER',
-      permissions: dto.permissions,
+      role,
+      permissions: role === 'SUPERVISOR' ? ['*'] : dto.permissions,
       schoolId: new Types.ObjectId(schoolId),
     });
 
@@ -41,7 +42,7 @@ export class ManagersService {
       id: newManager._id,
       username: newManager.username,
       email: newManager.email,
-      role: 'MANAGER',
+      role,
       permissions: newManager.permissions,
     };
   }
@@ -84,11 +85,14 @@ export class ManagersService {
     };
   }
 
-  async updatePermissions(id: string, type: 'admin' | 'teacher', permissions: string[]) {
+  async updatePermissions(id: string, type: 'admin' | 'teacher', permissions: string[], requesterRole?: string) {
     if (type === 'admin') {
-      const admin = await this.adminModel.findOne({ _id: id, role: 'MANAGER' });
+      const admin = await this.adminModel.findById(id);
       if (!admin) {
         throw new NotFoundException('المدير المطلوب غير موجود');
+      }
+      if (requesterRole === 'SUPERVISOR' && (admin.role === 'SUPERVISOR' || admin.role === 'OWNER')) {
+        throw new ForbiddenException('لا يمكن للمشرف تعديل صلاحيات مشرف آخر أو مالك المدرسة');
       }
       admin.permissions = permissions;
       await admin.save();
@@ -113,7 +117,9 @@ export class ManagersService {
   }
 
   async findAllManagers() {
-    const admins = await this.adminModel.find({ role: 'MANAGER' }).lean();
+    const admins = await this.adminModel
+      .find({ role: { $in: ['MANAGER', 'SUPERVISOR'] } })
+      .lean();
     const teachers = await this.teacherModel.find({ isManager: true }).lean();
 
     const formattedAdmins = admins.map((a: any) => ({
@@ -121,7 +127,7 @@ export class ManagersService {
       name: a.username,
       email: a.email,
       type: 'admin',
-      role: 'MANAGER',
+      role: a.role,
       permissions: a.permissions || [],
       isActive: true,
     }));
@@ -139,12 +145,16 @@ export class ManagersService {
     return [...formattedAdmins, ...formattedTeachers];
   }
 
-  async removeManager(id: string, type: 'admin' | 'teacher') {
+  async removeManager(id: string, type: 'admin' | 'teacher', requesterRole?: string) {
     if (type === 'admin') {
-      const result = await this.adminModel.deleteOne({ _id: id, role: 'MANAGER' });
-      if (result.deletedCount === 0) {
+      const admin = await this.adminModel.findById(id);
+      if (!admin) {
         throw new NotFoundException('المدير المطلوب غير موجود');
       }
+      if (requesterRole === 'SUPERVISOR' && (admin.role === 'SUPERVISOR' || admin.role === 'OWNER')) {
+        throw new ForbiddenException('لا يمكن للمشرف حذف مشرف آخر أو مالك المدرسة');
+      }
+      await this.adminModel.deleteOne({ _id: id });
     } else {
       const teacher = await this.teacherModel.findOne({ _id: id, isManager: true });
       if (!teacher) {
