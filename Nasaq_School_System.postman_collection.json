@@ -5627,7 +5627,7 @@
             "description": "Register a new school tenant. Public endpoint.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Aura School\",\n  \"email\": \"info@auraschool.com\",\n  \"phone\": \"+20 1234567890\",\n  \"address\": \"123 Main Street, Cairo\"\n}",
+              "raw": "{\n  \"schoolName\": \"Aura School\",\n  \"slug\": \"aura-school\",\n  \"schoolEmail\": \"info@auraschool.com\",\n  \"phone\": \"+201234567890\",\n  \"ownerName\": \"Ahmed Hassan\",\n  \"ownerUsername\": \"owner_ahmed\",\n  \"ownerEmail\": \"owner@auraschool.com\",\n  \"ownerPassword\": \"Owner#2026\"\n}",
               "options": { "raw": { "language": "json" } }
             }
           }
