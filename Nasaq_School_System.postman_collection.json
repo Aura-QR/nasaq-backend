@@ -5600,7 +5600,7 @@
             "description": "Login as platform super-admin. Returns platform-level JWT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"identifier\": \"superadmin\",\n  \"password\": \"SuperAdmin@123\"\n}",
+              "raw": "{\n  \"identifier\": \"qraura0@gmail.com\",\n  \"password\": \"Aura#2026\"\n}",
               "options": { "raw": { "language": "json" } }
             }
           }
@@ -5789,7 +5789,7 @@
     },
     {
       "name": "Managers",
-      "description": "School manager management. OWNER only.",
+      "description": "School manager and supervisor management. OWNER or SUPERVISOR.",
       "item": [
         {
           "name": "Create Manager",
@@ -5807,10 +5807,34 @@
               "type": "bearer",
               "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
             },
-            "description": "Create a new manager admin (OWNER only).",
+            "description": "Create a new manager admin (OWNER or SUPERVISOR).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Manager Ali\",\n  \"email\": \"manager@school.com\",\n  \"password\": \"Manager@123\",\n  \"permissions\": []\n}",
+              "raw": "{\n  \"username\": \"manager_ali\",\n  \"email\": \"manager@school.com\",\n  \"password\": \"Manager@123\",\n  \"role\": \"MANAGER\",\n  \"permissions\": [\"school.students.read\", \"school.classes.read\"]\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          }
+        },
+        {
+          "name": "Create Supervisor",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/managers",
+              "host": ["{{baseUrl}}"],
+              "path": ["managers"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+            },
+            "description": "Create a new supervisor admin (OWNER only).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"supervisor_ali\",\n  \"email\": \"supervisor@school.com\",\n  \"password\": \"Supervisor@123\",\n  \"role\": \"SUPERVISOR\",\n  \"permissions\": [\"*\"]\n}",
               "options": { "raw": { "language": "json" } }
             }
           }
@@ -5829,7 +5853,7 @@
               "type": "bearer",
               "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
             },
-            "description": "List all managers (OWNER only)."
+            "description": "List all managers & supervisors (OWNER or SUPERVISOR)."
           }
         },
         {
@@ -5846,7 +5870,7 @@
               "type": "bearer",
               "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
             },
-            "description": "Promote an existing teacher to the manager role (OWNER only)."
+            "description": "Promote an existing teacher to the manager role (OWNER or SUPERVISOR)."
           }
         },
         {
@@ -5863,7 +5887,7 @@
               "type": "bearer",
               "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
             },
-            "description": "Demote a teacher from the manager role (OWNER only)."
+            "description": "Demote a teacher from the manager role (OWNER or SUPERVISOR)."
           }
         },
         {
@@ -5882,10 +5906,10 @@
               "type": "bearer",
               "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
             },
-            "description": "Update a manager's permissions (OWNER only).",
+            "description": "Update a manager's permissions (OWNER or SUPERVISOR).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"permissions\": [\"students\", \"teachers\", \"financial\"]\n}",
+              "raw": "{\n  \"permissions\": [\"school.students.read\", \"school.teachers.read\", \"school.financial.read\"]\n}",
               "options": { "raw": { "language": "json" } }
             }
           }
@@ -5904,7 +5928,7 @@
               "type": "bearer",
               "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
             },
-            "description": "Remove a manager (OWNER only)."
+            "description": "Remove a manager (OWNER or SUPERVISOR)."
           }
         }
       ]
@@ -5927,7 +5951,7 @@
               "type": "bearer",
               "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
             },
-            "description": "Get all permissions defaults for the school (OWNER/ADMIN only)."
+            "description": "Get all permissions defaults for the school (OWNER/SUPERVISOR only)."
           }
         },
         {
@@ -5944,7 +5968,7 @@
               "type": "bearer",
               "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
             },
-            "description": "Sync financial permissions for all roles (OWNER only)."
+            "description": "Sync financial permissions for all roles (OWNER/SUPERVISOR only)."
           }
         }
       ]
