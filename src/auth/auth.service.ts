@@ -12,6 +12,8 @@ import { Role } from './enums/role.enum';
 import { PasswordUtil } from './utils/password.util';
 import { PermissionsService } from 'src/permissions/permissions.service';
 
+import { PlatformAdmin } from 'src/platform/platform-admins/schemas/platform-admin.schema';
+
 @Injectable()
 export class AuthService {
     constructor(
@@ -19,12 +21,49 @@ export class AuthService {
         @InjectModel(Student.name) private studentModel: Model<Student>,
         @InjectModel(Teacher.name) private teacherModel: Model<Teacher>,
         @InjectModel(School.name) private schoolModel: Model<School>,
+        @InjectModel(PlatformAdmin.name) private platformAdminModel: Model<PlatformAdmin>,
         private jwtService: JwtService,
         private permissionsService: PermissionsService
     ){}
 
     async login(loginDto: LoginUserDto) {
         const { identifier, password } = loginDto;
+
+        // 1. Check Platform Super Admin
+        const platformAdmin = await this.platformAdminModel
+            .findOne({ email: identifier.toLowerCase().trim() })
+            .select('+password');
+
+        if (platformAdmin && platformAdmin.isActive) {
+            const isPasswordValid = await PasswordUtil.compare(password, platformAdmin.password);
+            if (isPasswordValid) {
+                const payload: AuthJwtPayload = {
+                    sub: platformAdmin._id.toString(),
+                    email: platformAdmin.email,
+                    role: 'SUPER_ADMIN',
+                    schoolId: null,
+                    permissions: [
+                        'platform.schools.manage',
+                        'platform.subscriptions.manage',
+                        'platform.plans.manage',
+                        'platform.analytics.view',
+                    ],
+                };
+                const accessToken = await this.jwtService.signAsync(payload);
+                return {
+                    accessToken,
+                    requiresPasswordSetup: false,
+                    user: {
+                        id: platformAdmin._id,
+                        name: platformAdmin.name,
+                        email: platformAdmin.email,
+                        role: 'SUPER_ADMIN',
+                        schoolId: null,
+                    },
+                    permissions: payload.permissions,
+                };
+            }
+        }
 
         let filterSchoolId: any = null;
         if (loginDto.schoolSlug) {

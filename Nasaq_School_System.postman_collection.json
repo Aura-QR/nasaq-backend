@@ -152,7 +152,7 @@
       "name": "Auth",
       "item": [
         {
-          "name": "Login (Teacher/Student)",
+          "name": "Unified Login (All Roles)",
           "request": {
             "method": "POST",
             "header": [
@@ -171,13 +171,13 @@
                 "login"
               ]
             },
-            "description": "Login for Teachers and Students. Returns JWT token.",
+            "description": "Unified login endpoint for ALL system roles (SUPER_ADMIN, OWNER, SUPERVISOR, MANAGER, TEACHER, STUDENT). Returns JWT token and user profile.",
             "auth": {
               "type": "noauth"
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"identifier\": \"john.doe@school.com\",\n  \"password\": \"secret123\"\n}",
+              "raw": "{\n  \"identifier\": \"qraura0@gmail.com\",\n  \"password\": \"Aura#2026\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -214,6 +214,7 @@
             "auth": {
               "type": "noauth"
             },
+            "description": "[DEPRECATED] Use POST /auth/login instead. Returns admin JWT token.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"identifier\": \"admin_ali\",\n  \"password\": \"Admin@123\"\n}",
@@ -5597,7 +5598,7 @@
               "path": ["platform", "auth", "login"]
             },
             "auth": { "type": "noauth" },
-            "description": "Login as platform super-admin. Returns platform-level JWT.",
+            "description": "[DEPRECATED] Use POST /auth/login instead. Login as platform super-admin. Returns platform-level JWT.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"identifier\": \"qraura0@gmail.com\",\n  \"password\": \"Aura#2026\"\n}",

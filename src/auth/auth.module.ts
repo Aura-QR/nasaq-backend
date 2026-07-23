@@ -6,6 +6,7 @@ import { Admin, AdminSchema } from 'src/admin/schemas/admin.schema';
 import { Teacher, TeacherSchema } from 'src/teachers/schemas/teacher.schema';
 import { Student, StudentSchema } from 'src/students/schemas/student.schema';
 import { School, SchoolSchema } from 'src/platform/schools/schemas/school.schema';
+import { PlatformAdmin, PlatformAdminSchema } from 'src/platform/platform-admins/schemas/platform-admin.schema';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule } from '@nestjs/config';
@@ -28,6 +29,7 @@ import { PermissionsModule } from 'src/permissions/permissions.module';
       { name: Teacher.name, schema: TeacherSchema },
       { name: Student.name, schema: StudentSchema },
       { name: School.name, schema: SchoolSchema },
+      { name: PlatformAdmin.name, schema: PlatformAdminSchema },
     ])
   ],
   controllers: [AuthController],
