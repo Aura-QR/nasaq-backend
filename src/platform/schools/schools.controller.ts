@@ -24,7 +24,7 @@ export class SchoolsController {
     return this.schoolsService.findAll();
   }
 
-  @Get('platform/schools/:id')
+  @Get(['platform/schools/:id', 'schools/:id'])
   @PlatformOnly()
   @UseGuards(JwtAuthGuard, TenantGuard)
   async findOne(@Param('id') id: string) {

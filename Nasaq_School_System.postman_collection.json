@@ -5665,7 +5665,7 @@
               "type": "bearer",
               "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
             },
-            "description": "Get a school by its ID."
+            "description": "Get a school by its ID, including detailed counts/stats for students, teachers, subjects, books/library, classes, managers, exams, projects, and owner details. Requires platform-level JWT."
           }
         },
         {

@@ -1,6 +1,7 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection } from 'mongoose';
+import * as mongoose from 'mongoose';
 import { School } from './schemas/school.schema';
 import { Admin } from 'src/admin/schemas/admin.schema';
 import { Permission } from 'src/permissions/schemas/permission.schema';
@@ -148,7 +149,56 @@ export class SchoolsService {
   }
 
   async findOne(id: string) {
-    return this.schoolModel.findById(id).setOptions({ skipTenantScope: true }).lean();
+    const school = await this.schoolModel.findById(id).setOptions({ skipTenantScope: true }).lean();
+    if (!school) {
+      throw new NotFoundException(`المدرسة بمعرف ${id} غير موجودة`);
+    }
+
+    const schoolObjectId = new mongoose.Types.ObjectId(id);
+    const db = this.connection.db;
+
+    const [
+      studentCount,
+      teacherCount,
+      subjectCount,
+      bookCount,
+      classCount,
+      managerCount,
+      examCount,
+      projectCount,
+      ownerAdmin,
+    ] = await Promise.all([
+      db.collection('students').countDocuments({ schoolId: schoolObjectId }),
+      db.collection('teachers').countDocuments({ schoolId: schoolObjectId }),
+      db.collection('subjects').countDocuments({ schoolId: schoolObjectId }),
+      db.collection('libraries').countDocuments({ schoolId: schoolObjectId }),
+      db.collection('classes').countDocuments({ schoolId: schoolObjectId }),
+      db.collection('admins').countDocuments({ schoolId: schoolObjectId, role: { $in: ['MANAGER', 'SUPERVISOR'] } }),
+      db.collection('exams').countDocuments({ schoolId: schoolObjectId }),
+      db.collection('projects').countDocuments({ schoolId: schoolObjectId }),
+      db.collection('admins').findOne({ schoolId: schoolObjectId, role: 'OWNER' }, { projection: { password: 0 } }),
+    ]);
+
+    return {
+      ...school,
+      owner: ownerAdmin
+        ? {
+            id: ownerAdmin._id,
+            username: ownerAdmin.username,
+            email: ownerAdmin.email,
+          }
+        : null,
+      stats: {
+        students: studentCount,
+        teachers: teacherCount,
+        subjects: subjectCount,
+        books: bookCount,
+        classes: classCount,
+        managers: managerCount,
+        exams: examCount,
+        projects: projectCount,
+      },
+    };
   }
 
   async update(id: string, updateDto: any) {
