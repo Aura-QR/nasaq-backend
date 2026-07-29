@@ -34,7 +34,9 @@ app.enableCors({
       allowedOrigins.includes('*') ||
       /\.sslip\.io$/.test(new URL(origin).hostname) ||
       origin.startsWith('http://localhost:') ||
-      origin.startsWith('https://localhost:');
+      origin.startsWith('https://localhost:') ||
+      origin.startsWith('http://127.0.0.1:') ||
+      origin.startsWith('https://127.0.0.1:');
 
     if (isAllowed) {
       return callback(null, true);
