@@ -1,13 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Permission } from './schemas/permission.schema';
 
 @Injectable()
-export class PermissionsService {
+export class PermissionsService implements OnModuleInit {
+  private readonly logger = new Logger(PermissionsService.name);
+
   constructor(
     @InjectModel(Permission.name) private permissionModel: Model<Permission>,
   ) {}
+
+  async onModuleInit() {
+    try {
+      const collection = this.permissionModel.collection;
+      const indexes = await collection.indexes();
+      const legacyRoleIndex = indexes.find((idx) => idx.name === 'role_1');
+      if (legacyRoleIndex) {
+        this.logger.log('Dropping legacy unique index "role_1" from permissions collection...');
+        await collection.dropIndex('role_1');
+        this.logger.log('Legacy index "role_1" dropped successfully.');
+      }
+      await this.permissionModel.syncIndexes();
+    } catch (err: any) {
+      if (err?.codeName !== 'NamespaceNotFound') {
+        this.logger.warn(`Permission index sync warning: ${err?.message}`);
+      }
+    }
+  }
 
   async findAll() {
     return this.permissionModel.find().lean();

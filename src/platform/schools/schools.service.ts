@@ -54,68 +54,77 @@ export class SchoolsService {
 
     const schoolId = school._id.toString();
 
-    // Steps 2-5: Run inside a tenant context so tenantScopedPlugin is satisfied
-    const { owner } = await this.tenantContext.runWithTenant(
-      schoolId,
-      false,
-      async () => {
-        // 2. Hash owner password
-        const hashedPassword = await PasswordUtil.hash(dto.ownerPassword);
+    let owner: any;
+    try {
+      // Steps 2-5: Run inside a tenant context so tenantScopedPlugin is satisfied
+      const result = await this.tenantContext.runWithTenant(
+        schoolId,
+        false,
+        async () => {
+          // 2. Hash owner password
+          const hashedPassword = await PasswordUtil.hash(dto.ownerPassword);
 
-        // 3. Create the Owner Admin document (tenantScopedPlugin will auto-stamp schoolId)
-        const owner = await new this.adminModel({
-          username: dto.ownerUsername,
-          email: dto.ownerEmail,
-          password: hashedPassword,
-          role: 'OWNER',
-          schoolId: school._id,
-        }).save();
+          // 3. Create the Owner Admin document (tenantScopedPlugin will auto-stamp schoolId)
+          const owner = await new this.adminModel({
+            username: dto.ownerUsername,
+            email: dto.ownerEmail,
+            password: hashedPassword,
+            role: 'OWNER',
+            schoolId: school._id,
+          }).save();
 
-        // 4. Link Owner to the School
-        school.ownerId = owner._id as any;
-        await school.save();
+          // 4. Link Owner to the School
+          school.ownerId = owner._id as any;
+          await school.save();
 
-        // 5. Seed default permissions for the school
-        const defaultTeacherPerms = {
-          students: { read: true, add: false, edit: false, delete: false },
-          teachers: { read: false, add: false, edit: false, delete: false },
-          classes: { read: true, add: false, edit: false, delete: false },
-          subjects: { read: false, add: false, edit: false, delete: false },
-          lectures: { read: true, add: false, edit: false, delete: false },
-          library: { read: true, add: false, edit: false, delete: false },
-          attendance: { read: false, add: true, edit: true, delete: false },
-          gradesCriteria: { read: true, add: false, edit: false, delete: false },
-          exams: { read: true, add: true, edit: true, delete: true },
-          projects: { read: true, add: true, edit: true, delete: true },
-          grades: { read: true, add: true, edit: true, delete: false },
-          preparation: { read: true, add: true, edit: true, delete: true },
-          financial: { read: false, add: false, edit: false, delete: false },
-        };
+          // 5. Seed default permissions for the school
+          const defaultTeacherPerms = {
+            students: { read: true, add: false, edit: false, delete: false },
+            teachers: { read: false, add: false, edit: false, delete: false },
+            classes: { read: true, add: false, edit: false, delete: false },
+            subjects: { read: false, add: false, edit: false, delete: false },
+            lectures: { read: true, add: false, edit: false, delete: false },
+            library: { read: true, add: false, edit: false, delete: false },
+            attendance: { read: false, add: true, edit: true, delete: false },
+            gradesCriteria: { read: true, add: false, edit: false, delete: false },
+            exams: { read: true, add: true, edit: true, delete: true },
+            projects: { read: true, add: true, edit: true, delete: true },
+            grades: { read: true, add: true, edit: true, delete: false },
+            preparation: { read: true, add: true, edit: true, delete: true },
+            financial: { read: false, add: false, edit: false, delete: false },
+          };
 
-        const defaultStudentPerms = {
-          students: { read: false, add: false, edit: false, delete: false },
-          teachers: { read: false, add: false, edit: false, delete: false },
-          classes: { read: false, add: false, edit: false, delete: false },
-          subjects: { read: false, add: false, edit: false, delete: false },
-          lectures: { read: false, add: false, edit: false, delete: false },
-          library: { read: true, add: false, edit: false, delete: false },
-          attendance: { read: true, add: false, edit: false, delete: false },
-          gradesCriteria: { read: false, add: false, edit: false, delete: false },
-          exams: { read: false, add: false, edit: false, delete: false },
-          projects: { read: false, add: false, edit: false, delete: false },
-          grades: { read: false, add: false, edit: false, delete: false },
-          preparation: { read: false, add: false, edit: false, delete: false },
-          financial: { read: false, add: false, edit: false, delete: false },
-        };
+          const defaultStudentPerms = {
+            students: { read: false, add: false, edit: false, delete: false },
+            teachers: { read: false, add: false, edit: false, delete: false },
+            classes: { read: false, add: false, edit: false, delete: false },
+            subjects: { read: false, add: false, edit: false, delete: false },
+            lectures: { read: false, add: false, edit: false, delete: false },
+            library: { read: true, add: false, edit: false, delete: false },
+            attendance: { read: true, add: false, edit: false, delete: false },
+            gradesCriteria: { read: false, add: false, edit: false, delete: false },
+            exams: { read: false, add: false, edit: false, delete: false },
+            projects: { read: false, add: false, edit: false, delete: false },
+            grades: { read: false, add: false, edit: false, delete: false },
+            preparation: { read: false, add: false, edit: false, delete: false },
+            financial: { read: false, add: false, edit: false, delete: false },
+          };
 
-        await this.permissionModel.create([
-          { role: 'TEACHER', schoolId: school._id, permissions: defaultTeacherPerms },
-          { role: 'STUDENT', schoolId: school._id, permissions: defaultStudentPerms },
-        ]);
+          await this.permissionModel.create([
+            { role: 'TEACHER', schoolId: school._id, permissions: defaultTeacherPerms },
+            { role: 'STUDENT', schoolId: school._id, permissions: defaultStudentPerms },
+          ]);
 
-        return { owner };
-      },
-    );
+          return { owner };
+        },
+      );
+      owner = result.owner;
+    } catch (error) {
+      // Rollback orphaned school & owner admin if secondary steps fail
+      await this.adminModel.deleteMany({ schoolId: school._id }).setOptions({ skipTenantScope: true });
+      await this.schoolModel.findByIdAndDelete(school._id).setOptions({ skipTenantScope: true });
+      throw error;
+    }
 
     const tokenPayload = {
       sub: owner._id.toString(),
