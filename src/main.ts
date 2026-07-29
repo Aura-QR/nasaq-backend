@@ -9,13 +9,50 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
 app.enableCors({
-  origin: [
-    'http://nasaq.185.170.196.120.sslip.io',
-    'http://localhost:5000',
-    'http://localhost:3000',
-  ],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, Curl, Postman)
+    if (!origin) return callback(null, true);
+
+    const envOrigins = process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
+      : [];
+
+    const allowedOrigins = [
+      'https://nasaq.185.170.196.120.sslip.io',
+      'http://nasaq.185.170.196.120.sslip.io',
+      'https://api.nasaq.185.170.196.120.sslip.io',
+      'http://api.nasaq.185.170.196.120.sslip.io',
+      'http://localhost:5000',
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://localhost:4200',
+      ...envOrigins,
+    ];
+
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+      allowedOrigins.includes('*') ||
+      /\.sslip\.io$/.test(new URL(origin).hostname) ||
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('https://localhost:');
+
+    if (isAllowed) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'Accept',
+    'X-Requested-With',
+    'X-School-Id',
+    'x-tenant-id',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers',
+  ],
   exposedHeaders: ['Authorization'],
   credentials: true,
   preflightContinue: false,

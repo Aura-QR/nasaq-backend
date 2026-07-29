@@ -52,7 +52,7 @@ import { TenantGuard } from './tenancy/guards/tenant.guard';
       serveRoot: '/uploads',
       serveStaticOptions: {
         setHeaders: (res) => {
-          res.removeHeader('Access-Control-Allow-Origin');
+          res.setHeader('Access-Control-Allow-Origin', '*');
         },
       },
     }),
