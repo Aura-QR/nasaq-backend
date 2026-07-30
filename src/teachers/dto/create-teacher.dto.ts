@@ -9,21 +9,15 @@ import {
   Matches,
   IsBoolean,
   IsArray,
-  ArrayMinSize,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
 export class CreateTeacherDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(2)
   @ApiProperty({ description: 'The name of the teacher' })
   name: string;
-
-  // @IsString()
-  // @IsNotEmpty()
-  // @MinLength(2)
-  // @ApiProperty({ description: 'The last name of the teacher' })
-  // lastName: string;
 
   @IsEmail()
   @IsNotEmpty()
@@ -39,25 +33,25 @@ export class CreateTeacherDto {
   phoneNumber?: string;
 
   @IsArray()
-  @ArrayMinSize(1, { message: 'يجب تعيين المعلم لمادة واحدة على الأقل' })
+  @IsOptional()
   @IsMongoId({ each: true })
-  @ApiProperty({ description: 'The subject IDs of the teacher' })
-  subjectIds: string[]; //  Teacher must be assigned to at least one subject
+  @ApiProperty({ description: 'Subject IDs (deprecated, use TeacherAssignments)', required: false })
+  subjectIds?: string[];
 
   @IsString()
   @IsOptional()
   @ApiProperty({ description: 'The qualification of the teacher' })
-  qualification?: string; // "Bachelor's in Mathematics", "PhD in Physics"
+  qualification?: string;
 
   @IsString()
   @IsOptional()
   @ApiProperty({ description: 'The experience of the teacher' })
-  experience?: string; //"5 years", "10+ years"
+  experience?: string;
 
   @IsString()
   @IsOptional()
   @ApiProperty({ description: 'The specialization of the teacher' })
-  specialization?: string; //  "Secondary Education", "Primary Mathematics"
+  specialization?: string;
 
   @IsDateString()
   @IsNotEmpty()

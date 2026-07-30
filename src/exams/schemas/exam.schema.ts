@@ -1,4 +1,3 @@
-
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document } from 'mongoose';
 import { ExamType } from '../enums/exam-type.enum';
@@ -24,26 +23,30 @@ export class Exam extends Document {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'GradesCriteria',
-    index: true
+    index: true,
   })
   gradesCriteriaId: mongoose.Types.ObjectId;
 
-   @Prop({
+  @Prop({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'Subject',
-    index: true
+    index: true,
   })
   subjectId: mongoose.Types.ObjectId;
 
-  @Prop({ required: true })
-  academicYear: string;
-
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicYear',
+    required: true,
+    index: true,
+  })
+  academicYearId: mongoose.Types.ObjectId;
 
   @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Class' }],
     required: true,
-    index: true
+    index: true,
   })
   classIds: mongoose.Types.ObjectId[];
 
@@ -51,13 +54,13 @@ export class Exam extends Document {
   examType: ExamType;
 
   @Prop({ required: true })
-  grade : number;
+  grade: number;
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'Teacher',
-    index: true
+    index: true,
   })
   createdBy: mongoose.Types.ObjectId;
 
@@ -80,4 +83,5 @@ ExamSchema.plugin(tenantScopedPlugin);
 ExamSchema.index({ schoolId: 1, gradesCriteriaId: 1, examType: 1 });
 ExamSchema.index({ schoolId: 1, classIds: 1 });
 ExamSchema.index({ schoolId: 1, subjectId: 1 });
+ExamSchema.index({ schoolId: 1, academicYearId: 1 });
 ExamSchema.index({ schoolId: 1, createdAt: -1 });

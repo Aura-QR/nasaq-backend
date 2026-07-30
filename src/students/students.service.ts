@@ -47,19 +47,7 @@ export class StudentsService {
     }
 
 
-    if (createStudentDto.classId) {
-      const classData = await this.classModel.findById(createStudentDto.classId);
 
-      if (!classData) {
-        throw new NotFoundException(`الفصل بمعرف ${createStudentDto.classId} غير موجود`);
-      }
-
-      if (classData.gender !== 'both' && classData.gender !== createStudentDto.gender) {
-        throw new BadRequestException(
-          `هذا الفصل مخصص للطلاب من جنس ${classData.gender} فقط. جنس الطالب هو ${createStudentDto.gender}`
-        );
-      }
-    }
 
     const currentYear = new Date().getFullYear();
     const year = currentYear.toString().slice(-2);
@@ -94,15 +82,6 @@ export class StudentsService {
 
     const student = new this.studentModel(studentFields);
     await student.save();
-
-    if (createStudentDto.classId) {
-      await this.classModel.findByIdAndUpdate(
-        createStudentDto.classId,
-        { $addToSet: { studentIds: student._id } }
-      );
-    }
-
-    await student.populate('classId', 'roomNumber gender academicYear');
 
     return {
       message: 'تم إضافة الطالب بنجاح',
@@ -222,55 +201,8 @@ export class StudentsService {
       throw new NotFoundException(`الطالب بمعرف ${id} غير موجود`);
     }
 
-    if (updateStudentDto.classId !==  undefined) {
-      const oldClassId = currentStudent.classId?.toString();
-      const newClassId = updateStudentDto.classId?.toString();
-
-      if (oldClassId !== newClassId) {
-
-        if (newClassId) {
-          const newClass = await this.classModel.findById(newClassId);
-
-          if (!newClass) {
-            throw new NotFoundException(`الفصل بمعرف ${newClassId} غير موجود`);
-          }
-          const studentGender = updateStudentDto.gender || currentStudent.gender;
-          if (newClass.gender !== 'both' && newClass.gender !== studentGender) {
-            throw new BadRequestException(
-              `هذا الفصل مخصص للطلاب من جنس ${newClass.gender} فقط. جنس الطالب هو ${studentGender}`
-            );
-          }
-        }
-        if (oldClassId) {
-          await this.classModel.findByIdAndUpdate(
-            oldClassId,
-            { $pull: { studentIds: id } }
-          );
-        }
-        if (newClassId) {
-          await this.classModel.findByIdAndUpdate(
-            newClassId,
-            { $addToSet: { studentIds: id } }
-          );
-          await this.financialRecordService.createOrUpdateRecord(id, newClassId);
-        }
-      }
-    }
-
-    if (updateStudentDto.installmentPlanId !== undefined) {
-      const oldInstallmentPlanId = currentStudent.installmentPlanId?.toString() || null;
-      const newInstallmentPlanId = updateStudentDto.installmentPlanId?.toString() || null;
-
-      if (oldInstallmentPlanId !== newInstallmentPlanId) {
-        await this.financialRecordService.switchTuitionInstallmentPlan(
-          id,
-          updateStudentDto.installmentPlanId,
-        );
-      }
-    }
     const student = await this.studentModel
       .findByIdAndUpdate(id, updateStudentDto, { new: true })
-      .populate('classId', 'roomNumber gender academicYear')
       .exec();
     if (!student) {
       throw new NotFoundException(`الطالب بمعرف ${id} غير موجود`);

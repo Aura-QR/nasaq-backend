@@ -98,7 +98,7 @@ export class BusService {
       data: {
         student: record.studentId,
         class: record.classId,
-        academicYear: record.academicYear,
+        academicYearId: record.academicYearId,
         bus: record.bus,
       },
     };

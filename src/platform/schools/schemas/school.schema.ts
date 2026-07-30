@@ -3,14 +3,17 @@ import { Document, Types } from 'mongoose';
 
 @Schema({ _id: false })
 export class SchoolSettings {
-  @Prop({ default: '2026/2027' })
-  academicYear: string;
+  @Prop({ type: Types.ObjectId, ref: 'AcademicYear', default: null })
+  activeAcademicYearId?: Types.ObjectId;
 
   @Prop({ default: 'Asia/Riyadh' })
   timezone: string;
 
   @Prop({ default: 'ar' })
   language: string;
+
+  @Prop({ default: 3, min: 1 })
+  termsPerYear: number;
 }
 
 const SchoolSettingsSchema = SchemaFactory.createForClass(SchoolSettings);

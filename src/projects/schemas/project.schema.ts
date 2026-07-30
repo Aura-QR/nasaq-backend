@@ -2,15 +2,13 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import mongoose, { Document } from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
-
 @Schema({ timestamps: true })
 export class Project extends Document {
-
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'GradesCriteria',
-    index: true
+    index: true,
   })
   gradesCriteriaId: mongoose.Types.ObjectId;
 
@@ -20,7 +18,7 @@ export class Project extends Document {
   @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Class' }],
     required: true,
-    index: true
+    index: true,
   })
   classIds: mongoose.Types.ObjectId[];
 
@@ -28,12 +26,17 @@ export class Project extends Document {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Subject',
     required: true,
-    index: true
+    index: true,
   })
   subjectId: mongoose.Types.ObjectId;
 
-  @Prop({ required: true })
-  academicYear: string;
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicYear',
+    required: true,
+    index: true,
+  })
+  academicYearId: mongoose.Types.ObjectId;
 
   @Prop({ required: true })
   title: string;
@@ -48,7 +51,7 @@ export class Project extends Document {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'Teacher',
-    index: true
+    index: true,
   })
   createdBy: mongoose.Types.ObjectId;
 
@@ -76,5 +79,5 @@ export const ProjectSchema = SchemaFactory.createForClass(Project);
 ProjectSchema.plugin(tenantScopedPlugin);
 
 ProjectSchema.index({ schoolId: 1, classIds: 1 });
+ProjectSchema.index({ schoolId: 1, academicYearId: 1 });
 ProjectSchema.index({ schoolId: 1, createdAt: -1 });
-

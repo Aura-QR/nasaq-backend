@@ -61,7 +61,7 @@ export class PreparationService {
 
     const savedPreparation = await new this.preparationModel({
       ...createPreparationDto,
-      subject: lecture.subjectId,
+      subject: lecture.subjectOfferingId,
       submittedBy: teacherId,
       name: teacherName,
     }).save();
@@ -314,7 +314,7 @@ export class PreparationService {
         );
       }
 
-      updatePreparationDto['subject'] = newLecture.subjectId;
+      updatePreparationDto['subject'] = newLecture.subjectOfferingId;
     }
 
     const baseUrl =

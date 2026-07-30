@@ -4,64 +4,52 @@ import {
   IsNumber,
   IsOptional,
   IsMongoId,
-  IsArray,
   Min,
-  IsDateString,
   IsBoolean,
   IsEnum,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { GenderEnum } from '../enums/gender.enum';
+
 export class CreateClassDto {
   @IsString()
   @IsNotEmpty()
-  @ApiProperty({ description: 'The academic year of the class' })
-  academicYear: string;
+  @ApiProperty({ description: 'Name of the class (e.g. 1/1, 1/2)' })
+  name: string;
 
-  @IsEnum(['male', 'female', 'both'])
+  @IsMongoId()
   @IsNotEmpty()
-  @ApiProperty({ description: 'The gender of the class' })
-  gender: string;
+  @ApiProperty({ description: 'ID of the GradeLevel' })
+  gradeLevelId: string;
 
-  @IsArray()
-  @IsMongoId({ each: true })
-  @IsOptional()
-  @ApiProperty({ description: 'The subject IDs of the class' })
-  subjectIds?: string[];
+  @IsMongoId()
+  @IsNotEmpty()
+  @ApiProperty({ description: 'ID of the AcademicYear' })
+  academicYearId: string;
 
-  @IsArray()
-  @IsMongoId({ each: true })
-  @IsOptional()
-  @ApiProperty({ description: 'The student IDs of the class' })
-  studentIds?: string[];
+  @IsEnum(GenderEnum)
+  @IsNotEmpty()
+  @ApiProperty({ description: 'Gender for the class' })
+  gender: GenderEnum;
 
   @IsMongoId()
   @IsOptional()
-  @ApiProperty({ description: 'The teacher in charge of the class' })
+  @ApiProperty({ description: 'Teacher in charge of the class', required: false })
   teacherInChargeId?: string;
 
   @IsString()
-  @IsNotEmpty()
-  @ApiProperty({ description: 'The room number of the class' })
-  roomNumber: string;
+  @IsOptional()
+  @ApiProperty({ description: 'Physical room number', required: false })
+  roomNumber?: string;
 
   @IsNumber()
   @IsNotEmpty()
   @Min(1)
-  @ApiProperty({ description: 'The maximum capacity of the class' })
+  @ApiProperty({ description: 'Maximum capacity of the class' })
   maxCapacity: number;
 
   @IsBoolean()
-  @IsNotEmpty()
-  @ApiProperty({ description: 'The active status of the class' })
-  isActive: boolean;
-
-  // @IsDateString()
-  // @IsOptional()
-  // @ApiProperty({ description: 'The start date of the class' })
-  // startDate?: string;
-
-  // @IsDateString()
-  // @IsOptional()
-  // @ApiProperty({ description: 'The end date of the class' })
-  // endDate?: string;
+  @IsOptional()
+  @ApiProperty({ description: 'Active status of the class', default: true })
+  isActive?: boolean;
 }

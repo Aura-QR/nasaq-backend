@@ -102,15 +102,11 @@ export class TeachersController {
   //   return await this.teachersService.filtering(allParams);
   // }
 
-  @ApiOperation({ summary: 'Get teachers by subject' })
-  @ApiResponse({ status: 200, description: 'Teachers fetched successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiResponse({ status: 404, description: 'Teachers not found' })
-  @Get('by-subject/:subjectId')
-  @HttpCode(HttpStatus.OK)
-  async findBySubject(@Param('subjectId') subjectId: string) {
-    return await this.teachersService.findBySubject(subjectId);
-  }  
+  // @ApiOperation({ summary: 'Get teachers by subject' })
+  // @Get('by-subject/:subjectId')
+  // async findBySubject(@Param('subjectId') subjectId: string) {
+  //   return await this.teachersService.findBySubject(subjectId);
+  // }  
 
   @ApiOperation({ summary: 'Get teacher by ID' })
   @ApiResponse({ status: 200, description: 'Teacher fetched successfully' })

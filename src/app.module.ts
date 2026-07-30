@@ -26,6 +26,13 @@ import { PreparationModule } from './preparation/preparation.module';
 import { TasksModule } from './tasks/tasks.module';
 import { FinancialModule } from './financial/financial.module';
 import { ExpensesModule } from './expenses/expenses.module';
+import { AcademicYearsModule } from './academic-years/academic-years.module';
+import { TermsModule } from './terms/terms.module';
+import { StagesModule } from './stages/stages.module';
+import { GradeLevelsModule } from './grade-levels/grade-levels.module';
+import { EnrollmentsModule } from './enrollments/enrollments.module';
+import { SubjectOfferingsModule } from './subject-offerings/subject-offerings.module';
+import { TeacherAssignmentsModule } from './teacher-assignments/teacher-assignments.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -76,6 +83,13 @@ import { TenantGuard } from './tenancy/guards/tenant.guard';
     TasksModule,
     FinancialModule,
     ExpensesModule,
+    AcademicYearsModule,
+    TermsModule,
+    StagesModule,
+    GradeLevelsModule,
+    EnrollmentsModule,
+    SubjectOfferingsModule,
+    TeacherAssignmentsModule,
   ],
   controllers: [AppController],
   providers: [

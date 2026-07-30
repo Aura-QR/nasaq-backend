@@ -5,50 +5,38 @@ import {
   IsNumber,
   Min,
   Max,
-  IsString,
   IsOptional,
-  IsBoolean
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { DayOfWeek } from '../enums/day-of-week.enum';
 
 export class CreateLectureDto {
-  @ApiProperty({
-    description: 'ID of the class this lecture belongs to'
-  })
+  @ApiProperty({ description: 'ID of the class this lecture belongs to' })
   @IsNotEmpty()
   @IsMongoId()
   classId: string;
 
-  @ApiProperty({
-    description: 'ID of the subject being taught'
-  })
+  @ApiProperty({ description: 'ID of the SubjectOffering instance' })
   @IsNotEmpty()
   @IsMongoId()
-  subjectId: string;
+  subjectOfferingId: string;
 
-  @ApiProperty({
-    description: 'ID of the teacher teaching this lecture'
-  })
+  @ApiProperty({ description: 'ID of the Term' })
   @IsNotEmpty()
   @IsMongoId()
-  teacherId: string;
+  termId: string;
 
-  @ApiProperty({
-    description: 'Day of the week for this lecture',
-    enum: DayOfWeek,
-    example: DayOfWeek.MONDAY
-  })
+  @ApiPropertyOptional({ description: 'ID of the teacher teaching this lecture (optional)' })
+  @IsOptional()
+  @IsMongoId()
+  teacherId?: string;
+
+  @ApiProperty({ description: 'Day of the week', enum: DayOfWeek })
   @IsNotEmpty()
   @IsEnum(DayOfWeek)
   dayOfWeek: DayOfWeek;
 
-  @ApiProperty({
-    description: 'Time slot number exp:  (1 = first period, 2 = second period)',
-    minimum: 1,
-    maximum: 10,
-    example: 1
-  })
+  @ApiProperty({ description: 'Time slot number (1-10)', minimum: 1, maximum: 10 })
   @IsNotEmpty()
   @IsNumber()
   @Min(1)

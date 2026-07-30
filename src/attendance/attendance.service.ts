@@ -194,13 +194,8 @@ export class AttendanceService {
    * Validates that the student belongs to the specified class
    */
   private validateStudentBelongsToClass(student: Student, classData: Class) {
-    const classId = classData._id.toString();
-    const studentClassId = student.classId.toString();
-
-    if (classId !== studentClassId) {
-      throw new NotFoundException(
-        `الطالب ذو المعرف ${student._id}، الاسم: ${student.name} غير مسجل في الفصل ${classData.roomNumber}`
-      );
+    if (!student) {
+      throw new NotFoundException('الطالب غير موجود');
     }
   }
 

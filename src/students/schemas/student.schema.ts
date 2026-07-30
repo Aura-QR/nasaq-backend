@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
-import * as mongoose from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ timestamps: true })
@@ -23,9 +22,6 @@ export class Student extends Document {
   @Prop({ required: true })
   nationality: string;
 
-  @Prop({ required: true })
-  academicYear: string;
-
   @Prop({ required: true, index: true })
   phoneNumber: string;
 
@@ -43,20 +39,6 @@ export class Student extends Document {
 
   @Prop()
   notes: string;
-
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Class',
-    default: null,
-  })
-  classId?: mongoose.Types.ObjectId;
-
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'InstallmentPlan',
-    default: null,
-  })
-  installmentPlanId?: mongoose.Types.ObjectId;
 
   @Prop({ default: true })
   isActive: boolean;
@@ -96,22 +78,27 @@ StudentSchema.index(
   },
 );
 
-StudentSchema.pre('save', function(next) {
+StudentSchema.pre('save', function (next) {
   this.name = `${this.firstName} ${this.fatherName} ${this.familyName}`;
   next();
 });
 
-StudentSchema.pre('findOneAndUpdate', async function(next) {
+StudentSchema.pre('findOneAndUpdate', async function (next) {
   const update = this.getUpdate() as any;
-  if (update.firstName || update.fatherName || update.familyName || 
-      update.$set?.firstName || update.$set?.fatherName || update.$set?.familyName) {
-    
+  if (
+    update.firstName ||
+    update.fatherName ||
+    update.familyName ||
+    update.$set?.firstName ||
+    update.$set?.fatherName ||
+    update.$set?.familyName
+  ) {
     const docToUpdate = await this.model.findOne(this.getQuery());
-    
+
     const firstName = update.firstName || update.$set?.firstName || docToUpdate?.firstName;
     const fatherName = update.fatherName || update.$set?.fatherName || docToUpdate?.fatherName;
     const familyName = update.familyName || update.$set?.familyName || docToUpdate?.familyName;
-    
+
     if (!update.$set) update.$set = {};
     update.$set.name = `${firstName} ${fatherName} ${familyName}`;
   }

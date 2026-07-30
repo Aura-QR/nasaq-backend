@@ -3,20 +3,24 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { LecturesController } from './lectures.controller';
 import { LecturesService } from './lectures.service';
 import { Lecture, LectureSchema } from './schemas/lecture.schema';
-import { ClassesModule } from '../classes/classes.module';
-import { SubjectsModule } from '../subjects/subjects.module';
-import { TeachersModule } from '../teachers/teachers.module';
-import { StudentsModule } from 'src/students/students.module';
-import { CaslModule } from '../casl/casl.module';
+import { Class, ClassSchema } from '../classes/schemas/class.schema';
+import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
+import { Student, StudentSchema } from 'src/students/schemas/student.schema';
+import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
+import { TeacherAssignment, TeacherAssignmentSchema } from '../teacher-assignments/schemas/teacher-assignment.schema';
+import { Term, TermSchema } from '../terms/schemas/term.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Lecture.name, schema: LectureSchema }]),
-    forwardRef(() => ClassesModule),
-    forwardRef(() => SubjectsModule),
-    forwardRef(() => TeachersModule),
-    forwardRef(() => StudentsModule),
-    CaslModule,
+    MongooseModule.forFeature([
+      { name: Lecture.name, schema: LectureSchema },
+      { name: Class.name, schema: ClassSchema },
+      { name: Teacher.name, schema: TeacherSchema },
+      { name: Student.name, schema: StudentSchema },
+      { name: SubjectOffering.name, schema: SubjectOfferingSchema },
+      { name: TeacherAssignment.name, schema: TeacherAssignmentSchema },
+      { name: Term.name, schema: TermSchema },
+    ]),
   ],
   controllers: [LecturesController],
   providers: [LecturesService],

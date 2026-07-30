@@ -31,34 +31,29 @@ export class CreateExamDto {
   @IsMongoId()
   @ApiProperty({
     description: 'The ID of the subject this exam belongs to',
-    example: 'string',
   })
   subjectId: string;
 
-  @IsString()
+  @IsMongoId()
   @ApiProperty({
-    description: 'The academic year for this exam',
-    example: 'grade 1',
+    description: 'The ID of the academic year for this exam',
   })
-  academicYear: string;
+  academicYearId: string;
 
   @IsArray()
   @IsMongoId({ each: true })
   @ApiProperty({
     description: 'Array of class IDs that will take this exam',
-    example: ['classId-1', 'classId-2'],
   })
   classIds: string[];
 
   @IsEnum(ExamType)
   @ApiProperty({
-    description: 'The type of exam (final, assignment, activity, or quiz). Note: Projects grades are added manually and do not have exams.',
+    description: 'The type of exam (final, assignment, activity, or quiz).',
     enum: ExamType,
     example: ExamType.FINAL,
   })
   examType: ExamType;
-
-
 
   @Transform(({ value }) => {
     const d = new Date(value);
@@ -89,18 +84,6 @@ export class CreateExamDto {
   @ApiProperty({
     description: 'Array of questions for this exam',
     type: [QuestionDto],
-    example: [
-      {
-        question: 'What is the capital of France?',
-        options: ['Paris', 'London', 'Berlin', 'Madrid'],
-        correctAnswer: 'Paris',
-      },
-      {
-        question: 'What is 2 + 2?',
-        options: ['3', '4', '5', '6'],
-        correctAnswer: '4',
-      },
-    ],
   })
   questions: QuestionDto[];
 }

@@ -8,12 +8,17 @@ export class GradesCriteria extends Document {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'Subject',
-    index: true
+    index: true,
   })
   subjectId: mongoose.Types.ObjectId;
 
-  @Prop({required: true})
-  academicYear : string;
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicYear',
+    required: true,
+    index: true,
+  })
+  academicYearId: mongoose.Types.ObjectId;
 
   @Prop({ required: true })
   final: number;
@@ -38,10 +43,8 @@ export class GradesCriteria extends Document {
 
   @Prop({ required: true, min: 1 })
   quizzesCount: number;
-
 }
 export const GradesCriteriaSchema = SchemaFactory.createForClass(GradesCriteria);
 GradesCriteriaSchema.plugin(tenantScopedPlugin);
 
-GradesCriteriaSchema.index({ schoolId: 1, subjectId: 1, academicYear: 1 });
-
+GradesCriteriaSchema.index({ schoolId: 1, subjectId: 1, academicYearId: 1 }, { unique: true });

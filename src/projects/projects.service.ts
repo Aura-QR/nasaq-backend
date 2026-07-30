@@ -193,11 +193,7 @@ export class ProjectsService {
       throw new NotFoundException(`الطالب غير موجود`);
     }
 
-    if (!student.classId) {
-      return { message: 'الطالب غير مسجل في أي فصل', data: [] };
-    }
-
-    const query: any = { classIds: { $in: [student.classId] } };
+    const query: any = {};
 
     const now = new Date();
     if (filters.status === 'upcoming') query.dueDate = { $gt: now };
@@ -384,8 +380,7 @@ export class ProjectsService {
       const student = await this.studentModel.findById(user.userId);
       if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
-      const inClass = project.classIds.some(c => c.toString() === student.classId?.toString());
-      if (!inClass) throw new ForbiddenException('هذا المشروع غير متاح لفصلك');
+
     }
 
     const projectFolder = path.join('./uploads/projects', projectId);
@@ -741,8 +736,7 @@ export class ProjectsService {
     const student = await this.studentModel.findById(studentId);
     if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
-    const classMatch = project.classIds.some(c => c.toString() === student.classId?.toString());
-    if (!classMatch) throw new ForbiddenException('هذا المشروع غير متاح لفصلك');
+
 
     if (new Date() > (project as any).dueDate) {
       throw new BadRequestException('انتهى الوقت المحدد لتسليم هذا المشروع');
@@ -861,13 +855,9 @@ export class ProjectsService {
     const student = await this.studentModel.findById(studentId);
     if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
-    const studentInProject = project.classIds.some(c => c.toString() === student.classId?.toString());
-    if (!studentInProject) throw new ForbiddenException('هذا الطالب غير مسجل في فصول هذا المشروع');
-
     const lecture = await this.lectureModel.findOne({
       teacherId: new mongoose.Types.ObjectId(teacher.userId),
-      subjectId: project.subjectId,
-      classId: student.classId,
+      subjectOfferingId: project.subjectId,
     });
     if (!lecture) throw new ForbiddenException('ليس لديك صلاحية لتقييم هذا الطالب في هذه المادة');
 

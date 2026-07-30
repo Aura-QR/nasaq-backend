@@ -3,6 +3,7 @@ import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { PaymentStatus, FeeStatus } from '../enums/payment-status.enum';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
+
 @Schema({ _id: false })
 class DiscountSnapshot {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Discount', required: true })
@@ -174,8 +175,8 @@ export class StudentFinancialRecord extends Document {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true, index: true })
   studentId: mongoose.Types.ObjectId;
 
-  @Prop({ required: true })
-  academicYear: string;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'AcademicYear', required: true, index: true })
+  academicYearId: mongoose.Types.ObjectId;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: true })
   classId: mongoose.Types.ObjectId;
@@ -205,6 +206,6 @@ export class StudentFinancialRecord extends Document {
 export const StudentFinancialRecordSchema = SchemaFactory.createForClass(StudentFinancialRecord);
 StudentFinancialRecordSchema.plugin(tenantScopedPlugin);
 
-StudentFinancialRecordSchema.index({ schoolId: 1, studentId: 1, academicYear: 1 }, { unique: true });
+StudentFinancialRecordSchema.index({ schoolId: 1, studentId: 1, academicYearId: 1 }, { unique: true });
 StudentFinancialRecordSchema.index({ schoolId: 1, 'trips.tripTemplateId': 1 });
 StudentFinancialRecordSchema.index({ schoolId: 1, 'bus.enrolled': 1 });

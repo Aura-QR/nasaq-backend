@@ -3,22 +3,14 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ClassesController } from './classes.controller';
 import { ClassesService } from './classes.service';
 import { Class, ClassSchema } from './schemas/class.schema';
-import { SubjectsModule } from '../subjects/subjects.module';
-import { StudentsModule } from '../students/students.module';
-import { LecturesModule } from '../lectures/lectures.module';
-import { TeachersModule } from '../teachers/teachers.module';
-import { GradesCriteriaModule } from '../grades-criteria/grades-criteria.module';
-import { FinancialModule } from '../financial/financial.module';
+import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Class.name, schema: ClassSchema }]),
-    forwardRef(() => SubjectsModule),
-    forwardRef(() => StudentsModule),
-    forwardRef(() => LecturesModule),
-    forwardRef(() => TeachersModule),
-    forwardRef(() => GradesCriteriaModule),
-    forwardRef(() => FinancialModule),
+    MongooseModule.forFeature([
+      { name: Class.name, schema: ClassSchema },
+      { name: Teacher.name, schema: TeacherSchema },
+    ]),
   ],
   controllers: [ClassesController],
   providers: [ClassesService],

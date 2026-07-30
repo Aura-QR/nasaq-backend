@@ -5,8 +5,8 @@ import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ collection: 'feeConfigs', timestamps: true })
 export class FeeConfig extends Document {
-  @Prop({ required: true, index: true })
-  academicYear: string;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'AcademicYear', required: true, index: true })
+  academicYearId: mongoose.Types.ObjectId;
 
   @Prop({ required: true, min: 0 })
   tuitionFee: number;
@@ -22,4 +22,4 @@ export class FeeConfig extends Document {
 export const FeeConfigSchema = SchemaFactory.createForClass(FeeConfig);
 FeeConfigSchema.plugin(tenantScopedPlugin);
 
-FeeConfigSchema.index({ schoolId: 1, academicYear: 1 }, { unique: true });
+FeeConfigSchema.index({ schoolId: 1, academicYearId: 1 }, { unique: true });

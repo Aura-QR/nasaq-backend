@@ -1,0 +1,64 @@
+import { Controller, Get, Post, Body, Patch, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import { AcademicYearsService } from './academic-years.service';
+import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
+import { UpdateAcademicYearDto } from './dto/update-academic-year.dto';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+@ApiTags('academic-years')
+@Controller('academic-years')
+export class AcademicYearsController {
+  constructor(private readonly academicYearsService: AcademicYearsService) {}
+
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new academic year' })
+  @ApiResponse({ status: 201, description: 'The academic year has been successfully created.' })
+  @ApiResponse({ status: 409, description: 'Academic year with the same name already exists.' })
+  create(@Body() createAcademicYearDto: CreateAcademicYearDto) {
+    return this.academicYearsService.create(createAcademicYearDto);
+  }
+
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get all academic years' })
+  @ApiResponse({ status: 200, description: 'List of all academic years.' })
+  findAll() {
+    return this.academicYearsService.findAll();
+  }
+
+  @Get('active')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get the active academic year' })
+  @ApiResponse({ status: 200, description: 'The active academic year.' })
+  @ApiResponse({ status: 404, description: 'Active academic year not found.' })
+  findActive() {
+    return this.academicYearsService.findActive();
+  }
+
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get an academic year by id' })
+  @ApiResponse({ status: 200, description: 'The found academic year.' })
+  @ApiResponse({ status: 404, description: 'Academic year not found.' })
+  findOne(@Param('id') id: string) {
+    return this.academicYearsService.findOne(id);
+  }
+
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update an academic year' })
+  @ApiResponse({ status: 200, description: 'The academic year has been successfully updated.' })
+  @ApiResponse({ status: 404, description: 'Academic year not found.' })
+  update(@Param('id') id: string, @Body() updateAcademicYearDto: UpdateAcademicYearDto) {
+    return this.academicYearsService.update(id, updateAcademicYearDto);
+  }
+
+  @Patch(':id/setup-step')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update setup step for an academic year' })
+  @ApiResponse({ status: 200, description: 'The setup step has been successfully updated.' })
+  @ApiResponse({ status: 404, description: 'Academic year not found.' })
+  updateSetupStep(@Param('id') id: string, @Body('step') step: number) {
+    return this.academicYearsService.updateSetupStep(id, step);
+  }
+}

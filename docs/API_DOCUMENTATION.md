@@ -1,89 +1,69 @@
-# Aura School System — API Documentation
+# Nasaq School System — Complete API Documentation
 
-> **Version:** 2.0 (Multi-Tenant SaaS)  
+> **Version:** 2.0 (Multi-Tenant SaaS — Academic System v2)  
 > **Framework:** NestJS + Mongoose (MongoDB)  
 > **Live Swagger UI:** `http://localhost:3000/api/docs`  
 > **Base URL:** `http://localhost:3000`  
-> **Last Updated:** 2026-07-21
+> **Last Updated:** 2026-07-30
 
 ---
 
 ## Table of Contents
 
-1. [Architecture & Domains Overview](#1-architecture--domains-overview)
+1. [Architecture & Scoping Principles](#1-architecture--scoping-principles)
 2. [Global Configuration](#2-global-configuration)
 3. [Authentication & Authorization](#3-authentication--authorization)
 4. [Database Schemas Dictionary](#4-database-schemas-dictionary)
 5. [Complete API Endpoints Reference](#5-complete-api-endpoints-reference)
-   - [5.1 Platform & School Registration](#51-platform--school-registration)
-   - [5.2 Platform Administration (SUPER_ADMIN)](#52-platform-administration-super_admin)
+   - [5.1 Platform Administration & School Registration](#51-platform-administration--school-registration)
+   - [5.2 Authentication (Login Endpoints)](#52-authentication-login-endpoints)
    - [5.3 Managers Management (OWNER Only)](#53-managers-management-owner-only)
-   - [5.4 Dashboards & Analytics](#54-dashboards--analytics)
-   - [5.5 Auth](#55-auth)
-   - [5.6 Admin](#56-admin)
-   - [5.7 Students](#57-students)
-   - [5.8 Teachers](#58-teachers)
-   - [5.9 Classes](#59-classes)
-   - [5.10 Subjects](#510-subjects)
-   - [5.11 Attendance](#511-attendance)
-   - [5.12 Lectures](#512-lectures)
-   - [5.13 Exams](#513-exams)
-   - [5.14 Grades Criteria](#514-grades-criteria)
-   - [5.15 Projects](#515-projects)
-   - [5.16 Preparation](#516-preparation)
-   - [5.17 Library](#517-library)
-   - [5.18 Financial — Records](#518-financial--records)
-   - [5.19 Financial — Fee Configs](#519-financial--fee-configs)
-   - [5.20 Financial — Installment Plans](#520-financial--installment-plans)
-   - [5.21 Financial — Discounts](#521-financial--discounts)
-   - [5.22 Financial — Additional Fees](#522-financial--additional-fees)
-   - [5.23 Financial — Bus Module](#523-financial--bus-module)
-   - [5.24 Financial — Trips Module](#524-financial--trips-module)
-   - [5.25 Expenses — Categories](#525-expenses--categories)
-   - [5.26 Expenses](#526-expenses)
+   - [5.4 Permissions & Dynamic Role Controls](#54-permissions--dynamic-role-controls)
+   - [5.5 Dashboards & Analytics](#55-dashboards--analytics)
+   - [5.6 Admin User Management](#56-admin-user-management)
+   - [5.7 Academic Years & Start New Year Wizard](#57-academic-years--start-new-year-wizard)
+   - [5.8 Terms](#58-terms)
+   - [5.9 Stages](#59-stages)
+   - [5.10 Grade Levels](#510-grade-levels)
+   - [5.11 Classes](#511-classes)
+   - [5.12 Enrollments & Bulk Student Promotion](#512-enrollments--bulk-student-promotion)
+   - [5.13 Subject Offerings](#513-subject-offerings)
+   - [5.14 Teacher Assignments](#514-teacher-assignments)
+   - [5.15 Subjects Catalog](#515-subjects-catalog)
+   - [5.16 Teachers](#516-teachers)
+   - [5.17 Students & Portal OTP Setup](#517-students--portal-otp-setup)
+   - [5.18 Attendance](#518-attendance)
+   - [5.19 Lectures & Copy Schedule Engine](#519-lectures--copy-schedule-engine)
+   - [5.20 Exams & Online Quiz System](#520-exams--online-quiz-system)
+   - [5.21 Grades Criteria](#521-grades-criteria)
+   - [5.22 Projects & File Submissions](#522-projects--file-submissions)
+   - [5.23 Lesson Preparation](#523-lesson-preparation)
+   - [5.24 Digital Library](#524-library)
+   - [5.25 Financial — Records & Student Ledgers](#525-financial--records--student-ledgers)
+   - [5.26 Financial — Fee Configs](#526-financial--fee-configs)
+   - [5.27 Financial — Installment Plans](#527-financial--installment-plans)
+   - [5.28 Financial — Discounts](#528-financial--discounts)
+   - [5.29 Financial — Additional Fees](#530-financial--additional-fees)
+   - [5.30 Financial — Bus Subscription Module](#530-financial--bus-subscription-module)
+   - [5.31 Financial — Trips Subscription Module](#531-financial--trips-subscription-module)
+   - [5.32 Expenses — Categories](#532-expenses--categories)
+   - [5.33 Expenses](#533-expenses)
+   - [5.34 System Health & Diagnostics](#534-system-health--diagnostics)
 6. [Standard Response Envelope](#6-standard-response-envelope)
 7. [Environment Variables](#7-environment-variables)
 
 ---
 
-## 1. Architecture & Domains Overview
+## 1. Architecture & Scoping Principles
 
-The Aura School System is organized into the following NestJS feature modules:
+The Nasaq platform enforces strict data scoping across all collections:
 
-| Module | Description |
-|---|---|
-| **Auth** | JWT-based login for all user types (Admin, Teacher, Student) |
-| **Admin** | Admin account management + admin-specific login |
-| **Students** | Full student lifecycle: CRUD, password setup, OTP flow |
-| **Teachers** | Teacher management, subject assignment, profile access |
-| **Classes** | Classroom management, student enrollment, teacher-in-charge |
-| **Subjects** | Academic subjects, many-to-many relationship with classes |
-| **Attendance** | Absence tracking per student/class/date |
-| **Lectures** | Weekly schedule slots (day + slot per class/subject/teacher) |
-| **Exams** | Online exam management, questions, grading, results |
-| **Grades Criteria** | Grade distribution rules per subject |
-| **Projects** | File-based project assignments with student submissions |
-| **Preparation** | Teacher lesson preparation files linked to lectures |
-| **Library** | External resource links linked to subjects |
-| **Financial** | Complete tuition/bus/trip/discount/installment financial system |
-| **Expenses** | School operating expenses with categories |
-| **CASL** | Ability-based authorization (`@CheckAbilities`) |
-| **Tasks** | Background scheduled tasks |
+### Scoping Matrix
 
-| **Tenancy (Core)** | Request-scoped tenant context (`AsyncLocalStorage`) & automated database scoping (`tenantScopedPlugin`) |
-| **Platform** | Platform Super Admin auth, school registration (`POST /schools/register`), & subscription controls |
-| **Managers** | School Owner manager management (create admin manager, promote/demote teacher manager, edit permissions) |
-| **Dashboards** | Single-school Owner dashboard, permission-filtered Manager dashboard, cross-tenant Super Admin dashboard |
-
-### Role System
-
-```
-SUPER_ADMIN → Platform Super Admin (cross-tenant management & platform analytics)
-OWNER       → School Owner (full administrative control within tenant, permissions: ['*'])
-MANAGER     → School Manager (delegated access with custom permission overrides array)
-TEACHER     → Teacher (classes taught, subject, lecture, attendance, exam, & project management)
-STUDENT     → Student (read-only access to own profile, schedule, grades, exams, & submissions)
-```
+| Scope | Meaning | Collections |
+|---|---|---|
+| **Tenant-Scoped** | Created once per school, persists across all academic years | `Stages`, `GradeLevels`, `Subjects`, `Teachers`, `SchoolSettings` |
+| **Year-Scoped** | Tied to a specific `academicYearId` | `AcademicYears`, `Terms`, `Classes`, `Enrollments`, `SubjectOfferings`, `TeacherAssignments`, `Lectures`, `FeeConfigs`, `StudentFinancialRecords`, `Exams`, `GradesCriteria`, `Projects`, `Library`, `Expenses` |
 
 ---
 
@@ -91,1160 +71,1142 @@ STUDENT     → Student (read-only access to own profile, schedule, grades, exam
 
 | Setting | Value |
 |---|---|
-| **Multi-Tenancy** | Server-side scoping guarantee via `tenantScopedPlugin`. `schoolId` is derived from JWT and is NEVER accepted in request body |
+| **Multi-Tenancy** | Server-side scoping via `tenantScopedPlugin`. `schoolId` derived from JWT |
+| **Terms Per School** | Configurable per school via `SchoolSettings.termsPerYear` (default: 3) |
 | **Validation** | `ValidationPipe` — `whitelist: true`, `forbidNonWhitelisted: true`, `transform: true` |
-| **CORS** | Enabled for all origins (`*`) |
-| **Response Format** | Wrapped by a global `ResponseInterceptor` |
-| **Error Format** | Handled by a global `GlobalExceptionFilter` |
+| **Response Format** | Wrapped by global `ResponseInterceptor` |
 | **Auth Strategy** | JWT Bearer Token (`Authorization: Bearer <token>`) |
 
 ---
 
 ## 3. Authentication & Authorization
 
-### Guards in Use
-
-| Guard | Purpose |
-|---|---|
-| `JwtAuthGuard` | Verifies the JWT token signature; injects `@CurrentUser()` |
-| `TenantGuard` | Asserts active school status (`isActive: true`) and enforces platform vs school route boundaries |
-| `AbilitiesGuard` | CASL-based resource/action authorization driven by flat permission strings |
-| `RolesGuard` | Role-based guard used in administrative and financial endpoints |
-
-### JWT Token
-
-All protected endpoints require:
+### Roles & Access Hierarchy
 
 ```
-Authorization: Bearer <jwt_token>
+SUPER_ADMIN → Platform Super Admin (cross-tenant management & platform analytics)
+OWNER       → School Owner (full administrative & financial authority)
+MANAGER     → School Manager (administrative & academic control, no financials)
+TEACHER     → Teacher (assigned subject offerings, lectures, attendance, exams, projects)
+STUDENT     → Student (read-only portal access, exam submission, project upload)
 ```
 
-The token is obtained via `POST /auth/login` or `POST /admin/login`. It contains:
+### Protection Badges
 
-```json
-{
-  "sub": "6a5f678e25dec6ce6b8d3f58",
-  "email": "user@school.com",
-  "role": "OWNER | MANAGER | TEACHER | STUDENT | SUPER_ADMIN",
-  "schoolId": "6a5f678e25dec6ce6b8d3f58",
-  "permissions": ["school.students.read", "school.classes.manage"]
-}
-```
-
-### Endpoint Protection Legend
-
-| Symbol | Meaning |
-|---|---|
-| 🔓 | Public — no authentication required |
-| 🔐 | Requires `JwtAuthGuard` (any valid JWT) |
-| 🛡️ | Requires `JwtAuthGuard` + CASL `AbilitiesGuard` |
+- 🔓 **Public**: Open endpoint (no JWT header needed).
+- 🔐 **Authenticated**: Requires `JwtAuthGuard` (valid bearer token).
+- 🛡️ **Protected**: Requires `JwtAuthGuard` + `AbilitiesGuard` / `TenantGuard`.
 
 ---
 
 ## 4. Database Schemas Dictionary
 
-### 4.1 `admins` Collection
+### 4.1 `academicYears` Collection (Year-Scoped)
+| Field | Type | Required | Default | Notes |
+|---|---|---|---|---|
+| `_id` | ObjectId | Auto | — | Document ID |
+| `name` | String | ✅ | — | e.g. `"2026/2027"` |
+| `startDate` | Date | ✅ | — | |
+| `endDate` | Date | ✅ | — | |
+| `status` | String | — | `"active"` | Enum: `"active"` \| `"archived"` |
+| `setupStep` | String | — | `"setup_terms"` | Step tracker in New Year Wizard |
 
-| Field | Type | Required | Unique | Default | Notes |
-|---|---|---|---|---|---|
-| `_id` | ObjectId | Auto | ✅ | — | MongoDB document ID |
-| `username` | String | ✅ | ✅ | — | Min 3 chars |
-| `email` | String | ✅ | ✅ | — | Valid email format |
-| `password` | String | ✅ | — | — | Hashed (bcrypt) |
-| `role` | String | — | — | `"ADMIN"` | Fixed value |
-| `createdAt` | Date | Auto | — | — | Timestamp |
-| `updatedAt` | Date | Auto | — | — | Timestamp |
-
----
-
-### 4.2 `students` Collection
-
-| Field | Type | Required | Unique | Default | Notes |
-|---|---|---|---|---|---|
-| `_id` | ObjectId | Auto | ✅ | — | |
-| `firstName` | String | ✅ | — | — | |
-| `familyName` | String | ✅ | — | — | |
-| `fatherName` | String | ✅ | — | — | |
-| `name` | String | Auto | — | — | Computed: `firstName + fatherName + familyName` (pre-save hook) |
-| `birthDate` | Date | ✅ | — | — | |
-| `gender` | String | ✅ | — | — | Enum: `"male"` \| `"female"` |
-| `nationality` | String | ✅ | — | — | |
-| `academicYear` | String | ✅ | — | — | e.g. `"2024-2025"` |
-| `phoneNumber` | String | ✅ | — | — | Indexed; digits/spaces/+/- only |
-| `email` | String | ✅ | ✅ | — | Indexed |
-| `schoolEmail` | String | — | ✅ | — | Auto-generated school email; indexed |
-| `address` | String | ✅ | — | — | |
-| `previousSchool` | String | — | — | — | Optional |
-| `registrationDate` | Date | — | — | `Date.now` | |
-| `notes` | String | — | — | — | Optional |
-| `classId` | ObjectId → Class | — | — | `null` | |
-| `installmentPlanId` | ObjectId → InstallmentPlan | — | — | `null` | |
-| `isActive` | Boolean | — | — | `true` | |
-| `role` | String | — | — | `"STUDENT"` | |
-| `password` | String | — | — | — | `select: false`; hashed |
-| `hasPassword` | Boolean | — | — | `false` | True once OTP setup done |
-| `otp` | String | — | — | — | `select: false` |
-| `otpExpiry` | Date | — | — | — | `select: false` |
-| `createdAt` | Date | Auto | — | — | |
-| `updatedAt` | Date | Auto | — | — | |
-
----
-
-### 4.3 `teachers` Collection
-
-| Field | Type | Required | Unique | Default | Notes |
-|---|---|---|---|---|---|
-| `_id` | ObjectId | Auto | ✅ | — | |
-| `name` | String | ✅ | — | — | Min 2 chars |
-| `email` | String | ✅ | ✅ | — | Indexed |
-| `phoneNumber` | String | — | — | — | Indexed; optional |
-| `subjectIds` | ObjectId[] → Subject | ✅ | — | `[]` | Must have at least 1 subject |
-| `qualification` | String | — | — | — | e.g. `"Bachelor's in Math"` |
-| `experience` | String | — | — | — | e.g. `"5 years"` |
-| `specialization` | String | — | — | — | e.g. `"Secondary Education"` |
-| `hireDate` | Date | ✅ | — | — | ISO date string |
-| `address` | String | — | — | — | Optional |
-| `isActive` | Boolean | ✅ | — | — | |
-| `isInCharge` | Boolean | — | — | `false` | |
-| `role` | String | — | — | `"TEACHER"` | |
-| `password` | String | ✅ | — | — | Hashed (bcrypt) |
-| `createdAt` | Date | Auto | — | — | |
-| `updatedAt` | Date | Auto | — | — | |
-
----
-
-### 4.4 `classes` Collection
-
+### 4.2 `terms` Collection (Year-Scoped)
 | Field | Type | Required | Default | Notes |
 |---|---|---|---|---|
 | `_id` | ObjectId | Auto | — | |
-| `academicYear` | String | ✅ | — | e.g. `"2024-2025"` |
-| `gender` | String | ✅ | — | Enum: `"male"` \| `"female"` |
-| `subjectIds` | ObjectId[] → Subject | — | `[]` | |
-| `studentIds` | ObjectId[] → Student | — | `[]` | |
+| `academicYearId` | ObjectId → AcademicYear | ✅ | — | Indexed |
+| `name` | String | ✅ | — | e.g. `"ترم 1"` |
+| `order` | Number | ✅ | — | Dynamic order per tenant |
+| `startDate` | Date | ✅ | — | |
+| `endDate` | Date | ✅ | — | |
+| `status` | String | — | `"upcoming"` | Enum: `"upcoming"` \| `"active"` \| `"closed"` |
+
+### 4.3 `stages` Collection (Tenant-Scoped)
+| Field | Type | Required | Default | Notes |
+|---|---|---|---|---|
+| `_id` | ObjectId | Auto | — | |
+| `name` | String | ✅ | — | e.g. `"الابتدائي"` |
+| `order` | Number | ✅ | — | Display order |
+
+### 4.4 `gradeLevels` Collection (Tenant-Scoped)
+| Field | Type | Required | Default | Notes |
+|---|---|---|---|---|
+| `_id` | ObjectId | Auto | — | |
+| `stageId` | ObjectId → Stage | ✅ | — | Indexed |
+| `name` | String | ✅ | — | e.g. `"صف أول"` |
+| `order` | Number | ✅ | — | Global numeric order across stages used for promotion |
+
+### 4.5 `classes` Collection (Year-Scoped)
+| Field | Type | Required | Default | Notes |
+|---|---|---|---|---|
+| `_id` | ObjectId | Auto | — | |
+| `name` | String | ✅ | — | Pedagogical name, e.g. `"1/1"` |
+| `gradeLevelId` | ObjectId → GradeLevel | ✅ | — | Indexed |
+| `academicYearId` | ObjectId → AcademicYear | ✅ | — | Indexed |
+| `gender` | String | ✅ | — | Enum: `"male"` \| `"female"` \| `"both"` |
+| `roomNumber` | String | — | — | Physical room location |
+| `maxCapacity` | Number | ✅ | `30` | |
 | `teacherInChargeId` | ObjectId → Teacher | — | `null` | |
-| `roomNumber` | String | ✅ | — | |
-| `maxCapacity` | Number | ✅ | — | |
-| `isActive` | Boolean | ✅ | `true` | |
-| `currentEnrollment` | Number (virtual) | Auto | — | `studentIds.length` |
-| `availableSeats` | Number (virtual) | Auto | — | `maxCapacity - currentEnrollment` |
-| `createdAt` | Date | Auto | — | |
-| `updatedAt` | Date | Auto | — | |
 
----
-
-### 4.5 `subjects` Collection
-
-| Field | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `_id` | ObjectId | Auto | — | |
-| `subjectName` | String | ✅ | — | |
-| `subjectCode` | String | — | — | Optional |
-| `classIds` | ObjectId[] → Class | — | `[]` | Many-to-many |
-
----
-
-### 4.6 `attendance` Collection
-
+### 4.6 `enrollments` Collection (Year-Scoped)
 | Field | Type | Required | Default | Notes |
 |---|---|---|---|---|
 | `_id` | ObjectId | Auto | — | |
 | `studentId` | ObjectId → Student | ✅ | — | Indexed |
 | `classId` | ObjectId → Class | ✅ | — | Indexed |
-| `date` | Date | ✅ | — | Absence date |
-| `name` | String | — | — | Indexed; student name snapshot |
-| `createdAt` | Date | Auto | — | |
-| `updatedAt` | Date | Auto | — | |
+| `academicYearId` | ObjectId → AcademicYear | ✅ | — | Indexed |
+| `status` | String | — | `"enrolled"` | Enum: `"enrolled"` \| `"promoted"` \| `"retained"` \| `"withdrawn"` \| `"graduated"` |
+| `enrolledAt` | Date | — | `Date.now` | |
 
----
+### 4.7 `subjectOfferings` Collection (Year-Scoped)
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `_id` | ObjectId | Auto | |
+| `subjectId` | ObjectId → Subject | ✅ | Indexed |
+| `gradeLevelId` | ObjectId → GradeLevel | ✅ | Indexed |
+| `termId` | ObjectId → Term | ✅ | Indexed |
 
-### 4.7 `lectures` Collection (Schedule)
+### 4.8 `teacherAssignments` Collection (Year-Scoped)
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `_id` | ObjectId | Auto | |
+| `teacherId` | ObjectId → Teacher | ✅ | Indexed |
+| `subjectOfferingId` | ObjectId → SubjectOffering | ✅ | Indexed |
 
+### 4.9 `lectures` Collection (Schedule — Year-Scoped)
 | Field | Type | Required | Default | Notes |
 |---|---|---|---|---|
 | `_id` | ObjectId | Auto | — | |
 | `classId` | ObjectId → Class | ✅ | — | Indexed |
-| `subjectId` | ObjectId → Subject | ✅ | — | Indexed |
-| `teacherId` | ObjectId → Teacher | ✅ | — | Indexed |
+| `subjectOfferingId` | ObjectId → SubjectOffering | ✅ | — | Indexed |
+| `termId` | ObjectId → Term | ✅ | — | Indexed |
+| `teacherId` | ObjectId → Teacher | ❌ | `null` | Nullable for unassigned lectures |
 | `dayOfWeek` | String | ✅ | — | `"Sunday"` – `"Thursday"` |
-| `slot` | Number | ✅ | — | Min: 1, Max: 10 (period number) |
-| `preparation` | ObjectId[] → Preparation | — | `[]` | |
-| `createdAt` | Date | Auto | — | |
-| `updatedAt` | Date | Auto | — | |
-
----
-
-### 4.8 `exams` Collection
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `_id` | ObjectId | Auto | |
-| `gradesCriteriaId` | ObjectId → GradesCriteria | ✅ | Indexed |
-| `subjectId` | ObjectId → Subject | ✅ | Indexed |
-| `academicYear` | String | ✅ | |
-| `classIds` | ObjectId[] → Class | ✅ | Indexed |
-| `examType` | String | ✅ | Enum: `"quiz"` \| `"assignment"` \| `"activity"` \| `"final"` |
-| `grade` | Number | ✅ | Max grade |
-| `createdBy` | ObjectId → Teacher | ✅ | Indexed |
-| `startDate` | Date | ✅ | Exam window opens |
-| `endDate` | Date | ✅ | Exam window closes |
-| `duration` | Number | ✅ | In minutes; min: 1 |
-| `questions[].question` | String | ✅ | |
-| `questions[].options` | String[] | ✅ | |
-| `questions[].correctAnswer` | String | ✅ | |
-| `createdAt` | Date | Auto | |
-| `updatedAt` | Date | Auto | |
-
----
-
-### 4.9 `gradesCriteria` Collection
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `_id` | ObjectId | Auto | |
-| `subjectId` | ObjectId → Subject | ✅ | Indexed |
-| `academicYear` | String | ✅ | |
-| `final` | Number | ✅ | Grade weight for final exam |
-| `assignments` | Number | ✅ | Weight per assignment |
-| `assignmentsCount` | Number | ✅ | Min: 1 |
-| `activities` | Number | ✅ | Weight per activity |
-| `projects` | Number | ✅ | Weight per project |
-| `projectsCount` | Number | ✅ | Min: 1 |
-| `quizzes` | Number | ✅ | Weight per quiz |
-| `quizzesCount` | Number | ✅ | Min: 1 |
-| `createdAt` | Date | Auto | |
-| `updatedAt` | Date | Auto | |
-
----
-
-### 4.10 `library` Collection
-
-| Field | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `_id` | ObjectId | Auto | — | |
-| `title` | String | ✅ | — | |
-| `link` | String | ✅ | — | URL to external resource |
-| `subjectId` | ObjectId → Subject | — | `null` | Optional |
-| `academicYear` | String | — | — | Optional, e.g. `"2024-2025"` |
-
----
-
-### 4.11 `feeConfigs` Collection
-
-| Field | Type | Required | Unique | Notes |
-|---|---|---|---|---|
-| `_id` | ObjectId | Auto | ✅ | |
-| `academicYear` | String | ✅ | ✅ | One config per year; indexed |
-| `tuitionFee` | Number | ✅ | — | Min: 0 |
-| `createdBy` | ObjectId → Admin | ✅ | — | |
-| `createdAt` | Date | Auto | — | |
-| `updatedAt` | Date | Auto | — | |
-
----
-
-### 4.12 `installmentPlans` Collection
-
-| Field | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `_id` | ObjectId | Auto | — | |
-| `name` | String | ✅ | — | |
-| `description` | String | — | — | |
-| `numberOfInstallments` | Number | ✅ | — | Min: 1 |
-| `dueDates` | Date[] | ✅ | — | Array of due dates |
-| `isDefault` | Boolean | — | `false` | |
-| `isActive` | Boolean | — | `true` | |
-| `createdBy` | ObjectId → Admin | ✅ | — | |
-| `createdAt` | Date | Auto | — | |
-| `updatedAt` | Date | Auto | — | |
-
----
-
-### 4.13 `studentFinancialRecords` Collection
-
-Central financial document per student per academic year.
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `_id` | ObjectId | Auto | |
-| `studentId` | ObjectId → Student | ✅ | Indexed; unique per `studentId + academicYear` |
-| `academicYear` | String | ✅ | |
-| `classId` | ObjectId → Class | ✅ | |
-| `feeConfigId` | ObjectId → FeeConfig | ✅ | |
-| `installmentPlanId` | ObjectId → InstallmentPlan | — | `null` = single full payment |
-| `tuition.fee` | Number | ✅ | Original tuition amount |
-| `tuition.discount` | DiscountSnapshot \| null | — | Applied discount |
-| `tuition.netFee` | Number | — | `fee - discountAmount` |
-| `tuition.status` | String | — | `"unpaid"` \| `"partial"` \| `"paid"` |
-| `tuition.installments[]` | Installment[] | — | Each with `amount`, `dueDate`, `status`, `paidAmount`, `payments[]` |
-| `bus.enrolled` | Boolean | — | Default: `false` |
-| `bus.serviceType` | String | — | `"pickup"` \| `"dropoff"` \| `"both"` |
-| `bus.fee` | Number | — | |
-| `trips[]` | TripRecord[] | — | Per-trip financial data |
-| `additionalFees[]` | StudentAdditionalFee[] | — | Extra fee assignments |
+| `slot` | Number | ✅ | — | Period number (1–10) |
 
 ---
 
 ## 5. Complete API Endpoints Reference
 
-> **Pagination**: All list endpoints support `?page=1&limit=10` query parameters.
-
 ---
 
-### 5.1 Auth
+### 5.1 Platform Administration & School Registration
 
-Base path: `/auth`
+Base path: `/schools` & `/platform/schools`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/auth/login` | 🔓 | Login for Teachers and Students |
-
-#### `POST /auth/login`
+#### `POST /schools/register` 🔓
+Onboards a new school tenant and creates its primary `OWNER` admin account.
 
 ```json
 {
-  "identifier": "john.doe@school.com",
-  "password": "secret123"
+  "schoolName": "مدرسة النور الأهلية",
+  "slug": "alnoor",
+  "email": "admin@alnoor.sa",
+  "phone": "+966555123456",
+  "country": "Saudi Arabia",
+  "city": "الرياض",
+  "address": "طريق الملك فهد",
+  "ownerName": "المهندس فهد العتيبي",
+  "ownerEmail": "owner@alnoor.sa",
+  "ownerPassword": "OwnerPassword123!"
 }
 ```
 
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `identifier` | String | ✅ | Min 3 chars; username or email |
-| `password` | String | ✅ | Min 6 chars |
+#### `GET /platform/schools` 🛡️ (SUPER_ADMIN)
+Lists all registered school tenants on the platform.
 
-**Response `200`:**
+#### `GET /platform/schools/:id` 🛡️ (SUPER_ADMIN)
+Get detailed tenant profile and settings by ID.
 
-```json
-{
-  "token": "eyJhbGci...",
-  "user": { "userId": "...", "role": "TEACHER" }
-}
-```
+#### `PATCH /platform/schools/:id` 🛡️ (SUPER_ADMIN)
+Update school tenant configuration.
+
+#### `PATCH /platform/schools/:id/suspend` 🛡️ (SUPER_ADMIN)
+Suspend a school tenant's subscription and block access.
+
+#### `PATCH /platform/schools/:id/activate` 🛡️ (SUPER_ADMIN)
+Re-activate a suspended school tenant.
 
 ---
 
-### 5.6 Admin
+### 5.2 Authentication (Login Endpoints)
+
+#### `POST /auth/login` 🔓
+Unified login endpoint for School Users (`OWNER`, `MANAGER`, `TEACHER`, `STUDENT`).
+
+```json
+{
+  "email": "owner@alnoor.sa",
+  "password": "Password123!"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "statusCode": 200,
+  "message": "User logged in successfully",
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "6650a1b2c3d4e5f6a7b8c9d1",
+      "name": "المهندس فهد العتيبي",
+      "email": "owner@alnoor.sa",
+      "role": "OWNER",
+      "schoolId": "6650a1b2c3d4e5f6a7b8c9d0"
+    }
+  }
+}
+```
+
+#### `POST /admin/login` 🔓
+Dedicated login endpoint for School Admins / Owners / Managers.
+
+#### `POST /platform/auth/login` 🔓
+Platform Super Admin login endpoint.
+
+---
+
+### 5.3 Managers Management (OWNER Only)
+
+Base path: `/managers`
+
+#### `POST /managers` 🛡️
+Create a new dedicated manager account.
+
+#### `PATCH /managers/promote/:teacherId` 🛡️
+Promote an existing teacher to hold dual Manager privileges.
+
+#### `PATCH /managers/demote/:teacherId` 🛡️
+Demote a teacher-manager back to standard teacher permissions.
+
+#### `PATCH /managers/:id/permissions` 🛡️
+Set custom permission overrides array for a manager.
+
+#### `GET /managers` 🛡️
+List all administrative manager accounts in the school.
+
+#### `DELETE /managers/:id` 🛡️
+Delete a manager account.
+
+---
+
+### 5.4 Permissions & Dynamic Role Controls
+
+Base path: `/permissions`
+
+#### `GET /permissions` 🔐
+Get current user's effective permission list.
+
+#### `POST /permissions/sync-financial` 🛡️
+Sync default financial permissions across role documents.
+
+---
+
+### 5.5 Dashboards & Analytics
+
+Base path: `/dashboards`
+
+#### `GET /dashboards/owner` 🛡️ (OWNER)
+Get complete executive financial, academic, and administrative analytics.
+
+#### `GET /dashboards/manager` 🛡️ (MANAGER)
+Get manager dashboard filtered by granted permission permissions.
+
+#### `GET /dashboards/super-admin` 🛡️ (SUPER_ADMIN)
+Get cross-tenant platform overview analytics.
+
+---
+
+### 5.6 Admin User Management
 
 Base path: `/admin`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/admin/register` | 🔓 | Register a new admin account |
-| `POST` | `/admin/login` | 🔓 | Admin login (returns JWT) |
-| `GET` | `/admin` | 🔓 | Get all admins |
-| `GET` | `/admin/:id` | 🔓 | Get admin by ID |
-| `PATCH` | `/admin/:id` | 🔓 | Update admin details |
-| `DELETE` | `/admin/:id` | 🔓 | Delete an admin |
+#### `GET /admin` 🔐
+List all admin accounts in the tenant.
 
-#### `POST /admin/register`
+#### `GET /admin/:id` 🔐
+Get admin profile by ID.
 
-```json
-{
-  "username": "admin_ali",
-  "email": "ali@school.com",
-  "password": "Admin@123"
-}
-```
+#### `PATCH /admin/:id` 🔐
+Update admin profile details.
 
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `username` | String | ✅ | Min 3 chars |
-| `email` | String | ✅ | Valid email |
-| `password` | String | ✅ | Min 6 chars |
-
-**Errors:** `409 Conflict` if username or email already exists.
-
-#### `POST /admin/login`
-
-```json
-{
-  "identifier": "admin_ali",
-  "password": "Admin@123"
-}
-```
+#### `DELETE /admin/:id` 🔐
+Delete an admin account.
 
 ---
 
-### 5.7 Students
+### 5.7 Academic Years & Start New Year Wizard
 
-Base path: `/students`
+Base path: `/academic-years`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/students` | 🔓 | Create a new student |
-| `GET` | `/students` | 🔓 | List students (paginated + filterable) |
-| `GET` | `/students/list` | 🔓 | Simplified list for dropdowns |
-| `GET` | `/students/me` | 🔐 | Get authenticated student's own profile |
-| `GET` | `/students/:id` | 🔓 | Get student by ID |
-| `PATCH` | `/students/:id` | 🔓 | Update student |
-| `PATCH` | `/students/:id/toggle-active` | 🔓 | Toggle active status |
-| `DELETE` | `/students/:id` | 🔓 | Delete student |
-| `POST` | `/students/request-password-setup` | 🔓 | Send OTP to student email |
-| `POST` | `/students/set-password` | 🔓 | Set password using OTP |
-
-#### `POST /students` — Create Student
+#### `POST /academic-years` 🔐
+Create a new academic year (archives the current active year).
 
 ```json
 {
-  "firstName": "Ahmed",
-  "familyName": "Hassan",
-  "fatherName": "Mohamed",
-  "birthDate": "2010-05-15",
-  "gender": "male",
-  "nationality": "Egyptian",
-  "academicYear": "2024-2025",
-  "phoneNumber": "+20 1234567890",
-  "email": "ahmed.parent@gmail.com",
-  "address": "123 Nile Street, Cairo",
-  "previousSchool": "Cairo Primary School",
-  "registrationDate": "2026-01-01",
-  "notes": "Allergic to peanuts",
-  "classId": "6650a1b2c3d4e5f6a7b8c9d0",
-  "installmentPlanId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "isActive": true,
-  "password": "Student@123"
+  "name": "2027/2028",
+  "startDate": "2027-09-01",
+  "endDate": "2028-05-15",
+  "status": "active"
 }
 ```
 
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `firstName` | String | ✅ | Min 2 chars |
-| `familyName` | String | ✅ | Min 2 chars |
-| `fatherName` | String | ✅ | Min 2 chars |
-| `birthDate` | String | ✅ | ISO date string |
-| `gender` | String | ✅ | `"male"` \| `"female"` |
-| `nationality` | String | ✅ | |
-| `academicYear` | String | ✅ | |
-| `phoneNumber` | String | ✅ | Digits, spaces, `+`, `-`, `()` only |
-| `email` | String | ✅ | Valid email |
-| `address` | String | ✅ | |
-| `previousSchool` | String | ❌ | |
-| `registrationDate` | String | ❌ | ISO date string |
-| `notes` | String | ❌ | |
-| `classId` | String | ❌ | MongoDB ObjectId |
-| `installmentPlanId` | String | ❌ | MongoDB ObjectId; omit for single payment |
-| `isActive` | Boolean | ❌ | Default: `true` |
-| `password` | String | ❌ | Min 6 chars; defaults to `schoolEmail` if omitted |
+#### `GET /academic-years` 🔐
+List all academic years for the tenant.
 
-#### `POST /students/request-password-setup`
+#### `GET /academic-years/active` 🔐
+Get the currently active academic year.
 
-```json
-{ "email": "ahmed.parent@gmail.com" }
-```
+#### `GET /academic-years/:id` 🔐
+Get academic year details.
 
-#### `POST /students/set-password`
+#### `PATCH /academic-years/:id` 🔐
+Update academic year details.
 
-```json
-{
-  "email": "ahmed.parent@gmail.com",
-  "otp": "123456",
-  "password": "NewPass@123"
-}
-```
+#### `PATCH /academic-years/:id/setup-step` 🔐
+Update setup wizard progress step (`setup_terms`, `setup_stages`, `setup_classes`, `setup_subject_offerings`, `setup_teacher_assignments`, `setup_schedule`, `completed`).
+
+#### `DELETE /academic-years/:id` 🔐
+Delete an academic year.
 
 ---
 
-### 5.8 Teachers
+### 5.8 Terms
 
-Base path: `/teachers`
+Base path: `/terms`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/teachers` | 🔓 | Create a new teacher |
-| `GET` | `/teachers` | 🔓 | List teachers (paginated + filterable) |
-| `GET` | `/teachers/list` | 🔓 | Simplified list for dropdowns |
-| `GET` | `/teachers/me` | 🛡️ | Get authenticated teacher's profile |
-| `GET` | `/teachers/by-subject/:subjectId` | 🔓 | Get teachers for a specific subject |
-| `GET` | `/teachers/:id` | 🔓 | Get teacher by ID |
-| `PATCH` | `/teachers/:id` | 🔓 | Update teacher |
-| `PATCH` | `/teachers/:id/toggle-active` | 🔓 | Toggle active status |
-| `DELETE` | `/teachers/:id` | 🔓 | Delete teacher |
+#### `POST /terms` 🔐
+Create a single term.
 
-#### `POST /teachers` — Create Teacher
+#### `POST /terms/bulk` 🔐
+Create bulk terms for an academic year.
 
 ```json
 {
-  "name": "Dr. Fatima Ali",
-  "email": "fatima.ali@school.com",
-  "phoneNumber": "+20 1098765432",
-  "subjectIds": ["6650a1b2c3d4e5f6a7b8c9d0"],
-  "qualification": "PhD in Physics",
-  "experience": "10+ years",
-  "specialization": "Secondary Education",
-  "hireDate": "2020-09-01",
-  "address": "45 University Road, Alexandria",
-  "isActive": true,
-  "password": "Teacher@123"
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "terms": [
+    { "name": "ترم 1", "order": 1, "startDate": "2027-09-01", "endDate": "2027-11-15" },
+    { "name": "ترم 2", "order": 2, "startDate": "2027-11-29", "endDate": "2028-02-15" },
+    { "name": "ترم 3", "order": 3, "startDate": "2028-02-22", "endDate": "2028-05-15" }
+  ]
 }
 ```
 
-| Field | Type | Required | Validation |
-|---|---|---|---|
-| `name` | String | ✅ | Min 2 chars |
-| `email` | String | ✅ | Valid email |
-| `phoneNumber` | String | ❌ | International phone format |
-| `subjectIds` | String[] | ✅ | Array of ObjectIds; min 1 item |
-| `qualification` | String | ❌ | |
-| `experience` | String | ❌ | |
-| `specialization` | String | ❌ | |
-| `hireDate` | String | ✅ | ISO date string |
-| `address` | String | ❌ | |
-| `isActive` | Boolean | ✅ | |
-| `password` | String | ✅ | Min 6 chars |
+#### `POST /terms/copy-from/:targetYearId/:sourceYearId` 🔐
+Copy term names & structure from a previous academic year.
+
+#### `GET /terms` 🔐
+List terms (filterable by `academicYearId`).
+
+#### `GET /terms/:id` 🔐
+Get term details.
+
+#### `PATCH /terms/:id` 🔐
+Update term details.
+
+#### `DELETE /terms/:id` 🔐
+Delete a term.
 
 ---
 
-### 5.9 Classes
+### 5.9 Stages
+
+Base path: `/stages`
+
+#### `POST /stages` 🔐
+Create a tenant-scoped stage (e.g., "الابتدائي").
+
+#### `GET /stages` 🔐
+List all tenant stages sorted by order.
+
+#### `GET /stages/:id` 🔐
+Get stage details.
+
+#### `PATCH /stages/:id` 🔐
+Update stage name or order.
+
+#### `DELETE /stages/:id` 🔐
+Delete a stage.
+
+---
+
+### 5.10 Grade Levels
+
+Base path: `/grade-levels`
+
+#### `POST /grade-levels` 🔐
+Create a grade level linked to a stage.
+
+#### `GET /grade-levels` 🔐
+List all grade levels sorted by global progression order.
+
+#### `GET /grade-levels/next/:id` 🔐
+Get the next grade level in progression (used for student promotion preview).
+
+#### `GET /grade-levels/:id` 🔐
+Get grade level details.
+
+#### `PATCH /grade-levels/:id` 🔐
+Update grade level.
+
+#### `DELETE /grade-levels/:id` 🔐
+Delete a grade level.
+
+---
+
+### 5.11 Classes
 
 Base path: `/classes`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/classes` | 🔓 | Create a new class |
-| `GET` | `/classes` | 🔓 | List classes (paginated + filterable) |
-| `GET` | `/classes/list` | 🔓 | Simplified list for dropdowns |
-| `GET` | `/classes/my-classes` | 🔐 | Classes the authenticated teacher teaches |
-| `GET` | `/classes/student/me` | 🔐 | The authenticated student's class |
-| `GET` | `/classes/student/me/mates` | 🔐 | The authenticated student's classmates |
-| `GET` | `/classes/:id` | 🔓 | Get class by ID |
-| `GET` | `/classes/:id/students` | 🔓 | Get all students in a class |
-| `PATCH` | `/classes/:id` | 🔓 | Update class details |
-| `PATCH` | `/classes/:id/toggle-active` | 🔓 | Toggle active status |
-| `PATCH` | `/classes/:id/add-student/:studentId` | 🔓 | Add a student to a class |
-| `PATCH` | `/classes/:id/remove-student/:studentId` | 🔓 | Remove a student from a class |
-| `DELETE` | `/classes/:id` | 🔓 | Delete class |
-
-#### `POST /classes` — Create Class
+#### `POST /classes` 🔐
+Create a classroom section under a grade level and academic year.
 
 ```json
 {
-  "academicYear": "2024-2025",
+  "name": "1/1",
+  "gradeLevelId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
   "gender": "male",
-  "subjectIds": ["6650a1b2c3d4e5f6a7b8c9d0"],
-  "teacherInChargeId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "roomNumber": "A101",
-  "maxCapacity": 35,
-  "isActive": true
+  "maxCapacity": 30,
+  "roomNumber": "A-101"
 }
 ```
 
----
+#### `POST /classes/copy-from/:targetYearId/:sourceYearId` 🔐
+Copy class names, capacities, and room numbers from previous academic year.
 
-### 5.10 Subjects
+#### `GET /classes` 🔐
+List classes (filter by `academicYearId`, `gradeLevelId`).
 
-Base path: `/subjects`
+#### `GET /classes/list` 🔐
+Get simplified class list for dropdowns.
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/subjects` | 🔓 | Create a new subject |
-| `GET` | `/subjects` | 🔐 | List subjects (paginated + filterable) — role-aware |
-| `GET` | `/subjects/list` | 🔓 | Simplified list for dropdowns |
-| `GET` | `/subjects/student/me` | 🔐 | Subjects for the authenticated student |
-| `GET` | `/subjects/teacher/me` | 🔐 | Subjects taught by the authenticated teacher |
-| `GET` | `/subjects/:id` | 🔓 | Get subject by ID |
-| `PATCH` | `/subjects/:id` | 🔓 | Update subject |
-| `DELETE` | `/subjects/:id` | 🔓 | Delete subject |
+#### `GET /classes/:id` 🔐
+Get class details.
 
-#### `POST /subjects`
+#### `PATCH /classes/:id` 🔐
+Update class details.
 
-```json
-{
-  "subjectName": "Mathematics",
-  "subjectCode": "MATH-101",
-  "classIds": ["6650a1b2c3d4e5f6a7b8c9d0"]
-}
-```
+#### `PATCH /classes/:id/toggle-active` 🔐
+Toggle active/inactive status.
+
+#### `DELETE /classes/:id` 🔐
+Delete a class.
 
 ---
 
-### 5.11 Attendance
+### 5.12 Enrollments & Bulk Student Promotion
 
-Base path: `/attendance`
+Base path: `/enrollments`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/attendance` | 🔓 | Record an absence (mark student absent) |
-| `GET` | `/attendance` | 🔓 | List records (filterable by `studentId`, `classId`, `date`) |
-| `GET` | `/attendance/student/me` | 🔐 | Authenticated student's own absence records |
-| `PATCH` | `/attendance/:id` | 🔓 | Update an attendance record |
-| `DELETE` | `/attendance/:id` | 🔓 | Delete an attendance record |
-
-#### `POST /attendance`
+#### `POST /enrollments` 🔐
+Enroll a student into a class for an academic year.
 
 ```json
 {
   "studentId": "6650a1b2c3d4e5f6a7b8c9d0",
   "classId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "date": "2026-07-21"
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d2"
 }
 ```
 
+#### `GET /enrollments` 🔐
+List enrollments with pagination and filters.
+
+#### `GET /enrollments/promotion-preview/:targetAcademicYearId` 🔐
+Preview bulk student promotion mapping to next grade level classes.
+
+#### `POST /enrollments/bulk-promote/:targetAcademicYearId` 🔐
+Execute bulk promotion of students into target year classes.
+
+```json
+{
+  "promotions": [
+    { "studentId": "6650a1b2c3d4e5f6a7b8c9d0", "targetClassId": "6650a1b2c3d4e5f6a7b8c9d3", "action": "promote" },
+    { "studentId": "6650a1b2c3d4e5f6a7b8c9d1", "targetClassId": "6650a1b2c3d4e5f6a7b8c9d1", "action": "retain" }
+  ]
+}
+```
+
+#### `GET /enrollments/student/:studentId` 🔐
+Get student enrollment history across academic years.
+
+#### `DELETE /enrollments/:id` 🔐
+Remove student enrollment.
+
 ---
 
-### 5.12 Lectures
+### 5.13 Subject Offerings
+
+Base path: `/subject-offerings`
+
+#### `POST /subject-offerings` 🔐
+Create a subject offering mapping a subject to a grade level and term.
+
+#### `POST /subject-offerings/copy-from/:targetYearId/:sourceYearId` 🔐
+Copy subject offerings from a previous academic year.
+
+#### `GET /subject-offerings` 🔐
+List subject offerings (filter by `gradeLevelId`, `termId`).
+
+#### `GET /subject-offerings/:id` 🔐
+Get subject offering details.
+
+#### `DELETE /subject-offerings/:id` 🔐
+Delete a subject offering.
+
+---
+
+### 5.14 Teacher Assignments
+
+Base path: `/teacher-assignments`
+
+#### `POST /teacher-assignments` 🔐
+Assign a teacher to a subject offering.
+
+#### `GET /teacher-assignments` 🔐
+List teacher assignments.
+
+#### `GET /teacher-assignments/:id` 🔐
+Get assignment details.
+
+#### `DELETE /teacher-assignments/:id` 🔐
+Delete teacher assignment.
+
+---
+
+### 5.15 Subjects Catalog
+
+Base path: `/subjects`
+
+#### `POST /subjects` 🔐
+Create a new master subject in the tenant catalog.
+
+#### `GET /subjects` 🔐
+List master subjects.
+
+#### `GET /subjects/student/me` 🔐 (STUDENT)
+Get subjects offered to the logged-in student.
+
+#### `GET /subjects/teacher/me` 🔐 (TEACHER)
+Get subjects taught by the logged-in teacher.
+
+#### `GET /subjects/list` 🔐
+Simplified subject list for UI dropdowns.
+
+#### `GET /subjects/:id` 🔐
+Get subject details by ID.
+
+#### `PATCH /subjects/:id` 🔐
+Update subject details.
+
+#### `DELETE /subjects/:id` 🔐
+Delete subject.
+
+---
+
+### 5.16 Teachers
+
+Base path: `/teachers`
+
+#### `POST /teachers` 🔐
+Add a new teacher profile.
+
+#### `GET /teachers` 🔐
+List teachers (paginated + filterable).
+
+#### `GET /teachers/me` 🔐 (TEACHER)
+Get authenticated teacher profile.
+
+#### `GET /teachers/list` 🔐
+Simplified teacher list for dropdowns.
+
+#### `GET /teachers/:id` 🔐
+Get teacher details.
+
+#### `PATCH /teachers/:id` 🔐
+Update teacher profile.
+
+#### `PATCH /teachers/:id/toggle-active` 🔐
+Toggle teacher active status.
+
+#### `DELETE /teachers/:id` 🔐
+Delete a teacher profile.
+
+---
+
+### 5.17 Students & Portal OTP Setup
+
+Base path: `/students`
+
+#### `POST /students` 🔐
+Create a new student profile.
+
+#### `GET /students` 🔐
+List students (paginated + filterable).
+
+#### `GET /students/list` 🔐
+Simplified student list for dropdowns.
+
+#### `GET /students/me` 🔐 (STUDENT)
+Get logged-in student profile.
+
+#### `GET /students/:id` 🔐
+Get student details.
+
+#### `PATCH /students/:id` 🔐
+Update student profile.
+
+#### `PATCH /students/:id/toggle-active` 🔐
+Toggle student active status.
+
+#### `DELETE /students/:id` 🔐
+Delete student.
+
+#### `POST /students/request-password-setup` 🔓
+Request OTP for portal activation.
+
+#### `POST /students/set-password` 🔓
+Set portal password using OTP.
+
+---
+
+### 5.18 Attendance
+
+Base path: `/attendance`
+
+#### `POST /attendance` 🔐
+Record student attendance for a class lecture.
+
+```json
+{
+  "studentId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "classId": "6650a1b2c3d4e5f6a7b8c9d1",
+  "date": "2026-09-02",
+  "status": "present"
+}
+```
+
+#### `GET /attendance` 🔐
+List attendance records (filter by `classId`, `date`, `studentId`).
+
+#### `GET /attendance/student/me` 🔐 (STUDENT)
+Get authenticated student attendance history.
+
+#### `PATCH /attendance/:id` 🔐
+Update attendance record.
+
+#### `DELETE /attendance/:id` 🔐
+Delete attendance record.
+
+---
+
+### 5.19 Lectures & Copy Schedule Engine
 
 Base path: `/lectures`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/lectures` | 🔓 | Create a lecture (schedule slot) |
-| `GET` | `/lectures` | 🛡️ | List lectures (role-aware) |
-| `GET` | `/lectures/student/me` | 🔐 | Weekly schedule for authenticated student |
-| `GET` | `/lectures/teacher/me/classes` | 🔐 | Classes the authenticated teacher teaches |
-| `GET` | `/lectures/student/:id` | 🔓 | All lectures for a specific student |
-| `GET` | `/lectures/:id` | 🔓 | Get lecture by ID |
-| `PATCH` | `/lectures/:id` | 🔓 | Update lecture |
-| `DELETE` | `/lectures/:id` | 🔓 | Delete lecture |
+#### `POST /lectures` 🔐
+Create a single timetable lecture slot.
 
-#### `POST /lectures`
+#### `POST /lectures/copy-from/:targetYearId/:targetTermId/:sourceTermId` 🔐
+Execute Copy Schedule Engine (Wizard Step 7). Returns 4 result buckets:
+- `created`: Successfully matched & created lectures.
+- `unresolved`: Subject not offered in target term.
+- `needsTeacher`: Subject offered, but no teacher assigned in target year.
+- `teacherConflict`: Teacher already booked at slot in target term (created with `teacherId = null`).
 
-```json
-{
-  "classId": "6650a1b2c3d4e5f6a7b8c9d0",
-  "subjectId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "teacherId": "6650a1b2c3d4e5f6a7b8c9d2",
-  "dayOfWeek": "Sunday",
-  "slot": 1
-}
-```
+#### `GET /lectures` 🔐
+List timetable lectures (filter by `termId`, `classId`, `teacherId`).
 
-#### `GET /lectures/teacher/me/classes` — Query Parameters
+#### `GET /lectures/:id` 🔐
+Get lecture details.
 
-| Param | Type | Required |
-|---|---|---|
-| `subjectId` | String | ❌ |
+#### `PATCH /lectures/:id` 🔐
+Update lecture slot or teacher.
+
+#### `DELETE /lectures/:id` 🔐
+Delete lecture slot.
 
 ---
 
-### 5.13 Exams
+### 5.20 Exams & Online Quiz System
 
-Base path: `/exams`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+Base path: `/exams`
 
-| Method | Endpoint | Who Can | Description |
-|---|---|---|---|
-| `POST` | `/exams` | Teacher | Create exam |
-| `GET` | `/exams` | Admin/Teacher | List all exams (role-filtered) |
-| `GET` | `/exams/student/me` | Student | Get student's exams |
-| `GET` | `/exams/:id` | All | Get exam by ID |
-| `PATCH` | `/exams/:id` | Teacher | Update exam |
-| `DELETE` | `/exams/:id` | Teacher/Admin | Delete exam |
-| `DELETE` | `/exams/deleteAll` | Admin | Delete all exams |
-| `POST` | `/exams/:examId/questions` | Teacher | Add question |
-| `PATCH` | `/exams/:examId/questions/:questionId` | Teacher | Update question |
-| `DELETE` | `/exams/:examId/questions/:questionId` | Teacher | Delete question |
-| `POST` | `/exams/:examId/start` | Student | Start exam, get remaining seconds |
-| `POST` | `/exams/:examId/grade` | Student | Submit answers for grading |
-| `PATCH` | `/exams/:examId/students/:studentId/grade` | Teacher | Manually edit a student's grade |
+#### `POST /exams` 🔐
+Create an exam or online quiz.
 
-#### `POST /exams` — Create Exam
+#### `GET /exams` 🔐
+List exams.
 
-```json
-{
-  "gradesCriteriaId": "6650a1b2c3d4e5f6a7b8c9d0",
-  "subjectId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "academicYear": "2024-2025",
-  "classIds": ["6650a1b2c3d4e5f6a7b8c9d2"],
-  "examType": "quiz",
-  "grade": 10,
-  "startDate": "2026-07-22T09:00:00.000Z",
-  "endDate": "2026-07-22T10:00:00.000Z",
-  "duration": 45,
-  "questions": [
-    {
-      "question": "What is the capital of France?",
-      "options": ["London", "Paris", "Berlin", "Madrid"],
-      "correctAnswer": "Paris"
-    }
-  ]
-}
-```
+#### `GET /exams/student/me` 🔐 (STUDENT)
+Get active exams for student.
 
-#### `POST /exams/:examId/grade` — Submit Answers
+#### `GET /exams/:id` 🔐
+Get exam details with questions.
 
-```json
-{
-  "answers": [
-    { "questionId": "6650a1b2c3d4e5f6a7b8c9d0", "answer": "Paris" }
-  ]
-}
-```
+#### `PATCH /exams/:id` 🔐
+Update exam parameters.
 
-**Response includes:** `examId`, `examType`, `totalQuestions`, `correctAnswers`, `percentage`, `maxGrade`, `achievedGrade`, `results[]`, `passed`.
+#### `DELETE /exams/:id` 🔐
+Delete exam.
 
-#### `GET /exams/student/me` — Query Parameters
+#### `POST /exams/:examId/questions` 🔐
+Add a question to exam.
 
-| Param | Type | Description |
-|---|---|---|
-| `examType` | String | `quiz` \| `assignment` \| `activity` \| `final` |
-| `academicYear` | String | |
-| `subjectId` | ObjectId | |
-| `gradesCriteriaId` | ObjectId | |
-| `status` | String | `upcoming` \| `available` \| `expired` |
+#### `PATCH /exams/:examId/questions/:questionId` 🔐
+Update an exam question.
+
+#### `DELETE /exams/:examId/questions/:questionId` 🔐
+Delete an exam question.
+
+#### `POST /exams/:examId/start` 🔐 (STUDENT)
+Start taking an online exam.
+
+#### `POST /exams/:examId/grade` 🔐 (STUDENT)
+Submit answers for automated grading.
+
+#### `PATCH /exams/:examId/students/:studentId/grade` 🔐 (TEACHER)
+Manually grade or override student exam score.
+
+#### `DELETE /exams/deleteAll` 🔐
+Bulk delete exams.
 
 ---
 
-### 5.14 Grades Criteria
+### 5.21 Grades Criteria
 
-Base path: `/gradesCriteria`
+Base path: `/grades-criteria`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/gradesCriteria` | 🔓 | Create grading criteria |
-| `GET` | `/gradesCriteria` | 🛡️ | List all criteria (role-filtered) |
-| `GET` | `/gradesCriteria/student/me` | 🔐 | Criteria for authenticated student |
-| `GET` | `/gradesCriteria/student/me/subjects` | 🔐 | Subjects of authenticated student |
-| `GET` | `/gradesCriteria/student/me/grades` | 🔐 | Grades for authenticated student (requires `?subjectId=`) |
-| `GET` | `/gradesCriteria/:id` | 🔓 | Get by ID |
-| `PATCH` | `/gradesCriteria/:id` | 🔓 | Update criteria |
-| `DELETE` | `/gradesCriteria/:id` | 🔓 | Delete criteria |
+#### `POST /grades-criteria` 🔐
+Create grade weighting criteria for a subject and academic year.
 
-#### `POST /gradesCriteria`
+#### `GET /grades-criteria` 🔐
+List grade criteria.
 
-```json
-{
-  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
-  "academicYear": "2024-2025",
-  "final": 50,
-  "assignments": 5,
-  "assignmentsCount": 3,
-  "activities": 10,
-  "projects": 15,
-  "projectsCount": 2,
-  "quizzes": 5,
-  "quizzesCount": 4
-}
-```
+#### `GET /grades-criteria/my-criteria` 🔐 (STUDENT)
+Get grade criteria for student's subjects.
+
+#### `GET /grades-criteria/my-subjects` 🔐 (STUDENT)
+Get student's subjects list.
+
+#### `GET /grades-criteria/my-grades` 🔐 (STUDENT)
+Get student's computed grades breakdown.
+
+#### `GET /grades-criteria/:id` 🔐
+Get criteria details.
+
+#### `PATCH /grades-criteria/:id` 🔐
+Update grade criteria percentages.
+
+#### `DELETE /grades-criteria/:id` 🔐
+Delete grade criteria.
 
 ---
 
-### 5.15 Projects
+### 5.22 Projects & File Submissions
 
-Base path: `/projects`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**  
-**File uploads use `Content-Type: multipart/form-data`.**
+Base path: `/projects`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/projects` | 🛡️ | Create project with files (Teacher) |
-| `GET` | `/projects` | 🛡️ | List all projects (role-aware) |
-| `GET` | `/projects/teacher/me` | 🔐 | Projects created by the authenticated teacher |
-| `GET` | `/projects/student/me` | 🔐 | Projects for the authenticated student |
-| `GET` | `/projects/submissions` | 🔐 | Teacher lists submissions by subject + class |
-| `DELETE` | `/projects/deleteAll` | 🛡️ | Delete all projects (Admin) |
-| `GET` | `/projects/:id` | 🛡️ | Get project by ID |
-| `GET` | `/projects/:id/download` | 🔐 | Download project files as ZIP |
-| `PATCH` | `/projects/:id` | 🛡️ | Update project |
-| `DELETE` | `/projects/:id` | 🛡️ | Delete project |
-| `POST` | `/projects/:id/files` | 🛡️ | Add files to project |
-| `DELETE` | `/projects/:id/files/:filename` | 🛡️ | Remove a file from project |
-| `POST` | `/projects/:projectId/submit` | 🔐 | Student uploads submission files |
-| `DELETE` | `/projects/:projectId/submit/files/:filename` | 🔐 | Student removes submission file |
-| `GET` | `/projects/:projectId/my-submission` | 🔐 | Student views their own submission |
-| `GET` | `/projects/:projectId/submissions` | 🔐 | Teacher lists all submissions |
-| `GET` | `/projects/:projectId/submissions/:studentId/download` | 🔐 | Teacher downloads student submission as ZIP |
-| `PATCH` | `/projects/:projectId/submissions/:studentId/grade` | 🔐 | Teacher grades a student submission |
+#### `POST /projects` 🔐
+Create a project assignment.
 
-#### `POST /projects` — Create Project (`multipart/form-data`)
+#### `GET /projects` 🔐
+List project assignments.
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `classIds` | String[] | ✅ | Array of class ObjectIds |
-| `subjectId` | String | ✅ | ObjectId |
-| `academicYear` | String | ✅ | |
-| `title` | String | ✅ | |
-| `description` | String | ✅ | |
-| `dueDate` | String | ✅ | ISO 8601 datetime |
-| `files` | File[] | ❌ | Max 10 files, 20MB each |
+#### `GET /projects/teacher/me` 🔐 (TEACHER)
+Get projects created by teacher.
 
-#### `GET /projects/submissions` — Query Parameters
+#### `GET /projects/student/me` 🔐 (STUDENT)
+Get projects assigned to student.
 
-| Param | Type | Required |
-|---|---|---|
-| `subjectId` | ObjectId | ✅ |
-| `classId` | ObjectId | ✅ |
+#### `GET /projects/:id` 🔐
+Get project details.
 
-#### `PATCH /projects/:projectId/submissions/:studentId/grade`
+#### `GET /projects/:id/download` 🔐
+Download project instructions file.
 
-```json
-{ "achievedGrade": 18.5 }
-```
+#### `PATCH /projects/:id` 🔐
+Update project.
 
----
+#### `DELETE /projects/:id` 🔐
+Delete project.
 
-### 5.16 Preparation
+#### `POST /projects/:id/files` 🔐
+Upload additional files to project.
 
-Base path: `/preparation`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**  
-**File uploads use `Content-Type: multipart/form-data`.**
+#### `DELETE /projects/:id/files/:filename` 🔐
+Delete project file attachment.
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/preparation` | 🛡️ | Create preparation with files for a lecture |
-| `GET` | `/preparation` | 🛡️ | List preparations (filterable by `lecture`) |
-| `GET` | `/preparation/:id` | 🛡️ | Get preparation by ID |
-| `PATCH` | `/preparation/:id` | 🛡️ | Update preparation |
-| `DELETE` | `/preparation/:id` | 🛡️ | Delete preparation |
-| `POST` | `/preparation/:id/files` | 🛡️ | Add files to a preparation |
-| `DELETE` | `/preparation/:id/files/:filename` | 🛡️ | Remove a file from preparation |
+#### `GET /projects/submissions` 🔐
+List project submissions.
 
-#### `POST /preparation` — (`multipart/form-data`)
+#### `POST /projects/:projectId/submit` 🔐 (STUDENT)
+Submit student project response file.
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `lecture` | String | ✅ | Lecture ID (ObjectId) |
-| `files` | File[] | ❌ | Max 10 files, 20MB each |
+#### `DELETE /projects/:projectId/submit/files/:filename` 🔐 (STUDENT)
+Remove file from project submission.
+
+#### `GET /projects/:projectId/my-submission` 🔐 (STUDENT)
+Get logged-in student's project submission status.
+
+#### `GET /projects/:projectId/submissions` 🔐 (TEACHER)
+List all student submissions for a project.
+
+#### `GET /projects/:projectId/submissions/:studentId/download` 🔐 (TEACHER)
+Download student submission file.
+
+#### `PATCH /projects/:projectId/submissions/:studentId/grade` 🔐 (TEACHER)
+Grade student project submission.
+
+#### `DELETE /projects/deleteAll` 🔐
+Bulk delete projects.
 
 ---
 
-### 5.17 Library
+### 5.23 Lesson Preparation
+
+Base path: `/preparation`
+
+#### `POST /preparation` 🔐 (TEACHER)
+Create lesson preparation record for a lecture.
+
+#### `GET /preparation` 🔐
+List lesson preparations.
+
+#### `GET /preparation/:id` 🔐
+Get lesson preparation details.
+
+#### `PATCH /preparation/:id` 🔐
+Update lesson preparation.
+
+#### `DELETE /preparation/:id` 🔐
+Delete lesson preparation.
+
+#### `POST /preparation/:id/files` 🔐
+Upload attachments to lesson preparation.
+
+#### `DELETE /preparation/:id/files/:filename` 🔐
+Delete attachment from lesson preparation.
+
+---
+
+### 5.24 Digital Library
 
 Base path: `/library`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/library` | 🔓 | Create a library resource link |
-| `GET` | `/library` | 🔓 | List library items (paginated + filterable) |
-| `GET` | `/library/list` | 🔓 | Simplified list for dropdowns |
-| `PATCH` | `/library/:id` | 🔓 | Update a library item |
-| `DELETE` | `/library/:id` | 🔓 | Delete a library item |
+#### `POST /library` 🔐
+Add a new resource link to digital library.
 
-#### `POST /library`
+#### `GET /library` 🔐
+List library resources.
 
-```json
-{
-  "title": "Khan Academy - Algebra",
-  "link": "https://www.khanacademy.org/math/algebra",
-  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
-  "academicYear": "2024-2025"
-}
-```
+#### `GET /library/:id` 🔐
+Get library resource details.
+
+#### `PATCH /library/:id` 🔐
+Update library resource.
+
+#### `DELETE /library/:id` 🔐
+Delete library resource.
 
 ---
 
-### 5.18 Financial — Records
+### 5.25 Financial — Records & Student Ledgers
 
-Base path: `/financial/records`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+Base path: `/financial-records`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/financial/records` | 🛡️ | List all financial records (Admin) |
-| `GET` | `/financial/records/me` | 🔐 | Student's own financial record |
-| `GET` | `/financial/records/me/summary` | 🔐 | Student's installment summary |
-| `GET` | `/financial/records/me/trips` | 🔐 | Student's trips overview |
-| `GET` | `/financial/records/:studentId` | 🛡️ | Full financial record for a student |
-| `GET` | `/financial/records/:studentId/summary` | 🛡️ | Installment summary for a student |
-| `POST` | `/financial/records/:studentId/tuition/pay` | 🛡️ | Record a tuition installment payment |
+#### `GET /financial-records` 🛡️
+List financial records for all students.
 
-#### `GET /financial/records` — Filter Parameters
+#### `GET /financial-records/me` 🔐 (STUDENT)
+Get logged-in student's financial ledger.
 
-| Param | Type |
-|---|---|
-| `academicYear` | String |
-| `classId` | ObjectId |
-| `studentName` | String |
-| `tuitionStatus` | `unpaid` \| `partial` \| `paid` |
+#### `GET /financial-records/me/summary` 🔐 (STUDENT)
+Get summary of dues & payments.
 
-#### `POST /financial/records/:studentId/tuition/pay`
+#### `GET /financial-records/me/trips` 🔐 (STUDENT)
+Get student trip financial records.
 
-```json
-{
-  "amount": 5000,
-  "paidAt": "2026-07-21T10:00:00.000Z",
-  "notes": "Received in cash at front desk"
-}
-```
+#### `GET /financial-records/:studentId` 🛡️
+Get specific student's financial record.
+
+#### `GET /financial-records/:studentId/summary` 🛡️
+Get student financial summary.
+
+#### `POST /financial-records/:studentId/tuition/pay` 🛡️
+Record a tuition fee payment.
 
 ---
 
-### 5.19 Financial — Fee Configs
+### 5.26 Financial — Fee Configs
 
-Base path: `/financial/fee-configs`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+Base path: `/fee-configs`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/financial/fee-configs` | 🛡️ | Create fee config for an academic year |
-| `GET` | `/financial/fee-configs` | 🛡️ | List all fee configurations |
-| `GET` | `/financial/fee-configs/:id` | 🛡️ | Get fee config by ID |
-| `PATCH` | `/financial/fee-configs/:id` | 🛡️ | Update fee config |
-| `DELETE` | `/financial/fee-configs/:id` | 🛡️ | Delete (blocked if used by students) |
+#### `POST /fee-configs` 🛡️
+Create annual tuition fee configuration.
 
-#### `POST /financial/fee-configs`
+#### `GET /fee-configs` 🛡️
+List fee configurations.
 
-```json
-{
-  "academicYear": "2024-2025",
-  "tuitionFee": 20000
-}
-```
+#### `GET /fee-configs/:id` 🛡️
+Get fee configuration details.
+
+#### `PATCH /fee-configs/:id` 🛡️
+Update fee configuration.
+
+#### `DELETE /fee-configs/:id` 🛡️
+Delete fee configuration.
 
 ---
 
-### 5.20 Financial — Installment Plans
+### 5.27 Financial — Installment Plans
 
-Base path: `/financial/installment-plans`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+Base path: `/installment-plans`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/financial/installment-plans` | 🛡️ | Create an installment plan template |
-| `GET` | `/financial/installment-plans` | 🛡️ | List all installment plans |
-| `GET` | `/financial/installment-plans/:id` | 🛡️ | Get by ID |
-| `PATCH` | `/financial/installment-plans/:id` | 🛡️ | Update plan |
-| `PATCH` | `/financial/installment-plans/:id/set-default` | 🛡️ | Set as system default |
-| `DELETE` | `/financial/installment-plans/:id` | 🛡️ | Delete (blocked if used by students) |
+#### `POST /installment-plans` 🛡️
+Create tuition installment plan template.
 
-#### `POST /financial/installment-plans`
+#### `GET /installment-plans` 🛡️
+List installment plans.
 
-```json
-{
-  "name": "Three Installments",
-  "description": "Paid across 3 terms",
-  "numberOfInstallments": 3,
-  "dueDates": ["2024-09-01", "2025-01-01", "2025-04-01"]
-}
-```
+#### `GET /installment-plans/:id` 🛡️
+Get installment plan details.
+
+#### `PATCH /installment-plans/:id` 🛡️
+Update installment plan template.
+
+#### `PATCH /installment-plans/:id/set-default` 🛡️
+Set plan as default for new enrollments.
+
+#### `DELETE /installment-plans/:id` 🛡️
+Delete installment plan template.
 
 ---
 
-### 5.21 Financial — Discounts
+### 5.28 Financial — Discounts
 
-Base path: `/financial/discounts`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+Base path: `/discounts`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/financial/discounts` | 🛡️ | Create a discount template |
-| `GET` | `/financial/discounts` | 🛡️ | List all discount templates |
-| `GET` | `/financial/discounts/:id` | 🛡️ | Get by ID |
-| `PATCH` | `/financial/discounts/:id` | 🛡️ | Update template |
-| `DELETE` | `/financial/discounts/:id` | 🛡️ | Delete template |
-| `POST` | `/financial/discounts/apply/tuition/:studentId` | 🛡️ | Apply discount to student tuition |
-| `DELETE` | `/financial/discounts/apply/tuition/:studentId` | 🛡️ | Remove discount from student tuition |
-| `POST` | `/financial/discounts/apply/bus/:studentId` | 🛡️ | Apply discount to student bus fee |
-| `DELETE` | `/financial/discounts/apply/bus/:studentId` | 🛡️ | Remove discount from student bus fee |
-| `POST` | `/financial/discounts/apply/trips/:studentId/:tripId` | 🛡️ | Apply discount to a student trip |
-| `DELETE` | `/financial/discounts/apply/trips/:studentId/:tripId` | 🛡️ | Remove discount from a student trip |
+#### `POST /discounts` 🛡️
+Create discount policy.
 
-#### Apply Discount Request Body
+#### `GET /discounts` 🛡️
+List discount policies.
 
-```json
-{ "discountId": "6650a1b2c3d4e5f6a7b8c9d0" }
-```
+#### `GET /discounts/:id` 🛡️
+Get discount policy details.
 
----
+#### `PATCH /discounts/:id` 🛡️
+Update discount policy.
 
-### 5.22 Financial — Additional Fees
+#### `DELETE /discounts/:id` 🛡️
+Delete discount policy.
 
-Base path: `/financial/additional-fees`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+#### `POST /discounts/apply/tuition/:studentId` 🛡️
+Apply discount to student tuition.
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/financial/additional-fees` | 🛡️ | Create additional fee — auto-assigned to target students |
-| `GET` | `/financial/additional-fees` | 🛡️ | List all additional fees |
-| `GET` | `/financial/additional-fees/:id` | 🛡️ | Get by ID |
-| `DELETE` | `/financial/additional-fees/:id` | 🛡️ | Delete fee and remove from all student records |
-| `POST` | `/financial/additional-fees/:feeId/pay/:studentId` | 🛡️ | Record payment for an additional fee |
+#### `DELETE /discounts/apply/tuition/:studentId` 🛡️
+Remove discount from student tuition.
+
+#### `POST /discounts/apply/bus/:studentId` 🛡️
+Apply discount to student bus fee.
+
+#### `DELETE /discounts/apply/bus/:studentId` 🛡️
+Remove discount from student bus fee.
+
+#### `POST /discounts/apply/trips/:studentId/:tripId` 🛡️
+Apply discount to student trip fee.
+
+#### `DELETE /discounts/apply/trips/:studentId/:tripId` 🛡️
+Remove discount from student trip fee.
 
 ---
 
-### 5.23 Financial — Bus Module
+### 5.29 Financial — Additional Fees
 
-Base path: `/financial/bus`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+Base path: `/additional-fees`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `GET` | `/financial/bus` | 🛡️ | List students enrolled in bus service |
-| `GET` | `/financial/bus/candidates` | 🛡️ | List students not enrolled (new enrollment candidates) |
-| `GET` | `/financial/bus/me` | 🔐 | Student's own bus plan details |
-| `GET` | `/financial/bus/:studentId` | 🛡️ | Bus profile for a specific student |
-| `POST` | `/financial/bus/:studentId/enroll` | 🛡️ | Enroll student in bus service |
-| `POST` | `/financial/bus/:studentId/pay` | 🛡️ | Record a bus payment |
-| `DELETE` | `/financial/bus/:studentId/unenroll` | 🛡️ | Unenroll student from bus service |
+#### `POST /additional-fees` 🛡️
+Create an additional fee (books, uniform, exam fees).
 
-#### `POST /financial/bus/:studentId/enroll`
+#### `GET /additional-fees` 🛡️
+List additional fees.
 
-```json
-{
-  "serviceType": "both",
-  "fee": 3000,
-  "installmentPlanId": "6650a1b2c3d4e5f6a7b8c9d0"
-}
-```
+#### `GET /additional-fees/:id` 🛡️
+Get additional fee details.
 
-**`serviceType` values:** `"pickup"` | `"dropoff"` | `"both"`
+#### `DELETE /additional-fees/:id` 🛡️
+Delete additional fee.
 
-**List endpoints filter parameters:** `academicYear`, `classId`, `page`, `limit`
+#### `POST /additional-fees/:feeId/pay/:studentId` 🛡️
+Record student payment for additional fee.
 
 ---
 
-### 5.24 Financial — Trips Module
+### 5.30 Financial — Bus Subscription Module
 
-Base path: `/financial/trips`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+Base path: `/bus-subscriptions` & `/bus`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/financial/trips` | 🛡️ | Create a trip template |
-| `GET` | `/financial/trips` | 🛡️ | List trip templates |
-| `GET` | `/financial/trips/:tripTemplateId` | 🛡️ | Get trip template details |
-| `GET` | `/financial/trips/:tripTemplateId/students` | 🛡️ | List students enrolled in a trip |
-| `GET` | `/financial/trips/:tripTemplateId/candidates` | 🛡️ | List students who can be added |
-| `POST` | `/financial/trips/:tripTemplateId/enroll` | 🛡️ | Add a student to a trip |
-| `DELETE` | `/financial/trips/:tripTemplateId/students/:studentId` | 🛡️ | Remove a student from a trip |
+#### `GET /bus-subscriptions` 🛡️
+List all bus subscription records.
+
+#### `GET /bus-subscriptions/candidates` 🛡️
+List students eligible for bus enrollment.
+
+#### `GET /bus-subscriptions/me` 🔐 (STUDENT)
+Get student's own bus subscription status.
+
+#### `GET /bus-subscriptions/:studentId` 🛡️
+Get specific student's bus subscription.
+
+#### `POST /bus-subscriptions/:studentId/enroll` 🛡️
+Enroll student in bus service (`pickup`, `dropoff`, `both`).
+
+#### `POST /bus-subscriptions/:studentId/pay` 🛡️
+Record bus fee payment.
+
+#### `DELETE /bus-subscriptions/:studentId/unenroll` 🛡️
+Unenroll student from bus service.
+
+#### `POST /bus/enroll` 🛡️
+Legacy bus enrollment endpoint.
+
+#### `GET /bus` 🛡️
+Legacy list bus subscriptions endpoint.
+
+#### `POST /bus/pay` 🛡️
+Legacy bus payment endpoint.
+
+#### `DELETE /bus/unenroll` 🛡️
+Legacy unenroll endpoint.
 
 ---
 
-### 5.25 Expenses — Categories
+### 5.31 Financial — Trips Subscription Module
 
-Base path: `/expenses/categories`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+Base path: `/trip-subscriptions` & `/trips`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/expenses/categories` | 🛡️ | Create an expense category |
-| `GET` | `/expenses/categories` | 🛡️ | List all categories |
-| `GET` | `/expenses/categories/:id` | 🛡️ | Get category by ID |
-| `PATCH` | `/expenses/categories/:id` | 🛡️ | Update a category |
-| `DELETE` | `/expenses/categories/:id` | 🛡️ | Delete category (blocked if has expenses) |
+#### `POST /trip-subscriptions` 🛡️
+Create a new school trip event template.
 
-#### `POST /expenses/categories`
+#### `GET /trip-subscriptions` 🛡️
+List all trip templates.
 
-```json
-{ "name": "Utilities", "description": "Electricity, water, internet" }
-```
+#### `GET /trip-subscriptions/:tripTemplateId` 🛡️
+Get trip template details.
+
+#### `GET /trip-subscriptions/:tripTemplateId/students` 🛡️
+List students registered for trip.
+
+#### `GET /trip-subscriptions/:tripTemplateId/candidates` 🛡️
+List candidates eligible for trip.
+
+#### `POST /trip-subscriptions/:tripTemplateId/students/:studentId/register` 🛡️
+Register student for trip.
+
+#### `POST /trip-subscriptions/:tripTemplateId/students/:studentId/pay` 🛡️
+Record payment for trip.
+
+#### `DELETE /trip-subscriptions/:tripTemplateId/students/:studentId/unregister` 🛡️
+Unregister student from trip.
+
+#### `DELETE /trip-subscriptions/:tripTemplateId` 🛡️
+Delete trip template.
+
+#### `POST /trips` 🛡️
+Legacy create trip endpoint.
+
+#### `GET /trips` 🛡️
+Legacy list trips endpoint.
+
+#### `POST /trips/register` 🛡️
+Legacy trip registration endpoint.
+
+#### `POST /trips/pay` 🛡️
+Legacy trip payment endpoint.
 
 ---
 
-### 5.26 Expenses
+### 5.32 Expenses — Categories
 
-Base path: `/expenses`  
-**All endpoints require `JwtAuthGuard` + `AbilitiesGuard`.**
+Base path: `/expense-categories`
 
-| Method | Endpoint | Auth | Description |
-|---|---|---|---|
-| `POST` | `/expenses` | 🛡️ | Create an expense |
-| `GET` | `/expenses` | 🛡️ | List expenses (paginated + filterable) |
-| `GET` | `/expenses/:id` | 🛡️ | Get expense by ID |
-| `PATCH` | `/expenses/:id` | 🛡️ | Update an expense |
-| `DELETE` | `/expenses/:id` | 🛡️ | Delete an expense |
+#### `POST /expense-categories` 🛡️
+Create expense category (salaries, utilities, maintenance).
 
-#### `POST /expenses`
+#### `GET /expense-categories` 🛡️
+List expense categories.
 
-```json
-{
-  "name": "Electricity Bill - September",
-  "amount": 1500,
-  "categoryId": "6650a1b2c3d4e5f6a7b8c9d0",
-  "academicYear": "2024-2025",
-  "date": "2026-07-01"
-}
-```
+#### `GET /expense-categories/:id` 🛡️
+Get category details.
 
-#### `GET /expenses` — Filter Parameters
+#### `PATCH /expense-categories/:id` 🛡️
+Update expense category.
 
-| Param | Type |
-|---|---|
-| `name` | String |
-| `categoryId` | ObjectId |
-| `academicYear` | String |
-| `dateFrom` | Date |
-| `dateTo` | Date |
+#### `DELETE /expense-categories/:id` 🛡️
+Delete expense category.
+
+---
+
+### 5.33 Expenses
+
+Base path: `/expenses`
+
+#### `POST /expenses` 🛡️
+Log a new operational expense.
+
+#### `GET /expenses` 🛡️
+List operational expenses with pagination and filtering.
+
+#### `GET /expenses/:id` 🛡️
+Get expense record details.
+
+#### `PATCH /expenses/:id` 🛡️
+Update expense record.
+
+#### `DELETE /expenses/:id` 🛡️
+Delete expense record.
+
+---
+
+### 5.34 System Health & Diagnostics
+
+Base path: `/`
+
+#### `GET /health-check` 🔓
+Basic health check endpoint returning server timestamp & uptime.
+
+#### `GET /api/v1/health-check` 🔓
+Versioned health check alias endpoint.
+
+#### `GET /test` 🔓
+Diagnostic endpoint.
 
 ---
 
 ## 6. Standard Response Envelope
 
-All responses are wrapped by the global `ResponseInterceptor`.
-
-**Success:**
+All API responses are wrapped by the `ResponseInterceptor`:
 
 ```json
 {
-  "success": true,
   "statusCode": 200,
-  "data": { }
+  "message": "Operation successful",
+  "data": { ... },
+  "timestamp": "2026-07-30T14:05:00.000Z"
 }
 ```
-
-**Paginated Success:**
-
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "data": [ ],
-  "meta": {
-    "total": 150,
-    "page": 1,
-    "limit": 10,
-    "totalPages": 15
-  }
-}
-```
-
-**Error:**
-
-```json
-{
-  "success": false,
-  "statusCode": 404,
-  "message": "Student not found"
-}
-```
-
-**Common HTTP Status Codes:**
-
-| Code | Meaning |
-|---|---|
-| `200` | OK |
-| `201` | Created |
-| `400` | Bad Request / Validation Error |
-| `401` | Unauthorized — missing or invalid JWT |
-| `403` | Forbidden — insufficient permissions |
-| `404` | Not Found |
-| `409` | Conflict — duplicate resource |
-| `500` | Internal Server Error |
 
 ---
 
 ## 7. Environment Variables
 
-| Variable | Required | Example | Description |
-|---|---|---|---|
-| `MONGODB_URI` | ✅ | `mongodb://localhost:27017/aura-school-system` | MongoDB connection string |
-| `PORT` | ❌ | `3000` | Server port (default: `3000`) |
-| `JWT_SECRET` | ✅ | `your_super_secret_key_here` | Secret for signing JWT tokens |
-| `JWT_EXPIRE_IN` | ❌ | `1d` | JWT expiration duration (default: `1d`) |
-
-### Example `.env`
-
-```dotenv
-# Database
-MONGODB_URI=mongodb://localhost:27017/aura-school-system
-
-# Server
+```env
 PORT=3000
-
-# Authentication
-JWT_SECRET=your_super_secret_key_here_min_32_chars
-JWT_EXPIRE_IN=1d
+MONGO_URI=mongodb://localhost:27017/nasaq-db
+JWT_SECRET=your_jwt_secret_key
+JWT_EXPIRATION=7d
 ```
-
-> ⚠️ **Security Warning:** Never commit real secrets to version control. `JWT_SECRET` should be at least 32 random characters.
-
-### Running with Docker
-
-```bash
-docker compose up -d
-```
-
-This starts the application and a MongoDB instance using the environment variables in `docker-compose.yaml`.
-
----
-
-*Documentation generated from `src/` source code scan — Aura School System v1.0*

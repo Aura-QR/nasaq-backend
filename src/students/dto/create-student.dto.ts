@@ -8,7 +8,6 @@ import {
   IsEnum,
   Matches,
   IsBoolean,
-  IsMongoId,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -48,11 +47,6 @@ export class CreateStudentDto {
 
   @IsString()
   @IsNotEmpty()
-  @ApiProperty({ description: 'The academic year of the student' })
-  academicYear: string;
-
-  @IsString()
-  @IsNotEmpty()
   @Matches(/^[0-9+\-\s()]+$/, { message: 'صيغة رقم الهاتف غير صحيحة' })
   @ApiProperty({ description: 'The phone number of the student' })
   phoneNumber: string;
@@ -81,16 +75,6 @@ export class CreateStudentDto {
   @IsOptional()
   @ApiProperty({ description: 'The notes of the student', required: false })
   notes?: string;
-
-  @IsMongoId()
-  @IsOptional()
-  @ApiProperty({ description: 'The class ID of the student', required: false, example: '6650a1b2c3d4e5f6a7b8c9d0' })
-  classId?: string;
-
-  @IsMongoId()
-  @IsOptional()
-  @ApiProperty({ description: 'Installment plan ID. Omit to create a single full installment due immediately.', required: false, example: '6650a1b2c3d4e5f6a7b8c9d0' })
-  installmentPlanId?: string;
 
   @IsBoolean()
   @IsOptional()

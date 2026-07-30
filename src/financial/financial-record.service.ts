@@ -68,10 +68,10 @@ export class FinancialRecordService {
     const cls = await this.classModel.findById(classId).exec();
     if (!cls) return;
 
-    const feeConfig = await this.feeConfigModel.findOne({ academicYear: cls.academicYear }).exec();
+    const feeConfig = await this.feeConfigModel.findOne({ academicYearId: cls.academicYearId }).exec();
     if (!feeConfig) {
       throw new BadRequestException(
-        `لا توجد معايير رسوم للعام الدراسي "${cls.academicYear}". يرجى إنشاؤها أولاً قبل إضافة الطالب للفصل.`,
+        `لا توجد معايير رسوم للعام الدراسي المحدد. يرجى إنشاؤها أولاً قبل إضافة الطالب للفصل.`,
       );
     }
 
@@ -87,7 +87,7 @@ export class FinancialRecordService {
     // Use findOneAndUpdate with upsert to make this atomic and avoid race conditions.
     // $setOnInsert only runs when a new document is created; $set runs on both create and update.
     const existing = await this.recordModel.findOneAndUpdate(
-      { studentId: studentOid, academicYear: cls.academicYear },
+      { studentId: studentOid, academicYearId: cls.academicYearId },
       {
         $set: {
           classId: classOid,
@@ -116,7 +116,7 @@ export class FinancialRecordService {
     if (existing) {
       const feeChanged = existing.feeConfigId.toString() !== (feeConfig._id as mongoose.Types.ObjectId).toString();
       if (feeChanged) {
-        const record = await this.recordModel.findOne({ studentId: studentOid, academicYear: cls.academicYear }).exec();
+        const record = await this.recordModel.findOne({ studentId: studentOid, academicYearId: cls.academicYearId }).exec();
         if (record) {
           record.tuition.fee = feeConfig.tuitionFee;
           record.tuition.netFee = feeConfig.tuitionFee;
@@ -241,7 +241,7 @@ export class FinancialRecordService {
 
     return {
       studentId: record.studentId,
-      academicYear: record.academicYear,
+      academicYearId: record.academicYearId,
       tuition: {
         fee: record.tuition.discount ? record.tuition.netFee : record.tuition.fee,
         discountApplied: !!record.tuition.discount,

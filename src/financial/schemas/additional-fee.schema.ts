@@ -27,8 +27,8 @@ export class AdditionalFee extends Document {
   @Prop({ type: mongoose.Schema.Types.ObjectId, default: null })
   targetId: mongoose.Types.ObjectId | null;
 
-  @Prop({ default: null })
-  targetAcademicYear: string | null;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'AcademicYear', default: null })
+  targetAcademicYearId: mongoose.Types.ObjectId | null;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true })
   createdBy: mongoose.Types.ObjectId;

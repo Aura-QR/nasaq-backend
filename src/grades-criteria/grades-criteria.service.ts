@@ -33,7 +33,6 @@ export class GradesCriteriaService {
     @InjectModel(ProjectSubmission.name) private submissionModel: Model<ProjectSubmission>,
   ) {}
 
-
   private validateObjectId(id: string, entityName: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException(`صيغة معرف ${entityName} غير صحيحة`);
@@ -47,31 +46,14 @@ export class GradesCriteriaService {
     }
   }
 
-
-  async getMyGradesCriteria(studentId: string, subjectId?: string, academicYear?: string) {
-    const student = await this.studentModel.findById(studentId);
-    if (!student) {
-      throw new NotFoundException(`الطالب غير موجود`);
-    }
-
-    if (!student.classId) {
-      return { message: 'الطالب غير مسجل في أي فصل', data: [] };
-    }
-
-    const classData = await this.classModel.findById(student.classId);
-    if (!classData || !classData.subjectIds?.length) {
-      return { message: 'لا توجد مواد مرتبطة بفصل الطالب', data: [] };
-    }
-
-    const query: any = { subjectId: { $in: classData.subjectIds } };
-
+  async getMyGradesCriteria(studentId: string, subjectId?: string, academicYearId?: string) {
+    const query: any = {};
     if (subjectId) {
       this.validateObjectId(subjectId, 'subject');
       query.subjectId = new mongoose.Types.ObjectId(subjectId);
     }
-
-    if (academicYear) {
-      query.academicYear = academicYear;
+    if (academicYearId) {
+      query.academicYearId = new mongoose.Types.ObjectId(academicYearId);
     }
 
     const gradesCriteria = await this.gradesCriteriaModel
@@ -87,27 +69,10 @@ export class GradesCriteriaService {
   }
 
   async getMySubjects(studentId: string) {
-    const student = await this.studentModel.findById(studentId);
-    if (!student) {
-      throw new NotFoundException('الطالب غير موجود');
-    }
-
-    if (!student.classId) {
-      return { message: 'الطالب غير مسجل في أي فصل', data: [] };
-    }
-
-    const classData = await this.classModel
-      .findById(student.classId)
-      .populate('subjectIds', 'subjectName subjectCode')
-      .exec();
-
-    if (!classData || !classData.subjectIds?.length) {
-      return { message: 'لا توجد مواد في فصل الطالب', data: [] };
-    }
-
+    const subjects = await this.subjectModel.find().exec();
     return {
-      message: 'تم استرجاع مواد الطالب بنجاح',
-      data: classData.subjectIds,
+      message: 'تم استرجاع المواد بنجاح',
+      data: subjects,
     };
   }
 
@@ -119,29 +84,13 @@ export class GradesCriteriaService {
       throw new NotFoundException('الطالب غير موجود');
     }
 
-    if (!student.classId) {
-      throw new BadRequestException('الطالب غير مسجل في أي فصل');
-    }
-
-    const classData = await this.classModel.findById(student.classId).exec();
-    if (!classData) {
-      throw new NotFoundException('فصل الطالب غير موجود');
-    }
-
-    const subjectInClass = classData.subjectIds.some(
-      (id) => id.toString() === subjectId,
-    );
-    if (!subjectInClass) {
-      throw new BadRequestException('هذه المادة غير مرتبطة بفصل الطالب');
-    }
-
     const criteria = await this.gradesCriteriaModel
-      .findOne({ subjectId, academicYear: classData.academicYear })
+      .findOne({ subjectId: new mongoose.Types.ObjectId(subjectId) })
       .populate('subjectId', 'subjectName subjectCode')
       .exec();
 
     if (!criteria) {
-      throw new NotFoundException('لا توجد معايير تقييم لهذه المادة في العام الدراسي الحالي');
+      throw new NotFoundException('لا توجد معايير تقييم لهذه المادة');
     }
 
     const assignmentsCount = criteria.assignmentsCount || 1;
@@ -152,25 +101,19 @@ export class GradesCriteriaService {
     const gradePerQuiz = criteria.quizzes / quizzesCount;
     const gradePerProject = criteria.projects / projectsCount;
 
-    // Fetch all exams for this subject + class, sorted by creation date
     const exams = await this.examModel
-      .find({ subjectId, classIds: { $in: [student.classId] } })
+      .find({ subjectId })
       .sort({ createdAt: 1 })
       .select('_id examType')
       .exec();
 
     const examIds = exams.map(e => e._id);
-
-    // Fetch all results this student has for those exams
     const results = await this.examResultModel
       .find({ studentId, examId: { $in: examIds } })
       .select('examId achievedGrade')
       .exec();
 
-    // Map examId -> achievedGrade for quick lookup
     const resultMap = new Map(results.map(r => [r.examId.toString(), r.achievedGrade]));
-
-    // Group exams by type in order → determines numbering (quiz 1, quiz 2 ...)
     const byType: Record<string, string[]> = { quiz: [], assignment: [], activity: [], final: [] };
     exams.forEach(e => { if (byType[e.examType]) byType[e.examType].push(e._id.toString()); });
 
@@ -180,7 +123,7 @@ export class GradesCriteriaService {
       message: 'تم استرجاع درجات الطالب بنجاح',
       data: {
         subject: criteria.subjectId,
-        academicYear: criteria.academicYear,
+        academicYearId: criteria.academicYearId,
         grades: {
           final: {
             grade: byType.final[0] ? gradeFor(byType.final[0]) : 0,
@@ -211,32 +154,31 @@ export class GradesCriteriaService {
   }
 
   async create(createGradesCriteriaDto: CreateGradesCriteriaDto) {
-    const {subjectId, academicYear} = createGradesCriteriaDto;
+    const { subjectId, academicYearId } = createGradesCriteriaDto as any;
 
     this.validateObjectId(subjectId, 'subject');
     this.validateGradesSum(createGradesCriteriaDto);
 
     const subject = await this.subjectModel.findById(subjectId);
-
     if (!subject) {
       throw new NotFoundException(`المادة ذات المعرف ${subjectId} غير موجودة`);
     }
 
-
     const existingCriteria = await this.gradesCriteriaModel.findOne({
-      subjectId: subjectId,
-      academicYear: academicYear
+      subjectId: new mongoose.Types.ObjectId(subjectId),
+      academicYearId: new mongoose.Types.ObjectId(academicYearId),
     });
 
     if (existingCriteria) {
       throw new BadRequestException(
-        `معايير التقييم موجودة بالفعل للمادة ${subject.subjectName} (${subject.subjectCode}) في العام الدراسي ${academicYear}`
+        `معايير التقييم موجودة بالفعل للمادة ${subject.subjectName} (${subject.subjectCode}) في هذا العام الدراسي`,
       );
     }
 
     const newGradesCriteria = new this.gradesCriteriaModel({
       ...createGradesCriteriaDto,
-      subjectId: subjectId,
+      subjectId: new mongoose.Types.ObjectId(subjectId),
+      academicYearId: new mongoose.Types.ObjectId(academicYearId),
     });
 
     await newGradesCriteria.save();
@@ -248,8 +190,6 @@ export class GradesCriteriaService {
   async filtering(filters: any, pagination: PaginationDto = {}, user?: any) {
     const query: any = {};
 
-    const exactMatchFields = ['academicYear'];
-
     for (const [key, value] of Object.entries(filters)) {
       if (value === undefined || value === null || value === '') continue;
       if (key === 'page' || key === 'limit') continue;
@@ -259,39 +199,13 @@ export class GradesCriteriaService {
       if (key === 'subjectId') {
         this.validateObjectId(stringValue, 'subject');
         query[key] = new mongoose.Types.ObjectId(stringValue);
-      } else if (key === 'final' || key === 'assignments' || key === 'activities' || key === 'projects' || key === 'quizzes') {
+      } else if (key === 'academicYearId') {
+        this.validateObjectId(stringValue, 'academicYear');
+        query[key] = new mongoose.Types.ObjectId(stringValue);
+      } else if (['final', 'assignments', 'activities', 'projects', 'quizzes'].includes(key)) {
         query[key] = Number(stringValue);
-      } else if (exactMatchFields.includes(key)) {
-        query[key] = stringValue;
       } else {
         query[key] = stringValue;
-      }
-    }
-
-    if (user?.role === 'TEACHER') {
-      const teacher = await this.teacherModel.findById(user.userId).select('subjectIds').lean();
-      let teacherSubjectIds = (teacher?.subjectIds ?? []).map((id: any) => id.toString());
-
-      // Fallback for older data where teacher-subject links may exist only in lectures.
-      if (teacherSubjectIds.length === 0) {
-        const lectureSubjectIds = await this.tLectureModel
-          .distinct('subjectId', { teacherId: new mongoose.Types.ObjectId(user.userId) });
-        teacherSubjectIds = lectureSubjectIds.map((id: any) => id.toString());
-      }
-
-      if (teacherSubjectIds.length > 0) {
-        if (query.subjectId instanceof mongoose.Types.ObjectId) {
-          const requestedSubjectId = query.subjectId.toString();
-          query.subjectId = teacherSubjectIds.includes(requestedSubjectId)
-            ? query.subjectId
-            : null;
-        } else {
-          query.subjectId = {
-            $in: teacherSubjectIds.map((id) => new mongoose.Types.ObjectId(id)),
-          };
-        }
-      } else {
-        query.subjectId = null;
       }
     }
 
@@ -313,22 +227,22 @@ export class GradesCriteriaService {
       return {
         data: gradesCriteria.map(grade => transformGradesCriteriaResponse(grade)),
         totalDocs: paginationMeta.total,
-        totalPages: paginationMeta.totalPages
+        totalPages: paginationMeta.totalPages,
       };
     }
 
     return gradesCriteria.map(grade => transformGradesCriteriaResponse(grade));
   }
 
-  async findOne(id: string){
+  async findOne(id: string) {
     this.validateObjectId(id, 'gradesCriteria');
     const data = await this.gradesCriteriaModel
       .findById(id)
       .populate('subjectId', 'subjectName subjectCode');
-      if(!data){
-       throw new NotFoundException(`معايير التقييم ذات المعرف ${id} غير موجودة`);
-      }
-      return transformGradesCriteriaResponse(data);
+    if (!data) {
+      throw new NotFoundException(`معايير التقييم ذات المعرف ${id} غير موجودة`);
+    }
+    return transformGradesCriteriaResponse(data);
   }
 
   async update(id: string, updateGradesCriteriaDto: UpdateGradesCriteriaDto) {
@@ -341,13 +255,11 @@ export class GradesCriteriaService {
 
     if (updateGradesCriteriaDto.subjectId) {
       this.validateObjectId(updateGradesCriteriaDto.subjectId, 'subject');
-
       const subject = await this.subjectModel.findById(updateGradesCriteriaDto.subjectId);
       if (!subject) {
         throw new NotFoundException(`المادة ذات المعرف ${updateGradesCriteriaDto.subjectId} غير موجودة`);
       }
     }
-
 
     const mergedData = {
       final: updateGradesCriteriaDto.final ?? existingGradesCriteria.final,
@@ -362,9 +274,8 @@ export class GradesCriteriaService {
     const updatedGradesCriteria = await this.gradesCriteriaModel.findByIdAndUpdate(
       id,
       updateGradesCriteriaDto,
-      { new: true, runValidators: true }
-    )
-    .populate('subjectId', 'subjectName subjectCode');
+      { new: true, runValidators: true },
+    ).populate('subjectId', 'subjectName subjectCode');
 
     return transformGradesCriteriaResponse(updatedGradesCriteria);
   }
@@ -377,14 +288,12 @@ export class GradesCriteriaService {
       throw new NotFoundException(`معايير التقييم ذات المعرف ${id} غير موجودة`);
     }
 
-    // Collect exam and project IDs before deleting so we can clean up their results
     const exams = await this.examModel.find({ gradesCriteriaId: id }).select('_id').exec();
     const projects = await this.projectModel.find({ gradesCriteriaId: id }).select('_id').exec();
 
     const examIds = exams.map(e => e._id);
     const projectIds = projects.map(p => p._id);
 
-    // Delete grade results tied to those exams and projects
     if (examIds.length > 0) {
       await this.examResultModel.deleteMany({ examId: { $in: examIds } });
     }
@@ -392,15 +301,14 @@ export class GradesCriteriaService {
       await this.submissionModel.deleteMany({ projectId: { $in: projectIds } });
     }
 
-    // Cascade delete exams and projects
     await this.examModel.deleteMany({ gradesCriteriaId: id });
     await this.projectModel.deleteMany({ gradesCriteriaId: id });
 
     await this.gradesCriteriaModel.findByIdAndDelete(id);
 
     return {
-      message: `تم حذف معايير التقييم ذات المعرف ${id} بنجاح (بما في ذلك الامتحانات والمشاريع ونتائجها المرتبطة)`,
-      data: result
+      message: `تم حذف معايير التقييم ذات المعرف ${id} بنجاح`,
+      data: result,
     };
   }
 }

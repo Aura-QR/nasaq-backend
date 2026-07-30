@@ -46,7 +46,7 @@ export class SubjectsController {
   async findAll(@CurrentUser() user: any, @Query() queryParams: any) {
     const { page, limit, ...filters } = queryParams;
     const pagination: PaginationDto = { page, limit };
-    return await this.subjectsService.filtering(filters, pagination, user);
+    return await this.subjectsService.filtering(filters, pagination);
   }
 
   @ApiOperation({ summary: 'Get subjects for the authenticated student' })

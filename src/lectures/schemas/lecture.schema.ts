@@ -11,31 +11,40 @@ export class Lecture {
     type: MongooseSchema.Types.ObjectId,
     ref: 'Class',
     required: true,
-    index: true
+    index: true,
   })
   classId: MongooseSchema.Types.ObjectId;
 
   @Prop({
     type: MongooseSchema.Types.ObjectId,
-    ref: 'Subject',
+    ref: 'SubjectOffering',
     required: true,
-    index: true
+    index: true,
   })
-  subjectId: MongooseSchema.Types.ObjectId;
+  subjectOfferingId: MongooseSchema.Types.ObjectId;
+
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Term',
+    required: true,
+    index: true,
+  })
+  termId: MongooseSchema.Types.ObjectId;
 
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'Teacher',
-    required: true,
-    index: true
+    required: false,
+    default: null,
+    index: true,
   })
-  teacherId: MongooseSchema.Types.ObjectId;
+  teacherId?: MongooseSchema.Types.ObjectId;
 
   @Prop({
     type: String,
     required: true,
     enum: Object.values(DayOfWeek),
-    index: true
+    index: true,
   })
   dayOfWeek: DayOfWeek;
 
@@ -44,13 +53,13 @@ export class Lecture {
     required: true,
     min: 1,
     max: 10,
-    index: true
+    index: true,
   })
   slot: number;
 
   @Prop({
     type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Preparation' }],
-    default: []
+    default: [],
   })
   preparation: MongooseSchema.Types.ObjectId[];
 }
@@ -58,7 +67,17 @@ export class Lecture {
 export const LectureSchema = SchemaFactory.createForClass(Lecture);
 LectureSchema.plugin(tenantScopedPlugin);
 
-LectureSchema.index({ schoolId: 1, classId: 1, dayOfWeek: 1, slot: 1 });
-LectureSchema.index({ schoolId: 1, teacherId: 1 });
+// Unique slot per class per term
+LectureSchema.index(
+  { schoolId: 1, classId: 1, dayOfWeek: 1, slot: 1, termId: 1 },
+  { unique: true },
+);
 
-
+// Partial unique slot per teacher per term (skips null teacherId for "needs teacher" state)
+LectureSchema.index(
+  { schoolId: 1, teacherId: 1, dayOfWeek: 1, slot: 1, termId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { teacherId: { $ne: null } },
+  },
+);

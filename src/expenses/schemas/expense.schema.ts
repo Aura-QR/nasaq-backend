@@ -17,8 +17,8 @@ export class Expense extends Document {
   @Prop({ required: true })
   date: Date;
 
-  @Prop()
-  academicYear: string;
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'AcademicYear', default: null, index: true })
+  academicYearId: mongoose.Types.ObjectId | null;
 
   @Prop()
   notes: string;
@@ -32,4 +32,4 @@ ExpenseSchema.plugin(tenantScopedPlugin);
 
 ExpenseSchema.index({ schoolId: 1, categoryId: 1 });
 ExpenseSchema.index({ schoolId: 1, date: -1 });
-ExpenseSchema.index({ schoolId: 1, academicYear: 1 });
+ExpenseSchema.index({ schoolId: 1, academicYearId: 1 });

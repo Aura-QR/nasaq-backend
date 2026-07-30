@@ -19,11 +19,17 @@ export class Library extends Document {
   })
   subjectId?: mongoose.Types.ObjectId;
 
-  @Prop({ required: false })
-  academicYear?: string;
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'AcademicYear',
+    required: false,
+    default: null,
+  })
+  academicYearId?: mongoose.Types.ObjectId;
 }
 
 export const LibrarySchema = SchemaFactory.createForClass(Library);
 LibrarySchema.plugin(tenantScopedPlugin);
 
 LibrarySchema.index({ schoolId: 1, subjectId: 1 });
+LibrarySchema.index({ schoolId: 1, academicYearId: 1 });

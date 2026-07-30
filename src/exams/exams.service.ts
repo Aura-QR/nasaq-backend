@@ -71,7 +71,7 @@ export class ExamsService {
 
   async create(createExamDto: CreateExamDto, user: any) {
 
-    const { subjectId, academicYear, classIds, examType, questions, startDate, endDate, duration } = createExamDto;
+    const { subjectId, academicYearId, classIds, examType, questions, startDate, endDate, duration } = createExamDto;
 
     if (new Date(endDate) <= new Date(startDate)) {
       throw new BadRequestException('تاريخ انتهاء الامتحان يجب أن يكون بعد تاريخ البداية');
@@ -112,12 +112,12 @@ export class ExamsService {
 
     const gradesCriteria = await this.gradesCriteriaModel.findOne({
       subjectId,
-      academicYear,
+      academicYearId,
     });
 
     if (!gradesCriteria) {
       throw new NotFoundException(
-        `معايير التقييم غير موجودة للمادة ${subjectId} والعام الدراسي ${academicYear}`
+        `معايير التقييم غير موجودة للمادة ${subjectId} لهذا العام الدراسي`
       );
     }
 
@@ -174,7 +174,7 @@ export class ExamsService {
     const exam = await this.examModel.create({
        gradesCriteriaId: gradesCriteria._id,
        subjectId,
-       academicYear,
+       academicYearId,
        classIds,
        examType,
        grade: calculatedGrade,
@@ -206,11 +206,7 @@ export class ExamsService {
       throw new NotFoundException(`الطالب غير موجود`);
     }
 
-    if (!student.classId) {
-      return { message: 'الطالب غير مسجل في أي فصل', data: [] };
-    }
-
-    const query: any = { classIds: { $in: [student.classId] } };
+    const query: any = {};
 
     const allowedFilters: Record<string, 'string' | 'objectId'> = {
       examType: 'string',
@@ -419,23 +415,23 @@ export class ExamsService {
       }
     }
 
-    if (updateExamDto.subjectId || updateExamDto.academicYear) {
+    if (updateExamDto.subjectId || (updateExamDto as any).academicYearId) {
       const subjectId = updateExamDto.subjectId || existingExam.subjectId;
-      const academicYear = updateExamDto.academicYear || existingExam.academicYear;
+      const academicYearId = (updateExamDto as any).academicYearId || existingExam.academicYearId;
 
       if (updateExamDto.subjectId) {
         this.validateObjectId(updateExamDto.subjectId, 'subject');
       }
 
-      if (academicYear) {
+      if (academicYearId) {
         const gradesCriteria = await this.gradesCriteriaModel.findOne({
           subjectId,
-          academicYear,
+          academicYearId,
         });
 
         if (!gradesCriteria) {
           throw new NotFoundException(
-            `معايير التقييم غير موجودة للمادة ${subjectId} والعام الدراسي ${academicYear}`
+            `معايير التقييم غير موجودة للمادة ${subjectId} لهذا العام الدراسي`
           );
         }
 
@@ -765,11 +761,10 @@ export class ExamsService {
     const student = await this.studentModel.findById(studentId).exec();
     if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
-    // Verify teacher teaches this subject in the student's class
+    // Verify teacher teaches this subject
     const lecture = await this.lectureModel.findOne({
       teacherId: new mongoose.Types.ObjectId(String(teacher.userId)),
-      subjectId: exam.subjectId,
-      classId: student.classId,
+      subjectOfferingId: exam.subjectId,
     });
     if (!lecture) {
       throw new ForbiddenException('ليس لديك صلاحية لتعديل درجات هذا الطالب في هذه المادة');

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nasaq — إعداد مدرسة جديدة لأول مرة (نموذج تفاعلي)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F5F7; --surface:#FFFFFF; --surface-alt:#F8FAFB;
+    --ink:#16233A; --ink-soft:#5B6472; --ink-mute:#8A93A0;
+    --border:#E1E5EA; --border-strong:#C7CDD5;
+    --accent:#0F6E56; --accent-bg:#E1F5EE; --accent-dark:#085041;
+    --amber:#8A5A0B; --amber-bg:#FAEEDA;
+    --red:#A32D2D; --red-bg:#FCEBEB;
+    --green:#3B6D11; --green-bg:#EAF3DE;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Tajawal',sans-serif;}
+  .app{display:flex;min-height:100vh;}
+
+  .sidebar{width:260px;flex-shrink:0;background:var(--surface);border-left:1px solid var(--border);padding:22px 16px;position:sticky;top:0;height:100vh;overflow-y:auto;}
+  .brand{display:flex;align-items:center;gap:10px;margin-bottom:4px;padding:0 6px;}
+  .brand-mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;flex-shrink:0;}
+  .brand-name{font-weight:700;font-size:16px;}
+  .brand-sub{font-size:11px;color:var(--ink-mute);padding:0 6px 20px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+
+  .status-badge{display:flex;gap:8px;align-items:center;background:var(--amber-bg);color:var(--amber);border-radius:var(--radius);padding:10px 12px;margin-bottom:18px;font-size:11.5px;line-height:1.6;}
+
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:2px;transition:background .12s;}
+  .nav-item:hover{background:var(--surface-alt);}
+  .nav-item.active{background:var(--accent-bg);}
+  .nav-num{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink-mute);flex-shrink:0;font-weight:700;}
+  .nav-item.active .nav-num{border-color:var(--accent);color:var(--accent-dark);background:#fff;}
+  .nav-item.done .nav-num{background:var(--green);border-color:var(--green);color:#fff;}
+  .nav-label{font-size:12.5px;color:var(--ink-soft);}
+  .nav-item.active .nav-label{color:var(--accent-dark);font-weight:700;}
+  .nav-item.done .nav-label{color:var(--ink);}
+  .nav-tag{margin-right:auto;font-size:10px;padding:1px 7px;border-radius:99px;background:var(--surface-alt);color:var(--ink-mute);}
+  .nav-item.done .nav-tag{background:var(--green-bg);color:var(--green);}
+
+  .content{flex:1;padding:32px 40px;max-width:900px;}
+  .panel{display:none;}
+  .panel.active{display:block;animation:fade .15s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  .eyebrow{font-size:12px;color:var(--accent-dark);font-weight:700;margin-bottom:6px;}
+  h1{font-size:22px;font-weight:900;margin:0 0 6px;}
+  .lede{font-size:13.5px;color:var(--ink-soft);margin:0 0 26px;line-height:1.7;max-width:640px;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:18px;}
+  .card-title{font-size:14px;font-weight:700;margin:0 0 4px;}
+  .card-sub{font-size:12px;color:var(--ink-mute);margin:0 0 16px;}
+
+  label{font-size:12px;color:var(--ink-soft);display:block;margin-bottom:6px;font-weight:500;}
+  input[type=text],input[type=date],input[type=number],input[type=tel],input[type=email],select{width:100%;height:38px;border-radius:8px;border:1px solid var(--border-strong);padding:0 12px;font-family:inherit;font-size:13.5px;background:#fff;color:var(--ink);}
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  .field{margin-bottom:14px;}
+
+  button{font-family:inherit;font-size:13px;font-weight:700;border-radius:8px;padding:9px 18px;cursor:pointer;border:1px solid var(--border-strong);background:#fff;color:var(--ink);transition:opacity .12s;}
+  button:hover{opacity:.85;}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  button.ghost{background:transparent;border-color:var(--border);color:var(--ink-soft);}
+  button.add-row{width:100%;border-style:dashed;color:var(--accent-dark);font-size:12.5px;padding:8px;}
+  .btn-row{display:flex;justify-content:space-between;align-items:center;margin-top:22px;}
+  .btn-row .right{display:flex;gap:8px;}
+
+  .banner{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:8px;font-size:12.5px;margin-bottom:16px;line-height:1.6;}
+  .banner.info{background:var(--accent-bg);color:var(--accent-dark);}
+  .banner.success{background:var(--green-bg);color:var(--green);}
+  .banner.warning{background:var(--amber-bg);color:var(--amber);}
+  .banner.muted{background:var(--surface-alt);color:var(--ink-soft);}
+  .banner.nocopy{background:var(--red-bg);color:var(--red);}
+  .banner .ic{font-weight:900;flex-shrink:0;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:right;font-size:11.5px;color:var(--ink-mute);font-weight:700;padding:8px 10px;border-bottom:1px solid var(--border);}
+  td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  select.inline, input.inline{height:32px;font-size:12.5px;}
+  .rm{color:var(--red);cursor:pointer;font-size:12px;font-weight:700;background:none;border:none;padding:2px;}
+
+  .repeat-row{display:grid;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;}
+  .grades-repeat{grid-template-columns:1fr 40px;}
+  .subjects-repeat{grid-template-columns:1fr 40px;}
+  .teachers-repeat{grid-template-columns:1fr 1fr 1fr 40px;}
+  .stage-block{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;background:var(--surface-alt);}
+  .stage-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .stage-head input{font-weight:700;font-size:14px;border:none;background:transparent;padding:0;height:auto;width:auto;}
+  .stage-head input:focus{box-shadow:none;border-bottom:1.5px solid var(--accent);border-radius:0;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">ن</div><div class="brand-name">Nasaq</div></div>
+    <div class="brand-sub">إعداد مدرسة جديدة — أول مرة</div>
+
+    <div class="status-badge">
+      <span>⚠</span>
+      <span>مفيش سنوات دراسية سابقة على النظام. كل خطوة هنا بتتعمل يدويًا، مفيش «نسخ من سنة سابقة» متاح.</span>
+    </div>
+
+    <nav id="nav"></nav>
+  </aside>
+
+  <main class="content">
+
+    <!-- 1 -->
+    <section class="panel" id="panel-1">
+      <div class="eyebrow">الخطوة ١ من ٩</div>
+      <h1>بيانات المدرسة</h1>
+      <p class="lede">أول حاجة بتتعمل في حياة المدرسة على النظام — الـ Tenant. البيانات دي بتتعمل مرة واحدة بس ومش هتتكرر تاني.</p>
+
+      <div class="card">
+        <div class="grid2">
+          <div class="field"><label>اسم المدرسة</label><input type="text" value="مدرسة النور الأهلية"></div>
+          <div class="field"><label>المدينة</label><input type="text" value="الرياض"></div>
+          <div class="field"><label>البريد الإداري</label><input type="email" value="admin@alnoor.sa"></div>
+          <div class="field"><label>رقم التواصل</label><input type="tel" value="+966 5X XXX XXXX"></div>
+        </div>
+        <div class="banner muted">
+          <span class="ic">ⓘ</span>
+          <span>البيانات دي Tenant-scoped — بتتعمل مرة واحدة ومش بتتكرر ولا تتنسخ أي سنة جاية.</span>
+        </div>
+      </div>
+
+      <div class="btn-row"><span></span><div class="right"><button class="primary" onclick="completeAndGo(1)">حفظ ومتابعة</button></div></div>
+    </section>
+
+    <!-- 2 -->
+    <section class="panel" id="panel-2">
+      <div class="eyebrow">الخطوة ٢ من ٩</div>
+      <h1>المراحل والصفوف الدراسية</h1>
+      <p class="lede">دي أول مرة، يبقى محتاج تبني الهيكل ده من الصفر — مرحلة بمرحلة، وتحت كل مرحلة الصفوف اللي جواها. السنين الجاية هتلاقي الخطوة دي بس شاشة تأكيد، من غير أي بناء.</p>
+
+      <div class="card">
+        <div class="stage-block">
+          <div class="stage-head"><input type="text" value="الابتدائي"><button class="rm" onclick="this.closest('.stage-block').remove()">حذف المرحلة</button></div>
+          <div class="repeat-row grades-repeat"><input class="inline" value="صف أول"><button class="rm">✕</button></div>
+          <div class="repeat-row grades-repeat"><input class="inline" value="صف تاني"><button class="rm">✕</button></div>
+          <div class="repeat-row grades-repeat"><input class="inline" value="صف تالت"><button class="rm">✕</button></div>
+          <button class="add-row">+ إضافة صف دراسي</button>
+        </div>
+        <div class="stage-block">
+          <div class="stage-head"><input type="text" value="المتوسط"><button class="rm" onclick="this.closest('.stage-block').remove()">حذف المرحلة</button></div>
+          <div class="repeat-row grades-repeat"><input class="inline" value="أول متوسط"><button class="rm">✕</button></div>
+          <div class="repeat-row grades-repeat"><input class="inline" value="تاني متوسط"><button class="rm">✕</button></div>
+          <button class="add-row">+ إضافة صف دراسي</button>
+        </div>
+        <button class="add-row" style="margin-top:4px;">+ إضافة مرحلة دراسية جديدة</button>
+      </div>
+
+      <div class="btn-row"><button class="ghost" onclick="goStep(1)">رجوع</button><div class="right"><button class="primary" onclick="completeAndGo(2)">حفظ الهيكل ومتابعة</button></div></div>
+    </section>
+
+    <!-- 3 -->
+    <section class="panel" id="panel-3">
+      <div class="eyebrow">الخطوة ٣ من ٩</div>
+      <h1>بنك المواد الدراسية</h1>
+      <p class="lede">دي أسامي المواد بس (Subjects) — المفهوم المجرد، مش مرتبطة بصف أو ترم لسه. الربط الفعلي بيحصل بعدين في خطوة الـ Subject Offerings.</p>
+
+      <div class="card">
+        <div class="repeat-row subjects-repeat"><input class="inline" value="رياضيات"><button class="rm">✕</button></div>
+        <div class="repeat-row subjects-repeat"><input class="inline" value="اللغة العربية"><button class="rm">✕</button></div>
+        <div class="repeat-row subjects-repeat"><input class="inline" value="العلوم"><button class="rm">✕</button></div>
+        <div class="repeat-row subjects-repeat"><input class="inline" value="اللغة الإنجليزية"><button class="rm">✕</button></div>
+        <div class="repeat-row subjects-repeat"><input class="inline" value="التربية الإسلامية"><button class="rm">✕</button></div>
+        <button class="add-row">+ إضافة مادة</button>
+      </div>
+
+      <div class="btn-row"><button class="ghost" onclick="goStep(2)">رجوع</button><div class="right"><button class="primary" onclick="completeAndGo(3)">حفظ ومتابعة</button></div></div>
+    </section>
+
+    <!-- 4 -->
+    <section class="panel" id="panel-4">
+      <div class="eyebrow">الخطوة ٤ من ٩</div>
+      <h1>المعلمون</h1>
+      <p class="lede">إضافة المعلمين كأشخاص (Tenant-scoped). ربطهم بمادة وصف وترم معين بيحصل لاحقًا، مش هنا.</p>
+
+      <div class="card">
+        <div class="repeat-row teachers-repeat" style="grid-template-columns:1fr 1fr 1fr 40px;">
+          <input class="inline" value="أ. أحمد سالم"><input class="inline" value="0555xxxxxx"><input class="inline" value="ahmed@alnoor.sa"><button class="rm">✕</button>
+        </div>
+        <div class="repeat-row teachers-repeat" style="grid-template-columns:1fr 1fr 1fr 40px;">
+          <input class="inline" value="أ. سارة فهد"><input class="inline" value="0555xxxxxx"><input class="inline" value="sara@alnoor.sa"><button class="rm">✕</button>
+        </div>
+        <button class="add-row">+ إضافة معلم</button>
+      </div>
+
+      <div class="btn-row"><button class="ghost" onclick="goStep(3)">رجوع</button><div class="right"><button class="primary" onclick="completeAndGo(4)">حفظ ومتابعة</button></div></div>
+    </section>
+
+    <!-- 5 -->
+    <section class="panel" id="panel-5">
+      <div class="eyebrow">الخطوة ٥ من ٩</div>
+      <h1>إنشاء أول سنة دراسية والترمات</h1>
+      <p class="lede">دلوقتي بندخل أول مرة على Year-scoped tables. مفيش سنة سابقة يتنسخ منها حاجة — كل ده بيتحدد يدويًا.</p>
+
+      <div class="banner nocopy"><span class="ic">✕</span><span>زرار «نسخ من سنة سابقة» مش هيظهر هنا خالص — لأنه مفيش سنة سابقة على النظام أصلاً.</span></div>
+
+      <div class="card">
+        <p class="card-title">السنة الدراسية</p>
+        <div class="grid2">
+          <div class="field"><label>اسم السنة</label><input type="text" value="٢٠٢٦ / ٢٠٢٧"></div>
+          <div class="field"><label>عدد الترمات</label><input type="number" value="3"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-title">الترمات</p>
+        <div class="repeat-row" style="grid-template-columns:80px 1fr 1fr 40px;">
+          <span style="font-size:12px;color:var(--ink-mute)">ترم ١</span><input class="inline" type="date" value="2026-09-01"><input class="inline" type="date" value="2026-11-15"><button class="rm">✕</button>
+        </div>
+        <div class="repeat-row" style="grid-template-columns:80px 1fr 1fr 40px;">
+          <span style="font-size:12px;color:var(--ink-mute)">ترم ٢</span><input class="inline" type="date" value="2026-11-29"><input class="inline" type="date" value="2027-02-15"><button class="rm">✕</button>
+        </div>
+        <div class="repeat-row" style="grid-template-columns:80px 1fr 1fr 40px;">
+          <span style="font-size:12px;color:var(--ink-mute)">ترم ٣</span><input class="inline" type="date" value="2027-02-22"><input class="inline" type="date" value="2027-05-15"><button class="rm">✕</button>
+        </div>
+        <button class="add-row">+ إضافة ترم</button>
+      </div>
+
+      <div class="btn-row"><button class="ghost" onclick="goStep(4)">رجوع</button><div class="right"><button class="primary" onclick="completeAndGo(5)">إنشاء السنة والترمات ومتابعة</button></div></div>
+    </section>
+
+    <!-- 6 -->
+    <section class="panel" id="panel-6">
+      <div class="eyebrow">الخطوة ٦ من ٩</div>
+      <h1>الفصول</h1>
+      <p class="lede">لكل صف دراسي، حدد الفصول (الشُعب) اللي هتفتحها وسعة كل واحد.</p>
+
+      <div class="banner nocopy"><span class="ic">✕</span><span>مفيش «نسخ فصول» هنا برضه — أول مرة تُنشأ فيها الفصول على الإطلاق.</span></div>
+
+      <div class="card">
+        <table>
+          <tr><th>الصف الدراسي</th><th>اسم الفصل</th><th>السعة</th><th></th></tr>
+          <tr><td>صف أول</td><td><input class="inline" value="١/١"></td><td><input class="inline" type="number" value="30"></td><td><button class="rm">✕</button></td></tr>
+          <tr><td>صف أول</td><td><input class="inline" value="١/٢"></td><td><input class="inline" type="number" value="30"></td><td><button class="rm">✕</button></td></tr>
+          <tr><td>صف تاني</td><td><input class="inline" value="٢/١"></td><td><input class="inline" type="number" value="32"></td><td><button class="rm">✕</button></td></tr>
+        </table>
+        <button class="add-row" style="margin-top:10px;">+ إضافة فصل</button>
+      </div>
+
+      <div class="btn-row"><button class="ghost" onclick="goStep(5)">رجوع</button><div class="right"><button class="primary" onclick="completeAndGo(6)">حفظ الفصول ومتابعة</button></div></div>
+    </section>
+
+    <!-- 7 -->
+    <section class="panel" id="panel-7">
+      <div class="eyebrow">الخطوة ٧ من ٩</div>
+      <h1>تسجيل الطلاب</h1>
+      <p class="lede">إضافة الطلاب وربط كل واحد منهم بفصله. الإضافة الأولى غالبًا هتكون استيراد ملف Excel بدل الإدخال اليدوي.</p>
+
+      <div class="card">
+        <div class="banner info"><span class="ic">↑</span><span>استيراد ملف Excel يحتوي: اسم الطالب، رقم الهوية، بيانات ولي الأمر، والفصل.</span></div>
+        <button class="ghost" style="width:100%;padding:14px;border-style:dashed;">اختر ملف Excel للاستيراد</button>
+        <table style="margin-top:14px;">
+          <tr><th>الطالب</th><th>الفصل</th><th>رقم الهوية</th></tr>
+          <tr><td>ماجد أحمد</td><td>١/١</td><td>10xxxxxxxx</td></tr>
+          <tr><td>سارة خالد</td><td>١/١</td><td>10xxxxxxxx</td></tr>
+          <tr><td>عمر يوسف</td><td>١/٢</td><td>10xxxxxxxx</td></tr>
+        </table>
+      </div>
+
+      <div class="btn-row"><button class="ghost" onclick="goStep(6)">رجوع</button><div class="right"><button class="primary" onclick="completeAndGo(7)">تأكيد الطلاب ومتابعة</button></div></div>
+    </section>
+
+    <!-- 8 -->
+    <section class="panel" id="panel-8">
+      <div class="eyebrow">الخطوة ٨ من ٩</div>
+      <h1>ربط المواد بالصفوف والمعلمين</h1>
+      <p class="lede">هنا بتتولد الـ SubjectOfferings الفعلية — تحديد مين هيدرّس إيه لأنهي صف في أنهي ترم.</p>
+
+      <div class="card">
+        <table>
+          <tr><th>المادة</th><th>الصف الدراسي</th><th>الترم</th><th>المعلم</th><th></th></tr>
+          <tr><td><select class="inline"><option>رياضيات</option><option>اللغة العربية</option></select></td><td><select class="inline"><option>صف أول</option><option>صف تاني</option></select></td><td><select class="inline"><option>ترم ١</option></select></td><td><select class="inline"><option>أ. أحمد سالم</option><option>أ. سارة فهد</option></select></td><td><button class="rm">✕</button></td></tr>
+          <tr><td><select class="inline"><option>اللغة العربية</option><option>رياضيات</option></select></td><td><select class="inline"><option>صف أول</option><option>صف تاني</option></select></td><td><select class="inline"><option>ترم ١</option></select></td><td><select class="inline"><option>أ. سارة فهد</option><option>أ. أحمد سالم</option></select></td><td><button class="rm">✕</button></td></tr>
+        </table>
+        <button class="add-row" style="margin-top:10px;">+ إضافة ربط مادة</button>
+      </div>
+
+      <div class="btn-row"><button class="ghost" onclick="goStep(7)">رجوع</button><div class="right"><button class="primary" onclick="completeAndGo(8)">حفظ ومتابعة</button></div></div>
+    </section>
+
+    <!-- 9 -->
+    <section class="panel" id="panel-9">
+      <div class="eyebrow">الخطوة ٩ من ٩ — آخر خطوة</div>
+      <h1>الجدول الدراسي</h1>
+      <p class="lede">دي الفرق الجوهري عن ويزارد «بدء سنة جديدة» اللي بعتلك إياه قبل كده — هناك بيكون فيه زرار «نسخ الجدول». هنا، أول مرة، الجدول بيتبني بالكامل يدويًا خانة خانة.</p>
+
+      <div class="banner nocopy"><span class="ic">✕</span><span>مفيش زرار «نسخ الجدول» هنا — دي أول مرة، مفيش ترم أو سنة سابقة يتنسخ منها أي حصة.</span></div>
+
+      <div class="card">
+        <p class="card-title">جدول فصل ١/١ — ترم ١</p>
+        <table>
+          <tr><th>اليوم</th><th>الحصة ١</th><th>الحصة ٢</th><th>الحصة ٣</th></tr>
+          <tr><td>الأحد</td><td><select class="inline"><option>رياضيات — أ. أحمد</option><option>—</option></select></td><td><select class="inline"><option>عربي — أ. سارة</option><option>—</option></select></td><td><select class="inline"><option>—</option></select></td></tr>
+          <tr><td>الاتنين</td><td><select class="inline"><option>عربي — أ. سارة</option><option>—</option></select></td><td><select class="inline"><option>رياضيات — أ. أحمد</option><option>—</option></select></td><td><select class="inline"><option>—</option></select></td></tr>
+        </table>
+        <div class="banner muted" style="margin-top:14px;">
+          <span class="ic">ⓘ</span>
+          <span>من ترم ٢ وطالع، هتلاقي زرار «نسخ الجدول» متاح — لأن دلوقتي بقى فيه جدول سابق فعلي يتنسخ منه.</span>
+        </div>
+      </div>
+
+      <div class="btn-row"><button class="ghost" onclick="goStep(8)">رجوع</button><div class="right"><button class="primary" onclick="finish()">نشر الجدول وإطلاق المدرسة</button></div></div>
+    </section>
+
+    <section class="panel" id="panel-done">
+      <div class="eyebrow">اكتمل الإعداد</div>
+      <h1>مدرسة النور جاهزة على Nasaq</h1>
+      <p class="lede">كل البيانات الأساسية اتبنت من الصفر. من السنة الجاية، الأدمن مش هيمر بالخطوات دي تاني بنفس الشكل — هيستخدم ويزارد «بدء سنة جديدة» اللي فيه خيارات النسخ من السنة دي.</p>
+      <div class="banner success"><span class="ic">✓</span><span>Tenant، الهيكل الدراسي، المعلمين، أول سنة دراسية، الفصول، الطلاب، والجدول — كل حاجة محفوظة ونشطة الآن.</span></div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+const steps = [
+  {n:1,label:'بيانات المدرسة'},
+  {n:2,label:'المراحل والصفوف'},
+  {n:3,label:'بنك المواد'},
+  {n:4,label:'المعلمون'},
+  {n:5,label:'أول سنة وترمات'},
+  {n:6,label:'الفصول'},
+  {n:7,label:'تسجيل الطلاب'},
+  {n:8,label:'ربط المواد والمعلمين'},
+  {n:9,label:'الجدول الدراسي'}
+];
+let completed = new Set();
+let current = 1;
+
+function renderNav(){
+  const nav = document.getElementById('nav');
+  nav.innerHTML = '';
+  steps.forEach(s=>{
+    const el = document.createElement('div');
+    el.className = 'nav-item' + (s.n===current?' active':'') + (completed.has(s.n)?' done':'');
+    el.onclick = ()=>goStep(s.n);
+    el.innerHTML = `<div class="nav-num">${completed.has(s.n)?'✓':toArabicDigits(s.n)}</div>
+      <div class="nav-label">${s.label}</div>
+      ${completed.has(s.n)?'<div class="nav-tag">تم</div>':''}`;
+    nav.appendChild(el);
+  });
+}
+function toArabicDigits(n){
+  const map=['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+  return String(n).split('').map(d=>map[d]).join('');
+}
+function goStep(n){
+  current = n;
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+n).classList.add('active');
+  renderNav();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function completeAndGo(n){
+  completed.add(n);
+  if(n<9){ goStep(n+1); } else { goStep(n); }
+}
+function finish(){
+  completed.add(9);
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-done').classList.add('active');
+  renderNav();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+renderNav();
+goStep(1);
+</script>
+</body>
+</html>

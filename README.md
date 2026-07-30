@@ -1,55 +1,69 @@
 # 🎓 Nasaq School System - Backend
 
-A comprehensive school management system backend built with NestJS and MongoDB. This API provides robust endpoints for managing students, teachers, classes, subjects, and administrative operations.
+A comprehensive multi-tenant school management SaaS backend built with NestJS and MongoDB. This API provides robust modules for managing multi-tenancy, academic years, terms, stages, grade levels, classes, enrollments, subject offerings, teacher assignments, schedules, students, teachers, exams, projects, attendance, financial ledgers, and administrative operations.
 
-## 🚀 Features
+---
 
-- **Admin Management** - Secure admin authentication and authorization
-- **Student Management** - Complete CRUD operations for student records
-- **Teacher Management** - Manage teacher profiles and assignments
-- **Class Management** - Organize and manage classes
-- **Subject Management** - Create and manage subjects
-- **API Documentation** - Interactive Swagger/OpenAPI documentation
+## 🚀 Key Features
+
+- **Multi-Tenancy SaaS Core** — Tenant-scoped data isolation via custom Mongoose plugin & request context (`AsyncLocalStorage`).
+- **First-Time School Onboarding** — Step-by-step setup workflow for brand new school tenants.
+- **Start New Year Wizard (7 Steps)** — Annual academic year rollover engine supporting:
+  - Year creation & auto-archiving (`AcademicYear`)
+  - Terms setup & copying (`Term`)
+  - Class structure copying (`Class`)
+  - Bulk student promotion engine (`Enrollment`)
+  - Subject offerings & teacher assignments copying (`SubjectOffering`, `TeacherAssignment`)
+  - Copy schedule engine with conflict detection & unassigned lecture fallback (`Lecture`)
+- **Student & Enrollment Management** — Year-scoped student placement and promotion tracking.
+- **Teacher & Assignment Management** — Teacher profiles and year-scoped subject offering assignments.
+- **Timetable & Copy Schedule Engine** — Class and teacher slot conflict prevention and automated schedule migration across terms/years.
+- **Exams, Criteria & Projects** — Online exams with automated question grading, flexible evaluation criteria, and file-based student projects.
+- **Financial & Expense Management** — Tuition, bus, trip subscriptions, installment plans, discounts, additional fees, and expense tracking.
+- **API Documentation** — Complete interactive Swagger UI at `/api/docs`.
+
+---
 
 ## 🛠️ Tech Stack
 
 - **Framework:** NestJS
-- **Database:** MongoDB
+- **Database:** MongoDB & Mongoose
 - **Language:** TypeScript
-- **API Documentation:** Swagger/OpenAPI
+- **Authorization:** CASL (`@CheckAbilities`)
+- **API Documentation:** Swagger / OpenAPI
 - **Validation:** class-validator & class-transformer
+
+---
 
 ## 📋 Prerequisites
 
-Before you begin, ensure you have the following installed:
-- Node.js (v14 or higher)
+Ensure you have the following installed:
+- Node.js (v18 or higher)
 - npm or yarn
-- MongoDB instance (local or cloud)
+- MongoDB instance (v6 or higher)
+
+---
 
 ## ⚙️ Installation & Setup
 
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd Aura-School-System-Backend
+   cd nasaq-backend
    ```
 
 2. **Set up environment variables**
    ```bash
    cp .env.example .env
    ```
-   
-3. **Configure your database**
-   
-   Open the `.env` file and replace `MONGO_URI` with your MongoDB connection string:
-   ```
-   MONGO_URI=your_mongodb_connection_string
+   Configure your `MONGO_URI` and `JWT_SECRET` in `.env`.
+
+3. **Install dependencies**
+   ```bash
+   npm install --legacy-peer-deps
    ```
 
-4. **Install dependencies**
-   ```bash
-   npm i --legacy-peer-deps
-   ```
+---
 
 ## 🏃 Running the Application
 
@@ -58,51 +72,48 @@ Start the development server:
 npm run dev
 ```
 
-The server will start on `http://localhost:3000`
-
-## 📚 API Documentation
-
-Once the application is running, you can access the interactive API documentation at:
-
-**Swagger UI:** [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
-
-The Swagger interface provides:
-- Complete API endpoint documentation
-- Request/response schemas
-- Interactive API testing
-- Authentication flows
-
-## 📁 Project Structure
-
+Build for production:
+```bash
+npm run build
 ```
-src/
-├── admin/          # Admin authentication & management
-├── classes/        # Class management module
-├── students/       # Student management module
-├── teachers/       # Teacher management module
-├── subjects/       # Subject management module
-├── config/         # Configuration files
-├── filters/        # Exception filters
-├── interceptors/   # Response interceptors
-└── main.ts         # Application entry point
-```
-
-## 🔒 Security
-
-This application includes:
-- Input validation using DTOs
-- Request sanitization
-- Error handling with custom filters
-- Secure authentication mechanisms
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📝 License
-
-[Add your license here]
 
 ---
 
-**Note:** This is a backend API service. Make sure to configure CORS settings appropriately when connecting with a frontend application.
+## 📚 API Documentation
+
+Access the interactive API documentation at:
+- **Swagger UI:** [http://localhost:3000/api/docs](http://localhost:3000/api/docs)
+- **Architecture Docs:** `docs/MULTI_TENANT_ARCHITECTURE.md`
+- **API Reference:** `docs/API_DOCUMENTATION.md`
+- **Operational Workflow:** `docs/OPERATIONAL_WORKFLOW.md`
+
+---
+
+## 📁 Project Modules Structure
+
+```
+src/
+├── academic-years/       # Academic years & wizard setup tracker
+├── terms/                # Term management & copy engine
+├── stages/               # Tenant-scoped stages
+├── grade-levels/         # Tenant-scoped grade levels & progression
+├── classes/              # Classroom management & class copy engine
+├── enrollments/          # Student year-scoped enrollments & bulk promotion
+├── subject-offerings/    # Year-scoped subject offerings & copy engine
+├── teacher-assignments/  # Teacher subject offering assignments
+├── subjects/             # Master subject catalog
+├── teachers/             # Teacher profiles & directory
+├── students/             # Student records & portal accounts
+├── attendance/           # Daily absence tracking
+├── lectures/             # Lecture schedule & copy schedule engine
+├── exams/                # Exams, questions & result grading
+├── grades-criteria/     # Evaluation weighting criteria
+├── projects/             # Student project submissions & evaluation
+├── preparation/          # Teacher lesson preparation uploads
+├── library/              # Digital library resource links
+├── financial/            # Tuition, bus, trips, discounts, installments
+├── expenses/             # School expense tracking
+├── tenancy/              # Multi-tenant scoping plugin & request context
+├── platform/             # Super Admin platform & school registration
+└── auth/                 # Authentication & authorization guards
+```
