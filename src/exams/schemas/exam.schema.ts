@@ -44,6 +44,15 @@ export class Exam extends Document {
   academicYearId: mongoose.Types.ObjectId;
 
   @Prop({
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Term',
+    required: false,
+    default: null,
+    index: true,
+  })
+  termId?: mongoose.Types.ObjectId;
+
+  @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Class' }],
     required: true,
     index: true,
@@ -84,4 +93,5 @@ ExamSchema.index({ schoolId: 1, gradesCriteriaId: 1, examType: 1 });
 ExamSchema.index({ schoolId: 1, classIds: 1 });
 ExamSchema.index({ schoolId: 1, subjectId: 1 });
 ExamSchema.index({ schoolId: 1, academicYearId: 1 });
+ExamSchema.index({ schoolId: 1, termId: 1 });
 ExamSchema.index({ schoolId: 1, createdAt: -1 });

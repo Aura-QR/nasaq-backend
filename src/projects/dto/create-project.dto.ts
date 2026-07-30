@@ -14,10 +14,13 @@ export class CreateProjectDto {
   @IsOptional()
   @Transform(({ value }) => {
     if (!value) return value;
-    let arr = Array.isArray(value) ? value :
-              typeof value === 'string' ?
-                (value.includes('[') ? JSON.parse(value) : value.split(',').map((id: string) => id.trim())) :
-                [value];
+    let arr = Array.isArray(value)
+      ? value
+      : typeof value === 'string'
+      ? value.includes('[')
+        ? JSON.parse(value)
+        : value.split(',').map((id: string) => id.trim())
+      : [value];
     return arr;
   })
   @IsArray()
@@ -29,12 +32,15 @@ export class CreateProjectDto {
   @IsMongoId()
   subjectId: string;
 
-
-
-  @ApiProperty({ description: 'Academic year' })
-  @IsString()
+  @ApiProperty({ description: 'Academic Year ID' })
+  @IsMongoId()
   @IsNotEmpty()
-  academicYear: string;
+  academicYearId: string;
+
+  @ApiProperty({ description: 'Term ID (optional)', required: false })
+  @IsMongoId()
+  @IsOptional()
+  termId?: string;
 
   @ApiProperty({ description: 'Project title' })
   @IsString()
@@ -54,7 +60,7 @@ export class CreateProjectDto {
   @ApiProperty({
     description: 'Project file paths',
     type: [String],
-    required: false
+    required: false,
   })
   @IsOptional()
   @IsArray()

@@ -1,4 +1,4 @@
-import { IsEnum, IsArray, IsString, IsMongoId, ValidateNested, IsDate, IsInt, Min } from 'class-validator';
+import { IsEnum, IsArray, IsString, IsMongoId, ValidateNested, IsDate, IsInt, Min, IsOptional } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { ExamType } from '../enums/exam-type.enum';
@@ -39,6 +39,14 @@ export class CreateExamDto {
     description: 'The ID of the academic year for this exam',
   })
   academicYearId: string;
+
+  @IsMongoId()
+  @IsOptional()
+  @ApiProperty({
+    description: 'The ID of the term for this exam (optional)',
+    required: false,
+  })
+  termId?: string;
 
   @IsArray()
   @IsMongoId({ each: true })

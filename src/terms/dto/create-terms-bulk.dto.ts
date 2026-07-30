@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsDateString, IsNotEmpty, IsNumber, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class TermItemDto {
@@ -23,6 +23,11 @@ export class TermItemDto {
 }
 
 export class CreateTermsBulkDto {
+  @ApiProperty({ description: 'Academic Year ID (optional if specified in URL)', required: false })
+  @IsMongoId()
+  @IsOptional()
+  academicYearId?: string;
+
   @ApiProperty({ description: 'Array of terms to create', type: [TermItemDto] })
   @IsArray()
   @ValidateNested({ each: true })

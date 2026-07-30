@@ -78,18 +78,18 @@ export class ProjectsService {
 
     const gradesCriteria = await this.gradesCriteriaModel.findOne({
       subjectId: createProjectDto.subjectId,
-      academicYear: createProjectDto.academicYear,
+      academicYearId: createProjectDto.academicYearId,
     });
 
     if (!gradesCriteria) {
       throw new NotFoundException(
-        `معايير التقييم غير موجودة للمادة ${createProjectDto.subjectId} والعام الدراسي ${createProjectDto.academicYear}`,
+        `معايير التقييم غير موجودة للمادة ${createProjectDto.subjectId} لهذا العام الدراسي`,
       );
     }
 
     if (!gradesCriteria.projects) {
       throw new BadRequestException(
-        `هذه المادة غير مكونة للمشاريع في معايير التقييم للعام الدراسي ${createProjectDto.academicYear}`
+        `هذه المادة غير مكونة للمشاريع في معايير التقييم لهذا العام الدراسي`
       );
     }
 
@@ -98,6 +98,7 @@ export class ProjectsService {
 
     const savedProject = await new this.projectModel({
       ...createProjectDto,
+      termId: createProjectDto.termId ? new mongoose.Types.ObjectId(createProjectDto.termId) : null,
       gradesCriteriaId: gradesCriteria._id,
       grade: calculatedGrade,
       createdBy: user?.userId

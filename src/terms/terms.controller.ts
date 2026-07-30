@@ -8,6 +8,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { TermsService } from './terms.service';
 import { CreateTermDto } from './dto/create-term.dto';
@@ -29,18 +30,22 @@ export class TermsController {
     return await this.termsService.create(createTermDto);
   }
 
-  @Post('bulk/:academicYearId')
+  @Post(['bulk', 'bulk/:academicYearId'])
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create multiple terms for an academic year' })
+  @ApiOperation({ summary: 'Create multiple terms for an academic year (accepts academicYearId in URL or body)' })
   @ApiResponse({ status: 201, description: 'Terms created successfully' })
-  @ApiResponse({ status: 400, description: 'Duplicate orders in input' })
+  @ApiResponse({ status: 400, description: 'Duplicate orders in input or missing academicYearId' })
   @ApiResponse({ status: 409, description: 'Term order conflict' })
   async createBulk(
-    @Param('academicYearId') academicYearId: string,
     @Body() createTermsBulkDto: CreateTermsBulkDto,
+    @Param('academicYearId') paramYearId?: string,
   ) {
+    const targetYearId = paramYearId || createTermsBulkDto.academicYearId;
+    if (!targetYearId) {
+      throw new BadRequestException('academicYearId must be provided in URL parameters or request body.');
+    }
     return await this.termsService.createBulk(
-      academicYearId,
+      targetYearId,
       createTermsBulkDto.terms,
     );
   }

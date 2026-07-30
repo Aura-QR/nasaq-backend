@@ -71,7 +71,7 @@ export class ExamsService {
 
   async create(createExamDto: CreateExamDto, user: any) {
 
-    const { subjectId, academicYearId, classIds, examType, questions, startDate, endDate, duration } = createExamDto;
+    const { subjectId, academicYearId, termId, classIds, examType, questions, startDate, endDate, duration } = createExamDto;
 
     if (new Date(endDate) <= new Date(startDate)) {
       throw new BadRequestException('تاريخ انتهاء الامتحان يجب أن يكون بعد تاريخ البداية');
@@ -175,6 +175,7 @@ export class ExamsService {
        gradesCriteriaId: gradesCriteria._id,
        subjectId,
        academicYearId,
+       termId: termId ? new mongoose.Types.ObjectId(termId) : null,
        classIds,
        examType,
        grade: calculatedGrade,

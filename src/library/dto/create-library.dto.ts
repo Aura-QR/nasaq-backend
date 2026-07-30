@@ -27,13 +27,21 @@ export class CreateLibraryDto {
     description: 'The subject ID this item is connected to (optional)',
     required: false,
   })
-  subjectId?: string; // Optional: connected to a subject
+  subjectId?: string;
 
   @IsOptional()
-  @IsString()
+  @IsMongoId()
   @ApiProperty({
-    description: 'The academic year (e.g., "2024-2025") (optional)',
+    description: 'The academic year ID (optional)',
     required: false,
   })
-  academicYear?: string; // Optional: academic year
+  academicYearId?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  @ApiProperty({
+    description: 'The term ID (optional)',
+    required: false,
+  })
+  termId?: string;
 }
