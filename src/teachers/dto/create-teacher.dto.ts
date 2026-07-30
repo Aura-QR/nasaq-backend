@@ -54,23 +54,33 @@ export class CreateTeacherDto {
   specialization?: string;
 
   @IsDateString()
-  @IsNotEmpty()
-  @ApiProperty({ description: 'The hire date of the teacher' })
-  hireDate: string;
+  @IsOptional()
+  @ApiProperty({ description: 'The hire date of the teacher', required: false })
+  hireDate?: string;
 
   @IsString()
   @IsOptional()
-  @ApiProperty({ description: 'The address of the teacher' })
+  @ApiProperty({ description: 'The address of the teacher', required: false })
   address?: string;
 
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ description: 'Teacher status ("active" | "inactive")', required: false })
+  status?: string;
+
   @IsBoolean()
-  @IsNotEmpty()
-  @ApiProperty({ description: 'The active status of the teacher' })
-  isActive: boolean;
+  @IsOptional()
+  @ApiProperty({ description: 'The active status of the teacher', required: false })
+  isActive?: boolean;
+
+  @IsArray()
+  @IsOptional()
+  @ApiProperty({ description: 'Subjects list (optional)', required: false })
+  subjects?: any[];
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MinLength(6, { message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' })
-  @ApiProperty({ description: 'The password of the teacher' })
-  password: string;
+  @ApiProperty({ description: 'The password of the teacher', required: false })
+  password?: string;
 }

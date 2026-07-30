@@ -32,9 +32,21 @@ export class TeachersService {
       throw new ConflictException('Email already exists');
     }
 
-    const hashedPassword = await PasswordUtil.hash(createTeacherDto.password);
+    if (createTeacherDto.status !== undefined && createTeacherDto.isActive === undefined) {
+      createTeacherDto.isActive = createTeacherDto.status === 'active' || createTeacherDto.status === 'true';
+    }
+    if (createTeacherDto.isActive === undefined) {
+      createTeacherDto.isActive = true;
+    }
+    if (!createTeacherDto.hireDate) {
+      createTeacherDto.hireDate = new Date().toISOString().split('T')[0];
+    }
+
+    const { status, subjects, password, ...teacherFields } = createTeacherDto as any;
+    const hashedPassword = await PasswordUtil.hash(password || 'Teacher@123');
+
     const teacher = new this.teacherModel({
-      ...createTeacherDto,
+      ...teacherFields,
       password: hashedPassword,
     });
     await teacher.save();
@@ -63,9 +75,15 @@ export class TeachersService {
       throw new NotFoundException(`المعلم بمعرف ${id} غير موجود`);
     }
 
-    if (updateTeacherDto.email) {
+    if (updateTeacherDto.status !== undefined && updateTeacherDto.isActive === undefined) {
+      updateTeacherDto.isActive = updateTeacherDto.status === 'active' || updateTeacherDto.status === 'true';
+    }
+
+    const { status, subjects, ...cleanUpdateData } = updateTeacherDto as any;
+
+    if (cleanUpdateData.email) {
       const existingTeacher = await this.teacherModel.findOne({
-        email: updateTeacherDto.email,
+        email: cleanUpdateData.email,
         _id: { $ne: id },
       });
 
@@ -74,8 +92,12 @@ export class TeachersService {
       }
     }
 
+    if (cleanUpdateData.password) {
+      cleanUpdateData.password = await PasswordUtil.hash(cleanUpdateData.password);
+    }
+
     const updatedTeacher = await this.teacherModel
-      .findByIdAndUpdate(id, updateTeacherDto, { new: true })
+      .findByIdAndUpdate(id, cleanUpdateData, { new: true })
       .exec();
 
     return {

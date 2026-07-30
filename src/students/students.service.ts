@@ -72,8 +72,12 @@ export class StudentsService {
     const formattedCount = counter.count.toString().padStart(4, '0');
     const schoolEmail = `au${year}${formattedCount}@student.auraschool.com`;
 
-    const { password: _, ...studentData } = createStudentDto;
+    const { password: _, status, subjects, ...studentData } = createStudentDto as any;
     const studentFields: any = { ...studentData, schoolEmail };
+
+    if (status !== undefined && studentFields.isActive === undefined) {
+      studentFields.isActive = status === 'active' || status === 'true';
+    }
 
     if (createStudentDto.password) {
       studentFields.password = await PasswordUtil.hash(createStudentDto.password);
@@ -186,9 +190,14 @@ export class StudentsService {
       updateStudentDto.gender = updateStudentDto.gender.toLowerCase();
     }
 
-    if (updateStudentDto.email) {
+    const { status, subjects, ...cleanUpdateData } = updateStudentDto as any;
+    if (status !== undefined && cleanUpdateData.isActive === undefined) {
+      cleanUpdateData.isActive = status === 'active' || status === 'true';
+    }
+
+    if (cleanUpdateData.email) {
       const existingStudent = await this.studentModel.findOne({
-        email: updateStudentDto.email,
+        email: cleanUpdateData.email,
         _id: { $ne: id },
       });
 
@@ -202,7 +211,7 @@ export class StudentsService {
     }
 
     const student = await this.studentModel
-      .findByIdAndUpdate(id, updateStudentDto, { new: true })
+      .findByIdAndUpdate(id, cleanUpdateData, { new: true })
       .exec();
     if (!student) {
       throw new NotFoundException(`الطالب بمعرف ${id} غير موجود`);

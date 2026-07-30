@@ -515,7 +515,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"notes\": \"Updated note\"\n}",
+              "raw": "{\n  \"firstName\": \"Ahmed\",\n  \"familyName\": \"Hassan\",\n  \"fatherName\": \"Mohamed\",\n  \"birthDate\": \"2010-05-15\",\n  \"gender\": \"male\",\n  \"nationality\": \"Egyptian\",\n  \"phoneNumber\": \"+20 1234567890\",\n  \"email\": \"ahmed.parent@gmail.com\",\n  \"address\": \"123 Nile Street, Cairo\",\n  \"previousSchool\": \"Cairo Primary School\",\n  \"registrationDate\": \"2026-01-01\",\n  \"notes\": \"Updated note\",\n  \"classId\": \"6650a1b2c3d4e5f6a7b8c9d0\",\n  \"status\": \"active\",\n  \"isActive\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -815,7 +815,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"qualification\": \"PhD in Applied Physics\"\n}",
+              "raw": "{\n  \"name\": \"Dr. Fatima Ali\",\n  \"email\": \"fatima.ali@school.com\",\n  \"qualification\": \"PhD in Applied Physics\",\n  \"specialization\": \"Secondary Education\",\n  \"address\": \"45 University Road, Alexandria\",\n  \"status\": \"active\",\n  \"isActive\": true,\n  \"subjects\": []\n}",
               "options": {
                 "raw": {
                   "language": "json"

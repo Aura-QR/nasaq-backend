@@ -8,6 +8,7 @@ import {
   IsEnum,
   Matches,
   IsBoolean,
+  IsArray,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -91,4 +92,14 @@ export class CreateStudentDto {
   @IsOptional()
   @ApiProperty({ description: 'The class ID of the student', required: false })
   classId?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ description: 'Student status ("active" | "inactive")', required: false })
+  status?: string;
+
+  @IsArray()
+  @IsOptional()
+  @ApiProperty({ description: 'Subjects list (optional)', required: false })
+  subjects?: any[];
 }
