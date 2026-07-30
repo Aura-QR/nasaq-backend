@@ -25,7 +25,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
 
   handleRequest(err: any, user: any, info: any) {
     if (err || !user) {
-      throw err || new UnauthorizedException('Invalid or expired token');
+      if (info?.name === 'TokenExpiredError') {
+        throw new UnauthorizedException('انتهت صلاحية جلسة الدخول (Token Expired)، يرجى إعادة تسجيل الدخول');
+      }
+      if (info?.name === 'JsonWebTokenError') {
+        throw new UnauthorizedException('رمز التحقق (JWT Token) غير صالح أو صيغته خاطئة');
+      }
+      throw err || new UnauthorizedException('رمز التحقق مفقود أو غير صالح (Invalid or Expired Token)');
     }
     return user;
   }
