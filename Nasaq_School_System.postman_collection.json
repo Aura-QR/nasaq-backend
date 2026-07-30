@@ -145,6 +145,41 @@
       "key": "filename",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "academicYearId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "termId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "stageId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "gradeLevelId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subjectOfferingId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "teacherAssignmentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "enrollmentId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -1162,6 +1197,32 @@
               "type": "noauth"
             }
           }
+        },
+        {
+          "name": "Copy Classes From Previous Year",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/classes/copy-from/{{academicYearId}}/{{sourceYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classes",
+                "copy-from",
+                "{{academicYearId}}",
+                "{{sourceYearId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
         }
       ]
     },
@@ -1767,6 +1828,33 @@
               "type": "noauth"
             }
           }
+        },
+        {
+          "name": "Copy Schedule Engine",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/lectures/copy-from/{{academicYearId}}/{{targetTermId}}/{{sourceTermId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures",
+                "copy-from",
+                "{{academicYearId}}",
+                "{{targetTermId}}",
+                "{{sourceTermId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
         }
       ]
     },
@@ -1804,7 +1892,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"gradesCriteriaId\": \"6650a1b2c3d4e5f6a7b8c9d0\",\n  \"subjectId\": \"6650a1b2c3d4e5f6a7b8c9d1\",\n  \"academicYear\": \"2024-2025\",\n  \"classIds\": [\n    \"6650a1b2c3d4e5f6a7b8c9d2\"\n  ],\n  \"examType\": \"quiz\",\n  \"grade\": 10,\n  \"startDate\": \"2026-07-22T09:00:00.000Z\",\n  \"endDate\": \"2026-07-22T10:00:00.000Z\",\n  \"duration\": 45,\n  \"questions\": [\n    {\n      \"question\": \"What is the capital of France?\",\n      \"options\": [\n        \"London\",\n        \"Paris\",\n        \"Berlin\",\n        \"Madrid\"\n      ],\n      \"correctAnswer\": \"Paris\"\n    }\n  ]\n}",
+              "raw": "{\n  \"gradesCriteriaId\": \"6650a1b2c3d4e5f6a7b8c9d0\",\n  \"subjectId\": \"6650a1b2c3d4e5f6a7b8c9d1\",\n  \"academicYear\": \"2024-2025\",\n  \"classIds\": [\n    \"6650a1b2c3d4e5f6a7b8c9d2\"\n  ],\n  \"examType\": \"quiz\",\n  \"grade\": 10,\n  \"startDate\": \"2026-07-22T09:00:00.000Z\",\n  \"endDate\": \"2026-07-22T10:00:00.000Z\",\n  \"duration\": 45,\n  \"questions\": [\n    {\n      \"question\": \"What is the capital of France?\",\n      \"options\": [\n        \"London\",\n        \"Paris\",\n        \"Berlin\",\n        \"Madrid\"\n      ],\n      \"correctAnswer\": \"Paris\"\n    }\n  ],\n  \"termId\": \"{{termId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5530,10 +5618,16 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/health-check",
-              "host": ["{{baseUrl}}"],
-              "path": ["health-check"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health-check"
+              ]
             },
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "description": "Check server health status."
           }
         },
@@ -5544,10 +5638,18 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/health-check",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "health-check"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health-check"
+              ]
             },
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "description": "Health check alias under /api/v1."
           }
         },
@@ -5558,10 +5660,16 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/test",
-              "host": ["{{baseUrl}}"],
-              "path": ["test"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "test"
+              ]
             },
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "description": "Test endpoint to verify API functionality."
           }
         },
@@ -5572,10 +5680,18 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/test",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "test"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "test"
+              ]
             },
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "description": "Test endpoint alias under /api/v1."
           }
         }
@@ -5590,19 +5706,34 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/platform/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["platform", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "auth",
+                "login"
+              ]
             },
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "description": "[DEPRECATED] Use POST /auth/login instead. Login as platform super-admin. Returns platform-level JWT.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"identifier\": \"qraura0@gmail.com\",\n  \"password\": \"Aura#2026\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         }
@@ -5617,19 +5748,33 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/schools/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["schools", "register"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schools",
+                "register"
+              ]
             },
-            "auth": { "type": "noauth" },
+            "auth": {
+              "type": "noauth"
+            },
             "description": "Register a new school tenant. Public endpoint.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"schoolName\": \"Aura School\",\n  \"slug\": \"aura-school\",\n  \"schoolEmail\": \"info@auraschool.com\",\n  \"phone\": \"+201234567890\",\n  \"ownerName\": \"Ahmed Hassan\",\n  \"ownerUsername\": \"owner_ahmed\",\n  \"ownerEmail\": \"owner@auraschool.com\",\n  \"ownerPassword\": \"Owner#2026\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -5640,12 +5785,23 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/platform/schools",
-              "host": ["{{baseUrl}}"],
-              "path": ["platform", "schools"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "schools"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "List all school tenants. Requires platform-level JWT."
           }
@@ -5657,13 +5813,30 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/platform/schools/:id",
-              "host": ["{{baseUrl}}"],
-              "path": ["platform", "schools", ":id"],
-              "variable": [{ "key": "id", "value": "" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "schools",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Get a school by its ID, including detailed counts/stats for students, teachers, subjects, books/library, classes, managers, exams, projects, and owner details. Requires platform-level JWT."
           }
@@ -5673,23 +5846,47 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/platform/schools/:id",
-              "host": ["{{baseUrl}}"],
-              "path": ["platform", "schools", ":id"],
-              "variable": [{ "key": "id", "value": "" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "schools",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Update school details.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"Aura School Updated\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -5700,13 +5897,31 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/platform/schools/:id/suspend",
-              "host": ["{{baseUrl}}"],
-              "path": ["platform", "schools", ":id", "suspend"],
-              "variable": [{ "key": "id", "value": "" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "schools",
+                ":id",
+                "suspend"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Suspend a school tenant."
           }
@@ -5718,13 +5933,31 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/platform/schools/:id/activate",
-              "host": ["{{baseUrl}}"],
-              "path": ["platform", "schools", ":id", "activate"],
-              "variable": [{ "key": "id", "value": "" }]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "platform",
+                "schools",
+                ":id",
+                "activate"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Activate a suspended school tenant."
           }
@@ -5742,12 +5975,23 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/dashboards/owner",
-              "host": ["{{baseUrl}}"],
-              "path": ["dashboards", "owner"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboards",
+                "owner"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Get single-school metrics for the School Owner."
           }
@@ -5759,12 +6003,23 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/dashboards/manager",
-              "host": ["{{baseUrl}}"],
-              "path": ["dashboards", "manager"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboards",
+                "manager"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Get permission-filtered metrics for the Manager role."
           }
@@ -5776,12 +6031,23 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/dashboards/super-admin",
-              "host": ["{{baseUrl}}"],
-              "path": ["dashboards", "super-admin"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "dashboards",
+                "super-admin"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Get cross-tenant platform analytics. Requires platform-level JWT."
           }
@@ -5797,22 +6063,39 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/managers",
-              "host": ["{{baseUrl}}"],
-              "path": ["managers"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "managers"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Create a new manager admin (OWNER or SUPERVISOR).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"manager_ali\",\n  \"email\": \"manager@school.com\",\n  \"password\": \"Manager@123\",\n  \"role\": \"MANAGER\",\n  \"permissions\": [\"school.students.read\", \"school.classes.read\"]\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -5821,22 +6104,39 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/managers",
-              "host": ["{{baseUrl}}"],
-              "path": ["managers"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "managers"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Create a new supervisor admin (OWNER only).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"username\": \"supervisor_ali\",\n  \"email\": \"supervisor@school.com\",\n  \"password\": \"Supervisor@123\",\n  \"role\": \"SUPERVISOR\",\n  \"permissions\": [\"*\"]\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -5847,12 +6147,22 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/managers",
-              "host": ["{{baseUrl}}"],
-              "path": ["managers"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "managers"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "List all managers & supervisors (OWNER or SUPERVISOR)."
           }
@@ -5864,12 +6174,24 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/managers/promote/{{teacherId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["managers", "promote", "{{teacherId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "managers",
+                "promote",
+                "{{teacherId}}"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Promote an existing teacher to the manager role (OWNER or SUPERVISOR)."
           }
@@ -5881,12 +6203,24 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/managers/demote/{{teacherId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["managers", "demote", "{{teacherId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "managers",
+                "demote",
+                "{{teacherId}}"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Demote a teacher from the manager role (OWNER or SUPERVISOR)."
           }
@@ -5896,22 +6230,41 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/managers/{{managerId}}/permissions",
-              "host": ["{{baseUrl}}"],
-              "path": ["managers", "{{managerId}}", "permissions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "managers",
+                "{{managerId}}",
+                "permissions"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Update a manager's permissions (OWNER or SUPERVISOR).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"permissions\": [\"school.students.read\", \"school.teachers.read\", \"school.financial.read\"]\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -5922,12 +6275,23 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/managers/{{managerId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["managers", "{{managerId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "managers",
+                "{{managerId}}"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Remove a manager (OWNER or SUPERVISOR)."
           }
@@ -5945,12 +6309,22 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/permissions",
-              "host": ["{{baseUrl}}"],
-              "path": ["permissions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissions"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Get all permissions defaults for the school (OWNER/SUPERVISOR only)."
           }
@@ -5962,12 +6336,23 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/permissions/sync-financial",
-              "host": ["{{baseUrl}}"],
-              "path": ["permissions", "sync-financial"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "permissions",
+                "sync-financial"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Sync financial permissions for all roles (OWNER/SUPERVISOR only)."
           }
@@ -5983,22 +6368,43 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/financial/records/{{studentId}}/bus/enroll",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "records", "{{studentId}}", "bus", "enroll"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "bus",
+                "enroll"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Enroll a student in the bus service.",
             "body": {
               "mode": "raw",
               "raw": "{}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -6009,12 +6415,25 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/financial/records/{{studentId}}/bus",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "records", "{{studentId}}", "bus"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "bus"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Get a student's bus record."
           }
@@ -6024,22 +6443,43 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/financial/records/{{studentId}}/bus/pay",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "records", "{{studentId}}", "bus", "pay"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "bus",
+                "pay"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Record a bus payment received at school (Admin).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 500\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -6050,12 +6490,26 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/financial/records/{{studentId}}/bus/unenroll",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "records", "{{studentId}}", "bus", "unenroll"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "bus",
+                "unenroll"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Unenroll a student from the bus service."
           }
@@ -6071,22 +6525,42 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/financial/records/{{studentId}}/trips",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "records", "{{studentId}}", "trips"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "trips"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Add a trip to a student's financial record.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"tripTemplateId\": \"{{tripTemplateId}}\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -6097,12 +6571,25 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/financial/records/{{studentId}}/trips",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "records", "{{studentId}}", "trips"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "trips"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "List all trips for a student."
           }
@@ -6114,12 +6601,26 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/financial/records/{{studentId}}/trips/{{tripId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "records", "{{studentId}}", "trips", "{{tripId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "trips",
+                "{{tripId}}"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Get a single trip by ID for a student."
           }
@@ -6129,22 +6630,44 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/financial/records/{{studentId}}/trips/{{tripId}}/pay",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "records", "{{studentId}}", "trips", "{{tripId}}", "pay"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "trips",
+                "{{tripId}}",
+                "pay"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Record a trip payment received at school (Admin).",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"amount\": 200\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           }
         },
@@ -6155,15 +6678,1133 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/financial/records/{{studentId}}/trips/{{tripId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["financial", "records", "{{studentId}}", "trips", "{{tripId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "trips",
+                "{{tripId}}"
+              ]
             },
             "auth": {
               "type": "bearer",
-              "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "description": "Remove a trip from a student's financial record."
           }
+        }
+      ]
+    },
+    {
+      "name": "Academic Years",
+      "item": [
+        {
+          "name": "Create Academic Year",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"2027/2028\",\n  \"startDate\": \"2027-09-01\",\n  \"endDate\": \"2028-05-15\",\n  \"status\": \"active\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Academic Years",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Academic Year",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years",
+                "active"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Academic Year By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years/{{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years",
+                "{{academicYearId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update Academic Year",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years/{{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years",
+                "{{academicYearId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"2027/2028 Updated\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Wizard Setup Step",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years/{{academicYearId}}/setup-step",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years",
+                "{{academicYearId}}",
+                "setup-step"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"setupStep\": \"setup_terms\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Academic Year",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years/{{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years",
+                "{{academicYearId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Terms",
+      "item": [
+        {
+          "name": "Create Term",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"name\": \"ترم 1\",\n  \"order\": 1,\n  \"startDate\": \"2027-09-01\",\n  \"endDate\": \"2027-11-15\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Terms Bulk (Body)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms/bulk",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "bulk"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"terms\": [\n    {\n      \"name\": \"ترم 1\",\n      \"order\": 1,\n      \"startDate\": \"2027-09-01\",\n      \"endDate\": \"2027-11-15\"\n    },\n    {\n      \"name\": \"ترم 2\",\n      \"order\": 2,\n      \"startDate\": \"2027-11-29\",\n      \"endDate\": \"2028-02-15\"\n    },\n    {\n      \"name\": \"ترم 3\",\n      \"order\": 3,\n      \"startDate\": \"2028-02-22\",\n      \"endDate\": \"2028-05-15\"\n    }\n  ]\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Terms Bulk (URL)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms/bulk/{{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "bulk",
+                "{{academicYearId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"terms\": [\n    {\n      \"name\": \"ترم 1\",\n      \"order\": 1,\n      \"startDate\": \"2027-09-01\",\n      \"endDate\": \"2027-11-15\"\n    },\n    {\n      \"name\": \"ترم 2\",\n      \"order\": 2,\n      \"startDate\": \"2027-11-29\",\n      \"endDate\": \"2028-02-15\"\n    },\n    {\n      \"name\": \"ترم 3\",\n      \"order\": 3,\n      \"startDate\": \"2028-02-22\",\n      \"endDate\": \"2028-05-15\"\n    }\n  ]\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Copy Terms From Previous Year",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms/copy-from/{{academicYearId}}/{{sourceYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "copy-from",
+                "{{academicYearId}}",
+                "{{sourceYearId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Terms",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "List Terms By Academic Year",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms/by-year/{{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "by-year",
+                "{{academicYearId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Term By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms/{{termId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "{{termId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update Term",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms/{{termId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "{{termId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"ترم 1 معدل\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Term",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/terms/{{termId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "terms",
+                "{{termId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Stages",
+      "item": [
+        {
+          "name": "Create Stage",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stages"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"الابتدائي\",\n  \"order\": 1\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Stages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stages"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Stage By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stages/{{stageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stages",
+                "{{stageId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update Stage",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stages/{{stageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stages",
+                "{{stageId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"المرحلة الابتدائية\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Stage",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stages/{{stageId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stages",
+                "{{stageId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Grade Levels",
+      "item": [
+        {
+          "name": "Create Grade Level",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grade-levels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-levels"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stageId\": \"{{stageId}}\",\n  \"name\": \"الصف الأول\",\n  \"order\": 1\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Grade Levels",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grade-levels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-levels"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Next Grade Level Progression",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grade-levels/next/{{gradeLevelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-levels",
+                "next",
+                "{{gradeLevelId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Grade Level By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grade-levels/{{gradeLevelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-levels",
+                "{{gradeLevelId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Update Grade Level",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grade-levels/{{gradeLevelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-levels",
+                "{{gradeLevelId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"الصف الأول الابتدائي\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Grade Level",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grade-levels/{{gradeLevelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-levels",
+                "{{gradeLevelId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Enrollments",
+      "item": [
+        {
+          "name": "Create Student Enrollment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{studentId}}\",\n  \"classId\": \"{{classId}}\",\n  \"academicYearId\": \"{{academicYearId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Enrollments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Student Promotion Preview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments/promotion-preview/{{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments",
+                "promotion-preview",
+                "{{academicYearId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Bulk Promote Students",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments/bulk-promote/{{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments",
+                "bulk-promote",
+                "{{academicYearId}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"promotions\": [\n    {\n      \"studentId\": \"{{studentId}}\",\n      \"targetClassId\": \"{{targetClassId}}\",\n      \"action\": \"promote\"\n    }\n  ]\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Student Enrollments History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments/student/{{studentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments",
+                "student",
+                "{{studentId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Enrollment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments/{{enrollmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments",
+                "{{enrollmentId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Subject Offerings",
+      "item": [
+        {
+          "name": "Create Subject Offering",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subject-offerings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subject-offerings"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjectId\": \"{{subjectId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"termId\": \"{{termId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Copy Subject Offerings From Previous Year",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subject-offerings/copy-from/{{academicYearId}}/{{sourceYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subject-offerings",
+                "copy-from",
+                "{{academicYearId}}",
+                "{{sourceYearId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "List Subject Offerings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subject-offerings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subject-offerings"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Subject Offering By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subject-offerings/{{subjectOfferingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subject-offerings",
+                "{{subjectOfferingId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Subject Offering",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subject-offerings/{{subjectOfferingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subject-offerings",
+                "{{subjectOfferingId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Teacher Assignments",
+      "item": [
+        {
+          "name": "Create Teacher Assignment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/teacher-assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher-assignments"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teacherId\": \"{{teacherId}}\",\n  \"subjectOfferingId\": \"{{subjectOfferingId}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Teacher Assignments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/teacher-assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher-assignments"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Get Teacher Assignment By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/teacher-assignments/{{teacherAssignmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher-assignments",
+                "{{teacherAssignmentId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Teacher Assignment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/teacher-assignments/{{teacherAssignmentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher-assignments",
+                "{{teacherAssignmentId}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": []
         }
       ]
     }

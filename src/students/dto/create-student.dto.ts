@@ -86,4 +86,9 @@ export class CreateStudentDto {
   @MinLength(6, { message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' })
   @ApiProperty({ description: 'The password of the student (optional, defaults to schoolEmail)', required: false })
   password?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty({ description: 'The class ID of the student', required: false })
+  classId?: string;
 }

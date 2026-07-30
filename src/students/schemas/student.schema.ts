@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import * as mongoose from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ timestamps: true })
@@ -48,6 +49,9 @@ export class Student extends Document {
 
   @Prop({ index: true })
   schoolEmail: string;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Class', required: false, default: null, index: true })
+  classId?: mongoose.Types.ObjectId;
 
   @Prop({ default: 'STUDENT' })
   role: string;
