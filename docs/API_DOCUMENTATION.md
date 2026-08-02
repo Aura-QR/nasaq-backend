@@ -198,23 +198,34 @@ Base path: `/schools` & `/platform/schools`
 #### `POST /schools/register` 🔓
 Onboards a new school tenant and creates its primary `OWNER` admin account.
 
+**Request Payload (JSON):**
 ```json
 {
   "schoolName": "مدرسة النور الأهلية",
-  "slug": "alnoor",
-  "email": "admin@alnoor.sa",
-  "phone": "+966555123456",
-  "country": "Saudi Arabia",
-  "city": "الرياض",
-  "address": "طريق الملك فهد",
+  "slug": "alnoor-school",
+  "schoolEmail": "info@alnoor.sa",
+  "phone": "0555123456",
   "ownerName": "المهندس فهد العتيبي",
+  "ownerUsername": "fahad_owner",
   "ownerEmail": "owner@alnoor.sa",
-  "ownerPassword": "OwnerPassword123!"
+  "ownerPassword": "OwnerPassword123"
 }
 ```
 
+**Field Specifications (`RegisterSchoolDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `schoolName` | `string` | ✅ | Name of the school |
+| `slug` | `string` | ✅ | Lowercase letters, numbers, and hyphens only (`/^[a-z0-9-]+$/`) |
+| `schoolEmail` | `string` | ✅ | Valid email format |
+| `phone` | `string` | ❌ | School contact phone number |
+| `ownerName` | `string` | ✅ | Full name of the owner account |
+| `ownerUsername` | `string` | ✅ | Length: 4–20 characters |
+| `ownerEmail` | `string` | ✅ | Valid email format |
+| `ownerPassword` | `string` | ✅ | Length: 6–100 characters |
+
 #### `GET /platform/schools` 🛡️ (SUPER_ADMIN)
-Lists all registered school tenants on the platform.
+Lists all registered school tenants on the platform. Requires Platform Admin JWT (`x-platform-admin` scope).
 
 #### `GET /platform/schools/:id` 🛡️ (SUPER_ADMIN)
 Get detailed tenant profile and settings by ID.
@@ -222,11 +233,29 @@ Get detailed tenant profile and settings by ID.
 #### `PATCH /platform/schools/:id` 🛡️ (SUPER_ADMIN)
 Update school tenant configuration.
 
+**Request Payload (JSON):**
+```json
+{
+  "name": "مدرسة النور الأهلية المحدثة",
+  "phone": "0555999888",
+  "isActive": true,
+  "subscriptionStatus": "active"
+}
+```
+
+**Field Specifications (`UpdateSchoolDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ❌ | Updated school name |
+| `phone` | `string` | ❌ | Updated phone number |
+| `isActive` | `boolean` | ❌ | Activation state |
+| `subscriptionStatus` | `string` | ❌ | E.g. `"active"`, `"suspended"`, `"trial"` |
+
 #### `PATCH /platform/schools/:id/suspend` 🛡️ (SUPER_ADMIN)
-Suspend a school tenant's subscription and block access.
+Suspend a school tenant's subscription and block access (sets `isActive: false`, `subscriptionStatus: "suspended"`). Body: none.
 
 #### `PATCH /platform/schools/:id/activate` 🛡️ (SUPER_ADMIN)
-Re-activate a suspended school tenant.
+Re-activate a suspended school tenant. Body: none.
 
 ---
 
@@ -235,12 +264,22 @@ Re-activate a suspended school tenant.
 #### `POST /auth/login` 🔓
 Unified login endpoint for School Users (`OWNER`, `MANAGER`, `TEACHER`, `STUDENT`).
 
+**Request Payload (JSON):**
 ```json
 {
-  "email": "owner@alnoor.sa",
-  "password": "Password123!"
+  "identifier": "owner@alnoor.sa",
+  "password": "Password123",
+  "schoolSlug": "alnoor-school"
 }
 ```
+
+**Field Specifications (`LoginUserDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `identifier` | `string` | ✅ | Email or username (min length: 3) |
+| `password` | `string` | ✅ | Password (min length: 6) |
+| `schoolSlug` | `string` | ❌ | School slug for login scoping (optional if using `schoolId`) |
+| `schoolId` | `string` | ❌ | School MongoDB ID for login scoping (optional) |
 
 **Response (200 OK):**
 ```json
@@ -263,8 +302,22 @@ Unified login endpoint for School Users (`OWNER`, `MANAGER`, `TEACHER`, `STUDENT
 #### `POST /admin/login` 🔓
 Dedicated login endpoint for School Admins / Owners / Managers.
 
+**Request Payload (JSON):**
+```json
+{
+  "identifier": "admin_username",
+  "password": "Password123"
+}
+```
+
+**Field Specifications (`LoginAdminDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `identifier` | `string` | ✅ | Username or email (min length: 3) |
+| `password` | `string` | ✅ | Password (min length: 6) |
+
 #### `POST /platform/auth/login` 🔓
-Platform Super Admin login endpoint.
+Platform Super Admin login endpoint. Uses `LoginUserDto` (`identifier` + `password`).
 
 ---
 
@@ -275,14 +328,55 @@ Base path: `/managers`
 #### `POST /managers` 🛡️
 Create a new dedicated manager account.
 
+**Request Payload (JSON):**
+```json
+{
+  "username": "manager_ali",
+  "email": "ali.manager@school.com",
+  "password": "SecurePassword123",
+  "permissions": [
+    "school.students.read",
+    "school.students.create",
+    "school.teachers.read"
+  ],
+  "role": "MANAGER"
+}
+```
+
+**Field Specifications (`CreateManagerDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `username` | `string` | ✅ | Length: 4–20 characters |
+| `email` | `string` | ✅ | Valid email format |
+| `password` | `string` | ✅ | Length: 6–100 characters |
+| `permissions` | `string[]` | ✅ | Array of granted permission strings |
+| `role` | `string` | ❌ | Enum: `'MANAGER'` \| `'SUPERVISOR'` (default: `'MANAGER'`) |
+
 #### `PATCH /managers/promote/:teacherId` 🛡️
-Promote an existing teacher to hold dual Manager privileges.
+Promote an existing teacher to hold dual Manager privileges. Body: none.
 
 #### `PATCH /managers/demote/:teacherId` 🛡️
-Demote a teacher-manager back to standard teacher permissions.
+Demote a teacher-manager back to standard teacher permissions. Body: none.
 
 #### `PATCH /managers/:id/permissions` 🛡️
 Set custom permission overrides array for a manager.
+
+**Request Payload (JSON):**
+```json
+{
+  "permissions": [
+    "school.students.read",
+    "school.students.create",
+    "school.teachers.read",
+    "school.classes.read"
+  ]
+}
+```
+
+**Field Specifications (`UpdateManagerPermissionsDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `permissions` | `string[]` | ✅ | Array of permission key strings |
 
 #### `GET /managers` 🛡️
 List all administrative manager accounts in the school.
@@ -297,10 +391,10 @@ Delete a manager account.
 Base path: `/permissions`
 
 #### `GET /permissions` 🔐
-Get current user's effective permission list.
+Get default role permissions for the school (`TEACHER` and `STUDENT`). Requires `OWNER` or `SUPERVISOR` role.
 
 #### `POST /permissions/sync-financial` 🛡️
-Sync default financial permissions across role documents.
+Sync default financial permissions across role documents. Requires `OWNER` or `SUPERVISOR` role. Body: none.
 
 ---
 
@@ -312,7 +406,7 @@ Base path: `/dashboards`
 Get complete executive financial, academic, and administrative analytics.
 
 #### `GET /dashboards/manager` 🛡️ (MANAGER)
-Get manager dashboard filtered by granted permission permissions.
+Get manager dashboard filtered by granted permissions.
 
 #### `GET /dashboards/super-admin` 🛡️ (SUPER_ADMIN)
 Get cross-tenant platform overview analytics.
@@ -323,6 +417,25 @@ Get cross-tenant platform overview analytics.
 
 Base path: `/admin`
 
+#### `POST /admin` 🔐
+Create a new admin user profile.
+
+**Request Payload (JSON):**
+```json
+{
+  "username": "school_admin",
+  "email": "admin@school.com",
+  "password": "AdminPassword123"
+}
+```
+
+**Field Specifications (`CreateAdminDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `username` | `string` | ✅ | Min length: 3 |
+| `email` | `string` | ✅ | Valid email format |
+| `password` | `string` | ✅ | Min length: 6 |
+
 #### `GET /admin` 🔐
 List all admin accounts in the tenant.
 
@@ -330,7 +443,7 @@ List all admin accounts in the tenant.
 Get admin profile by ID.
 
 #### `PATCH /admin/:id` 🔐
-Update admin profile details.
+Update admin profile details. Accepts partial fields from `CreateAdminDto`.
 
 #### `DELETE /admin/:id` 🔐
 Delete an admin account.
@@ -344,14 +457,21 @@ Base path: `/academic-years`
 #### `POST /academic-years` 🔐
 Create a new academic year (archives the current active year).
 
+**Request Payload (JSON):**
 ```json
 {
   "name": "2027/2028",
   "startDate": "2027-09-01",
-  "endDate": "2028-05-15",
-  "status": "active"
+  "endDate": "2028-05-15"
 }
 ```
+
+**Field Specifications (`CreateAcademicYearDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Academic year label (e.g. `"2027/2028"`) |
+| `startDate` | `string` | ✅ | ISO Date String (`YYYY-MM-DD`) |
+| `endDate` | `string` | ✅ | ISO Date String (`YYYY-MM-DD`) |
 
 #### `GET /academic-years` 🔐
 List all academic years for the tenant.
@@ -363,10 +483,22 @@ Get the currently active academic year.
 Get academic year details.
 
 #### `PATCH /academic-years/:id` 🔐
-Update academic year details.
+Update academic year details. Accepts partial fields from `CreateAcademicYearDto`.
 
 #### `PATCH /academic-years/:id/setup-step` 🔐
-Update setup wizard progress step (`setup_terms`, `setup_stages`, `setup_classes`, `setup_subject_offerings`, `setup_teacher_assignments`, `setup_schedule`, `completed`).
+Update setup wizard progress step.
+
+**Request Payload (JSON):**
+```json
+{
+  "step": 2
+}
+```
+
+**Field Specifications:**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `step` | `number` | ✅ | Wizard step number (1–7) |
 
 #### `DELETE /academic-years/:id` 🔐
 Delete an academic year.
@@ -380,9 +512,30 @@ Base path: `/terms`
 #### `POST /terms` 🔐
 Create a single term.
 
+**Request Payload (JSON):**
+```json
+{
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "name": "ترم 1",
+  "order": 1,
+  "startDate": "2027-09-01",
+  "endDate": "2027-11-15"
+}
+```
+
+**Field Specifications (`CreateTermDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `academicYearId` | `string` | ✅ | Target Academic Year MongoID |
+| `name` | `string` | ✅ | Name of the term (e.g. `"ترم 1"`) |
+| `order` | `number` | ✅ | Term sequence order (min: 1) |
+| `startDate` | `string` | ✅ | ISO Date String (`YYYY-MM-DD`) |
+| `endDate` | `string` | ✅ | ISO Date String (`YYYY-MM-DD`) |
+
 #### `POST /terms/bulk` 🔐
 Create bulk terms for an academic year.
 
+**Request Payload (JSON):**
 ```json
 {
   "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
@@ -395,16 +548,36 @@ Create bulk terms for an academic year.
 ```
 
 #### `POST /terms/copy-from/:targetYearId/:sourceYearId` 🔐
-Copy term names & structure from a previous academic year.
+Copy term names & structure from a previous academic year. Body: none.
 
 #### `GET /terms` 🔐
-List terms (filterable by `academicYearId`).
+List terms (filterable by `Query: academicYearId`).
 
 #### `GET /terms/:id` 🔐
 Get term details.
 
 #### `PATCH /terms/:id` 🔐
 Update term details.
+
+**Request Payload (JSON):**
+```json
+{
+  "name": "ترم 1 معدل",
+  "order": 1,
+  "startDate": "2027-09-05",
+  "endDate": "2027-11-20",
+  "status": "active"
+}
+```
+
+**Field Specifications (`UpdateTermDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ❌ | Updated term name |
+| `order` | `number` | ❌ | Updated order (min: 1) |
+| `startDate` | `string` | ❌ | ISO Date String |
+| `endDate` | `string` | ❌ | ISO Date String |
+| `status` | `string` | ❌ | Enum: `'upcoming'` \| `'active'` \| `'closed'` |
 
 #### `DELETE /terms/:id` 🔐
 Delete a term.
@@ -418,6 +591,20 @@ Base path: `/stages`
 #### `POST /stages` 🔐
 Create a tenant-scoped stage (e.g., "الابتدائي").
 
+**Request Payload (JSON):**
+```json
+{
+  "name": "المرحلة الابتدائية",
+  "order": 1
+}
+```
+
+**Field Specifications (`CreateStageDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Stage name |
+| `order` | `number` | ✅ | Display order (min: 1) |
+
 #### `GET /stages` 🔐
 List all tenant stages sorted by order.
 
@@ -425,7 +612,7 @@ List all tenant stages sorted by order.
 Get stage details.
 
 #### `PATCH /stages/:id` 🔐
-Update stage name or order.
+Update stage name or order. Accepts partial fields from `CreateStageDto`.
 
 #### `DELETE /stages/:id` 🔐
 Delete a stage.
@@ -439,6 +626,22 @@ Base path: `/grade-levels`
 #### `POST /grade-levels` 🔐
 Create a grade level linked to a stage.
 
+**Request Payload (JSON):**
+```json
+{
+  "stageId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "name": "الصف الأول الابتدائي",
+  "order": 1
+}
+```
+
+**Field Specifications (`CreateGradeLevelDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `stageId` | `string` | ✅ | Parent Stage MongoID |
+| `name` | `string` | ✅ | Grade level name |
+| `order` | `number` | ✅ | Global progression numeric order across all stages (min: 1) |
+
 #### `GET /grade-levels` 🔐
 List all grade levels sorted by global progression order.
 
@@ -449,7 +652,7 @@ Get the next grade level in progression (used for student promotion preview).
 Get grade level details.
 
 #### `PATCH /grade-levels/:id` 🔐
-Update grade level.
+Update grade level. Accepts partial fields from `CreateGradeLevelDto`.
 
 #### `DELETE /grade-levels/:id` 🔐
 Delete a grade level.
@@ -463,22 +666,37 @@ Base path: `/classes`
 #### `POST /classes` 🔐
 Create a classroom section under a grade level and academic year.
 
+**Request Payload (JSON):**
 ```json
 {
   "name": "1/1",
   "gradeLevelId": "6650a1b2c3d4e5f6a7b8c9d0",
   "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
   "gender": "male",
+  "teacherInChargeId": "6650a1b2c3d4e5f6a7b8c9d9",
+  "roomNumber": "A-101",
   "maxCapacity": 30,
-  "roomNumber": "A-101"
+  "isActive": true
 }
 ```
 
+**Field Specifications (`CreateClassDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Class section name (e.g. `"1/1"`, `"1/2"`) |
+| `gradeLevelId` | `string` | ✅ | GradeLevel MongoID |
+| `academicYearId` | `string` | ✅ | AcademicYear MongoID |
+| `gender` | `string` | ✅ | Enum: `'male'` \| `'female'` \| `'both'` |
+| `maxCapacity` | `number` | ✅ | Maximum capacity (min: 1) |
+| `teacherInChargeId` | `string` | ❌ | Teacher MongoID in charge of class |
+| `roomNumber` | `string` | ❌ | Physical room location code |
+| `isActive` | `boolean` | ❌ | Active status (default: `true`) |
+
 #### `POST /classes/copy-from/:targetYearId/:sourceYearId` 🔐
-Copy class names, capacities, and room numbers from previous academic year.
+Copy class names, capacities, and room numbers from previous academic year. Body: none.
 
 #### `GET /classes` 🔐
-List classes (filter by `academicYearId`, `gradeLevelId`).
+List classes (`Query: academicYearId`, `gradeLevelId`).
 
 #### `GET /classes/list` 🔐
 Get simplified class list for dropdowns.
@@ -487,10 +705,10 @@ Get simplified class list for dropdowns.
 Get class details.
 
 #### `PATCH /classes/:id` 🔐
-Update class details.
+Update class details. Accepts partial fields from `CreateClassDto`.
 
 #### `PATCH /classes/:id/toggle-active` 🔐
-Toggle active/inactive status.
+Toggle active/inactive status. Body: none.
 
 #### `DELETE /classes/:id` 🔐
 Delete a class.
@@ -504,6 +722,7 @@ Base path: `/enrollments`
 #### `POST /enrollments` 🔐
 Enroll a student into a class for an academic year.
 
+**Request Payload (JSON):**
 ```json
 {
   "studentId": "6650a1b2c3d4e5f6a7b8c9d0",
@@ -512,8 +731,15 @@ Enroll a student into a class for an academic year.
 }
 ```
 
+**Field Specifications (`CreateEnrollmentDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `studentId` | `string` | ✅ | Student MongoID |
+| `classId` | `string` | ✅ | Target Class MongoID |
+| `academicYearId` | `string` | ✅ | AcademicYear MongoID |
+
 #### `GET /enrollments` 🔐
-List enrollments with pagination and filters.
+List enrollments with pagination and filters (`Query: studentId, classId, academicYearId, status`).
 
 #### `GET /enrollments/promotion-preview/:targetAcademicYearId` 🔐
 Preview bulk student promotion mapping to next grade level classes.
@@ -521,14 +747,30 @@ Preview bulk student promotion mapping to next grade level classes.
 #### `POST /enrollments/bulk-promote/:targetAcademicYearId` 🔐
 Execute bulk promotion of students into target year classes.
 
+**Request Payload (JSON):**
 ```json
 {
   "promotions": [
-    { "studentId": "6650a1b2c3d4e5f6a7b8c9d0", "targetClassId": "6650a1b2c3d4e5f6a7b8c9d3", "action": "promote" },
-    { "studentId": "6650a1b2c3d4e5f6a7b8c9d1", "targetClassId": "6650a1b2c3d4e5f6a7b8c9d1", "action": "retain" }
+    {
+      "studentId": "6650a1b2c3d4e5f6a7b8c9d0",
+      "targetClassId": "6650a1b2c3d4e5f6a7b8c9d3"
+    },
+    {
+      "studentId": "6650a1b2c3d4e5f6a7b8c9d1",
+      "targetClassId": "6650a1b2c3d4e5f6a7b8c9d4"
+    }
+  ],
+  "excludedStudentIds": [
+    "6650a1b2c3d4e5f6a7b8c9d9"
   ]
 }
 ```
+
+**Field Specifications (`BulkPromoteDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `promotions` | `SinglePromotionDto[]` | ✅ | Array of `{ studentId: string, targetClassId: string }` |
+| `excludedStudentIds` | `string[]` | ❌ | Array of student MongoIDs to exclude from promotion |
 
 #### `GET /enrollments/student/:studentId` 🔐
 Get student enrollment history across academic years.
@@ -545,11 +787,27 @@ Base path: `/subject-offerings`
 #### `POST /subject-offerings` 🔐
 Create a subject offering mapping a subject to a grade level and term.
 
+**Request Payload (JSON):**
+```json
+{
+  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "gradeLevelId": "6650a1b2c3d4e5f6a7b8c9d1",
+  "termId": "6650a1b2c3d4e5f6a7b8c9d2"
+}
+```
+
+**Field Specifications (`CreateSubjectOfferingDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `subjectId` | `string` | ✅ | Master Subject MongoID |
+| `gradeLevelId` | `string` | ✅ | GradeLevel MongoID |
+| `termId` | `string` | ✅ | Term MongoID |
+
 #### `POST /subject-offerings/copy-from/:targetYearId/:sourceYearId` 🔐
-Copy subject offerings from a previous academic year.
+Copy subject offerings from a previous academic year. Body: none.
 
 #### `GET /subject-offerings` 🔐
-List subject offerings (filter by `gradeLevelId`, `termId`).
+List subject offerings (`Query: gradeLevelId`, `termId`).
 
 #### `GET /subject-offerings/:id` 🔐
 Get subject offering details.
@@ -565,6 +823,20 @@ Base path: `/teacher-assignments`
 
 #### `POST /teacher-assignments` 🔐
 Assign a teacher to a subject offering.
+
+**Request Payload (JSON):**
+```json
+{
+  "teacherId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "subjectOfferingId": "6650a1b2c3d4e5f6a7b8c9d1"
+}
+```
+
+**Field Specifications (`CreateTeacherAssignmentDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `teacherId` | `string` | ✅ | Teacher MongoID |
+| `subjectOfferingId` | `string` | ✅ | SubjectOffering MongoID |
 
 #### `GET /teacher-assignments` 🔐
 List teacher assignments.
@@ -584,6 +856,25 @@ Base path: `/subjects`
 #### `POST /subjects` 🔐
 Create a new master subject in the tenant catalog.
 
+**Request Payload (JSON):**
+```json
+{
+  "subjectName": "الرياضيات",
+  "subjectCode": "MATH101",
+  "classIds": [
+    "6650a1b2c3d4e5f6a7b8c9d0",
+    "6650a1b2c3d4e5f6a7b8c9d1"
+  ]
+}
+```
+
+**Field Specifications (`CreateSubjectDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `subjectName` | `string` | ✅ | Name of the subject (min length: 2) |
+| `subjectCode` | `string` | ❌ | Code of the subject (e.g. `"MATH101"`) |
+| `classIds` | `string[]` | ❌ | Array of Class MongoIDs offering this subject |
+
 #### `GET /subjects` 🔐
 List master subjects.
 
@@ -600,7 +891,7 @@ Simplified subject list for UI dropdowns.
 Get subject details by ID.
 
 #### `PATCH /subjects/:id` 🔐
-Update subject details.
+Update subject details. Accepts partial fields from `CreateSubjectDto`.
 
 #### `DELETE /subjects/:id` 🔐
 Delete subject.
@@ -614,8 +905,44 @@ Base path: `/teachers`
 #### `POST /teachers` 🔐
 Add a new teacher profile.
 
+**Request Payload (JSON):**
+```json
+{
+  "name": "مريم أحمد",
+  "email": "mariam@teacher.com",
+  "phoneNumber": "01143279213",
+  "qualification": "تربية",
+  "specialization": "علوم",
+  "address": "أسيوط",
+  "isActive": true,
+  "subjectIds": [
+    "6a69e3d436a10520bf956e46"
+  ],
+  "password": "TeacherPassword123"
+}
+```
+
+**Field Specifications (`CreateTeacherDto`):**
+> [!IMPORTANT]
+> The field name for the phone number is **`phoneNumber`** (NOT `phone`). Request bodies containing `phone` will be rejected by NestJS ValidationPipe with `property phone should not exist`.
+
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Teacher full name (min length: 2) |
+| `email` | `string` | ✅ | Unique teacher email address |
+| `phoneNumber` | `string` | ❌ | Phone number (e.g. `01143279213`) |
+| `qualification` | `string` | ❌ | Degree / qualification |
+| `experience` | `string` | ❌ | Experience notes |
+| `specialization` | `string` | ❌ | Subject specialization |
+| `hireDate` | `string` | ❌ | ISO Date String (`YYYY-MM-DD`) |
+| `address` | `string` | ❌ | Living address |
+| `status` | `string` | ❌ | Status string (`"active"` \| `"inactive"`) |
+| `isActive` | `boolean` | ❌ | Active status flag |
+| `subjectIds` | `string[]` | ❌ | Array of Subject MongoIDs |
+| `password` | `string` | ❌ | Login password (min length: 6) |
+
 #### `GET /teachers` 🔐
-List teachers (paginated + filterable).
+List teachers (`Query: page, limit, name, email, specialization, isActive`).
 
 #### `GET /teachers/me` 🔐 (TEACHER)
 Get authenticated teacher profile.
@@ -627,10 +954,21 @@ Simplified teacher list for dropdowns.
 Get teacher details.
 
 #### `PATCH /teachers/:id` 🔐
-Update teacher profile.
+Update teacher profile. Accepts partial fields from `CreateTeacherDto` / `UpdateTeacherDto`.
+
+**Request Payload (JSON):**
+```json
+{
+  "name": "مريم أحمد علي",
+  "phoneNumber": "01143279213",
+  "specialization": "علوم عامة",
+  "address": "أسيوط - شارع الثورة",
+  "isActive": true
+}
+```
 
 #### `PATCH /teachers/:id/toggle-active` 🔐
-Toggle teacher active status.
+Toggle teacher active status. Body: none.
 
 #### `DELETE /teachers/:id` 🔐
 Delete a teacher profile.
@@ -644,8 +982,48 @@ Base path: `/students`
 #### `POST /students` 🔐
 Create a new student profile.
 
+**Request Payload (JSON):**
+```json
+{
+  "firstName": "أحمد",
+  "fatherName": "محمد",
+  "familyName": "العلي",
+  "birthDate": "2015-05-12",
+  "gender": "male",
+  "nationality": "سعودي",
+  "phoneNumber": "0551122334",
+  "email": "ahmed.student@school.com",
+  "address": "الرياض - حي الملز",
+  "classId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "isActive": true
+}
+```
+
+**Field Specifications (`CreateStudentDto`):**
+> [!IMPORTANT]
+> Name parameters are split into **`firstName`**, **`fatherName`**, and **`familyName`**. Use **`phoneNumber`** for the phone number (NOT `phone`).
+
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `firstName` | `string` | ✅ | Student first name (min length: 2) |
+| `fatherName` | `string` | ✅ | Father name (min length: 2) |
+| `familyName` | `string` | ✅ | Family/last name (min length: 2) |
+| `birthDate` | `string` | ✅ | ISO Date String (`YYYY-MM-DD`) |
+| `gender` | `string` | ✅ | Enum: `'male'` \| `'female'` |
+| `nationality` | `string` | ✅ | Student nationality |
+| `phoneNumber` | `string` | ✅ | Phone number |
+| `email` | `string` | ✅ | Valid email format |
+| `address` | `string` | ✅ | Living address |
+| `previousSchool` | `string` | ❌ | Previous school name |
+| `registrationDate`| `string` | ❌ | ISO Date String |
+| `notes` | `string` | ❌ | Administrative notes |
+| `isActive` | `boolean` | ❌ | Active status flag |
+| `password` | `string` | ❌ | Initial password (min length: 6) |
+| `classId` | `string` | ❌ | Class MongoID for automatic enrollment |
+| `status` | `string` | ❌ | `"active"` \| `"inactive"` |
+
 #### `GET /students` 🔐
-List students (paginated + filterable).
+List students (`Query: page, limit, classId, gender, name, email, isActive`).
 
 #### `GET /students/list` 🔐
 Simplified student list for dropdowns.
@@ -657,19 +1035,47 @@ Get logged-in student profile.
 Get student details.
 
 #### `PATCH /students/:id` 🔐
-Update student profile.
+Update student profile. Accepts partial fields from `CreateStudentDto`.
 
 #### `PATCH /students/:id/toggle-active` 🔐
-Toggle student active status.
+Toggle student active status. Body: none.
 
 #### `DELETE /students/:id` 🔐
 Delete student.
 
 #### `POST /students/request-password-setup` 🔓
-Request OTP for portal activation.
+Request 6-digit OTP sent to personal email for student portal account activation.
+
+**Request Payload (JSON):**
+```json
+{
+  "email": "ahmed.student@school.com"
+}
+```
+
+**Field Specifications (`RequestPasswordSetupDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `email` | `string` | ✅ | Registered personal email of the student |
 
 #### `POST /students/set-password` 🔓
-Set portal password using OTP.
+Set portal password using the 6-digit OTP.
+
+**Request Payload (JSON):**
+```json
+{
+  "email": "ahmed.student@school.com",
+  "otp": "123456",
+  "password": "NewStudentPassword123"
+}
+```
+
+**Field Specifications (`SetPasswordDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `email` | `string` | ✅ | Student email address |
+| `otp` | `string` | ✅ | 6-digit OTP code received |
+| `password` | `string` | ✅ | New portal password (min length: 6) |
 
 ---
 
@@ -678,25 +1084,32 @@ Set portal password using OTP.
 Base path: `/attendance`
 
 #### `POST /attendance` 🔐
-Record student attendance for a class lecture.
+Create a new attendance record (mark student absence).
 
+**Request Payload (JSON):**
 ```json
 {
   "studentId": "6650a1b2c3d4e5f6a7b8c9d0",
   "classId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "date": "2026-09-02",
-  "status": "present"
+  "date": "2025-11-18"
 }
 ```
 
+**Field Specifications (`CreateAttendanceDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `studentId` | `string` | ✅ | Student MongoID |
+| `classId` | `string` | ✅ | Class MongoID |
+| `date` | `string` | ✅ | Date string in format `YYYY-MM-DD` |
+
 #### `GET /attendance` 🔐
-List attendance records (filter by `classId`, `date`, `studentId`).
+List attendance records (`Query: page, limit, _id, studentId, classId, date, createdAt, updatedAt`).
 
 #### `GET /attendance/student/me` 🔐 (STUDENT)
-Get authenticated student attendance history.
+Get authenticated student attendance/absence history.
 
 #### `PATCH /attendance/:id` 🔐
-Update attendance record.
+Update attendance record. Accepts partial fields (`studentId`, `classId`, `date`).
 
 #### `DELETE /attendance/:id` 🔐
 Delete attendance record.
@@ -710,21 +1123,39 @@ Base path: `/lectures`
 #### `POST /lectures` 🔐
 Create a single timetable lecture slot.
 
+**Request Payload (JSON):**
+```json
+{
+  "classId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "subjectOfferingId": "6650a1b2c3d4e5f6a7b8c9d1",
+  "termId": "6650a1b2c3d4e5f6a7b8c9d2",
+  "teacherId": "6650a1b2c3d4e5f6a7b8c9d3",
+  "dayOfWeek": "Sunday",
+  "slot": 1
+}
+```
+
+**Field Specifications (`CreateLectureDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `classId` | `string` | ✅ | Class MongoID |
+| `subjectOfferingId` | `string` | ✅ | SubjectOffering MongoID |
+| `termId` | `string` | ✅ | Term MongoID |
+| `teacherId` | `string` | ❌ | Teacher MongoID (optional) |
+| `dayOfWeek` | `string` | ✅ | Enum: `"Sunday"` \| `"Monday"` \| `"Tuesday"` \| `"Wednesday"` \| `"Thursday"` \| `"Friday"` \| `"Saturday"` |
+| `slot` | `number` | ✅ | Period slot number (1–10) |
+
 #### `POST /lectures/copy-from/:targetYearId/:targetTermId/:sourceTermId` 🔐
-Execute Copy Schedule Engine (Wizard Step 7). Returns 4 result buckets:
-- `created`: Successfully matched & created lectures.
-- `unresolved`: Subject not offered in target term.
-- `needsTeacher`: Subject offered, but no teacher assigned in target year.
-- `teacherConflict`: Teacher already booked at slot in target term (created with `teacherId = null`).
+Execute Copy Schedule Engine (Wizard Step 7). Body: none.
 
 #### `GET /lectures` 🔐
-List timetable lectures (filter by `termId`, `classId`, `teacherId`).
+List timetable lectures (`Query: termId, classId, teacherId`).
 
 #### `GET /lectures/:id` 🔐
 Get lecture details.
 
 #### `PATCH /lectures/:id` 🔐
-Update lecture slot or teacher.
+Update lecture slot or teacher. Accepts partial fields from `CreateLectureDto`.
 
 #### `DELETE /lectures/:id` 🔐
 Delete lecture slot.
@@ -738,8 +1169,44 @@ Base path: `/exams`
 #### `POST /exams` 🔐
 Create an exam or online quiz.
 
+**Request Payload (JSON):**
+```json
+{
+  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
+  "termId": "6650a1b2c3d4e5f6a7b8c9d2",
+  "classIds": [
+    "6650a1b2c3d4e5f6a7b8c9d3"
+  ],
+  "examType": "final",
+  "startDate": "2026-06-01",
+  "endDate": "2026-06-01",
+  "duration": 120,
+  "questions": [
+    {
+      "question": "ما هي عاصمة المملكة العربية السعودية؟",
+      "options": ["الرياض", "جدة", "مكة", "الدمام"],
+      "correctAnswer": "الرياض"
+    }
+  ]
+}
+```
+
+**Field Specifications (`CreateExamDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `subjectId` | `string` | ✅ | Subject MongoID |
+| `academicYearId` | `string` | ✅ | AcademicYear MongoID |
+| `termId` | `string` | ❌ | Term MongoID (optional) |
+| `classIds` | `string[]` | ✅ | Array of Class MongoIDs |
+| `examType` | `string` | ✅ | Enum: `'final'` \| `'assignment'` \| `'activity'` \| `'quiz'` |
+| `startDate` | `string` | ✅ | Start date (`YYYY-MM-DD`) |
+| `endDate` | `string` | ✅ | End date (`YYYY-MM-DD`) |
+| `duration` | `number` | ✅ | Exam duration in minutes (min: 1) |
+| `questions` | `QuestionDto[]` | ✅ | Array of `{ question: string, options: string[], correctAnswer: string }` |
+
 #### `GET /exams` 🔐
-List exams.
+List exams (`Query: page, limit, classId, subjectId, academicYearId, termId, examType`).
 
 #### `GET /exams/student/me` 🔐 (STUDENT)
 Get active exams for student.
@@ -748,31 +1215,56 @@ Get active exams for student.
 Get exam details with questions.
 
 #### `PATCH /exams/:id` 🔐
-Update exam parameters.
+Update exam parameters. Accepts partial fields from `CreateExamDto`.
 
 #### `DELETE /exams/:id` 🔐
 Delete exam.
 
 #### `POST /exams/:examId/questions` 🔐
-Add a question to exam.
+Add a question to exam. Payload: `QuestionDto` (`{ question, options, correctAnswer }`).
 
 #### `PATCH /exams/:examId/questions/:questionId` 🔐
-Update an exam question.
+Update an exam question. Payload: partial `QuestionDto`.
 
 #### `DELETE /exams/:examId/questions/:questionId` 🔐
-Delete an exam question.
+Delete an exam question. Body: none.
 
 #### `POST /exams/:examId/start` 🔐 (STUDENT)
-Start taking an online exam.
+Start taking an online exam. Body: none.
 
 #### `POST /exams/:examId/grade` 🔐 (STUDENT)
 Submit answers for automated grading.
 
+**Request Payload (JSON):**
+```json
+{
+  "answers": [
+    {
+      "questionId": "6650a1b2c3d4e5f6a7b8c9d9",
+      "answer": "الرياض"
+    }
+  ]
+}
+```
+
+**Field Specifications (`SubmitAnswersDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `answers` | `AnswerDto[]` | ✅ | Array of `{ questionId: string, answer: string }` |
+
 #### `PATCH /exams/:examId/students/:studentId/grade` 🔐 (TEACHER)
 Manually grade or override student exam score.
 
+**Request Payload (JSON):**
+```json
+{
+  "score": 95,
+  "teacherNotes": "ممتاز"
+}
+```
+
 #### `DELETE /exams/deleteAll` 🔐
-Bulk delete exams.
+Bulk delete exams. Body: none.
 
 ---
 
@@ -782,6 +1274,36 @@ Base path: `/grades-criteria`
 
 #### `POST /grades-criteria` 🔐
 Create grade weighting criteria for a subject and academic year.
+
+**Request Payload (JSON):**
+```json
+{
+  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
+  "final": 40,
+  "assignments": 15,
+  "assignmentsCount": 3,
+  "activities": 15,
+  "projects": 15,
+  "projectsCount": 2,
+  "quizzes": 15,
+  "quizzesCount": 3
+}
+```
+
+**Field Specifications (`CreateGradesCriteriaDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `subjectId` | `string` | ✅ | Subject MongoID |
+| `academicYearId` | `string` | ✅ | AcademicYear MongoID |
+| `final` | `number` | ✅ | Final exam weight (1–100) |
+| `assignments` | `number` | ✅ | Total assignments weight (1–100) |
+| `assignmentsCount` | `number` | ✅ | Number of assignments (min: 1) |
+| `activities` | `number` | ✅ | Total activities weight (1–100) |
+| `projects` | `number` | ✅ | Total projects weight (1–100) |
+| `projectsCount` | `number` | ✅ | Number of projects (min: 1) |
+| `quizzes` | `number` | ✅ | Total quizzes weight (1–100) |
+| `quizzesCount` | `number` | ✅ | Number of quizzes (min: 1) |
 
 #### `GET /grades-criteria` 🔐
 List grade criteria.
@@ -799,7 +1321,7 @@ Get student's computed grades breakdown.
 Get criteria details.
 
 #### `PATCH /grades-criteria/:id` 🔐
-Update grade criteria percentages.
+Update grade criteria percentages. Accepts partial fields from `CreateGradesCriteriaDto`.
 
 #### `DELETE /grades-criteria/:id` 🔐
 Delete grade criteria.
@@ -812,6 +1334,34 @@ Base path: `/projects`
 
 #### `POST /projects` 🔐
 Create a project assignment.
+
+**Request Payload (JSON / multipart form-data):**
+```json
+{
+  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
+  "termId": "6650a1b2c3d4e5f6a7b8c9d2",
+  "classIds": [
+    "6650a1b2c3d4e5f6a7b8c9d3"
+  ],
+  "title": "مشروع العلوم البيئية",
+  "description": "قم بعمل بحث وتصميم عرض تقديمي عن التلوث البيئي",
+  "dueDate": "2026-05-30T23:59:59.000Z",
+  "filePaths": []
+}
+```
+
+**Field Specifications (`CreateProjectDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `subjectId` | `string` | ✅ | Subject MongoID |
+| `academicYearId` | `string` | ✅ | AcademicYear MongoID |
+| `termId` | `string` | ❌ | Term MongoID (optional) |
+| `classIds` | `string[]` | ❌ | Array of Class MongoIDs |
+| `title` | `string` | ✅ | Project title |
+| `description` | `string` | ✅ | Project description |
+| `dueDate` | `string` | ✅ | Due date ISO string |
+| `filePaths` | `string[]` | ❌ | Array of uploaded file paths |
 
 #### `GET /projects` 🔐
 List project assignments.
@@ -829,25 +1379,25 @@ Get project details.
 Download project instructions file.
 
 #### `PATCH /projects/:id` 🔐
-Update project.
+Update project. Accepts partial fields from `CreateProjectDto`.
 
 #### `DELETE /projects/:id` 🔐
 Delete project.
 
 #### `POST /projects/:id/files` 🔐
-Upload additional files to project.
+Upload additional files to project. Form-data key: `files`.
 
 #### `DELETE /projects/:id/files/:filename` 🔐
-Delete project file attachment.
+Delete project file attachment. Body: none.
 
 #### `GET /projects/submissions` 🔐
 List project submissions.
 
 #### `POST /projects/:projectId/submit` 🔐 (STUDENT)
-Submit student project response file.
+Submit student project response file. Form-data key: `files`.
 
 #### `DELETE /projects/:projectId/submit/files/:filename` 🔐 (STUDENT)
-Remove file from project submission.
+Remove file from project submission. Body: none.
 
 #### `GET /projects/:projectId/my-submission` 🔐 (STUDENT)
 Get logged-in student's project submission status.
@@ -861,8 +1411,16 @@ Download student submission file.
 #### `PATCH /projects/:projectId/submissions/:studentId/grade` 🔐 (TEACHER)
 Grade student project submission.
 
+**Request Payload (JSON):**
+```json
+{
+  "grade": 90,
+  "feedback": "عمل ممتاز ومجهود رائع"
+}
+```
+
 #### `DELETE /projects/deleteAll` 🔐
-Bulk delete projects.
+Bulk delete projects. Body: none.
 
 ---
 
@@ -873,23 +1431,37 @@ Base path: `/preparation`
 #### `POST /preparation` 🔐 (TEACHER)
 Create lesson preparation record for a lecture.
 
+**Request Payload (JSON / form-data):**
+```json
+{
+  "lecture": "507f1f77bcf86cd799439011",
+  "filePaths": ["uploads/preparations/lesson1.pdf"]
+}
+```
+
+**Field Specifications (`CreatePreparationDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `lecture` | `string` | ✅ | Lecture MongoID |
+| `filePaths` | `string[]` | ❌ | Array of file attachment paths |
+
 #### `GET /preparation` 🔐
-List lesson preparations.
+List lesson preparations (`Query: lectureId, teacherId`).
 
 #### `GET /preparation/:id` 🔐
 Get lesson preparation details.
 
 #### `PATCH /preparation/:id` 🔐
-Update lesson preparation.
+Update lesson preparation. Accepts partial fields from `CreatePreparationDto`.
 
 #### `DELETE /preparation/:id` 🔐
 Delete lesson preparation.
 
 #### `POST /preparation/:id/files` 🔐
-Upload attachments to lesson preparation.
+Upload attachments to lesson preparation. Form-data key: `files`.
 
 #### `DELETE /preparation/:id/files/:filename` 🔐
-Delete attachment from lesson preparation.
+Delete attachment from lesson preparation. Body: none.
 
 ---
 
@@ -900,14 +1472,34 @@ Base path: `/library`
 #### `POST /library` 🔐
 Add a new resource link to digital library.
 
+**Request Payload (JSON):**
+```json
+{
+  "title": "كتاب العلوم الصف الأول",
+  "link": "https://library.school.com/books/science1.pdf",
+  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
+  "termId": "6650a1b2c3d4e5f6a7b8c9d2"
+}
+```
+
+**Field Specifications (`CreateLibraryDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `title` | `string` | ✅ | Resource title (min length: 2) |
+| `link` | `string` | ✅ | Valid URL string |
+| `subjectId` | `string` | ❌ | Associated Subject MongoID |
+| `academicYearId` | `string` | ❌ | Associated AcademicYear MongoID |
+| `termId` | `string` | ❌ | Associated Term MongoID |
+
 #### `GET /library` 🔐
-List library resources.
+List library resources (`Query: page, limit, subjectId, academicYearId, termId`).
 
 #### `GET /library/:id` 🔐
 Get library resource details.
 
 #### `PATCH /library/:id` 🔐
-Update library resource.
+Update library resource. Accepts partial fields from `CreateLibraryDto`.
 
 #### `DELETE /library/:id` 🔐
 Delete library resource.
@@ -916,237 +1508,391 @@ Delete library resource.
 
 ### 5.25 Financial — Records & Student Ledgers
 
-Base path: `/financial-records`
+Base path: `/financial/records`
 
-#### `GET /financial-records` 🛡️
-List financial records for all students.
+#### `GET /financial/records` 🛡️
+List financial records for all students (`Query: page, limit, studentId, academicYear`).
 
-#### `GET /financial-records/me` 🔐 (STUDENT)
+#### `GET /financial/records/me` 🔐 (STUDENT)
 Get logged-in student's financial ledger.
 
-#### `GET /financial-records/me/summary` 🔐 (STUDENT)
-Get summary of dues & payments.
+#### `GET /financial/records/me/summary` 🔐 (STUDENT)
+Get summary of dues & payments for logged-in student.
 
-#### `GET /financial-records/me/trips` 🔐 (STUDENT)
-Get student trip financial records.
+#### `GET /financial/records/me/trips` 🔐 (STUDENT)
+Get logged-in student's trip financial records.
 
-#### `GET /financial-records/:studentId` 🛡️
+#### `GET /financial/records/:studentId` 🛡️
 Get specific student's financial record.
 
-#### `GET /financial-records/:studentId/summary` 🛡️
+#### `GET /financial/records/:studentId/summary` 🛡️
 Get student financial summary.
 
-#### `POST /financial-records/:studentId/tuition/pay` 🛡️
-Record a tuition fee payment.
+#### `POST /financial/records/:studentId/tuition/pay` 🛡️
+Record a tuition fee installment payment.
+
+**Request Payload (JSON):**
+```json
+{
+  "installmentNumber": 1,
+  "amount": 2500,
+  "paidAt": "2025-09-15",
+  "notes": "إيصال رقم 1042"
+}
+```
+
+**Field Specifications (`RecordPaymentDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `installmentNumber` | `number` | ✅ | Installment number to mark as paid (1-based, min: 1) |
+| `amount` | `number` | ✅ | Payment amount received (min: 0) |
+| `paidAt` | `string` | ✅ | Date received (`YYYY-MM-DD`) |
+| `notes` | `string` | ❌ | Optional payment notes / receipt number |
 
 ---
 
 ### 5.26 Financial — Fee Configs
 
-Base path: `/fee-configs`
+Base path: `/financial/fee-configs`
 
-#### `POST /fee-configs` 🛡️
-Create annual tuition fee configuration.
+#### `POST /financial/fee-configs` 🛡️
+Create annual tuition fee configuration for an academic level.
 
-#### `GET /fee-configs` 🛡️
+**Request Payload (JSON):**
+```json
+{
+  "academicYear": "Grade 1",
+  "tuitionFee": 10000
+}
+```
+
+**Field Specifications (`CreateFeeConfigDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `academicYear` | `string` | ✅ | Academic level / year name (must match Class.academicYear) |
+| `tuitionFee` | `number` | ✅ | Annual tuition fee amount in EGP (min: 0) |
+
+#### `GET /financial/fee-configs` 🛡️
 List fee configurations.
 
-#### `GET /fee-configs/:id` 🛡️
+#### `GET /financial/fee-configs/:id` 🛡️
 Get fee configuration details.
 
-#### `PATCH /fee-configs/:id` 🛡️
+#### `PATCH /financial/fee-configs/:id` 🛡️
 Update fee configuration.
 
-#### `DELETE /fee-configs/:id` 🛡️
+**Request Payload (JSON):**
+```json
+{
+  "tuitionFee": 12000
+}
+```
+
+**Field Specifications (`UpdateFeeConfigDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `tuitionFee` | `number` | ❌ | Updated tuition fee amount (min: 0) |
+
+#### `DELETE /financial/fee-configs/:id` 🛡️
 Delete fee configuration.
 
 ---
 
 ### 5.27 Financial — Installment Plans
 
-Base path: `/installment-plans`
+Base path: `/financial/installment-plans`
 
-#### `POST /installment-plans` 🛡️
+#### `POST /financial/installment-plans` 🛡️
 Create tuition installment plan template.
 
-#### `GET /installment-plans` 🛡️
+**Request Payload (JSON):**
+```json
+{
+  "name": "4 خيارات متساوية",
+  "description": "تقسيط المصروفات على 4 أقساط متساوية",
+  "numberOfInstallments": 4,
+  "dueDates": [
+    "2025-09-01",
+    "2025-11-01",
+    "2026-01-01",
+    "2026-03-01"
+  ],
+  "isDefault": true
+}
+```
+
+**Field Specifications (`CreateInstallmentPlanDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Plan name |
+| `description` | `string` | ❌ | Plan description |
+| `numberOfInstallments` | `number` | ✅ | Number of installments (min: 1) |
+| `dueDates` | `string[]` | ✅ | Array of ISO Date strings (length MUST match `numberOfInstallments`) |
+| `isDefault` | `boolean` | ❌ | Set as default template (default: `false`) |
+
+#### `GET /financial/installment-plans` 🛡️
 List installment plans.
 
-#### `GET /installment-plans/:id` 🛡️
+#### `GET /financial/installment-plans/:id` 🛡️
 Get installment plan details.
 
-#### `PATCH /installment-plans/:id` 🛡️
-Update installment plan template.
+#### `PATCH /financial/installment-plans/:id` 🛡️
+Update installment plan template. Accepts partial fields from `CreateInstallmentPlanDto`.
 
-#### `PATCH /installment-plans/:id/set-default` 🛡️
-Set plan as default for new enrollments.
+#### `PATCH /financial/installment-plans/:id/set-default` 🛡️
+Set plan as default for new enrollments. Body: none.
 
-#### `DELETE /installment-plans/:id` 🛡️
+#### `DELETE /financial/installment-plans/:id` 🛡️
 Delete installment plan template.
 
 ---
 
 ### 5.28 Financial — Discounts
 
-Base path: `/discounts`
+Base path: `/financial/discounts`
 
-#### `POST /discounts` 🛡️
+#### `POST /financial/discounts` 🛡️
 Create discount policy.
 
-#### `GET /discounts` 🛡️
+**Request Payload (JSON):**
+```json
+{
+  "name": "خصم الأشقاء",
+  "description": "يخصم للعائلات التي لديها أكثر من طالب",
+  "percentage": 10
+}
+```
+
+**Field Specifications (`CreateDiscountDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Discount policy name |
+| `description` | `string` | ❌ | Discount policy description |
+| `percentage` | `number` | ✅ | Discount percentage (0–100) |
+
+#### `GET /financial/discounts` 🛡️
 List discount policies.
 
-#### `GET /discounts/:id` 🛡️
+#### `GET /financial/discounts/:id` 🛡️
 Get discount policy details.
 
-#### `PATCH /discounts/:id` 🛡️
-Update discount policy.
+#### `PATCH /financial/discounts/:id` 🛡️
+Update discount policy. Accepts partial fields from `CreateDiscountDto`.
 
-#### `DELETE /discounts/:id` 🛡️
+#### `DELETE /financial/discounts/:id` 🛡️
 Delete discount policy.
 
-#### `POST /discounts/apply/tuition/:studentId` 🛡️
+#### `POST /financial/discounts/apply/tuition/:studentId` 🛡️
 Apply discount to student tuition.
 
-#### `DELETE /discounts/apply/tuition/:studentId` 🛡️
-Remove discount from student tuition.
+**Request Payload (JSON):**
+```json
+{
+  "discountId": "6650a1b2c3d4e5f6a7b8c9d0"
+}
+```
 
-#### `POST /discounts/apply/bus/:studentId` 🛡️
-Apply discount to student bus fee.
+**Field Specifications (`ApplyDiscountDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `discountId` | `string` | ✅ | Discount template MongoID |
 
-#### `DELETE /discounts/apply/bus/:studentId` 🛡️
-Remove discount from student bus fee.
+#### `DELETE /financial/discounts/apply/tuition/:studentId` 🛡️
+Remove discount from student tuition. Body: none.
 
-#### `POST /discounts/apply/trips/:studentId/:tripId` 🛡️
-Apply discount to student trip fee.
+#### `POST /financial/discounts/apply/bus/:studentId` 🛡️
+Apply discount to student bus fee. Uses `ApplyDiscountDto` (`{ discountId }`).
 
-#### `DELETE /discounts/apply/trips/:studentId/:tripId` 🛡️
-Remove discount from student trip fee.
+#### `DELETE /financial/discounts/apply/bus/:studentId` 🛡️
+Remove discount from student bus fee. Body: none.
+
+#### `POST /financial/discounts/apply/trips/:studentId/:tripId` 🛡️
+Apply discount to student trip fee. Uses `ApplyDiscountDto` (`{ discountId }`).
+
+#### `DELETE /financial/discounts/apply/trips/:studentId/:tripId` 🛡️
+Remove discount from student trip fee. Body: none.
 
 ---
 
 ### 5.29 Financial — Additional Fees
 
-Base path: `/additional-fees`
+Base path: `/financial/additional-fees`
 
-#### `POST /additional-fees` 🛡️
-Create an additional fee (books, uniform, exam fees).
+#### `POST /financial/additional-fees` 🛡️
+Create an additional fee (books, uniform, activity fee).
 
-#### `GET /additional-fees` 🛡️
+**Request Payload (JSON):**
+```json
+{
+  "name": "رسوم الكتب المدرسية",
+  "description": "حقيبة الكتب كاملة للفصل الدراسي الأول",
+  "amount": 500,
+  "targetType": "class",
+  "targetId": "6650a1b2c3d4e5f6a7b8c9d0"
+}
+```
+
+**Field Specifications (`CreateAdditionalFeeDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Additional fee name |
+| `description` | `string` | ❌ | Additional fee description |
+| `amount` | `number` | ✅ | Fee amount in EGP (min: 0) |
+| `targetType` | `string` | ✅ | Enum: `"all"` \| `"student"` \| `"class"` \| `"academicYear"` |
+| `targetId` | `string` | ❌ | Student MongoID or Class MongoID (required if targetType is `"student"` or `"class"`) |
+| `targetAcademicYear` | `string` | ❌ | Grade level / year string (required if targetType is `"academicYear"`) |
+
+#### `GET /financial/additional-fees` 🛡️
 List additional fees.
 
-#### `GET /additional-fees/:id` 🛡️
+#### `GET /financial/additional-fees/:id` 🛡️
 Get additional fee details.
 
-#### `DELETE /additional-fees/:id` 🛡️
+#### `DELETE /financial/additional-fees/:id` 🛡️
 Delete additional fee.
 
-#### `POST /additional-fees/:feeId/pay/:studentId` 🛡️
+#### `POST /financial/additional-fees/:feeId/pay/:studentId` 🛡️
 Record student payment for additional fee.
 
 ---
 
 ### 5.30 Financial — Bus Subscription Module
 
-Base path: `/bus-subscriptions` & `/bus`
+Base path: `/financial/bus` & `/financial/records/:studentId/bus`
 
-#### `GET /bus-subscriptions` 🛡️
-List all bus subscription records.
+#### `POST /financial/records/:studentId/bus/enroll` 🛡️
+Enroll student in bus service.
 
-#### `GET /bus-subscriptions/candidates` 🛡️
+**Request Payload (JSON):**
+```json
+{
+  "fee": 3000,
+  "serviceType": "both",
+  "installmentPlanId": "6650a1b2c3d4e5f6a7b8c9d0"
+}
+```
+
+**Field Specifications (`EnrollBusDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `fee` | `number` | ✅ | Annual bus fee in EGP (min: 0) |
+| `serviceType` | `string` | ✅ | Enum: `'pickup'` \| `'dropoff'` \| `'both'` |
+| `installmentPlanId` | `string` | ❌ | InstallmentPlan MongoID (omit for single full payment) |
+
+#### `POST /financial/records/:studentId/bus/pay` 🛡️
+Record bus fee installment payment. Uses `RecordPaymentDto` (`{ installmentNumber, amount, paidAt, notes }`).
+
+#### `DELETE /financial/records/:studentId/bus/unenroll` 🛡️
+Unenroll student from bus service. Body: none.
+
+#### `GET /financial/bus/subscriptions` 🛡️
+List all bus subscription records (`Query: page, limit, serviceType, studentId`).
+
+#### `GET /financial/bus/candidates` 🛡️
 List students eligible for bus enrollment.
 
-#### `GET /bus-subscriptions/me` 🔐 (STUDENT)
+#### `GET /financial/bus/me` 🔐 (STUDENT)
 Get student's own bus subscription status.
 
-#### `GET /bus-subscriptions/:studentId` 🛡️
+#### `GET /financial/bus/:studentId` 🛡️
 Get specific student's bus subscription.
-
-#### `POST /bus-subscriptions/:studentId/enroll` 🛡️
-Enroll student in bus service (`pickup`, `dropoff`, `both`).
-
-#### `POST /bus-subscriptions/:studentId/pay` 🛡️
-Record bus fee payment.
-
-#### `DELETE /bus-subscriptions/:studentId/unenroll` 🛡️
-Unenroll student from bus service.
-
-#### `POST /bus/enroll` 🛡️
-Legacy bus enrollment endpoint.
-
-#### `GET /bus` 🛡️
-Legacy list bus subscriptions endpoint.
-
-#### `POST /bus/pay` 🛡️
-Legacy bus payment endpoint.
-
-#### `DELETE /bus/unenroll` 🛡️
-Legacy unenroll endpoint.
 
 ---
 
 ### 5.31 Financial — Trips Subscription Module
 
-Base path: `/trip-subscriptions` & `/trips`
+Base path: `/financial/trips` & `/financial/records/:studentId/trips`
 
-#### `POST /trip-subscriptions` 🛡️
+#### `POST /financial/trips` 🛡️
 Create a new school trip event template.
 
-#### `GET /trip-subscriptions` 🛡️
+**Request Payload (JSON):**
+```json
+{
+  "name": "رحلة مجمع العلوم والتكنولوجيا",
+  "description": "رحلة علمية ترفيهية",
+  "fee": 150
+}
+```
+
+**Field Specifications (`CreateFinancialTripDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Trip title |
+| `description` | `string` | ❌ | Trip description |
+| `fee` | `number` | ✅ | Trip fee in EGP (min: 0) |
+
+#### `GET /financial/trips` 🛡️
 List all trip templates.
 
-#### `GET /trip-subscriptions/:tripTemplateId` 🛡️
+#### `GET /financial/trips/:tripId` 🛡️
 Get trip template details.
 
-#### `GET /trip-subscriptions/:tripTemplateId/students` 🛡️
+#### `GET /financial/trips/:tripId/students` 🛡️
 List students registered for trip.
 
-#### `GET /trip-subscriptions/:tripTemplateId/candidates` 🛡️
+#### `GET /financial/trips/:tripId/candidates` 🛡️
 List candidates eligible for trip.
 
-#### `POST /trip-subscriptions/:tripTemplateId/students/:studentId/register` 🛡️
+#### `POST /financial/trips/:tripId/register` 🛡️
 Register student for trip.
 
-#### `POST /trip-subscriptions/:tripTemplateId/students/:studentId/pay` 🛡️
-Record payment for trip.
+**Request Payload (JSON):**
+```json
+{
+  "studentId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "installmentPlanId": "6650a1b2c3d4e5f6a7b8c9d1"
+}
+```
 
-#### `DELETE /trip-subscriptions/:tripTemplateId/students/:studentId/unregister` 🛡️
-Unregister student from trip.
+**Field Specifications (`EnrollTripStudentDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `studentId` | `string` | ✅ | Student MongoID |
+| `installmentPlanId` | `string` | ❌ | Optional installment plan MongoID |
 
-#### `DELETE /trip-subscriptions/:tripTemplateId` 🛡️
-Delete trip template.
+#### `POST /financial/records/:studentId/trips/:tripId/pay` 🛡️
+Record payment for student trip. Uses `RecordPaymentDto` (`{ installmentNumber, amount, paidAt, notes }`).
 
-#### `POST /trips` 🛡️
-Legacy create trip endpoint.
+#### `DELETE /financial/trips/:tripId/unregister/:studentId` 🛡️
+Unregister student from trip. Body: none.
 
-#### `GET /trips` 🛡️
-Legacy list trips endpoint.
-
-#### `POST /trips/register` 🛡️
-Legacy trip registration endpoint.
-
-#### `POST /trips/pay` 🛡️
-Legacy trip payment endpoint.
+#### `DELETE /financial/trips/:tripId` 🛡️
+Delete trip template. Body: none.
 
 ---
 
 ### 5.32 Expenses — Categories
 
-Base path: `/expense-categories`
+Base path: `/expenses/categories`
 
-#### `POST /expense-categories` 🛡️
+#### `POST /expenses/categories` 🛡️
 Create expense category (salaries, utilities, maintenance).
 
-#### `GET /expense-categories` 🛡️
+**Request Payload (JSON):**
+```json
+{
+  "name": "صيانة دورية",
+  "description": "أعمال الصيانة والتجهيزات"
+}
+```
+
+**Field Specifications (`CreateExpenseCategoryDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Category name |
+| `description` | `string` | ❌ | Category description |
+
+#### `GET /expenses/categories` 🛡️
 List expense categories.
 
-#### `GET /expense-categories/:id` 🛡️
+#### `GET /expenses/categories/:id` 🛡️
 Get category details.
 
-#### `PATCH /expense-categories/:id` 🛡️
-Update expense category.
+#### `PATCH /expenses/categories/:id` 🛡️
+Update expense category. Accepts partial fields from `CreateExpenseCategoryDto`.
 
-#### `DELETE /expense-categories/:id` 🛡️
+#### `DELETE /expenses/categories/:id` 🛡️
 Delete expense category.
 
 ---
@@ -1158,14 +1904,36 @@ Base path: `/expenses`
 #### `POST /expenses` 🛡️
 Log a new operational expense.
 
+**Request Payload (JSON):**
+```json
+{
+  "name": "إصلاح أجهزة التكييف",
+  "amount": 1500,
+  "categoryId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "date": "2025-09-01",
+  "academicYear": "2025-2026",
+  "notes": "تم الصيانة بواسطة شركة التبريد"
+}
+```
+
+**Field Specifications (`CreateExpenseDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ | Expense title |
+| `amount` | `number` | ✅ | Amount spent in EGP (min: 0) |
+| `categoryId` | `string` | ✅ | Category MongoID |
+| `date` | `string` | ✅ | ISO Date String (`YYYY-MM-DD`) |
+| `academicYear` | `string` | ❌ | Academic year string |
+| `notes` | `string` | ❌ | Optional notes |
+
 #### `GET /expenses` 🛡️
-List operational expenses with pagination and filtering.
+List operational expenses (`Query: page, limit, categoryId, academicYear, date`).
 
 #### `GET /expenses/:id` 🛡️
 Get expense record details.
 
 #### `PATCH /expenses/:id` 🛡️
-Update expense record.
+Update expense record. Accepts partial fields from `CreateExpenseDto`.
 
 #### `DELETE /expenses/:id` 🛡️
 Delete expense record.
@@ -1196,7 +1964,7 @@ All API responses are wrapped by the `ResponseInterceptor`:
   "statusCode": 200,
   "message": "Operation successful",
   "data": { ... },
-  "timestamp": "2026-07-30T14:05:00.000Z"
+  "timestamp": "2026-08-02T09:35:00.000Z"
 }
 ```
 
@@ -1210,3 +1978,4 @@ MONGO_URI=mongodb://localhost:27017/nasaq-db
 JWT_SECRET=your_jwt_secret_key
 JWT_EXPIRATION=7d
 ```
+

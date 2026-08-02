@@ -17,7 +17,7 @@ export class Preparation {
 
   @Prop({
     type: MongooseSchema.Types.Mixed,
-    ref: 'Subject',
+    ref: 'SubjectOffering',
     required: true,
     index: true
   })
