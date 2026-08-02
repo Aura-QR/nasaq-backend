@@ -17,6 +17,8 @@ import { Project } from '../projects/schemas/project.schema';
 import { ProjectSubmission } from '../projects/schemas/project-submission.schema';
 import { Student } from '../students/schemas/student.schema';
 import { Class } from '../classes/schemas/class.schema';
+import { Enrollment } from '../enrollments/schemas/enrollment.schema';
+import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.schema';
 
 @Injectable()
 export class GradesCriteriaService {
@@ -31,6 +33,8 @@ export class GradesCriteriaService {
     @InjectModel(Class.name) private classModel: Model<Class>,
     @InjectModel(ExamResult.name) private examResultModel: Model<ExamResult>,
     @InjectModel(ProjectSubmission.name) private submissionModel: Model<ProjectSubmission>,
+    @InjectModel(Enrollment.name) private enrollmentModel: Model<Enrollment>,
+    @InjectModel(SubjectOffering.name) private subjectOfferingModel: Model<SubjectOffering>,
   ) {}
 
   private validateObjectId(id: string, entityName: string): void {
@@ -69,7 +73,61 @@ export class GradesCriteriaService {
   }
 
   async getMySubjects(studentId: string) {
-    const subjects = await this.subjectModel.find().exec();
+    const [enrollments, student] = await Promise.all([
+      this.enrollmentModel.find({ studentId }).select('classId').exec(),
+      this.studentModel.findById(studentId).select('classId').exec(),
+    ]);
+
+    const classIdsSet = new Set<string>();
+    if (student?.classId) {
+      classIdsSet.add(student.classId.toString());
+    }
+    enrollments.forEach((e) => {
+      if (e.classId) {
+        classIdsSet.add(e.classId.toString());
+      }
+    });
+
+    if (classIdsSet.size === 0) {
+      return {
+        message: 'تم استرجاع المواد بنجاح',
+        data: [],
+      };
+    }
+
+    const classes = await this.classModel
+      .find({ _id: { $in: Array.from(classIdsSet) } })
+      .select('gradeLevelId')
+      .exec();
+
+    const gradeLevelIds = Array.from(
+      new Set(classes.map((c) => c.gradeLevelId?.toString()).filter(Boolean)),
+    );
+
+    if (gradeLevelIds.length === 0) {
+      return {
+        message: 'تم استرجاع المواد بنجاح',
+        data: [],
+      };
+    }
+
+    const offerings = await this.subjectOfferingModel
+      .find({ gradeLevelId: { $in: gradeLevelIds } })
+      .select('subjectId')
+      .exec();
+
+    const subjectIds = Array.from(
+      new Set(offerings.map((o) => o.subjectId?.toString()).filter(Boolean)),
+    );
+
+    if (subjectIds.length === 0) {
+      return {
+        message: 'تم استرجاع المواد بنجاح',
+        data: [],
+      };
+    }
+
+    const subjects = await this.subjectModel.find({ _id: { $in: subjectIds } }).exec();
     return {
       message: 'تم استرجاع المواد بنجاح',
       data: subjects,

@@ -8,6 +8,9 @@ import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { LecturesModule } from '../lectures/lectures.module';
 import { GradesCriteriaModule } from '../grades-criteria/grades-criteria.module';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
+import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.schema';
+import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
+import { TeacherAssignment, TeacherAssignmentSchema } from '../teacher-assignments/schemas/teacher-assignment.schema';
 
 @Module({
   imports: [
@@ -15,6 +18,9 @@ import { Student, StudentSchema } from '../students/schemas/student.schema';
       { name: Subject.name, schema: SubjectSchema },
       { name: Class.name, schema: ClassSchema },
       { name: Student.name, schema: StudentSchema },
+      { name: Enrollment.name, schema: EnrollmentSchema },
+      { name: SubjectOffering.name, schema: SubjectOfferingSchema },
+      { name: TeacherAssignment.name, schema: TeacherAssignmentSchema },
     ]),
     forwardRef(() => TeachersModule),
     forwardRef(() => LecturesModule),
@@ -24,4 +30,4 @@ import { Student, StudentSchema } from '../students/schemas/student.schema';
   providers: [SubjectsService],
   exports: [SubjectsService, MongooseModule], // Export for use in other modules
 })
-export class SubjectsModule {}
+export class SubjectsModule {}

@@ -13,6 +13,8 @@ import { Project, ProjectSchema } from '../projects/schemas/project.schema';
 import { ProjectSubmission, ProjectSubmissionSchema } from '../projects/schemas/project-submission.schema';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
+import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.schema';
+import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
 
 @Module({
   imports: [
@@ -27,6 +29,8 @@ import { Class, ClassSchema } from '../classes/schemas/class.schema';
       { name: Class.name, schema: ClassSchema },
       { name: ExamResult.name, schema: ExamResultSchema },
       { name: ProjectSubmission.name, schema: ProjectSubmissionSchema },
+      { name: Enrollment.name, schema: EnrollmentSchema },
+      { name: SubjectOffering.name, schema: SubjectOfferingSchema },
     ]),
     CaslModule,
   ],
@@ -35,3 +39,4 @@ import { Class, ClassSchema } from '../classes/schemas/class.schema';
   exports: [GradesCriteriaService, MongooseModule],
 })
 export class GradesCriteriaModule {}
+
