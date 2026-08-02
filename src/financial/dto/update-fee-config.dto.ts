@@ -1,11 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsMongoId, IsNumber, IsOptional, Min } from 'class-validator';
 
 export class UpdateFeeConfigDto {
-  @ApiProperty({ required: false })
-  @IsString()
+  @ApiProperty({ required: false, description: 'Academic Year ID (Mongo ObjectId)' })
+  @IsMongoId()
   @IsOptional()
-  academicYear?: string;
+  academicYearId?: string;
 
   @ApiProperty({ required: false })
   @IsNumber()

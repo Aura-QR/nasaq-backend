@@ -500,9 +500,6 @@ Update setup wizard progress step.
 |---|---|---|---|
 | `step` | `number` | ✅ | Wizard step number (1–7) |
 
-#### `DELETE /academic-years/:id` 🔐
-Delete an academic year.
-
 ---
 
 ### 5.8 Terms
@@ -532,8 +529,8 @@ Create a single term.
 | `startDate` | `string` | ✅ | ISO Date String (`YYYY-MM-DD`) |
 | `endDate` | `string` | ✅ | ISO Date String (`YYYY-MM-DD`) |
 
-#### `POST /terms/bulk` 🔐
-Create bulk terms for an academic year.
+#### `POST /terms/bulk` or `POST /terms/bulk/:academicYearId` 🔐
+Create bulk terms for an academic year. Accepts `academicYearId` in URL or body.
 
 **Request Payload (JSON):**
 ```json
@@ -548,10 +545,10 @@ Create bulk terms for an academic year.
 ```
 
 #### `POST /terms/copy-from/:targetYearId/:sourceYearId` 🔐
-Copy term names & structure from a previous academic year. Body: none.
+Copy term names & structure from a previous academic year. Body: optional `{ termOverrides: [...] }`.
 
-#### `GET /terms` 🔐
-List terms (filterable by `Query: academicYearId`).
+#### `GET /terms/by-year/:academicYearId` 🔐
+List terms for a specific academic year.
 
 #### `GET /terms/:id` 🔐
 Get term details.
@@ -643,10 +640,10 @@ Create a grade level linked to a stage.
 | `order` | `number` | ✅ | Global progression numeric order across all stages (min: 1) |
 
 #### `GET /grade-levels` 🔐
-List all grade levels sorted by global progression order.
+List all grade levels sorted by global progression order (optionally filtered by `Query: stageId`).
 
-#### `GET /grade-levels/next/:id` 🔐
-Get the next grade level in progression (used for student promotion preview).
+#### `GET /grade-levels/by-stage/:stageId` 🔐
+Get grade levels belonging to a specific stage.
 
 #### `GET /grade-levels/:id` 🔐
 Get grade level details.
@@ -806,8 +803,8 @@ Create a subject offering mapping a subject to a grade level and term.
 #### `POST /subject-offerings/copy-from/:targetYearId/:sourceYearId` 🔐
 Copy subject offerings from a previous academic year. Body: none.
 
-#### `GET /subject-offerings` 🔐
-List subject offerings (`Query: gradeLevelId`, `termId`).
+#### `GET /subject-offerings/by-term/:termId` 🔐
+Get subject offerings for a specific term (optionally filtered by `Query: gradeLevelId`).
 
 #### `GET /subject-offerings/:id` 🔐
 Get subject offering details.
@@ -1270,9 +1267,9 @@ Bulk delete exams. Body: none.
 
 ### 5.21 Grades Criteria
 
-Base path: `/grades-criteria`
+Base path: `/gradesCriteria`
 
-#### `POST /grades-criteria` 🔐
+#### `POST /gradesCriteria` 🔐
 Create grade weighting criteria for a subject and academic year.
 
 **Request Payload (JSON):**
@@ -1305,25 +1302,25 @@ Create grade weighting criteria for a subject and academic year.
 | `quizzes` | `number` | ✅ | Total quizzes weight (1–100) |
 | `quizzesCount` | `number` | ✅ | Number of quizzes (min: 1) |
 
-#### `GET /grades-criteria` 🔐
+#### `GET /gradesCriteria` 🔐
 List grade criteria.
 
-#### `GET /grades-criteria/my-criteria` 🔐 (STUDENT)
+#### `GET /gradesCriteria/student/me` 🔐 (STUDENT)
 Get grade criteria for student's subjects.
 
-#### `GET /grades-criteria/my-subjects` 🔐 (STUDENT)
+#### `GET /gradesCriteria/student/me/subjects` 🔐 (STUDENT)
 Get student's subjects list.
 
-#### `GET /grades-criteria/my-grades` 🔐 (STUDENT)
-Get student's computed grades breakdown.
+#### `GET /gradesCriteria/student/me/grades` 🔐 (STUDENT)
+Get student's computed grades breakdown (`?subjectId=...`).
 
-#### `GET /grades-criteria/:id` 🔐
+#### `GET /gradesCriteria/:id` 🔐
 Get criteria details.
 
-#### `PATCH /grades-criteria/:id` 🔐
+#### `PATCH /gradesCriteria/:id` 🔐
 Update grade criteria percentages. Accepts partial fields from `CreateGradesCriteriaDto`.
 
-#### `DELETE /grades-criteria/:id` 🔐
+#### `DELETE /gradesCriteria/:id` 🔐
 Delete grade criteria.
 
 ---

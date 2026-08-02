@@ -12,6 +12,7 @@ import {
 import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.schema';
+import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
 import { multerConfig } from './config/multer.config';
 import { CaslModule } from 'src/casl/casl.module';
 
@@ -24,6 +25,7 @@ import { CaslModule } from 'src/casl/casl.module';
       { name: Lecture.name, schema: LectureSchema },
       { name: Student.name, schema: StudentSchema },
       { name: Enrollment.name, schema: EnrollmentSchema },
+      { name: SubjectOffering.name, schema: SubjectOfferingSchema },
     ]),
     CaslModule,
     MulterModule.register(multerConfig),
@@ -33,4 +35,5 @@ import { CaslModule } from 'src/casl/casl.module';
   exports: [ProjectsService],
 })
 export class ProjectsModule {}
+
 

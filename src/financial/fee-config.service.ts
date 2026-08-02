@@ -21,9 +21,9 @@ export class FeeConfigService {
   }
 
   async create(dto: CreateFeeConfigDto, adminId: string) {
-    const existing = await this.feeConfigModel.findOne({ academicYear: dto.academicYear });
+    const existing = await this.feeConfigModel.findOne({ academicYearId: new mongoose.Types.ObjectId(dto.academicYearId) });
     if (existing) {
-      throw new BadRequestException(`معايير الرسوم موجودة بالفعل للعام الدراسي: ${dto.academicYear}`);
+      throw new BadRequestException(`معايير الرسوم موجودة بالفعل لهذا العام الدراسي`);
     }
     const data = await this.feeConfigModel.create({ ...dto, createdBy: adminId });
     return { message: 'تم إنشاء معايير الرسوم بنجاح', data };
@@ -43,9 +43,9 @@ export class FeeConfigService {
 
   async update(id: string, dto: UpdateFeeConfigDto) {
     this.validateObjectId(id);
-    if (dto.academicYear) {
-      const dup = await this.feeConfigModel.findOne({ academicYear: dto.academicYear, _id: { $ne: id } });
-      if (dup) throw new BadRequestException(`العام الدراسي ${dto.academicYear} مستخدم بالفعل`);
+    if (dto.academicYearId) {
+      const dup = await this.feeConfigModel.findOne({ academicYearId: new mongoose.Types.ObjectId(dto.academicYearId), _id: { $ne: id } });
+      if (dup) throw new BadRequestException(`العام الدراسي مستخدم بالفعل في معايير رسوم أخرى`);
     }
     const data = await this.feeConfigModel
       .findByIdAndUpdate(id, dto, { new: true, runValidators: true })

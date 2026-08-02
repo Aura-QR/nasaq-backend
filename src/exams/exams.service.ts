@@ -14,6 +14,7 @@ import { Class } from '../classes/schemas/class.schema';
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { Student } from '../students/schemas/student.schema';
 import { Enrollment } from '../enrollments/schemas/enrollment.schema';
+import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.schema';
 import { transformExamResponse } from './transforms/response.transform';
 import { PaginationDto } from '../pagination/dto/pagination.dto';
 import { getPagination } from '../pagination/common/paginationUtils';
@@ -32,6 +33,7 @@ export class ExamsService {
     @InjectModel(Student.name) private studentModel: Model<Student>,
     @InjectModel(ExamResult.name) private examResultModel: Model<ExamResult>,
     @InjectModel(Enrollment.name) private enrollmentModel: Model<Enrollment>,
+    @InjectModel(SubjectOffering.name) private subjectOfferingModel: Model<SubjectOffering>,
   ) {}
 
   private validateObjectId(id: string, entityName: string): void {
@@ -48,18 +50,28 @@ export class ExamsService {
     classIds: string[],
     subjectId: string,
   ): Promise<void> {
-    // Find all lectures where this teacher teaches this subject
+    const offerings = await this.subjectOfferingModel
+      .find({ subjectId: new mongoose.Types.ObjectId(subjectId) })
+      .select('_id')
+      .exec();
+
+    const offeringIds = offerings.map((o) => o._id);
+    if (offeringIds.length === 0) {
+      throw new ForbiddenException('المادة المحددة غير مطروحة في أي مرحلة دراسية.');
+    }
+
     const lectures = await this.lectureModel
       .find({
         teacherId: new mongoose.Types.ObjectId(teacherId),
-        subjectId: new mongoose.Types.ObjectId(subjectId),
+        subjectOfferingId: { $in: offeringIds },
       })
+      .select('classId')
       .exec();
 
-    // Get the class IDs the teacher teaches for this subject
-    const teacherClassIds = lectures.map((lecture: any) => lecture.classId.toString());
+    const teacherClassIds = lectures
+      .map((lecture: any) => lecture.classId?.toString())
+      .filter(Boolean);
 
-    // Check if all requested classIds are in the teacher's classes
     const unauthorizedClasses = classIds.filter(
       (classId) => !teacherClassIds.includes(classId),
     );
@@ -793,9 +805,16 @@ export class ExamsService {
     if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
     // Verify teacher teaches this subject
+    const offerings = await this.subjectOfferingModel
+      .find({ subjectId: exam.subjectId })
+      .select('_id')
+      .exec();
+
+    const offeringIds = offerings.map((o) => o._id);
+
     const lecture = await this.lectureModel.findOne({
       teacherId: new mongoose.Types.ObjectId(String(teacher.userId)),
-      subjectOfferingId: exam.subjectId,
+      subjectOfferingId: { $in: offeringIds },
     });
     if (!lecture) {
       throw new ForbiddenException('ليس لديك صلاحية لتعديل درجات هذا الطالب في هذه المادة');

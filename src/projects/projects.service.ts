@@ -7,6 +7,7 @@ import { GradesCriteria } from '../grades-criteria/schemas/grades-criteria.schem
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { Student } from '../students/schemas/student.schema';
 import { Enrollment } from '../enrollments/schemas/enrollment.schema';
+import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.schema';
 import { CreateProjectDto } from './dto/create-project.dto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -30,6 +31,7 @@ export class ProjectsService {
     @InjectModel(Lecture.name) private lectureModel: Model<Lecture>,
     @InjectModel(Student.name) private studentModel: Model<Student>,
     @InjectModel(Enrollment.name) private enrollmentModel: Model<Enrollment>,
+    @InjectModel(SubjectOffering.name) private subjectOfferingModel: Model<SubjectOffering>,
   ) {}
 
   /**
@@ -40,25 +42,35 @@ export class ProjectsService {
     classIds: string[],
     subjectId: string,
   ): Promise<void> {
-    // Find all lectures where this teacher teaches this subject
+    const offerings = await this.subjectOfferingModel
+      .find({ subjectId: new mongoose.Types.ObjectId(subjectId) })
+      .select('_id')
+      .exec();
+
+    const offeringIds = offerings.map((o) => o._id);
+    if (offeringIds.length === 0) {
+      throw new ForbiddenException('المادة المحددة غير مطروحة في أي مرحلة دراسية.');
+    }
+
     const lectures = await this.lectureModel
       .find({
         teacherId: new mongoose.Types.ObjectId(teacherId),
-        subjectId: new mongoose.Types.ObjectId(subjectId),
+        subjectOfferingId: { $in: offeringIds },
       })
+      .select('classId')
       .exec();
 
-    // Get the class IDs the teacher teaches for this subject
-    const teacherClassIds = lectures.map((lecture: any) => lecture.classId.toString());
+    const teacherClassIds = lectures
+      .map((lecture: any) => lecture.classId?.toString())
+      .filter(Boolean);
 
-    // Check if all requested classIds are in the teacher's classes
     const unauthorizedClasses = classIds.filter(
       (classId) => !teacherClassIds.includes(classId),
     );
 
     if (unauthorizedClasses.length > 0) {
       throw new ForbiddenException(
-        `ليس لديك صلاحية لإنشاء مشاريع/امتحانات للفصول: ${unauthorizedClasses.join(', ')}. يمكنك الإنشاء فقط للفصول التي تدرس فيها هذه المادة.`,
+        `ليس لديك صلاحية لإنشاء مشاريع للفصول: ${unauthorizedClasses.join(', ')}. يمكنك الإنشاء فقط للفصول التي تدرس فيها هذه المادة.`,
       );
     }
   }
@@ -715,9 +727,15 @@ export class ProjectsService {
     if (!mongoose.Types.ObjectId.isValid(subjectId)) throw new BadRequestException('صيغة معرف المادة غير صحيحة');
     if (!mongoose.Types.ObjectId.isValid(classId)) throw new BadRequestException('صيغة معرف الفصل غير صحيحة');
 
+    const offerings = await this.subjectOfferingModel
+      .find({ subjectId: new mongoose.Types.ObjectId(subjectId) })
+      .select('_id')
+      .exec();
+    const offeringIds = offerings.map(o => o._id);
+
     const lecture = await this.lectureModel.findOne({
       teacherId: new mongoose.Types.ObjectId(teacherId),
-      subjectId: new mongoose.Types.ObjectId(subjectId),
+      subjectOfferingId: { $in: offeringIds },
       classId: new mongoose.Types.ObjectId(classId),
     });
     if (!lecture) throw new ForbiddenException('لا تدرّس هذه المادة في هذا الفصل');
@@ -830,9 +848,15 @@ export class ProjectsService {
     if (!project) throw new NotFoundException(`المشروع غير موجود`);
 
     if (user?.role === 'TEACHER') {
+      const offerings = await this.subjectOfferingModel
+        .find({ subjectId: project.subjectId })
+        .select('_id')
+        .exec();
+      const offeringIds = offerings.map(o => o._id);
+
       const lecture = await this.lectureModel.findOne({
         teacherId: new mongoose.Types.ObjectId(user.userId),
-        subjectId: project.subjectId,
+        subjectOfferingId: { $in: offeringIds },
         classId: { $in: project.classIds },
       });
       if (!lecture) throw new ForbiddenException('ليس لديك صلاحية لعرض تقديمات هذا المشروع');
@@ -855,9 +879,15 @@ export class ProjectsService {
     if (!project) throw new NotFoundException(`المشروع غير موجود`);
 
     if (user?.role === 'TEACHER') {
+      const offerings = await this.subjectOfferingModel
+        .find({ subjectId: project.subjectId })
+        .select('_id')
+        .exec();
+      const offeringIds = offerings.map(o => o._id);
+
       const lecture = await this.lectureModel.findOne({
         teacherId: new mongoose.Types.ObjectId(user.userId),
-        subjectId: project.subjectId,
+        subjectOfferingId: { $in: offeringIds },
         classId: { $in: project.classIds },
       });
       if (!lecture) throw new ForbiddenException('ليس لديك صلاحية لتنزيل هذا التقديم');
@@ -887,9 +917,15 @@ export class ProjectsService {
     const student = await this.studentModel.findById(studentId);
     if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
+    const offerings = await this.subjectOfferingModel
+      .find({ subjectId: project.subjectId })
+      .select('_id')
+      .exec();
+    const offeringIds = offerings.map(o => o._id);
+
     const lecture = await this.lectureModel.findOne({
       teacherId: new mongoose.Types.ObjectId(teacher.userId),
-      subjectOfferingId: project.subjectId,
+      subjectOfferingId: { $in: offeringIds },
     });
     if (!lecture) throw new ForbiddenException('ليس لديك صلاحية لتقييم هذا الطالب في هذه المادة');
 
