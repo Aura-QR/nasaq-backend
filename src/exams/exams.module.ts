@@ -9,6 +9,7 @@ import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
 import { CaslModule } from '../casl/casl.module';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
+import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.schema';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { Student, StudentSchema } from '../students/schemas/student.schema';
       { name: Lecture.name, schema: LectureSchema },
       { name: Student.name, schema: StudentSchema },
       { name: ExamResult.name, schema: ExamResultSchema },
+      { name: Enrollment.name, schema: EnrollmentSchema },
     ]),
     CaslModule,
   ],
@@ -27,3 +29,4 @@ import { Student, StudentSchema } from '../students/schemas/student.schema';
   exports: [ExamsService],
 })
 export class ExamsModule {}
+

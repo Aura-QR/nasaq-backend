@@ -11,6 +11,7 @@ import {
 } from '../grades-criteria/schemas/grades-criteria.schema';
 import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
+import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.schema';
 import { multerConfig } from './config/multer.config';
 import { CaslModule } from 'src/casl/casl.module';
 
@@ -22,6 +23,7 @@ import { CaslModule } from 'src/casl/casl.module';
       { name: GradesCriteria.name, schema: GradesCriteriaSchema },
       { name: Lecture.name, schema: LectureSchema },
       { name: Student.name, schema: StudentSchema },
+      { name: Enrollment.name, schema: EnrollmentSchema },
     ]),
     CaslModule,
     MulterModule.register(multerConfig),
@@ -31,3 +33,4 @@ import { CaslModule } from 'src/casl/casl.module';
   exports: [ProjectsService],
 })
 export class ProjectsModule {}
+

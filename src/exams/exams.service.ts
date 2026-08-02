@@ -13,6 +13,7 @@ import { GradesCriteria } from '../grades-criteria/schemas/grades-criteria.schem
 import { Class } from '../classes/schemas/class.schema';
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { Student } from '../students/schemas/student.schema';
+import { Enrollment } from '../enrollments/schemas/enrollment.schema';
 import { transformExamResponse } from './transforms/response.transform';
 import { PaginationDto } from '../pagination/dto/pagination.dto';
 import { getPagination } from '../pagination/common/paginationUtils';
@@ -30,6 +31,7 @@ export class ExamsService {
     @InjectModel(Lecture.name) private lectureModel: Model<Lecture>,
     @InjectModel(Student.name) private studentModel: Model<Student>,
     @InjectModel(ExamResult.name) private examResultModel: Model<ExamResult>,
+    @InjectModel(Enrollment.name) private enrollmentModel: Model<Enrollment>,
   ) {}
 
   private validateObjectId(id: string, entityName: string): void {
@@ -202,12 +204,40 @@ export class ExamsService {
 
 
   async getMyExams(studentId: string, filters: any = {}, pagination: PaginationDto = {}) {
-    const student = await this.studentModel.findById(studentId);
+    const [enrollments, student] = await Promise.all([
+      this.enrollmentModel.find({ studentId }).select('classId').exec(),
+      this.studentModel.findById(studentId).select('classId').exec(),
+    ]);
+
     if (!student) {
       throw new NotFoundException(`الطالب غير موجود`);
     }
 
-    const query: any = {};
+    const classIdsSet = new Set<string>();
+    if (student.classId) {
+      classIdsSet.add(student.classId.toString());
+    }
+    enrollments.forEach((e) => {
+      if (e.classId) {
+        classIdsSet.add(e.classId.toString());
+      }
+    });
+
+    if (classIdsSet.size === 0) {
+      return {
+        data: [],
+        totalDocs: 0,
+        totalPages: 0,
+      };
+    }
+
+    const studentClassObjectIds = Array.from(classIdsSet).map(
+      (id) => new mongoose.Types.ObjectId(id),
+    );
+
+    const query: any = {
+      classIds: { $in: studentClassObjectIds },
+    };
 
     const allowedFilters: Record<string, 'string' | 'objectId'> = {
       examType: 'string',

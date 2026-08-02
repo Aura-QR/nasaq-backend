@@ -6,6 +6,7 @@ import { ProjectSubmission } from './schemas/project-submission.schema';
 import { GradesCriteria } from '../grades-criteria/schemas/grades-criteria.schema';
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { Student } from '../students/schemas/student.schema';
+import { Enrollment } from '../enrollments/schemas/enrollment.schema';
 import { CreateProjectDto } from './dto/create-project.dto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -28,6 +29,7 @@ export class ProjectsService {
     private gradesCriteriaModel: Model<GradesCriteria>,
     @InjectModel(Lecture.name) private lectureModel: Model<Lecture>,
     @InjectModel(Student.name) private studentModel: Model<Student>,
+    @InjectModel(Enrollment.name) private enrollmentModel: Model<Enrollment>,
   ) {}
 
   /**
@@ -189,12 +191,41 @@ export class ProjectsService {
   }
 
   async getMyProjects(studentId: string, filters: any = {}, pagination: PaginationDto = {}) {
-    const student = await this.studentModel.findById(studentId);
+    const [enrollments, student] = await Promise.all([
+      this.enrollmentModel.find({ studentId }).select('classId').exec(),
+      this.studentModel.findById(studentId).select('classId').exec(),
+    ]);
+
     if (!student) {
       throw new NotFoundException(`الطالب غير موجود`);
     }
 
-    const query: any = {};
+    const classIdsSet = new Set<string>();
+    if (student.classId) {
+      classIdsSet.add(student.classId.toString());
+    }
+    enrollments.forEach((e) => {
+      if (e.classId) {
+        classIdsSet.add(e.classId.toString());
+      }
+    });
+
+    if (classIdsSet.size === 0) {
+      return {
+        message: 'تم استرجاع مشاريع الطالب بنجاح',
+        data: [],
+        totalDocs: 0,
+        totalPages: 0,
+      };
+    }
+
+    const studentClassObjectIds = Array.from(classIdsSet).map(
+      (id) => new mongoose.Types.ObjectId(id),
+    );
+
+    const query: any = {
+      classIds: { $in: studentClassObjectIds },
+    };
 
     const now = new Date();
     if (filters.status === 'upcoming') query.dueDate = { $gt: now };
