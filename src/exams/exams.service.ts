@@ -130,17 +130,31 @@ export class ExamsService {
     this.validateObjectId(subjectId, 'subject');
 
 
+    const offeringQuery: any = { subjectId: new mongoose.Types.ObjectId(subjectId) };
+    if (termId && mongoose.Types.ObjectId.isValid(termId)) {
+      offeringQuery.termId = new mongoose.Types.ObjectId(termId);
+    }
+    const offerings = await this.subjectOfferingModel.find(offeringQuery).select('_id').exec();
+    const offeringIds = offerings.map((o) => o._id);
+
     let gradesCriteria = await this.gradesCriteriaModel.findOne({
-      subjectId: new mongoose.Types.ObjectId(subjectId),
+      subjectOfferingId: { $in: offeringIds },
     }).exec();
 
     if (!gradesCriteria) {
-      gradesCriteria = await this.gradesCriteriaModel.findOne().exec();
+      const allOfferings = await this.subjectOfferingModel
+        .find({ subjectId: new mongoose.Types.ObjectId(subjectId) })
+        .select('_id')
+        .exec();
+      const allOfferingIds = allOfferings.map((o) => o._id);
+      gradesCriteria = await this.gradesCriteriaModel.findOne({
+        subjectOfferingId: { $in: allOfferingIds },
+      }).exec();
     }
 
     if (!gradesCriteria) {
       throw new NotFoundException(
-        `معايير التقييم غير موجودة للمادة ${subjectId}`
+        `معايير التقييم غير موجودة للمادة ${subjectId}`,
       );
     }
 

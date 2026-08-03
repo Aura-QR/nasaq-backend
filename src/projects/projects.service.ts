@@ -20,7 +20,13 @@ import { transformProjectResponse } from './transforms/response.transform';
 @Injectable()
 export class ProjectsService {
   private static readonly CLASS_FIELDS = 'roomNumber academicYear gender';
-  private static readonly GRADES_CRITERIA_FIELDS = 'academicYear projects';
+  private static readonly GRADES_CRITERIA_POPULATE = {
+    path: 'gradesCriteriaId',
+    populate: {
+      path: 'subjectOfferingId',
+      populate: { path: 'subjectId', select: 'subjectCode subjectName' },
+    },
+  };
   private static readonly SUBJECT_FIELDS = 'subjectCode subjectName';
 
   constructor(
@@ -90,14 +96,33 @@ export class ProjectsService {
       );
     }
 
-    const gradesCriteria = await this.gradesCriteriaModel.findOne({
-      subjectId: createProjectDto.subjectId,
-      academicYearId: createProjectDto.academicYearId,
+    const offeringQuery: any = { subjectId: new mongoose.Types.ObjectId(createProjectDto.subjectId) };
+    if (createProjectDto.termId && mongoose.Types.ObjectId.isValid(createProjectDto.termId)) {
+      offeringQuery.termId = new mongoose.Types.ObjectId(createProjectDto.termId);
+    }
+
+    const offerings = await this.subjectOfferingModel.find(offeringQuery).select('_id').exec();
+    const offeringIds = offerings.map((o) => o._id);
+
+    let gradesCriteria = await this.gradesCriteriaModel.findOne({
+      subjectOfferingId: { $in: offeringIds },
     });
 
     if (!gradesCriteria) {
+      const allOfferings = await this.subjectOfferingModel
+        .find({ subjectId: new mongoose.Types.ObjectId(createProjectDto.subjectId) })
+        .select('_id')
+        .exec();
+      const allOfferingIds = allOfferings.map((o) => o._id);
+
+      gradesCriteria = await this.gradesCriteriaModel.findOne({
+        subjectOfferingId: { $in: allOfferingIds },
+      });
+    }
+
+    if (!gradesCriteria) {
       throw new NotFoundException(
-        `معايير التقييم غير موجودة للمادة ${createProjectDto.subjectId} لهذا العام الدراسي`,
+        `معايير التقييم غير موجودة للمادة ${createProjectDto.subjectId}`,
       );
     }
 
@@ -152,7 +177,7 @@ export class ProjectsService {
 
     const populatedProject = await this.projectModel
       .findById(savedProject._id)
-      .populate({ path: 'gradesCriteriaId', select: ProjectsService.GRADES_CRITERIA_FIELDS })
+      .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();
@@ -176,7 +201,7 @@ export class ProjectsService {
   async findOne(id: string, req: any, user?: any): Promise<any> {
     const project = await this.projectModel
       .findById(id)
-      .populate({ path: 'gradesCriteriaId', select: ProjectsService.GRADES_CRITERIA_FIELDS })
+      .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();
@@ -256,7 +281,7 @@ export class ProjectsService {
     let projectsQuery = this.projectModel
       .find(query)
       .sort({ createdAt: -1 })
-      .populate({ path: 'gradesCriteriaId', select: ProjectsService.GRADES_CRITERIA_FIELDS })
+      .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS });
 
@@ -314,7 +339,7 @@ export class ProjectsService {
     let projectsQuery = this.projectModel
       .find(query)
       .sort({ createdAt: -1 })
-      .populate({ path: 'gradesCriteriaId', select: ProjectsService.GRADES_CRITERIA_FIELDS })
+      .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS });
 
@@ -374,7 +399,7 @@ export class ProjectsService {
     const isPaginationRequested = pagination.page !== undefined || pagination.limit !== undefined;
 
     let projectsQuery = this.projectModel.find(query).sort({ createdAt: -1 })
-      .populate({ path: 'gradesCriteriaId', select: ProjectsService.GRADES_CRITERIA_FIELDS })
+      .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS });
 
@@ -482,19 +507,33 @@ export class ProjectsService {
       );
     }
 
-    if (updateProjectDto.subjectId && updateProjectDto.academicYear) {
-      const gradesCriteria = await this.gradesCriteriaModel.findOne({
-        subjectId: updateProjectDto.subjectId,
-        academicYear: updateProjectDto.academicYear,
+    if (updateProjectDto.subjectId) {
+      const offeringQuery: any = { subjectId: new mongoose.Types.ObjectId(updateProjectDto.subjectId) };
+      if (updateProjectDto.termId && mongoose.Types.ObjectId.isValid(updateProjectDto.termId)) {
+        offeringQuery.termId = new mongoose.Types.ObjectId(updateProjectDto.termId);
+      }
+
+      const offerings = await this.subjectOfferingModel.find(offeringQuery).select('_id').exec();
+      const offeringIds = offerings.map((o) => o._id);
+
+      let gradesCriteria = await this.gradesCriteriaModel.findOne({
+        subjectOfferingId: { $in: offeringIds },
       });
 
       if (!gradesCriteria) {
-        throw new NotFoundException(
-          `معايير التقييم غير موجودة للمادة ${updateProjectDto.subjectId} والعام الدراسي ${updateProjectDto.academicYear}`,
-        );
+        const allOfferings = await this.subjectOfferingModel
+          .find({ subjectId: new mongoose.Types.ObjectId(updateProjectDto.subjectId) })
+          .select('_id')
+          .exec();
+        const allOfferingIds = allOfferings.map((o) => o._id);
+        gradesCriteria = await this.gradesCriteriaModel.findOne({
+          subjectOfferingId: { $in: allOfferingIds },
+        });
       }
 
-      updateProjectDto.gradesCriteriaId = gradesCriteria._id;
+      if (gradesCriteria) {
+        updateProjectDto.gradesCriteriaId = gradesCriteria._id;
+      }
     }
 
     Object.assign(project, updateProjectDto);
@@ -532,7 +571,7 @@ export class ProjectsService {
 
     const populatedProject = await this.projectModel
       .findById(id)
-      .populate({ path: 'gradesCriteriaId', select: ProjectsService.GRADES_CRITERIA_FIELDS })
+      .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();
@@ -633,7 +672,7 @@ export class ProjectsService {
 
     const updatedProject = await this.projectModel
       .findById(id)
-      .populate({ path: 'gradesCriteriaId', select: ProjectsService.GRADES_CRITERIA_FIELDS })
+      .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();
@@ -693,7 +732,7 @@ export class ProjectsService {
 
     const updatedProject = await this.projectModel
       .findById(id)
-      .populate({ path: 'gradesCriteriaId', select: ProjectsService.GRADES_CRITERIA_FIELDS })
+      .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();

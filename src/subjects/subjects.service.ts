@@ -218,9 +218,13 @@ export class SubjectsService {
       throw new NotFoundException(`المادة ذات المعرف ${id} غير موجودة`);
     }
 
+    const offerings = await this.subjectOfferingModel.find({ subjectId: id }).select('_id').exec();
+    const offeringIds = offerings.map((o) => o._id);
+
     await this.examModel.deleteMany({ subjectId: id });
     await this.projectModel.deleteMany({ subjectId: id });
-    await this.gradesCriteriaModel.deleteMany({ subjectId: id });
+    await this.gradesCriteriaModel.deleteMany({ subjectOfferingId: { $in: offeringIds } });
+    await this.subjectOfferingModel.deleteMany({ subjectId: id });
     await this.subjectModel.findByIdAndDelete(id).exec();
 
     return {
