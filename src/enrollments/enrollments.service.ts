@@ -89,7 +89,7 @@ export class EnrollmentsService {
       filter.classId = new mongoose.Types.ObjectId(classId);
     }
 
-    const enrollments = await this.enrollmentModel
+    return this.enrollmentModel
       .find(filter)
       .populate({
         path: 'studentId',
@@ -103,21 +103,6 @@ export class EnrollmentsService {
       .populate('academicYearId', 'name status startDate endDate')
       .sort({ createdAt: -1 })
       .exec();
-
-    return enrollments.map((enc) => {
-      const obj = enc.toObject({ virtuals: true });
-      const studentObj = obj.studentId as any;
-      return {
-        ...obj,
-        student: studentObj
-          ? {
-              ...studentObj,
-              class: studentObj.classId,
-              classId: studentObj.classId?._id ?? studentObj.classId ?? null,
-            }
-          : null,
-      };
-    });
   }
 
   async findByStudent(studentId: string) {
