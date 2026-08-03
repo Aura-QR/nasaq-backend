@@ -10,6 +10,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { Student } from './schemas/student.schema';
 import { Class } from '../classes/schemas/class.schema';
+import { Enrollment } from '../enrollments/schemas/enrollment.schema';
 import { transformStudentResponse } from './transforms/response.transform';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
@@ -26,9 +27,11 @@ export class StudentsService {
     @InjectModel(Class.name)
     private readonly classModel: Model<Class>,
     @InjectModel(Counter.name)
-       private readonly counterModel: Model<Counter>,
+    private readonly counterModel: Model<Counter>,
+    @InjectModel(Enrollment.name)
+    private readonly enrollmentModel: Model<Enrollment>,
     private readonly emailService: EmailService,
-     private readonly financialRecordService: FinancialRecordService,
+    private readonly financialRecordService: FinancialRecordService,
   ) { }
 
 
@@ -122,11 +125,28 @@ export class StudentsService {
   async filtering(filters: any, pagination: PaginationDto = {}) {
     const query: any = {};
 
+    const academicYearParam = filters.academicYearId || filters.academicYear;
+    const cleanFilters = { ...filters };
+    delete cleanFilters.academicYearId;
+    delete cleanFilters.academicYear;
+
+    if (academicYearParam && mongoose.Types.ObjectId.isValid(String(academicYearParam))) {
+      const enrollments = await this.enrollmentModel
+        .find({
+          academicYearId: new mongoose.Types.ObjectId(String(academicYearParam)),
+          status: 'active',
+        })
+        .select('studentId')
+        .exec();
+
+      const studentIds = enrollments.map((e) => e.studentId);
+      query._id = { $in: studentIds };
+    }
+
     const textSearchFields = ['name', 'firstName', 'familyName', 'fatherName', 'nationality', 'address', 'previousSchool', 'notes','schoolEmail'];
+    const exactMatchFields = ['gender', 'phoneNumber', 'email', 'classId'];
 
-    const exactMatchFields = ['gender', 'academicYear', 'phoneNumber', 'email', 'classId'];
-
-    for (const [key, value] of Object.entries(filters)) {
+    for (const [key, value] of Object.entries(cleanFilters)) {
       if (value === undefined || value === null || value === '') continue;
       if (key === 'page' || key === 'limit') continue;
 
@@ -144,13 +164,12 @@ export class StudentsService {
       else if (exactMatchFields.includes(key)) {
         if (key === 'classId' && stringValue === 'null') {
           query[key] = null;
-        } else if (key === 'classId') {
+        } else if (key === 'classId' && mongoose.Types.ObjectId.isValid(stringValue)) {
           query[key] = new mongoose.Types.ObjectId(stringValue);
         } else {
           query[key] = stringValue;
         }
       }
-
       else {
         query[key] = stringValue;
       }

@@ -67,21 +67,50 @@ export class EnrollmentsService {
     return enrollment.save();
   }
 
-  async findByYearAndClass(academicYearId?: string, classId?: string) {
-    const filter: any = { status: 'active' };
-    if (academicYearId) {
+  async findByYearAndClass(academicYearId?: string, classId?: string, status?: string) {
+    const filter: any = {};
+    if (status && status !== 'all') {
+      filter.status = status;
+    } else if (!status) {
+      filter.status = 'active';
+    }
+
+    if (academicYearId && mongoose.Types.ObjectId.isValid(academicYearId)) {
       filter.academicYearId = new mongoose.Types.ObjectId(academicYearId);
     }
-    if (classId) {
+    if (classId && mongoose.Types.ObjectId.isValid(classId)) {
       filter.classId = new mongoose.Types.ObjectId(classId);
     }
 
-    return this.enrollmentModel
+    const enrollments = await this.enrollmentModel
       .find(filter)
-      .populate('studentId', 'firstName familyName fatherName email phoneNumber')
-      .populate('classId', 'name roomNumber gender')
-      .populate('academicYearId', 'name status')
+      .populate({
+        path: 'studentId',
+        select: '-password -otp -otpExpiry',
+      })
+      .populate({
+        path: 'classId',
+        select: 'name roomNumber gender gradeLevelId',
+        populate: { path: 'gradeLevelId', select: 'name order' },
+      })
+      .populate('academicYearId', 'name status startDate endDate')
+      .sort({ createdAt: -1 })
       .exec();
+
+    return enrollments.map((enc) => {
+      const obj = enc.toObject({ virtuals: true });
+      const studentObj = obj.studentId as any;
+      return {
+        ...obj,
+        student: studentObj
+          ? {
+              ...studentObj,
+              class: studentObj.classId,
+              classId: studentObj.classId?._id ?? studentObj.classId ?? null,
+            }
+          : null,
+      };
+    });
   }
 
   async findByStudent(studentId: string) {

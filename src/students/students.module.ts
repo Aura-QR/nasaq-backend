@@ -5,6 +5,7 @@ import { StudentsService } from './students.service';
 import { Student, StudentSchema } from './schemas/student.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { Counter, CounterSchema } from 'src/Counter/Schema/counter.schema';
+import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.schema';
 import { EmailModule } from 'src/email/email.module';
 import { FinancialModule } from 'src/financial/financial.module';
 
@@ -13,7 +14,8 @@ import { FinancialModule } from 'src/financial/financial.module';
     MongooseModule.forFeature([
       { name: Student.name, schema: StudentSchema },
       { name: Class.name, schema: ClassSchema },
-      {name : Counter.name , schema : CounterSchema}
+      { name: Counter.name, schema: CounterSchema },
+      { name: Enrollment.name, schema: EnrollmentSchema },
     ]),
     EmailModule,
     FinancialModule,

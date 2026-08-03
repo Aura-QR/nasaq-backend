@@ -34,11 +34,13 @@ export class EnrollmentsController {
   @ApiOperation({ summary: 'Find enrollments by academic year and class' })
   @ApiQuery({ name: 'academicYearId', required: false })
   @ApiQuery({ name: 'classId', required: false })
+  @ApiQuery({ name: 'status', required: false })
   async findByYearAndClass(
     @Query('academicYearId') academicYearId?: string,
     @Query('classId') classId?: string,
+    @Query('status') status?: string,
   ) {
-    return await this.enrollmentsService.findByYearAndClass(academicYearId, classId);
+    return await this.enrollmentsService.findByYearAndClass(academicYearId, classId, status);
   }
 
   @Get('promotion-preview/:targetAcademicYearId')
