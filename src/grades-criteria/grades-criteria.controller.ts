@@ -16,26 +16,30 @@ export class GradesCriteriaController {
   constructor(private readonly gradesCriteriaService: GradesCriteriaService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a grading criteria for a subject in a class' })
+  @ApiOperation({ summary: 'Create a grading criteria for a subject offering' })
   @ApiResponse({ status: 201, description: 'Grading criteria created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation failed' })
-  @ApiResponse({ status: 404, description: 'Class or subject not found' })
-  @ApiResponse({ status: 409, description: 'Subject is not assigned to this class' })
+  @ApiResponse({ status: 404, description: 'Subject offering not found' })
+  @ApiResponse({ status: 409, description: 'Grading criteria already exists for this subject offering' })
   create(@Body() createGradesCriteriaDto: CreateGradesCriteriaDto) {
     return this.gradesCriteriaService.create(createGradesCriteriaDto);
   }
 
   @ApiOperation({ summary: 'Get grading criteria for the authenticated student' })
-  @ApiQuery({ name: 'subjectId', required: false, type: String, description: 'Filter by subject ID' })
-  @ApiQuery({ name: 'academicYear', required: false, type: String, description: 'Filter by academic year' })
+  @ApiQuery({ name: 'subjectOfferingId', required: false, type: String, description: 'Filter by SubjectOffering ID' })
+  @ApiQuery({ name: 'subjectId', required: false, type: String, description: 'Filter by Subject ID' })
   @ApiResponse({ status: 200, description: 'Grading criteria fetched successfully' })
   @ApiResponse({ status: 404, description: 'Student not found' })
   @Get('student/me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  async getMyGradesCriteria(@CurrentUser() user: any, @Query('subjectId') subjectId?: string, @Query('academicYear') academicYear?: string) {
-    return await this.gradesCriteriaService.getMyGradesCriteria(user.userId, subjectId, academicYear);
+  async getMyGradesCriteria(
+    @CurrentUser() user: any,
+    @Query('subjectOfferingId') subjectOfferingId?: string,
+    @Query('subjectId') subjectId?: string,
+  ) {
+    return await this.gradesCriteriaService.getMyGradesCriteria(user.userId, subjectOfferingId, subjectId);
   }
 
   @ApiOperation({ summary: 'Get subjects of the authenticated student' })
@@ -49,17 +53,22 @@ export class GradesCriteriaController {
     return await this.gradesCriteriaService.getMySubjects(user.userId);
   }
 
-  @ApiOperation({ summary: 'Get grades of the authenticated student for a subject' })
-  @ApiQuery({ name: 'subjectId', required: true, type: String, description: 'Subject ID' })
+  @ApiOperation({ summary: 'Get grades of the authenticated student for a subject offering' })
+  @ApiQuery({ name: 'subjectOfferingId', required: false, type: String, description: 'SubjectOffering ID' })
+  @ApiQuery({ name: 'subjectId', required: false, type: String, description: 'Subject ID' })
   @ApiResponse({ status: 200, description: 'Grades fetched successfully' })
-  @ApiResponse({ status: 400, description: 'Subject not in student class' })
+  @ApiResponse({ status: 400, description: 'Subject offering missing' })
   @ApiResponse({ status: 404, description: 'Student or grading criteria not found' })
   @Get('student/me/grades')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  async getMyGrades(@CurrentUser() user: any, @Query('subjectId') subjectId: string) {
-    return await this.gradesCriteriaService.getMyGrades(user.userId, subjectId);
+  async getMyGrades(
+    @CurrentUser() user: any,
+    @Query('subjectOfferingId') subjectOfferingId?: string,
+    @Query('subjectId') subjectId?: string,
+  ) {
+    return await this.gradesCriteriaService.getMyGrades(user.userId, subjectOfferingId, subjectId);
   }
 
   @ApiOperation({ summary: 'Get all grading criteria or filter with query params' })
@@ -68,6 +77,7 @@ export class GradesCriteriaController {
   @ApiResponse({ status: 404, description: 'Grading criteria not found' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
+  @ApiQuery({ name: 'subjectOfferingId', required: false, type: String, description: 'Filter by SubjectOffering ID' })
   @Get()
   @UseGuards(JwtAuthGuard, AbilitiesGuard)
   @ApiBearerAuth()
@@ -79,12 +89,11 @@ export class GradesCriteriaController {
     return await this.gradesCriteriaService.filtering(filters, pagination, user);
   }
 
-  
   @ApiOperation({ summary: 'Get grades criteria by ID' })
   @ApiParam({ name: 'id', description: 'Grades criteria ID' })
-  @ApiResponse({status: HttpStatus.OK, description: 'Grades criteria found successfully'})
-  @ApiResponse({status: HttpStatus.NOT_FOUND,description: 'Grades criteria not found'})
-  @ApiResponse({status: HttpStatus.BAD_REQUEST,description: 'Invalid ID format'})
+  @ApiResponse({ status: HttpStatus.OK, description: 'Grades criteria found successfully' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Grades criteria not found' })
+  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid ID format' })
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
@@ -96,7 +105,6 @@ export class GradesCriteriaController {
   @ApiResponse({ status: 200, description: 'Grading criteria updated successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - Invalid ID or validation failed' })
   @ApiResponse({ status: 404, description: 'GradesCriteria not found' })
-  @ApiResponse({ status: 409, description: 'Subject is not assigned to this class' })
   update(@Param('id') id: string, @Body() updateGradesCriteriaDto: UpdateGradesCriteriaDto) {
     return this.gradesCriteriaService.update(id, updateGradesCriteriaDto);
   }

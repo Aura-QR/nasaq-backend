@@ -124,14 +124,17 @@ export class ExamsService {
     this.validateObjectId(subjectId, 'subject');
 
 
-    const gradesCriteria = await this.gradesCriteriaModel.findOne({
-      subjectId,
-      academicYearId,
-    });
+    let gradesCriteria = await this.gradesCriteriaModel.findOne({
+      subjectId: new mongoose.Types.ObjectId(subjectId),
+    }).exec();
+
+    if (!gradesCriteria) {
+      gradesCriteria = await this.gradesCriteriaModel.findOne().exec();
+    }
 
     if (!gradesCriteria) {
       throw new NotFoundException(
-        `معايير التقييم غير موجودة للمادة ${subjectId} لهذا العام الدراسي`
+        `معايير التقييم غير موجودة للمادة ${subjectId}`
       );
     }
 
@@ -467,18 +470,17 @@ export class ExamsService {
       }
 
       if (academicYearId) {
-        const gradesCriteria = await this.gradesCriteriaModel.findOne({
-          subjectId,
-          academicYearId,
-        });
+        let gradesCriteria = await this.gradesCriteriaModel.findOne({
+          subjectId: new mongoose.Types.ObjectId(subjectId),
+        }).exec();
 
         if (!gradesCriteria) {
-          throw new NotFoundException(
-            `معايير التقييم غير موجودة للمادة ${subjectId} لهذا العام الدراسي`
-          );
+          gradesCriteria = await this.gradesCriteriaModel.findOne().exec();
         }
 
-        updateExamDto['gradesCriteriaId'] = gradesCriteria._id;
+        if (gradesCriteria) {
+          updateExamDto['gradesCriteriaId'] = gradesCriteria._id;
+        }
       }     
     }
 

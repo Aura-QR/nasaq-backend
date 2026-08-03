@@ -241,6 +241,21 @@ async function resetAndSeed() {
       updatedAt: now,
     });
 
+    await db.collection('gradesCriteria').insertOne({
+      schoolId: schoolId,
+      subjectOfferingId: mathOfferingId,
+      final: 40,
+      assignments: 20,
+      assignmentsCount: 4,
+      activities: 10,
+      projects: 15,
+      projectsCount: 1,
+      quizzes: 15,
+      quizzesCount: 3,
+      createdAt: now,
+      updatedAt: now,
+    });
+
     // 6. Seed Teacher & Teacher Assignment
     console.log('🌱 6/9 Seeding Teacher & Teacher Assignment...');
     await db.collection('teachers').insertOne({

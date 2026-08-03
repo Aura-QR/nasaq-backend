@@ -10,13 +10,8 @@ import { ApiProperty } from '@nestjs/swagger';
 export class CreateGradesCriteriaDto {
   @IsMongoId()
   @IsNotEmpty()
-  @ApiProperty({ description: 'The subject ID for the grading schema' })
-  subjectId: string;
-
-  @IsMongoId()
-  @IsNotEmpty()
-  @ApiProperty({ description: 'ID of the academic year' })
-  academicYearId: string;
+  @ApiProperty({ description: 'The SubjectOffering ID for the grading schema' })
+  subjectOfferingId: string;
 
   @IsNumber()
   @IsNotEmpty()

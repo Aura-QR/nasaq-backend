@@ -1,8 +1,11 @@
 export const transformGradesCriteriaResponse = (gradesCriteriaDoc: any) => {
-    const gradesCriteriaObj = gradesCriteriaDoc.toObject({ virtuals: false });
+    if (!gradesCriteriaDoc) return null;
+    const gradesCriteriaObj = typeof gradesCriteriaDoc.toObject === 'function'
+        ? gradesCriteriaDoc.toObject({ virtuals: false })
+        : gradesCriteriaDoc;
     return {
         ...gradesCriteriaObj,
-        subject: gradesCriteriaObj.subjectId,
-        subjectId: gradesCriteriaObj.subjectId?._id ?? null,
+        subjectOffering: gradesCriteriaObj.subjectOfferingId,
+        subjectOfferingId: gradesCriteriaObj.subjectOfferingId?._id ?? gradesCriteriaObj.subjectOfferingId ?? null,
     };
 };
