@@ -79,6 +79,38 @@ npm run build
 
 ---
 
+## 🗄️ Database Reset & Multi-Role Seeding
+
+To completely clear all data in the MongoDB database and seed a fresh development/testing environment with all 6 user roles and linked academic data, run:
+
+```bash
+npm run db:reset
+```
+
+### Seeded Credentials Summary
+
+| Role | Identifier / Email | Password | School Slug |
+| :--- | :--- | :--- | :--- |
+| **SUPER_ADMIN** | `qraura0@gmail.com` | `Aura#2026` | N/A (Platform Admin) |
+| **OWNER** | `owner@nasaq.com` or `owner` | `Password123!` | `nasaq-demo` |
+| **MANAGER** | `manager@nasaq.com` or `manager` | `Password123!` | `nasaq-demo` |
+| **SUPERVISOR** | `supervisor@nasaq.com` or `supervisor` | `Password123!` | `nasaq-demo` |
+| **TEACHER** | `teacher@nasaq.com` | `Password123!` | `nasaq-demo` |
+| **STUDENT** | `student@nasaq.com` | `Password123!` | `nasaq-demo` |
+
+### Seeded Relational Data
+
+- **School:** `مدرسة النسق النموذجية` (slug: `nasaq-demo`)
+- **Academic Year:** `2025-2026` (Active)
+- **Terms:** `الفصل الدراسي الأول` (Active), `الفصل الدراسي الثاني` (Upcoming)
+- **Stage & Grade:** `المرحلة الابتدائية` -> `الصف الأول الابتدائي` -> `فصل 1-أ`
+- **Subjects:** `الرياضيات` (MATH101), `اللغة العربية` (ARAB101)
+- **Offerings & Assignments:** Math offered in Grade 1, assigned to Teacher `أحمد علي`
+- **Enrollment:** Student `علي محمد الغامدي` enrolled in `فصل 1-أ`
+- **Permissions:** Pre-configured permission templates for `TEACHER`, `STUDENT`, `MANAGER`, and `SUPERVISOR`.
+
+---
+
 ## 📚 API Documentation
 
 Access the interactive API documentation at:

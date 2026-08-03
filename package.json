@@ -18,7 +18,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed:super-admin": "ts-node src/platform/seed-super-admin.ts"
+    "seed:super-admin": "ts-node src/platform/seed-super-admin.ts",
+    "db:reset": "ts-node src/scripts/reset-db.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",
