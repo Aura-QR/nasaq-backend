@@ -64,7 +64,14 @@ export class EnrollmentsService {
       enrolledAt: new Date(),
     });
 
-    return enrollment.save();
+    const savedEnrollment = await enrollment.save();
+
+    // Keep student.classId synchronized
+    await this.studentModel.findByIdAndUpdate(studentId, {
+      classId: new mongoose.Types.ObjectId(classId),
+    }).exec();
+
+    return savedEnrollment;
   }
 
   async findByYearAndClass(academicYearId?: string, classId?: string, status?: string) {

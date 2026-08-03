@@ -90,6 +90,29 @@ export class StudentsService {
     const student = new this.studentModel(studentFields);
     await student.save();
 
+    // Auto-create matching Enrollment record if classId is provided
+    if (createStudentDto.classId && mongoose.Types.ObjectId.isValid(createStudentDto.classId)) {
+      const targetClass = await this.classModel.findById(createStudentDto.classId).exec();
+      if (targetClass && targetClass.academicYearId) {
+        await this.enrollmentModel.findOneAndUpdate(
+          {
+            studentId: student._id,
+            academicYearId: targetClass.academicYearId,
+          },
+          {
+            $set: {
+              studentId: student._id,
+              classId: targetClass._id,
+              academicYearId: targetClass.academicYearId,
+              status: 'active',
+              enrolledAt: new Date(),
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true },
+        );
+      }
+    }
+
     return {
       message: 'تم إضافة الطالب بنجاح',
       data: transformStudentResponse(student),
@@ -235,6 +258,30 @@ export class StudentsService {
     if (!student) {
       throw new NotFoundException(`الطالب بمعرف ${id} غير موجود`);
     }
+
+    // Auto-update/create matching Enrollment record if classId is provided or updated
+    if (cleanUpdateData.classId && mongoose.Types.ObjectId.isValid(String(cleanUpdateData.classId))) {
+      const targetClass = await this.classModel.findById(cleanUpdateData.classId).exec();
+      if (targetClass && targetClass.academicYearId) {
+        await this.enrollmentModel.findOneAndUpdate(
+          {
+            studentId: student._id,
+            academicYearId: targetClass.academicYearId,
+          },
+          {
+            $set: {
+              studentId: student._id,
+              classId: targetClass._id,
+              academicYearId: targetClass.academicYearId,
+              status: 'active',
+              enrolledAt: new Date(),
+            },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true },
+        );
+      }
+    }
+
     return {
       message: 'تم تحديث بيانات الطالب بنجاح',
       student: transformStudentResponse(student),
