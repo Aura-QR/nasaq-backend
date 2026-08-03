@@ -255,7 +255,12 @@ export class StudentsService {
   }
 
   async requestPasswordSetup(email: string) {
-    const student = await this.studentModel.findOne({ email });
+    const cleanEmail = email.toLowerCase().trim();
+    const student = await this.studentModel
+      .findOne({
+        $or: [{ email: cleanEmail }, { schoolEmail: cleanEmail }],
+      })
+      .setOptions({ skipTenantScope: true });
 
     if (!student) {
       throw new NotFoundException('البريد الإلكتروني غير مسجل');
@@ -268,9 +273,13 @@ export class StudentsService {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-    await this.studentModel.findByIdAndUpdate(student._id, {
-      $set: { otp, otpExpiry },
-    });
+    await this.studentModel.findByIdAndUpdate(
+      student._id,
+      {
+        $set: { otp, otpExpiry },
+      },
+      { skipTenantScope: true },
+    );
 
     await this.emailService.sendOtp(email, otp);
 
@@ -278,9 +287,13 @@ export class StudentsService {
   }
 
   async setPassword(email: string, otp: string, newPassword: string) {
+    const cleanEmail = email.toLowerCase().trim();
     const student = await this.studentModel
-      .findOne({ email })
-      .select('+password +otp +otpExpiry');
+      .findOne({
+        $or: [{ email: cleanEmail }, { schoolEmail: cleanEmail }],
+      })
+      .select('+password +otp +otpExpiry')
+      .setOptions({ skipTenantScope: true });
 
     if (!student) {
       throw new NotFoundException('البريد الإلكتروني غير مسجل');
