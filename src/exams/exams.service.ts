@@ -22,7 +22,13 @@ import { getPagination } from '../pagination/common/paginationUtils';
 @Injectable()
 export class ExamsService {
    private static readonly CLASS_FIELDS_GENDER = 'roomNumber academicYear gender';
-   private static readonly GRADES_CRITERIA_FIELDS = 'academicYear';
+   private static readonly GRADES_CRITERIA_POPULATE = {
+     path: 'gradesCriteriaId',
+     populate: {
+       path: 'subjectOfferingId',
+       populate: { path: 'subjectId', select: 'subjectCode subjectName' },
+     },
+   };
    private static readonly SUBJECT_FIELDS = 'subjectCode subjectName';
   private static readonly TEACHER_FIELDS = 'name email';
   constructor(
@@ -204,14 +210,7 @@ export class ExamsService {
     });
 
     await exam.populate([
-      {
-        path: 'gradesCriteriaId',
-        select: ExamsService.GRADES_CRITERIA_FIELDS,
-        populate: {
-          path: 'subjectId',
-          select: ExamsService.SUBJECT_FIELDS
-        }
-      },
+      ExamsService.GRADES_CRITERIA_POPULATE,
       { path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER }
     ]);
     return transformExamResponse(exam);
@@ -292,11 +291,7 @@ export class ExamsService {
     let examsQuery = this.examModel
       .find(query)
       .sort({ createdAt: -1 })
-      .populate({
-        path: 'gradesCriteriaId',
-        select: ExamsService.GRADES_CRITERIA_FIELDS,
-        populate: { path: 'subjectId', select: ExamsService.SUBJECT_FIELDS },
-      })
+      .populate(ExamsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER });
 
     if (isPaginationRequested) {
@@ -380,14 +375,7 @@ export class ExamsService {
 
     let examsQuery = this.examModel
       .find(query).sort({ createdAt: -1 })
-      .populate({
-        path: 'gradesCriteriaId',
-        select: ExamsService.GRADES_CRITERIA_FIELDS,
-        populate: {
-          path: 'subjectId',
-          select: ExamsService.SUBJECT_FIELDS
-        }
-      })
+      .populate(ExamsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER })
       .populate({ path: 'createdBy', select: ExamsService.TEACHER_FIELDS });
 
@@ -415,14 +403,7 @@ export class ExamsService {
 
     const exam = await this.examModel
       .findById(id)
-      .populate({
-        path: 'gradesCriteriaId',
-        select: ExamsService.GRADES_CRITERIA_FIELDS,
-        populate: {
-          path: 'subjectId',
-          select: ExamsService.SUBJECT_FIELDS
-        }
-      })
+      .populate(ExamsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER })
       .populate({ path: 'createdBy', select: ExamsService.TEACHER_FIELDS })
       .exec();
@@ -489,15 +470,10 @@ export class ExamsService {
       updateExamDto,
       { new: true, runValidators: true }
     )
-    .populate({
-      path: 'gradesCriteriaId',
-      select: ExamsService.GRADES_CRITERIA_FIELDS,
-      populate: {
-        path: 'subjectId',
-        select: ExamsService.SUBJECT_FIELDS
-      }
-    })
-    .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER });
+    await updatedExam.populate([
+      ExamsService.GRADES_CRITERIA_POPULATE,
+      { path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER }
+    ]);
 
     return transformExamResponse(updatedExam);
   }
@@ -554,14 +530,7 @@ export class ExamsService {
 
     const exam = await this.examModel
       .findById(examId)
-      .populate({
-        path: 'gradesCriteriaId',
-        select: ExamsService.GRADES_CRITERIA_FIELDS,
-        populate: {
-          path: 'subjectId',
-          select: ExamsService.SUBJECT_FIELDS
-        }
-      })
+      .populate(ExamsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER });
     return transformExamResponse(exam);
   }
@@ -581,14 +550,7 @@ export class ExamsService {
 
     const exam = await this.examModel
       .findById(examId)
-      .populate({
-        path: 'gradesCriteriaId',
-        select: ExamsService.GRADES_CRITERIA_FIELDS,
-        populate: {
-          path: 'subjectId',
-          select: ExamsService.SUBJECT_FIELDS
-        }
-      })
+      .populate(ExamsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER });
     return transformExamResponse(exam);
   }
@@ -613,14 +575,7 @@ export class ExamsService {
 
     const exam = await this.examModel
       .findById(examId)
-      .populate({
-        path: 'gradesCriteriaId',
-        select: ExamsService.GRADES_CRITERIA_FIELDS,
-        populate: {
-          path: 'subjectId',
-          select: ExamsService.SUBJECT_FIELDS
-        }
-      })
+      .populate(ExamsService.GRADES_CRITERIA_POPULATE)
       .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER });
     return transformExamResponse(exam);
   }
