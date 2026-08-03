@@ -1558,7 +1558,7 @@ Create annual tuition fee configuration for an academic level.
 **Request Payload (JSON):**
 ```json
 {
-  "academicYear": "Grade 1",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
   "tuitionFee": 10000
 }
 ```
@@ -1566,7 +1566,7 @@ Create annual tuition fee configuration for an academic level.
 **Field Specifications (`CreateFeeConfigDto`):**
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `academicYear` | `string` | ✅ | Academic level / year name (must match Class.academicYear) |
+| `academicYearId` | `string` | ✅ | AcademicYear MongoID |
 | `tuitionFee` | `number` | ✅ | Annual tuition fee amount in EGP (min: 0) |
 
 #### `GET /financial/fee-configs` 🛡️
@@ -1581,6 +1581,7 @@ Update fee configuration.
 **Request Payload (JSON):**
 ```json
 {
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
   "tuitionFee": 12000
 }
 ```
@@ -1588,6 +1589,7 @@ Update fee configuration.
 **Field Specifications (`UpdateFeeConfigDto`):**
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `academicYearId` | `string` | ❌ | Associated AcademicYear MongoID |
 | `tuitionFee` | `number` | ❌ | Updated tuition fee amount (min: 0) |
 
 #### `DELETE /financial/fee-configs/:id` 🛡️

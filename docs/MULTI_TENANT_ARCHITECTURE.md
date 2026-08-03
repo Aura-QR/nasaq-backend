@@ -213,7 +213,7 @@ Plus the compound indexes listed in Section 9 below.
 
 ### 3.10 Remaining 17 collections (`classes`, `subjects`, `attendance`, `lectures`, `exams`, `gradesCriteria`, `projects`, `preparation`, `library`, `feeConfigs`, `installmentPlans`, `studentFinancialRecords`, discount templates, `additionalFees`, bus enrollment, `trips`, `expenseCategories`, `expenses`)
 - Each gets `schoolId: { type: ObjectId, ref: 'School', required: true, index: true }`.
-- `feeConfigs` unique index on `academicYear` → compound `{ schoolId: 1, academicYear: 1 }` unique (explicitly called out in your Section 5.3 — confirmed correct).
+- `feeConfigs` unique index on `academicYearId` → compound `{ schoolId: 1, academicYearId: 1 }` unique (explicitly called out in your Section 5.3 — confirmed correct).
 - Any other single-field unique index that was implicitly "global" (audit every schema file at implementation time — the two identified above are confirmed; others must be individually checked module-by-module during implementation, e.g. class names, subject codes if any).
 
 ### 3.11 `permissions` collection changes
@@ -468,7 +468,7 @@ preparation:                  { schoolId: 1, lectureId: 1 }
 
 library:                      { schoolId: 1, subjectId: 1 }
 
-feeConfigs:                   { schoolId: 1, academicYear: 1 } unique
+feeConfigs:                   { schoolId: 1, academicYearId: 1 } unique
 
 installmentPlans:             { schoolId: 1, createdAt: -1 }
 

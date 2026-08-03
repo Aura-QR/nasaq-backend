@@ -48,7 +48,9 @@ describe('Academic Modules Tenancy Isolation', () => {
     // Create class in School A
     await contextService.runWithTenant(schoolIdA, false, async () => {
       const cls = await classModel.create({
-        academicYear: '2026/2027',
+        name: 'Class 1A',
+        academicYearId: new mongoose.Types.ObjectId(),
+        gradeLevelId: new mongoose.Types.ObjectId(),
         gender: 'male',
         roomNumber: '101',
         maxCapacity: 30,

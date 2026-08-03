@@ -39,22 +39,22 @@ describe('Financial & Expense Modules Tenancy Isolation', () => {
   });
 
   it('should allow identical academicYear FeeConfig across different schools (compound unique index)', async () => {
-    const academicYear = '2026/2027';
+    const academicYearId = new mongoose.Types.ObjectId();
 
     // School A creates FeeConfig
     await contextService.runWithTenant(schoolIdA, false, async () => {
       const configA = await feeConfigModel.create({
-        academicYear,
+        academicYearId,
         tuitionFee: 5000,
         createdBy: dummyAdminId,
       });
       expect(configA.schoolId.toString()).toEqual(schoolIdA);
     });
 
-    // School B creates FeeConfig for the SAME academicYear
+    // School B creates FeeConfig for the SAME academicYearId
     await contextService.runWithTenant(schoolIdB, false, async () => {
       const configB = await feeConfigModel.create({
-        academicYear,
+        academicYearId,
         tuitionFee: 7500,
         createdBy: dummyAdminId,
       });
@@ -63,7 +63,7 @@ describe('Financial & Expense Modules Tenancy Isolation', () => {
 
     // Verify School A only sees its own FeeConfig
     await contextService.runWithTenant(schoolIdA, false, async () => {
-      const foundA = await feeConfigModel.findOne({ academicYear });
+      const foundA = await feeConfigModel.findOne({ academicYearId });
       expect(foundA.tuitionFee).toEqual(5000);
     });
   });

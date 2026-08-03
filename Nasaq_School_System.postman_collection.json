@@ -3832,7 +3832,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"academicYear\": \"2024-2025\",\n  \"tuitionFee\": 20000\n}",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"tuitionFee\": 20000\n}",
               "options": {
                 "raw": {
                   "language": "json"
