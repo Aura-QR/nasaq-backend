@@ -226,7 +226,23 @@ export class GradesCriteriaService {
   }
 
   async create(createGradesCriteriaDto: CreateGradesCriteriaDto) {
-    const { subjectOfferingId } = createGradesCriteriaDto;
+    let { subjectOfferingId } = createGradesCriteriaDto;
+    const { subjectId } = createGradesCriteriaDto as any;
+
+    if (!subjectOfferingId && subjectId) {
+      this.validateObjectId(subjectId, 'subject');
+      const offering = await this.subjectOfferingModel.findOne({
+        subjectId: new mongoose.Types.ObjectId(subjectId),
+      });
+      if (!offering) {
+        throw new NotFoundException(`لم يتم العثور على عرض لهذه المادة (SubjectOffering) للمادة ${subjectId}`);
+      }
+      subjectOfferingId = offering._id.toString();
+    }
+
+    if (!subjectOfferingId) {
+      throw new BadRequestException('يرجى تحديد subjectOfferingId أو subjectId لإنشاء معايير التقييم');
+    }
 
     this.validateObjectId(subjectOfferingId, 'subjectOffering');
     this.validateGradesSum(createGradesCriteriaDto);

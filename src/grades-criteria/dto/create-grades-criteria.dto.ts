@@ -2,6 +2,7 @@ import {
   IsNotEmpty,
   IsNumber,
   IsMongoId,
+  IsOptional,
   Min,
   Max,
 } from 'class-validator';
@@ -9,9 +10,19 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateGradesCriteriaDto {
   @IsMongoId()
-  @IsNotEmpty()
-  @ApiProperty({ description: 'The SubjectOffering ID for the grading schema' })
-  subjectOfferingId: string;
+  @IsOptional()
+  @ApiProperty({ description: 'The SubjectOffering ID for the grading schema', required: false })
+  subjectOfferingId?: string;
+
+  @IsMongoId()
+  @IsOptional()
+  @ApiProperty({ description: 'The Subject ID (alternative to subjectOfferingId)', required: false })
+  subjectId?: string;
+
+  @IsMongoId()
+  @IsOptional()
+  @ApiProperty({ description: 'The Academic Year ID (optional)', required: false })
+  academicYearId?: string;
 
   @IsNumber()
   @IsNotEmpty()

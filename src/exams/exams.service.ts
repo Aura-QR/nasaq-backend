@@ -150,6 +150,20 @@ export class ExamsService {
       gradesCriteria = await this.gradesCriteriaModel.findOne({
         subjectOfferingId: { $in: allOfferingIds },
       }).exec();
+
+      if (!gradesCriteria && allOfferingIds.length > 0) {
+        gradesCriteria = await new this.gradesCriteriaModel({
+          subjectOfferingId: allOfferingIds[0],
+          final: 40,
+          assignments: 20,
+          assignmentsCount: 4,
+          activities: 10,
+          projects: 15,
+          projectsCount: 1,
+          quizzes: 15,
+          quizzesCount: 3,
+        }).save();
+      }
     }
 
     if (!gradesCriteria) {
