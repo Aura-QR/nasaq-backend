@@ -30,23 +30,9 @@ export class QuestionDto {
 export class CreateExamDto {
   @IsMongoId()
   @ApiProperty({
-    description: 'The ID of the subject this exam belongs to',
+    description: 'The ID of the SubjectOffering for this exam',
   })
-  subjectId: string;
-
-  @IsMongoId()
-  @ApiProperty({
-    description: 'The ID of the academic year for this exam',
-  })
-  academicYearId: string;
-
-  @IsMongoId()
-  @IsOptional()
-  @ApiProperty({
-    description: 'The ID of the term for this exam (optional)',
-    required: false,
-  })
-  termId?: string;
+  subjectOfferingId: string;
 
   @IsArray()
   @IsMongoId({ each: true })

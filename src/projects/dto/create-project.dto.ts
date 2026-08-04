@@ -27,20 +27,10 @@ export class CreateProjectDto {
   @IsMongoId({ each: true })
   classIds?: string[];
 
-  @ApiProperty({ description: 'Subject ID', type: String })
+  @ApiProperty({ description: 'SubjectOffering ID', type: String })
   @IsNotEmpty()
   @IsMongoId()
-  subjectId: string;
-
-  @ApiProperty({ description: 'Academic Year ID' })
-  @IsMongoId()
-  @IsNotEmpty()
-  academicYearId: string;
-
-  @ApiProperty({ description: 'Term ID (optional)', required: false })
-  @IsMongoId()
-  @IsOptional()
-  termId?: string;
+  subjectOfferingId: string;
 
   @ApiProperty({ description: 'Project title' })
   @IsString()

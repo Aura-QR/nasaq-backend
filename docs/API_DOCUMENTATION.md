@@ -1169,9 +1169,7 @@ Create an exam or online quiz.
 **Request Payload (JSON):**
 ```json
 {
-  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
-  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "termId": "6650a1b2c3d4e5f6a7b8c9d2",
+  "subjectOfferingId": "6650a1b2c3d4e5f6a7b8c9d0",
   "classIds": [
     "6650a1b2c3d4e5f6a7b8c9d3"
   ],
@@ -1192,9 +1190,7 @@ Create an exam or online quiz.
 **Field Specifications (`CreateExamDto`):**
 | Field | Type | Required | Rules & Description |
 |---|---|---|---|
-| `subjectId` | `string` | ✅ | Subject MongoID |
-| `academicYearId` | `string` | ✅ | AcademicYear MongoID |
-| `termId` | `string` | ❌ | Term MongoID (optional) |
+| `subjectOfferingId` | `string` | ✅ | SubjectOffering MongoID |
 | `classIds` | `string[]` | ✅ | Array of Class MongoIDs |
 | `examType` | `string` | ✅ | Enum: `'final'` \| `'assignment'` \| `'activity'` \| `'quiz'` |
 | `startDate` | `string` | ✅ | Start date (`YYYY-MM-DD`) |
@@ -1203,7 +1199,7 @@ Create an exam or online quiz.
 | `questions` | `QuestionDto[]` | ✅ | Array of `{ question: string, options: string[], correctAnswer: string }` |
 
 #### `GET /exams` 🔐
-List exams (`Query: page, limit, classId, subjectId, academicYearId, termId, examType`).
+List exams (`Query: page, limit, classId, subjectOfferingId, examType`).
 
 #### `GET /exams/student/me` 🔐 (STUDENT)
 Get active exams for student.
@@ -1335,9 +1331,7 @@ Create a project assignment.
 **Request Payload (JSON / multipart form-data):**
 ```json
 {
-  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
-  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "termId": "6650a1b2c3d4e5f6a7b8c9d2",
+  "subjectOfferingId": "6650a1b2c3d4e5f6a7b8c9d0",
   "classIds": [
     "6650a1b2c3d4e5f6a7b8c9d3"
   ],
@@ -1351,9 +1345,7 @@ Create a project assignment.
 **Field Specifications (`CreateProjectDto`):**
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `subjectId` | `string` | ✅ | Subject MongoID |
-| `academicYearId` | `string` | ✅ | AcademicYear MongoID |
-| `termId` | `string` | ❌ | Term MongoID (optional) |
+| `subjectOfferingId` | `string` | ✅ | SubjectOffering MongoID |
 | `classIds` | `string[]` | ❌ | Array of Class MongoIDs |
 | `title` | `string` | ✅ | Project title |
 | `description` | `string` | ✅ | Project description |
@@ -1474,9 +1466,7 @@ Add a new resource link to digital library.
 {
   "title": "كتاب العلوم الصف الأول",
   "link": "https://library.school.com/books/science1.pdf",
-  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
-  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "termId": "6650a1b2c3d4e5f6a7b8c9d2"
+  "subjectOfferingId": "6650a1b2c3d4e5f6a7b8c9d0"
 }
 ```
 
@@ -1485,12 +1475,10 @@ Add a new resource link to digital library.
 |---|---|---|---|
 | `title` | `string` | ✅ | Resource title (min length: 2) |
 | `link` | `string` | ✅ | Valid URL string |
-| `subjectId` | `string` | ❌ | Associated Subject MongoID |
-| `academicYearId` | `string` | ❌ | Associated AcademicYear MongoID |
-| `termId` | `string` | ❌ | Associated Term MongoID |
+| `subjectOfferingId` | `string` | ❌ | Associated SubjectOffering MongoID (optional) |
 
 #### `GET /library` 🔐
-List library resources (`Query: page, limit, subjectId, academicYearId, termId`).
+List library resources (`Query: page, limit, subjectOfferingId`).
 
 #### `GET /library/:id` 🔐
 Get library resource details.

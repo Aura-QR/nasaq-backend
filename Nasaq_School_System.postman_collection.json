@@ -1892,7 +1892,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"gradesCriteriaId\": \"6650a1b2c3d4e5f6a7b8c9d0\",\n  \"subjectId\": \"6650a1b2c3d4e5f6a7b8c9d1\",\n  \"academicYear\": \"2024-2025\",\n  \"classIds\": [\n    \"6650a1b2c3d4e5f6a7b8c9d2\"\n  ],\n  \"examType\": \"quiz\",\n  \"grade\": 10,\n  \"startDate\": \"2026-07-22T09:00:00.000Z\",\n  \"endDate\": \"2026-07-22T10:00:00.000Z\",\n  \"duration\": 45,\n  \"questions\": [\n    {\n      \"question\": \"What is the capital of France?\",\n      \"options\": [\n        \"London\",\n        \"Paris\",\n        \"Berlin\",\n        \"Madrid\"\n      ],\n      \"correctAnswer\": \"Paris\"\n    }\n  ],\n  \"termId\": \"{{termId}}\"\n}",
+              "raw": "{\n  \"subjectOfferingId\": \"6650a1b2c3d4e5f6a7b8c9d1\",\n  \"classIds\": [\n    \"6650a1b2c3d4e5f6a7b8c9d2\"\n  ],\n  \"examType\": \"quiz\",\n  \"startDate\": \"2026-07-22T09:00:00.000Z\",\n  \"endDate\": \"2026-07-22T10:00:00.000Z\",\n  \"duration\": 45,\n  \"questions\": [\n    {\n      \"question\": \"What is the capital of France?\",\n      \"options\": [\n        \"London\",\n        \"Paris\",\n        \"Berlin\",\n        \"Madrid\"\n      ],\n      \"correctAnswer\": \"Paris\"\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1933,7 +1933,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/exams/student/me?examType=&academicYear=&subjectId=&gradesCriteriaId=&status=",
+              "raw": "{{baseUrl}}/exams/student/me?examType=&subjectOfferingId=&gradesCriteriaId=&status=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1949,12 +1949,7 @@
                   "description": ""
                 },
                 {
-                  "key": "academicYear",
-                  "value": "",
-                  "description": ""
-                },
-                {
-                  "key": "subjectId",
+                  "key": "subjectOfferingId",
                   "value": "",
                   "description": ""
                 },
@@ -2601,14 +2596,9 @@
                   "value": "6650a1b2c3d4e5f6a7b8c9d0"
                 },
                 {
-                  "key": "subjectId",
+                  "key": "subjectOfferingId",
                   "type": "text",
                   "value": "6650a1b2c3d4e5f6a7b8c9d1"
-                },
-                {
-                  "key": "academicYear",
-                  "type": "text",
-                  "value": "2024-2025"
                 },
                 {
                   "key": "title",
@@ -2722,7 +2712,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/projects/submissions?subjectId=&classId=",
+              "raw": "{{baseUrl}}/projects/submissions?subjectOfferingId=&classId=",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -2732,7 +2722,7 @@
               ],
               "query": [
                 {
-                  "key": "subjectId",
+                  "key": "subjectOfferingId",
                   "value": "",
                   "description": ""
                 },
@@ -3440,7 +3430,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Khan Academy - Algebra\",\n  \"link\": \"https://www.khanacademy.org/math/algebra\",\n  \"subjectId\": \"6650a1b2c3d4e5f6a7b8c9d0\",\n  \"academicYear\": \"2024-2025\"\n}",
+              "raw": "{\n  \"title\": \"Khan Academy - Algebra\",\n  \"link\": \"https://www.khanacademy.org/math/algebra\",\n  \"subjectOfferingId\": \"6650a1b2c3d4e5f6a7b8c9d0\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

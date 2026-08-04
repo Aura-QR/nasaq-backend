@@ -24,24 +24,8 @@ export class CreateLibraryDto {
   @IsOptional()
   @IsMongoId()
   @ApiProperty({
-    description: 'The subject ID this item is connected to (optional)',
+    description: 'The SubjectOffering ID this item is connected to (optional)',
     required: false,
   })
-  subjectId?: string;
-
-  @IsOptional()
-  @IsMongoId()
-  @ApiProperty({
-    description: 'The academic year ID (optional)',
-    required: false,
-  })
-  academicYearId?: string;
-
-  @IsOptional()
-  @IsMongoId()
-  @ApiProperty({
-    description: 'The term ID (optional)',
-    required: false,
-  })
-  termId?: string;
+  subjectOfferingId?: string;
 }

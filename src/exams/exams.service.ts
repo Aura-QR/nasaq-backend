@@ -29,8 +29,15 @@ export class ExamsService {
        populate: { path: 'subjectId', select: 'subjectCode subjectName' },
      },
    };
-   private static readonly SUBJECT_FIELDS = 'subjectCode subjectName';
-  private static readonly TEACHER_FIELDS = 'name email';
+   private static readonly SUBJECT_OFFERING_POPULATE = {
+     path: 'subjectOfferingId',
+     populate: [
+       { path: 'subjectId', select: 'subjectCode subjectName' },
+       { path: 'termId', select: 'name startDate endDate' },
+       { path: 'gradeLevelId', select: 'name' },
+     ],
+   };
+   private static readonly TEACHER_FIELDS = 'name email';
   constructor(
     @InjectModel(Exam.name) private examModel: Model<Exam>,
     @InjectModel(GradesCriteria.name) private gradesCriteriaModel: Model<GradesCriteria>,
@@ -49,27 +56,17 @@ export class ExamsService {
   }
 
   /**
-   * Verify that a teacher teaches the specified classes with the given subject
+   * Verify that a teacher teaches the specified classes with the given subject offering
    */
   private async verifyTeacherClassAccess(
     teacherId: string,
     classIds: string[],
-    subjectId: string,
+    subjectOfferingId: string,
   ): Promise<void> {
-    const offerings = await this.subjectOfferingModel
-      .find({ subjectId: new mongoose.Types.ObjectId(subjectId) })
-      .select('_id')
-      .exec();
-
-    const offeringIds = offerings.map((o) => o._id);
-    if (offeringIds.length === 0) {
-      throw new ForbiddenException('المادة المحددة غير مطروحة في أي مرحلة دراسية.');
-    }
-
     const lectures = await this.lectureModel
       .find({
         teacherId: new mongoose.Types.ObjectId(teacherId),
-        subjectOfferingId: { $in: offeringIds },
+        subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
       })
       .select('classId')
       .exec();
@@ -91,7 +88,7 @@ export class ExamsService {
 
   async create(createExamDto: CreateExamDto, user: any) {
 
-    const { subjectId, academicYearId, termId, classIds, examType, questions, startDate, endDate, duration } = createExamDto;
+    const { subjectOfferingId, classIds, examType, questions, startDate, endDate, duration } = createExamDto;
 
     if (new Date(endDate) <= new Date(startDate)) {
       throw new BadRequestException('تاريخ انتهاء الامتحان يجب أن يكون بعد تاريخ البداية');
@@ -109,12 +106,14 @@ export class ExamsService {
       }
     }
 
-    // If user is a teacher, verify they teach these classes with this subject
+    this.validateObjectId(subjectOfferingId, 'subjectOffering');
+
+    // If user is a teacher, verify they teach these classes with this subject offering
     if (user?.role === 'TEACHER') {
       await this.verifyTeacherClassAccess(
         user.userId,
         classIds,
-        subjectId,
+        subjectOfferingId,
       );
     }
 
@@ -126,50 +125,22 @@ export class ExamsService {
       }
     }
 
-
-    this.validateObjectId(subjectId, 'subject');
-
-
-    const offeringQuery: any = { subjectId: new mongoose.Types.ObjectId(subjectId) };
-    if (termId && mongoose.Types.ObjectId.isValid(termId)) {
-      offeringQuery.termId = new mongoose.Types.ObjectId(termId);
-    }
-    const offerings = await this.subjectOfferingModel.find(offeringQuery).select('_id').exec();
-    const offeringIds = offerings.map((o) => o._id);
-
     let gradesCriteria = await this.gradesCriteriaModel.findOne({
-      subjectOfferingId: { $in: offeringIds },
+      subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
     }).exec();
 
     if (!gradesCriteria) {
-      const allOfferings = await this.subjectOfferingModel
-        .find({ subjectId: new mongoose.Types.ObjectId(subjectId) })
-        .select('_id')
-        .exec();
-      const allOfferingIds = allOfferings.map((o) => o._id);
-      gradesCriteria = await this.gradesCriteriaModel.findOne({
-        subjectOfferingId: { $in: allOfferingIds },
-      }).exec();
-
-      if (!gradesCriteria && allOfferingIds.length > 0) {
-        gradesCriteria = await new this.gradesCriteriaModel({
-          subjectOfferingId: allOfferingIds[0],
-          final: 40,
-          assignments: 20,
-          assignmentsCount: 4,
-          activities: 10,
-          projects: 15,
-          projectsCount: 1,
-          quizzes: 15,
-          quizzesCount: 3,
-        }).save();
-      }
-    }
-
-    if (!gradesCriteria) {
-      throw new NotFoundException(
-        `معايير التقييم غير موجودة للمادة ${subjectId}`,
-      );
+      gradesCriteria = await new this.gradesCriteriaModel({
+        subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
+        final: 40,
+        assignments: 20,
+        assignmentsCount: 4,
+        activities: 10,
+        projects: 15,
+        projectsCount: 1,
+        quizzes: 15,
+        quizzesCount: 3,
+      }).save();
     }
 
     const validExamTypes = {
@@ -224,9 +195,7 @@ export class ExamsService {
 
     const exam = await this.examModel.create({
        gradesCriteriaId: gradesCriteria._id,
-       subjectId,
-       academicYearId,
-       termId: termId ? new mongoose.Types.ObjectId(termId) : null,
+       subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
        classIds,
        examType,
        grade: calculatedGrade,
@@ -283,8 +252,7 @@ export class ExamsService {
 
     const allowedFilters: Record<string, 'string' | 'objectId'> = {
       examType: 'string',
-      academicYear: 'string',
-      subjectId: 'objectId',
+      subjectOfferingId: 'objectId',
       gradesCriteriaId: 'objectId',
     };
 
@@ -320,6 +288,7 @@ export class ExamsService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate(ExamsService.GRADES_CRITERIA_POPULATE)
+      .populate(ExamsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER });
 
     if (isPaginationRequested) {
@@ -371,7 +340,7 @@ export class ExamsService {
   async filtering(filters: any, pagination: PaginationDto = {},user : any) {
     const query: any = {};
 
-    const exactMatchFields = ['examType', 'gradesCriteriaId', 'classIds' , 'subjectId', 'academicYear'];
+    const exactMatchFields = ['examType', 'gradesCriteriaId', 'classIds', 'subjectOfferingId'];
 
     for (const [key, value] of Object.entries(filters)) {
       if (value === undefined || value === null || value === '') continue;
@@ -382,7 +351,7 @@ export class ExamsService {
       if (exactMatchFields.includes(key)) {
         if (key === 'classIds') {
           query[key] = { $in: [new mongoose.Types.ObjectId(stringValue)] };
-        } else if (key === 'gradesCriteriaId') {
+        } else if (key === 'gradesCriteriaId' || key === 'subjectOfferingId') {
           query[key] = new mongoose.Types.ObjectId(stringValue);
         } else {
           query[key] = stringValue;
@@ -404,6 +373,7 @@ export class ExamsService {
     let examsQuery = this.examModel
       .find(query).sort({ createdAt: -1 })
       .populate(ExamsService.GRADES_CRITERIA_POPULATE)
+      .populate(ExamsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER })
       .populate({ path: 'createdBy', select: ExamsService.TEACHER_FIELDS });
 
@@ -432,6 +402,7 @@ export class ExamsService {
     const exam = await this.examModel
       .findById(id)
       .populate(ExamsService.GRADES_CRITERIA_POPULATE)
+      .populate(ExamsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER })
       .populate({ path: 'createdBy', select: ExamsService.TEACHER_FIELDS })
       .exec();
@@ -470,27 +441,15 @@ export class ExamsService {
       }
     }
 
-    if (updateExamDto.subjectId || (updateExamDto as any).academicYearId) {
-      const subjectId = updateExamDto.subjectId || existingExam.subjectId;
-      const academicYearId = (updateExamDto as any).academicYearId || existingExam.academicYearId;
+    if (updateExamDto.subjectOfferingId) {
+      this.validateObjectId(updateExamDto.subjectOfferingId, 'subjectOffering');
+      const gradesCriteria = await this.gradesCriteriaModel.findOne({
+        subjectOfferingId: new mongoose.Types.ObjectId(updateExamDto.subjectOfferingId),
+      }).exec();
 
-      if (updateExamDto.subjectId) {
-        this.validateObjectId(updateExamDto.subjectId, 'subject');
+      if (gradesCriteria) {
+        updateExamDto['gradesCriteriaId'] = gradesCriteria._id;
       }
-
-      if (academicYearId) {
-        let gradesCriteria = await this.gradesCriteriaModel.findOne({
-          subjectId: new mongoose.Types.ObjectId(subjectId),
-        }).exec();
-
-        if (!gradesCriteria) {
-          gradesCriteria = await this.gradesCriteriaModel.findOne().exec();
-        }
-
-        if (gradesCriteria) {
-          updateExamDto['gradesCriteriaId'] = gradesCriteria._id;
-        }
-      }     
     }
 
     const updatedExam = await this.examModel.findByIdAndUpdate(
@@ -789,17 +748,10 @@ export class ExamsService {
     const student = await this.studentModel.findById(studentId).exec();
     if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
-    // Verify teacher teaches this subject
-    const offerings = await this.subjectOfferingModel
-      .find({ subjectId: exam.subjectId })
-      .select('_id')
-      .exec();
-
-    const offeringIds = offerings.map((o) => o._id);
-
+    // Verify teacher teaches this subject offering
     const lecture = await this.lectureModel.findOne({
       teacherId: new mongoose.Types.ObjectId(String(teacher.userId)),
-      subjectOfferingId: { $in: offeringIds },
+      subjectOfferingId: exam.subjectOfferingId,
     });
     if (!lecture) {
       throw new ForbiddenException('ليس لديك صلاحية لتعديل درجات هذا الطالب في هذه المادة');

@@ -24,28 +24,11 @@ export class Project extends Document {
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Subject',
+    ref: 'SubjectOffering',
     required: true,
     index: true,
   })
-  subjectId: mongoose.Types.ObjectId;
-
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'AcademicYear',
-    required: true,
-    index: true,
-  })
-  academicYearId: mongoose.Types.ObjectId;
-
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Term',
-    required: false,
-    default: null,
-    index: true,
-  })
-  termId?: mongoose.Types.ObjectId;
+  subjectOfferingId: mongoose.Types.ObjectId;
 
   @Prop({ required: true })
   title: string;
@@ -88,6 +71,5 @@ export const ProjectSchema = SchemaFactory.createForClass(Project);
 ProjectSchema.plugin(tenantScopedPlugin);
 
 ProjectSchema.index({ schoolId: 1, classIds: 1 });
-ProjectSchema.index({ schoolId: 1, academicYearId: 1 });
-ProjectSchema.index({ schoolId: 1, termId: 1 });
+ProjectSchema.index({ schoolId: 1, subjectOfferingId: 1 });
 ProjectSchema.index({ schoolId: 1, createdAt: -1 });

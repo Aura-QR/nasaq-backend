@@ -13,32 +13,15 @@ export class Library extends Document {
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Subject',
+    ref: 'SubjectOffering',
     required: false,
     default: null,
+    index: true,
   })
-  subjectId?: mongoose.Types.ObjectId;
-
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'AcademicYear',
-    required: false,
-    default: null,
-  })
-  academicYearId?: mongoose.Types.ObjectId;
-
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Term',
-    required: false,
-    default: null,
-  })
-  termId?: mongoose.Types.ObjectId;
+  subjectOfferingId?: mongoose.Types.ObjectId;
 }
 
 export const LibrarySchema = SchemaFactory.createForClass(Library);
 LibrarySchema.plugin(tenantScopedPlugin);
 
-LibrarySchema.index({ schoolId: 1, subjectId: 1 });
-LibrarySchema.index({ schoolId: 1, academicYearId: 1 });
-LibrarySchema.index({ schoolId: 1, termId: 1 });
+LibrarySchema.index({ schoolId: 1, subjectOfferingId: 1 });

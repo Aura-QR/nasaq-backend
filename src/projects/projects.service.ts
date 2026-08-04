@@ -27,7 +27,14 @@ export class ProjectsService {
       populate: { path: 'subjectId', select: 'subjectCode subjectName' },
     },
   };
-  private static readonly SUBJECT_FIELDS = 'subjectCode subjectName';
+  private static readonly SUBJECT_OFFERING_POPULATE = {
+    path: 'subjectOfferingId',
+    populate: [
+      { path: 'subjectId', select: 'subjectCode subjectName' },
+      { path: 'termId', select: 'name startDate endDate' },
+      { path: 'gradeLevelId', select: 'name' },
+    ],
+  };
 
   constructor(
     @InjectModel(Project.name) private projectModel: Model<Project>,
@@ -41,27 +48,17 @@ export class ProjectsService {
   ) {}
 
   /**
-   * Verify that a teacher teaches the specified classes with the given subject
+   * Verify that a teacher teaches the specified classes with the given subject offering
    */
   private async verifyTeacherClassAccess(
     teacherId: string,
     classIds: string[],
-    subjectId: string,
+    subjectOfferingId: string,
   ): Promise<void> {
-    const offerings = await this.subjectOfferingModel
-      .find({ subjectId: new mongoose.Types.ObjectId(subjectId) })
-      .select('_id')
-      .exec();
-
-    const offeringIds = offerings.map((o) => o._id);
-    if (offeringIds.length === 0) {
-      throw new ForbiddenException('المادة المحددة غير مطروحة في أي مرحلة دراسية.');
-    }
-
     const lectures = await this.lectureModel
       .find({
         teacherId: new mongoose.Types.ObjectId(teacherId),
-        subjectOfferingId: { $in: offeringIds },
+        subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
       })
       .select('classId')
       .exec();
@@ -87,57 +84,31 @@ export class ProjectsService {
     files?: Express.Multer.File[],
     user?: any,
   ): Promise<any> {
-    // If user is a teacher, verify they teach these classes with this subject
+    // If user is a teacher, verify they teach these classes with this subject offering
     if (user?.role === 'TEACHER') {
       await this.verifyTeacherClassAccess(
         user.userId,
         createProjectDto.classIds,
-        createProjectDto.subjectId,
+        createProjectDto.subjectOfferingId,
       );
     }
 
-    const offeringQuery: any = { subjectId: new mongoose.Types.ObjectId(createProjectDto.subjectId) };
-    if (createProjectDto.termId && mongoose.Types.ObjectId.isValid(createProjectDto.termId)) {
-      offeringQuery.termId = new mongoose.Types.ObjectId(createProjectDto.termId);
-    }
-
-    const offerings = await this.subjectOfferingModel.find(offeringQuery).select('_id').exec();
-    const offeringIds = offerings.map((o) => o._id);
-
     let gradesCriteria = await this.gradesCriteriaModel.findOne({
-      subjectOfferingId: { $in: offeringIds },
+      subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId),
     });
 
     if (!gradesCriteria) {
-      const allOfferings = await this.subjectOfferingModel
-        .find({ subjectId: new mongoose.Types.ObjectId(createProjectDto.subjectId) })
-        .select('_id')
-        .exec();
-      const allOfferingIds = allOfferings.map((o) => o._id);
-
-      gradesCriteria = await this.gradesCriteriaModel.findOne({
-        subjectOfferingId: { $in: allOfferingIds },
-      });
-
-      if (!gradesCriteria && allOfferingIds.length > 0) {
-        gradesCriteria = await new this.gradesCriteriaModel({
-          subjectOfferingId: allOfferingIds[0],
-          final: 40,
-          assignments: 20,
-          assignmentsCount: 4,
-          activities: 10,
-          projects: 15,
-          projectsCount: 1,
-          quizzes: 15,
-          quizzesCount: 3,
-        }).save();
-      }
-    }
-
-    if (!gradesCriteria) {
-      throw new NotFoundException(
-        `معايير التقييم غير موجودة للمادة ${createProjectDto.subjectId}`,
-      );
+      gradesCriteria = await new this.gradesCriteriaModel({
+        subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId),
+        final: 40,
+        assignments: 20,
+        assignmentsCount: 4,
+        activities: 10,
+        projects: 15,
+        projectsCount: 1,
+        quizzes: 15,
+        quizzesCount: 3,
+      }).save();
     }
 
     if (!gradesCriteria.projects) {
@@ -151,7 +122,7 @@ export class ProjectsService {
 
     const savedProject = await new this.projectModel({
       ...createProjectDto,
-      termId: createProjectDto.termId ? new mongoose.Types.ObjectId(createProjectDto.termId) : null,
+      subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId),
       gradesCriteriaId: gradesCriteria._id,
       grade: calculatedGrade,
       createdBy: user?.userId
@@ -192,7 +163,7 @@ export class ProjectsService {
     const populatedProject = await this.projectModel
       .findById(savedProject._id)
       .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
-      .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
+      .populate(ProjectsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();
 
@@ -216,7 +187,7 @@ export class ProjectsService {
     const project = await this.projectModel
       .findById(id)
       .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
-      .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
+      .populate(ProjectsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();
 
@@ -282,8 +253,8 @@ export class ProjectsService {
     if (filters.status === 'upcoming') query.dueDate = { $gt: now };
     else if (filters.status === 'overdue') query.dueDate = { $lt: now };
 
-    if (filters.subjectId && mongoose.Types.ObjectId.isValid(filters.subjectId))
-      query.subjectId = new mongoose.Types.ObjectId(filters.subjectId);
+    if (filters.subjectOfferingId && mongoose.Types.ObjectId.isValid(filters.subjectOfferingId))
+      query.subjectOfferingId = new mongoose.Types.ObjectId(filters.subjectOfferingId);
     if (filters.gradesCriteriaId && mongoose.Types.ObjectId.isValid(filters.gradesCriteriaId))
       query.gradesCriteriaId = new mongoose.Types.ObjectId(filters.gradesCriteriaId);
     if (filters.academicYear) query.academicYear = filters.academicYear;
@@ -296,7 +267,7 @@ export class ProjectsService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
-      .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
+      .populate(ProjectsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS });
 
     if (isPaginationRequested)
@@ -340,8 +311,8 @@ export class ProjectsService {
     if (filters.status === 'upcoming') query.dueDate = { $gt: now };
     else if (filters.status === 'overdue') query.dueDate = { $lt: now };
 
-    if (filters.subjectId && mongoose.Types.ObjectId.isValid(filters.subjectId))
-      query.subjectId = new mongoose.Types.ObjectId(filters.subjectId);
+    if (filters.subjectOfferingId && mongoose.Types.ObjectId.isValid(filters.subjectOfferingId))
+      query.subjectOfferingId = new mongoose.Types.ObjectId(filters.subjectOfferingId);
     if (filters.classIds && mongoose.Types.ObjectId.isValid(filters.classIds))
       query.classIds = { $in: [new mongoose.Types.ObjectId(filters.classIds)] };
     if (filters.academicYear) query.academicYear = filters.academicYear;
@@ -354,7 +325,7 @@ export class ProjectsService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
-      .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
+      .populate(ProjectsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS });
 
     if (isPaginationRequested)
@@ -386,7 +357,7 @@ export class ProjectsService {
     const textSearchFields = ['academicYear','title'];
     const arrayMatchFields = ['classIds'];
     const dataMatchFields = ['dueDate']
-    const objectIdFields = ['gradesCriteriaId' , 'subjectId'];
+    const objectIdFields = ['gradesCriteriaId' , 'subjectOfferingId'];
 
     for (const [key, value] of Object.entries(filters)) {
       if (value === undefined || value === null || value === '') continue;
@@ -414,7 +385,7 @@ export class ProjectsService {
 
     let projectsQuery = this.projectModel.find(query).sort({ createdAt: -1 })
       .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
-      .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
+      .populate(ProjectsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS });
 
     if (isPaginationRequested) {
@@ -513,37 +484,18 @@ export class ProjectsService {
       }
     }
 
-    if (updateProjectDto.classIds && updateProjectDto.subjectId && user?.role === 'TEACHER') {
+    if (updateProjectDto.classIds && updateProjectDto.subjectOfferingId && user?.role === 'TEACHER') {
       await this.verifyTeacherClassAccess(
         user.userId,
         updateProjectDto.classIds,
-        updateProjectDto.subjectId,
+        updateProjectDto.subjectOfferingId,
       );
     }
 
-    if (updateProjectDto.subjectId) {
-      const offeringQuery: any = { subjectId: new mongoose.Types.ObjectId(updateProjectDto.subjectId) };
-      if (updateProjectDto.termId && mongoose.Types.ObjectId.isValid(updateProjectDto.termId)) {
-        offeringQuery.termId = new mongoose.Types.ObjectId(updateProjectDto.termId);
-      }
-
-      const offerings = await this.subjectOfferingModel.find(offeringQuery).select('_id').exec();
-      const offeringIds = offerings.map((o) => o._id);
-
-      let gradesCriteria = await this.gradesCriteriaModel.findOne({
-        subjectOfferingId: { $in: offeringIds },
+    if (updateProjectDto.subjectOfferingId) {
+      const gradesCriteria = await this.gradesCriteriaModel.findOne({
+        subjectOfferingId: new mongoose.Types.ObjectId(updateProjectDto.subjectOfferingId),
       });
-
-      if (!gradesCriteria) {
-        const allOfferings = await this.subjectOfferingModel
-          .find({ subjectId: new mongoose.Types.ObjectId(updateProjectDto.subjectId) })
-          .select('_id')
-          .exec();
-        const allOfferingIds = allOfferings.map((o) => o._id);
-        gradesCriteria = await this.gradesCriteriaModel.findOne({
-          subjectOfferingId: { $in: allOfferingIds },
-        });
-      }
 
       if (gradesCriteria) {
         updateProjectDto.gradesCriteriaId = gradesCriteria._id;
@@ -586,7 +538,7 @@ export class ProjectsService {
     const populatedProject = await this.projectModel
       .findById(id)
       .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
-      .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
+      .populate(ProjectsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();
 
@@ -687,7 +639,7 @@ export class ProjectsService {
     const updatedProject = await this.projectModel
       .findById(id)
       .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
-      .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
+      .populate(ProjectsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();
 
@@ -747,7 +699,7 @@ export class ProjectsService {
     const updatedProject = await this.projectModel
       .findById(id)
       .populate(ProjectsService.GRADES_CRITERIA_POPULATE)
-      .populate({ path: 'subjectId', select: ProjectsService.SUBJECT_FIELDS })
+      .populate(ProjectsService.SUBJECT_OFFERING_POPULATE)
       .populate({ path: 'classIds', select: ProjectsService.CLASS_FIELDS })
       .exec();
 
@@ -776,25 +728,19 @@ export class ProjectsService {
     }
   }
 
-  async listSubmissionsBySubjectAndClass(teacherId: string, subjectId: string, classId: string, req: any) {
-    if (!mongoose.Types.ObjectId.isValid(subjectId)) throw new BadRequestException('صيغة معرف المادة غير صحيحة');
+  async listSubmissionsBySubjectAndClass(teacherId: string, subjectOfferingId: string, classId: string, req: any) {
+    if (!mongoose.Types.ObjectId.isValid(subjectOfferingId)) throw new BadRequestException('صيغة معرف عرض المادة غير صحيحة');
     if (!mongoose.Types.ObjectId.isValid(classId)) throw new BadRequestException('صيغة معرف الفصل غير صحيحة');
-
-    const offerings = await this.subjectOfferingModel
-      .find({ subjectId: new mongoose.Types.ObjectId(subjectId) })
-      .select('_id')
-      .exec();
-    const offeringIds = offerings.map(o => o._id);
 
     const lecture = await this.lectureModel.findOne({
       teacherId: new mongoose.Types.ObjectId(teacherId),
-      subjectOfferingId: { $in: offeringIds },
+      subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
       classId: new mongoose.Types.ObjectId(classId),
     });
     if (!lecture) throw new ForbiddenException('لا تدرّس هذه المادة في هذا الفصل');
 
     const projects = await this.projectModel
-      .find({ subjectId: new mongoose.Types.ObjectId(subjectId), classIds: { $in: [new mongoose.Types.ObjectId(classId)] } })
+      .find({ subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId), classIds: { $in: [new mongoose.Types.ObjectId(classId)] } })
       .select('_id title dueDate grade')
       .exec();
 
@@ -901,15 +847,9 @@ export class ProjectsService {
     if (!project) throw new NotFoundException(`المشروع غير موجود`);
 
     if (user?.role === 'TEACHER') {
-      const offerings = await this.subjectOfferingModel
-        .find({ subjectId: project.subjectId })
-        .select('_id')
-        .exec();
-      const offeringIds = offerings.map(o => o._id);
-
       const lecture = await this.lectureModel.findOne({
         teacherId: new mongoose.Types.ObjectId(user.userId),
-        subjectOfferingId: { $in: offeringIds },
+        subjectOfferingId: project.subjectOfferingId,
         classId: { $in: project.classIds },
       });
       if (!lecture) throw new ForbiddenException('ليس لديك صلاحية لعرض تقديمات هذا المشروع');
@@ -932,15 +872,9 @@ export class ProjectsService {
     if (!project) throw new NotFoundException(`المشروع غير موجود`);
 
     if (user?.role === 'TEACHER') {
-      const offerings = await this.subjectOfferingModel
-        .find({ subjectId: project.subjectId })
-        .select('_id')
-        .exec();
-      const offeringIds = offerings.map(o => o._id);
-
       const lecture = await this.lectureModel.findOne({
         teacherId: new mongoose.Types.ObjectId(user.userId),
-        subjectOfferingId: { $in: offeringIds },
+        subjectOfferingId: project.subjectOfferingId,
         classId: { $in: project.classIds },
       });
       if (!lecture) throw new ForbiddenException('ليس لديك صلاحية لتنزيل هذا التقديم');
@@ -970,15 +904,9 @@ export class ProjectsService {
     const student = await this.studentModel.findById(studentId);
     if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
-    const offerings = await this.subjectOfferingModel
-      .find({ subjectId: project.subjectId })
-      .select('_id')
-      .exec();
-    const offeringIds = offerings.map(o => o._id);
-
     const lecture = await this.lectureModel.findOne({
       teacherId: new mongoose.Types.ObjectId(teacher.userId),
-      subjectOfferingId: { $in: offeringIds },
+      subjectOfferingId: project.subjectOfferingId,
     });
     if (!lecture) throw new ForbiddenException('ليس لديك صلاحية لتقييم هذا الطالب في هذه المادة');
 

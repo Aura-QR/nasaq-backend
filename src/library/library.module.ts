@@ -1,21 +1,19 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LibraryController } from './library.controller';
 import { LibraryService } from './library.service';
 import { Library, LibrarySchema } from './schemas/library.schema';
-import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
-import { SubjectsModule } from '../subjects/subjects.module';
+import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Library.name, schema: LibrarySchema },
-      { name: Subject.name, schema: SubjectSchema },
+      { name: SubjectOffering.name, schema: SubjectOfferingSchema },
     ]),
-    forwardRef(() => SubjectsModule),
   ],
   controllers: [LibraryController],
   providers: [LibraryService],
-  exports: [LibraryService, MongooseModule], // Export for use in other modules
+  exports: [LibraryService, MongooseModule],
 })
 export class LibraryModule {}

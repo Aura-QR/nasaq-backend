@@ -30,27 +30,10 @@ export class Exam extends Document {
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    ref: 'Subject',
+    ref: 'SubjectOffering',
     index: true,
   })
-  subjectId: mongoose.Types.ObjectId;
-
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'AcademicYear',
-    required: true,
-    index: true,
-  })
-  academicYearId: mongoose.Types.ObjectId;
-
-  @Prop({
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Term',
-    required: false,
-    default: null,
-    index: true,
-  })
-  termId?: mongoose.Types.ObjectId;
+  subjectOfferingId: mongoose.Types.ObjectId;
 
   @Prop({
     type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Class' }],
@@ -91,7 +74,5 @@ ExamSchema.plugin(tenantScopedPlugin);
 
 ExamSchema.index({ schoolId: 1, gradesCriteriaId: 1, examType: 1 });
 ExamSchema.index({ schoolId: 1, classIds: 1 });
-ExamSchema.index({ schoolId: 1, subjectId: 1 });
-ExamSchema.index({ schoolId: 1, academicYearId: 1 });
-ExamSchema.index({ schoolId: 1, termId: 1 });
+ExamSchema.index({ schoolId: 1, subjectOfferingId: 1 });
 ExamSchema.index({ schoolId: 1, createdAt: -1 });

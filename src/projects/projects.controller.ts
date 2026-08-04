@@ -48,13 +48,9 @@ export class ProjectsController {
           items: { type: 'string' },
           description: 'Array of class IDs',
         },
-        subjectId: {
+        subjectOfferingId: {
           type: 'string',
-          description: 'Subject ID',
-        },
-        academicYear: {
-          type: 'string',
-          description: 'Academic year (e.g., 2024-2025)',
+          description: 'SubjectOffering ID',
         },
         title: {
           type: 'string',
@@ -78,7 +74,7 @@ export class ProjectsController {
           description: 'Project files (max 10 files, 20MB each)',
         },
       },
-      required: ['classIds', 'subjectId', 'academicYear', 'title', 'description', 'dueDate'],
+      required: ['classIds', 'subjectOfferingId', 'title', 'description', 'dueDate'],
     },
   })
   create(
@@ -104,7 +100,7 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Get projects created by the authenticated teacher' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'subjectId', required: false, type: String })
+  @ApiQuery({ name: 'subjectOfferingId', required: false, type: String })
   @ApiQuery({ name: 'academicYear', required: false, type: String })
   @ApiQuery({ name: 'classIds', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['upcoming', 'overdue'] })
@@ -119,7 +115,7 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Get projects for the authenticated student (with filter + pagination)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'subjectId', required: false, type: String })
+  @ApiQuery({ name: 'subjectOfferingId', required: false, type: String })
   @ApiQuery({ name: 'academicYear', required: false, type: String })
   @ApiQuery({ name: 'gradesCriteriaId', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['upcoming', 'overdue'], description: 'Filter by due date status' })
@@ -169,9 +165,9 @@ export class ProjectsController {
           items: { type: 'string' },
           description: 'Array of class IDs',
         },
-        subjectId: {
+        subjectOfferingId: {
           type: 'string',
-          description: 'Subject ID',
+          description: 'SubjectOffering ID',
         },
         academicYear: {
           type: 'string',
@@ -266,17 +262,17 @@ export class ProjectsController {
 
   @Get('submissions')
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Teacher — get all student submissions for a specific subject + class' })
-  @ApiQuery({ name: 'subjectId', required: true, type: String })
+  @ApiOperation({ summary: 'Teacher — get all student submissions for a specific subject offering + class' })
+  @ApiQuery({ name: 'subjectOfferingId', required: true, type: String })
   @ApiQuery({ name: 'classId', required: true, type: String })
   @HttpCode(HttpStatus.OK)
   async listSubmissionsBySubjectAndClass(
     @CurrentUser() user: any,
-    @Query('subjectId') subjectId: string,
+    @Query('subjectOfferingId') subjectOfferingId: string,
     @Query('classId') classId: string,
     @Req() req: any,
   ) {
-    return this.projectsService.listSubmissionsBySubjectAndClass(user.userId, subjectId, classId, req);
+    return this.projectsService.listSubmissionsBySubjectAndClass(user.userId, subjectOfferingId, classId, req);
   }
 
   // ─── Student Submission Endpoints ─────────────────────────────────────────

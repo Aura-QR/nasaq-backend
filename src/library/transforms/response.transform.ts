@@ -1,8 +1,9 @@
 export const transformLibraryResponse = (libraryDoc: any) => {
-  const libraryObj = libraryDoc.toObject({ virtuals: false });
+  if (!libraryDoc) return null;
+  const libraryObj = typeof libraryDoc.toObject === 'function' ? libraryDoc.toObject({ virtuals: false }) : libraryDoc;
   return {
     ...libraryObj,
-    subject: libraryObj.subjectId,
-    subjectId: libraryObj.subjectId?._id??null,
+    subjectOffering: libraryObj.subjectOfferingId,
+    subjectOfferingId: libraryObj.subjectOfferingId?._id ?? libraryObj.subjectOfferingId ?? null,
   };
 };
