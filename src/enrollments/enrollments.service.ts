@@ -9,6 +9,7 @@ import { GradeLevel } from '../grade-levels/schemas/grade-level.schema';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 import { BulkPromoteDto } from './dto/bulk-promote.dto';
 import { GradesCriteriaService } from '../grades-criteria/grades-criteria.service';
+import { FinancialRecordService } from '../financial/financial-record.service';
 
 @Injectable()
 export class EnrollmentsService {
@@ -18,6 +19,7 @@ export class EnrollmentsService {
     @InjectModel(Class.name) private readonly classModel: Model<Class>,
     @InjectModel(GradeLevel.name) private readonly gradeLevelModel: Model<GradeLevel>,
     private readonly gradesCriteriaService: GradesCriteriaService,
+    private readonly financialRecordService: FinancialRecordService,
   ) {}
 
   async enroll(createEnrollmentDto: CreateEnrollmentDto) {
@@ -67,6 +69,16 @@ export class EnrollmentsService {
     });
 
     const savedEnrollment = await enrollment.save();
+
+    // Create/update the student's financial record for this academic year
+    try {
+      await this.financialRecordService.createOrUpdateRecord(studentId, classId);
+    } catch (error: any) {
+      // Log but don't fail enrollment — FeeConfig or InstallmentPlan may not be set up yet
+      console.warn(
+        `[Enrollment] Financial record creation skipped for student ${studentId}: ${error.message}`,
+      );
+    }
 
     // Keep student.classId synchronized
     await this.studentModel.findByIdAndUpdate(studentId, {
@@ -255,6 +267,15 @@ export class EnrollmentsService {
 
         await enrollment.save();
         createdDocs.push(enrollment);
+
+        // Create/update the student's financial record for the new academic year
+        try {
+          await this.financialRecordService.createOrUpdateRecord(promo.studentId, promo.targetClassId);
+        } catch (financialError: any) {
+          console.warn(
+            `[BulkPromote] Financial record creation skipped for student ${promo.studentId}: ${financialError.message}`,
+          );
+        }
       } catch (err: any) {
         errors.push({
           studentId: promo.studentId,

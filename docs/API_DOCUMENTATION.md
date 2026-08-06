@@ -1572,43 +1572,68 @@ Delete library resource.
 Base path: `/financial/records`
 
 #### `GET /financial/records` 🛡️
-List financial records for all students (`Query: page, limit, studentId, academicYear`).
+List financial records for all students (`Query: page, limit, classId, studentName, tuitionStatus, academicYearId`).
 
 #### `GET /financial/records/me` 🔐 (STUDENT)
-Get logged-in student's financial ledger.
+Get logged-in student's financial ledger (`Query: academicYearId`).
 
 #### `GET /financial/records/me/summary` 🔐 (STUDENT)
-Get summary of dues & payments for logged-in student.
+Get summary of dues & payments for logged-in student (`Query: academicYearId`).
 
 #### `GET /financial/records/me/trips` 🔐 (STUDENT)
-Get logged-in student's trip financial records.
+Get logged-in student's trip financial records (`Query: academicYearId`).
 
 #### `GET /financial/records/:studentId` 🛡️
-Get specific student's financial record.
+Get specific student's financial record (`Query: academicYearId`).
 
 #### `GET /financial/records/:studentId/summary` 🛡️
-Get student financial summary.
+Get student financial summary (`Query: academicYearId`).
 
 #### `POST /financial/records/:studentId/tuition/pay` 🛡️
-Record a tuition fee installment payment.
+Record a tuition fee installment payment (supports full or partial payments).
 
 **Request Payload (JSON):**
 ```json
 {
   "installmentNumber": 1,
-  "amount": 2500,
-  "paidAt": "2025-09-15",
-  "notes": "إيصال رقم 1042"
+  "amount": 1200,
+  "paidAt": "2026-09-15",
+  "notes": "إيصال رقم 1042",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0"
 }
 ```
 
 **Field Specifications (`RecordPaymentDto`):**
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `installmentNumber` | `number` | ✅ | Installment number to mark as paid (1-based, min: 1) |
-| `amount` | `number` | ✅ | Payment amount received (min: 0) |
+| `installmentNumber` | `number` | ✅ | Installment number to pay (1-based, min: 1) |
+| `amount` | `number` | ✅ | Payment amount received. Supports partial payments up to the remaining installment balance (`0 < amount <= remaining`) |
 | `paidAt` | `string` | ✅ | Date received (`YYYY-MM-DD`) |
 | `notes` | `string` | ❌ | Optional payment notes / receipt number |
+| `academicYearId` | `string` | ❌ | Optional AcademicYear MongoID |
+
+#### `POST /financial/records/:studentId/tuition/refund` 🛡️
+#### `POST /financial/records/:studentId/tuition/installments/:installmentNumber/refund` 🛡️
+Record a refund / payment correction on a tuition installment.
+
+**Request Payload (JSON):**
+```json
+{
+  "installmentNumber": 1,
+  "amount": 1200,
+  "reason": "تصحيح خطأ في المبلغ المسجل بحسب الإيصال رقم 4501",
+  "refundedAt": "2026-09-19"
+}
+```
+
+**Field Specifications (`RefundPaymentDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `installmentNumber` | `number` | ✅ | Installment number to issue refund on (1-based) |
+| `amount` | `number` | ✅ | Refund amount (`0 < amount <= paidAmount`) |
+| `reason` | `string` | ✅ | Reason for refund / payment correction |
+| `refundedAt` | `string` | ❌ | Optional date refund was processed (`YYYY-MM-DD`) |
+| `academicYearId` | `string` | ❌ | Optional AcademicYear MongoID |
 
 ---
 
@@ -1617,12 +1642,13 @@ Record a tuition fee installment payment.
 Base path: `/financial/fee-configs`
 
 #### `POST /financial/fee-configs` 🛡️
-Create annual tuition fee configuration for an academic level.
+Create annual tuition fee configuration for a specific grade level and academic year.
 
 **Request Payload (JSON):**
 ```json
 {
   "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "gradeLevelId": "6650a1b2c3d4e5f6a7b8c9d1",
   "tuitionFee": 10000
 }
 ```
@@ -1631,10 +1657,11 @@ Create annual tuition fee configuration for an academic level.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `academicYearId` | `string` | ✅ | AcademicYear MongoID |
+| `gradeLevelId` | `string` | ✅ | GradeLevel MongoID |
 | `tuitionFee` | `number` | ✅ | Annual tuition fee amount in EGP (min: 0) |
 
 #### `GET /financial/fee-configs` 🛡️
-List fee configurations.
+List fee configurations (populates `academicYearId` and `gradeLevelId`).
 
 #### `GET /financial/fee-configs/:id` 🛡️
 Get fee configuration details.
@@ -1646,6 +1673,7 @@ Update fee configuration.
 ```json
 {
   "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "gradeLevelId": "6650a1b2c3d4e5f6a7b8c9d1",
   "tuitionFee": 12000
 }
 ```
@@ -1654,6 +1682,7 @@ Update fee configuration.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `academicYearId` | `string` | ❌ | Associated AcademicYear MongoID |
+| `gradeLevelId` | `string` | ❌ | Associated GradeLevel MongoID |
 | `tuitionFee` | `number` | ❌ | Updated tuition fee amount (min: 0) |
 
 #### `DELETE /financial/fee-configs/:id` 🛡️

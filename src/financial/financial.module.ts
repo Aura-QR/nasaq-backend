@@ -9,6 +9,7 @@ import { AdditionalFeeService } from './additional-fee.service';
 import { AdditionalFeeController } from './additional-fee.controller';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
+import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-level.schema';
 import { CaslModule } from '../casl/casl.module';
 import { FeeConfigService } from './fee-config.service';
 import { FeeConfigController } from './fee-config.controller';
@@ -36,6 +37,7 @@ import { FinancialTrip, FinancialTripSchema } from './schemas/financial-trip.sch
       { name: AdditionalFee.name, schema: AdditionalFeeSchema },
       { name: Student.name, schema: StudentSchema },
       { name: Class.name, schema: ClassSchema },
+      { name: GradeLevel.name, schema: GradeLevelSchema },
       { name: FinancialTrip.name, schema: FinancialTripSchema },
     ]),
     CaslModule,

@@ -33,6 +33,9 @@ class PaymentEvent {
 
   @Prop()
   notes: string;
+
+  @Prop({ enum: ['payment', 'refund'], default: 'payment' })
+  type: string;
 }
 const PaymentEventSchema = SchemaFactory.createForClass(PaymentEvent);
 

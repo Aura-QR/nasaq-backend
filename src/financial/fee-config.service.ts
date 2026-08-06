@@ -21,31 +21,42 @@ export class FeeConfigService {
   }
 
   async create(dto: CreateFeeConfigDto, adminId: string) {
-    const existing = await this.feeConfigModel.findOne({ academicYearId: new mongoose.Types.ObjectId(dto.academicYearId) });
+    const existing = await this.feeConfigModel.findOne({
+      academicYearId: new mongoose.Types.ObjectId(dto.academicYearId),
+      gradeLevelId: new mongoose.Types.ObjectId(dto.gradeLevelId),
+    });
     if (existing) {
-      throw new BadRequestException(`معايير الرسوم موجودة بالفعل لهذا العام الدراسي`);
+      throw new BadRequestException(`معايير الرسوم موجودة بالفعل لهذا العام الدراسي والمرحلة الدراسية`);
     }
     const data = await this.feeConfigModel.create({ ...dto, createdBy: adminId });
     return { message: 'تم إنشاء معايير الرسوم بنجاح', data };
   }
 
   async find() {
-    const data = await this.feeConfigModel.find().sort({ createdAt: -1 }).exec();
+    const data = await this.feeConfigModel.find().sort({ createdAt: -1 }).populate('gradeLevelId', 'name order').populate('academicYearId', 'name').exec();
     return { message: 'تم استرجاع معايير الرسوم بنجاح', data };
   }
 
   async findOne(id: string) {
     this.validateObjectId(id);
-    const data = await this.feeConfigModel.findById(id).exec();
+    const data = await this.feeConfigModel.findById(id).populate('gradeLevelId', 'name order').populate('academicYearId', 'name').exec();
     if (!data) throw new NotFoundException('معايير الرسوم غير موجودة');
     return { message: 'تم استرجاع معايير الرسوم بنجاح', data };
   }
 
   async update(id: string, dto: UpdateFeeConfigDto) {
     this.validateObjectId(id);
-    if (dto.academicYearId) {
-      const dup = await this.feeConfigModel.findOne({ academicYearId: new mongoose.Types.ObjectId(dto.academicYearId), _id: { $ne: id } });
-      if (dup) throw new BadRequestException(`العام الدراسي مستخدم بالفعل في معايير رسوم أخرى`);
+    if (dto.academicYearId || dto.gradeLevelId) {
+      const current = await this.feeConfigModel.findById(id).exec();
+      if (!current) throw new NotFoundException('معايير الرسوم غير موجودة');
+      const checkYearId = dto.academicYearId ? new mongoose.Types.ObjectId(dto.academicYearId) : current.academicYearId;
+      const checkGradeId = dto.gradeLevelId ? new mongoose.Types.ObjectId(dto.gradeLevelId) : current.gradeLevelId;
+      const dup = await this.feeConfigModel.findOne({
+        academicYearId: checkYearId,
+        gradeLevelId: checkGradeId,
+        _id: { $ne: id },
+      });
+      if (dup) throw new BadRequestException(`العام الدراسي والمرحلة الدراسية مستخدمان بالفعل في معايير رسوم أخرى`);
     }
     const data = await this.feeConfigModel
       .findByIdAndUpdate(id, dto, { new: true, runValidators: true })

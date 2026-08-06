@@ -3776,7 +3776,53 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"amount\": 5000,\n  \"paidAt\": \"2026-07-21T10:00:00.000Z\",\n  \"notes\": \"Received in cash at front desk\"\n}",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 2667,\n  \"paidAt\": \"2026-09-03T10:00:00.000Z\",\n  \"notes\": \"Card payment, receipt #4471\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Record Tuition Installment Refund",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/tuition/installments/1/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "tuition",
+                "installments",
+                "1",
+                "refund"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 1200,\n  \"reason\": \"Incorrect amount recorded per receipt #4501\",\n  \"refundedAt\": \"2026-09-19\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3822,7 +3868,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"tuitionFee\": 20000\n}",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"tuitionFee\": 8000\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -6464,7 +6510,54 @@
             "description": "Record a bus payment received at school (Admin).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"amount\": 500\n}",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 500,\n  \"paidAt\": \"2026-09-05T10:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Record Bus Installment Refund (nested)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/bus/installments/1/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "bus",
+                "installments",
+                "1",
+                "refund"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Record a refund on a bus installment payment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 250,\n  \"reason\": \"Bus service overpayment correction\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -6652,7 +6745,55 @@
             "description": "Record a trip payment received at school (Admin).",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"amount\": 200\n}",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 200,\n  \"paidAt\": \"2026-09-10T10:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Record Trip Installment Refund (nested)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/trips/{{tripId}}/installments/1/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "trips",
+                "{{tripId}}",
+                "installments",
+                "1",
+                "refund"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Record a refund on a trip installment payment.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 100,\n  \"reason\": \"Trip overpayment correction\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

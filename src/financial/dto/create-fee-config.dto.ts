@@ -7,6 +7,11 @@ export class CreateFeeConfigDto {
   @IsNotEmpty()
   academicYearId: string;
 
+  @ApiProperty({ description: 'Grade Level ID (Mongo ObjectId)' })
+  @IsMongoId()
+  @IsNotEmpty()
+  gradeLevelId: string;
+
   @ApiProperty({ description: 'Annual tuition fee in EGP' })
   @IsNumber()
   @Min(0)

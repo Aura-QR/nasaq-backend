@@ -20,4 +20,9 @@ export class RecordPaymentDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiProperty({ required: false, description: 'Academic Year ID (Mongo ObjectId)' })
+  @IsString()
+  @IsOptional()
+  academicYearId?: string;
 }

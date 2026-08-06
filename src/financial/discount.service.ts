@@ -80,10 +80,20 @@ export class DiscountService {
     return { message: 'تم حذف الخصم بنجاح' };
   }
 
-  async applyToTuition(studentId: string, dto: ApplyDiscountDto) {
+  private async getRecord(studentId: string, academicYearId?: string): Promise<StudentFinancialRecord> {
     this.validateObjectId(studentId);
-    const record = await this.recordModel.findOne({ studentId: new mongoose.Types.ObjectId(studentId) }).exec();
+    const query: any = { studentId: new mongoose.Types.ObjectId(studentId) };
+    if (academicYearId) {
+      this.validateObjectId(academicYearId);
+      query.academicYearId = new mongoose.Types.ObjectId(academicYearId);
+    }
+    const record = await this.recordModel.findOne(query).sort({ createdAt: -1 }).exec();
     if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
+    return record;
+  }
+
+  async applyToTuition(studentId: string, dto: ApplyDiscountDto) {
+    const record = await this.getRecord(studentId, dto.academicYearId);
 
     const discount = await this.discountModel.findById(dto.discountId).exec();
     if (!discount) throw new NotFoundException('الخصم غير موجود');
@@ -113,10 +123,8 @@ export class DiscountService {
     return { message: 'تم تطبيق الخصم على الرسوم الدراسية بنجاح', data: record.tuition };
   }
 
-  async removeFromTuition(studentId: string) {
-    this.validateObjectId(studentId);
-    const record = await this.recordModel.findOne({ studentId: new mongoose.Types.ObjectId(studentId) }).exec();
-    if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
+  async removeFromTuition(studentId: string, academicYearId?: string) {
+    const record = await this.getRecord(studentId, academicYearId);
 
     record.tuition.discount = null;
     record.tuition.netFee = record.tuition.fee;
@@ -129,9 +137,7 @@ export class DiscountService {
   }
 
   async applyToBus(studentId: string, dto: ApplyDiscountDto) {
-    this.validateObjectId(studentId);
-    const record = await this.recordModel.findOne({ studentId: new mongoose.Types.ObjectId(studentId) }).exec();
-    if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
+    const record = await this.getRecord(studentId, dto.academicYearId);
     if (!record.bus.enrolled) throw new BadRequestException('الطالب غير مسجل في خدمة الحافلة');
     if (record.bus.discount) {
       throw new BadRequestException('يوجد خصم مطبق بالفعل على رسوم الحافلة — قم بإزالته أولاً');
@@ -161,10 +167,8 @@ export class DiscountService {
     return { message: 'تم تطبيق الخصم على رسوم الحافلة بنجاح', data: record.bus };
   }
 
-  async removeFromBus(studentId: string) {
-    this.validateObjectId(studentId);
-    const record = await this.recordModel.findOne({ studentId: new mongoose.Types.ObjectId(studentId) }).exec();
-    if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
+  async removeFromBus(studentId: string, academicYearId?: string) {
+    const record = await this.getRecord(studentId, academicYearId);
 
     record.bus.discount = null;
     record.bus.netFee = record.bus.fee;
@@ -177,10 +181,8 @@ export class DiscountService {
   }
 
   async applyToTrip(studentId: string, tripId: string, dto: ApplyDiscountDto) {
-    this.validateObjectId(studentId);
     this.validateObjectId(tripId);
-    const record = await this.recordModel.findOne({ studentId: new mongoose.Types.ObjectId(studentId) }).exec();
-    if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
+    const record = await this.getRecord(studentId, dto.academicYearId);
 
     const trip = record.trips.find(t => (t as any)._id.toString() === tripId);
     if (!trip) throw new NotFoundException('الرحلة غير موجودة');
@@ -212,11 +214,9 @@ export class DiscountService {
     return { message: 'تم تطبيق الخصم على رسوم الرحلة بنجاح', data: trip };
   }
 
-  async removeFromTrip(studentId: string, tripId: string) {
-    this.validateObjectId(studentId);
+  async removeFromTrip(studentId: string, tripId: string, academicYearId?: string) {
     this.validateObjectId(tripId);
-    const record = await this.recordModel.findOne({ studentId: new mongoose.Types.ObjectId(studentId) }).exec();
-    if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
+    const record = await this.getRecord(studentId, academicYearId);
 
     const trip = record.trips.find(t => (t as any)._id.toString() === tripId);
     if (!trip) throw new NotFoundException('الرحلة غير موجودة');

@@ -6,6 +6,7 @@ import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FinancialRecordService } from './financial-record.service';
 import { RecordPaymentDto } from './dto/record-payment.dto';
+import { RefundPaymentDto } from './dto/refund-payment.dto';
 
 @Controller('financial/records')
 @UseGuards(JwtAuthGuard, AbilitiesGuard)
@@ -18,6 +19,7 @@ export class FinancialRecordController {
   @CheckAbilities({ action: 'read', subject: 'Financial' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List all financial records (Admin)' })
+  @ApiQuery({ name: 'academicYearId', required: false })
   @ApiQuery({ name: 'academicYear', required: false })
   @ApiQuery({ name: 'classId', required: false })
   @ApiQuery({ name: 'studentName', required: false })
@@ -33,51 +35,112 @@ export class FinancialRecordController {
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Student views their own financial record' })
-  async findMyRecord(@CurrentUser() user: any) {
-    return this.financialRecordService.findMyRecord(user.userId);
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async findMyRecord(
+    @CurrentUser() user: any,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.financialRecordService.findMyRecord(user.userId, academicYearId);
   }
 
   @Get('me/summary')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Student views their own installment summary (paid/pending/overdue counts)' })
-  async getMySummary(@CurrentUser() user: any) {
-    return this.financialRecordService.getSummary(user.userId);
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async getMySummary(
+    @CurrentUser() user: any,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.financialRecordService.getSummary(user.userId, academicYearId);
   }
 
   @Get('me/trips')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Student views trips overview (all trips + enrolled trips financial details)' })
-  async getMyTripsOverview(@CurrentUser() user: any) {
-    return this.financialRecordService.getMyTripsOverview(user.userId);
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async getMyTripsOverview(
+    @CurrentUser() user: any,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.financialRecordService.getMyTripsOverview(user.userId, academicYearId);
   }
 
   @Get(':studentId')
   @CheckAbilities({ action: 'read', subject: 'Financial' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get full financial record for a specific student (Admin)' })
-  async findOne(@Param('studentId') studentId: string) {
-    return this.financialRecordService.findOne(studentId);
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async findOne(
+    @Param('studentId') studentId: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.financialRecordService.findOne(studentId, academicYearId);
   }
 
   @Get(':studentId/summary')
   @CheckAbilities({ action: 'read', subject: 'Financial' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get installment summary for a specific student (Admin)' })
-  async getSummary(@Param('studentId') studentId: string) {
-    return this.financialRecordService.getSummary(studentId);
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async getSummary(
+    @Param('studentId') studentId: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.financialRecordService.getSummary(studentId, academicYearId);
   }
 
   @Post(':studentId/tuition/pay')
   @CheckAbilities({ action: 'update', subject: 'Financial' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Record a tuition installment payment received at school (Admin)' })
+  @ApiQuery({ name: 'academicYearId', required: false })
   async payTuition(
     @Param('studentId') studentId: string,
     @Body() dto: RecordPaymentDto,
     @CurrentUser() user: any,
+    @Query('academicYearId') academicYearId?: string,
   ) {
+    if (academicYearId && !dto.academicYearId) {
+      dto.academicYearId = academicYearId;
+    }
     return this.financialRecordService.payTuition(studentId, dto, user.userId);
+  }
+
+  @Post(':studentId/tuition/refund')
+  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Record a refund / correction on a tuition installment payment (Admin)' })
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async refundTuition(
+    @Param('studentId') studentId: string,
+    @Body() dto: RefundPaymentDto,
+    @CurrentUser() user: any,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    if (academicYearId && !dto.academicYearId) {
+      dto.academicYearId = academicYearId;
+    }
+    return this.financialRecordService.refundTuition(studentId, dto, user.userId);
+  }
+
+  @Post(':studentId/tuition/installments/:installmentNumber/refund')
+  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Record a refund / correction on a specific tuition installment payment (Admin)' })
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async refundTuitionByNumber(
+    @Param('studentId') studentId: string,
+    @Param('installmentNumber') installmentNumber: number,
+    @Body() dto: RefundPaymentDto,
+    @CurrentUser() user: any,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    dto.installmentNumber = Number(installmentNumber);
+    if (academicYearId && !dto.academicYearId) {
+      dto.academicYearId = academicYearId;
+    }
+    return this.financialRecordService.refundTuition(studentId, dto, user.userId);
   }
 }

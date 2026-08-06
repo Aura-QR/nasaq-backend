@@ -7,6 +7,11 @@ export class UpdateFeeConfigDto {
   @IsOptional()
   academicYearId?: string;
 
+  @ApiProperty({ required: false, description: 'Grade Level ID (Mongo ObjectId)' })
+  @IsMongoId()
+  @IsOptional()
+  gradeLevelId?: string;
+
   @ApiProperty({ required: false })
   @IsNumber()
   @Min(0)

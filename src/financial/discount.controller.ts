@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -75,8 +75,12 @@ export class DiscountController {
   @CheckAbilities({ action: 'update', subject: 'Financial' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Remove discount from a student tuition fee' })
-  async removeFromTuition(@Param('studentId') studentId: string) {
-    return this.discountService.removeFromTuition(studentId);
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async removeFromTuition(
+    @Param('studentId') studentId: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.discountService.removeFromTuition(studentId, academicYearId);
   }
 
   @Post('apply/bus/:studentId')
@@ -91,8 +95,12 @@ export class DiscountController {
   @CheckAbilities({ action: 'update', subject: 'Financial' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Remove discount from a student bus fee' })
-  async removeFromBus(@Param('studentId') studentId: string) {
-    return this.discountService.removeFromBus(studentId);
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async removeFromBus(
+    @Param('studentId') studentId: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.discountService.removeFromBus(studentId, academicYearId);
   }
 
   @Post('apply/trips/:studentId/:tripId')
@@ -111,10 +119,12 @@ export class DiscountController {
   @CheckAbilities({ action: 'update', subject: 'Financial' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Remove discount from a student trip fee' })
+  @ApiQuery({ name: 'academicYearId', required: false })
   async removeFromTrip(
     @Param('studentId') studentId: string,
     @Param('tripId') tripId: string,
+    @Query('academicYearId') academicYearId?: string,
   ) {
-    return this.discountService.removeFromTrip(studentId, tripId);
+    return this.discountService.removeFromTrip(studentId, tripId, academicYearId);
   }
 }

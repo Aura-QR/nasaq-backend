@@ -9,6 +9,7 @@ import { Student } from '../students/schemas/student.schema';
 import { Class } from '../classes/schemas/class.schema';
 import { FinancialTrip } from './schemas/financial-trip.schema';
 import { RecordPaymentDto } from './dto/record-payment.dto';
+import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
 import { getPagination } from '../pagination/common/paginationUtils';
 
@@ -29,6 +30,16 @@ export class FinancialRecordService {
     }
   }
 
+  private buildStudentQuery(studentId: string, academicYearId?: string): any {
+    this.validateObjectId(studentId, 'الطالب');
+    const query: any = { studentId: new mongoose.Types.ObjectId(studentId) };
+    if (academicYearId) {
+      this.validateObjectId(academicYearId, 'العام الدراسي');
+      query.academicYearId = new mongoose.Types.ObjectId(academicYearId);
+    }
+    return query;
+  }
+
   buildInstallments(fee: number, plan: InstallmentPlan) {
     const n = plan.numberOfInstallments;
     const base = Math.floor(fee / n);
@@ -45,8 +56,10 @@ export class FinancialRecordService {
 
   computeFeeStatus(installments: any[]): FeeStatus {
     const allPaid = installments.every(i => i.status === PaymentStatus.PAID);
-    const anyPaid = installments.some(i => i.status === PaymentStatus.PAID);
-    return allPaid ? FeeStatus.PAID : anyPaid ? FeeStatus.PARTIAL : FeeStatus.UNPAID;
+    const anyProgress = installments.some(
+      i => i.status === PaymentStatus.PAID || i.status === PaymentStatus.PARTIAL,
+    );
+    return allPaid ? FeeStatus.PAID : anyProgress ? FeeStatus.PARTIAL : FeeStatus.UNPAID;
   }
 
   private buildSingleInstallment(fee: number) {
@@ -68,10 +81,13 @@ export class FinancialRecordService {
     const cls = await this.classModel.findById(classId).exec();
     if (!cls) return;
 
-    const feeConfig = await this.feeConfigModel.findOne({ academicYearId: cls.academicYearId }).exec();
+    const feeConfig = await this.feeConfigModel.findOne({
+      academicYearId: cls.academicYearId,
+      gradeLevelId: cls.gradeLevelId,
+    }).exec();
     if (!feeConfig) {
       throw new BadRequestException(
-        `لا توجد معايير رسوم للعام الدراسي المحدد. يرجى إنشاؤها أولاً قبل إضافة الطالب للفصل.`,
+        `لا توجد معايير رسوم للعام الدراسي والمرحلة الدراسية المحددة. يرجى إنشاؤها أولاً قبل إضافة الطالب للفصل.`,
       );
     }
 
@@ -79,8 +95,16 @@ export class FinancialRecordService {
     if ((student as any).installmentPlanId) {
       plan = await this.planModel.findById((student as any).installmentPlanId).exec();
     }
+    if (!plan) {
+      plan = await this.planModel.findOne({ isDefault: true, isActive: true }).exec();
+    }
+    if (!plan) {
+      throw new BadRequestException(
+        `لا توجد خطة تقسيط افتراضية. يرجى إنشاء خطة تقسيط وتعيينها كافتراضية قبل تسجيل الطلاب.`,
+      );
+    }
 
-    const planId = plan ? (plan._id as mongoose.Types.ObjectId) : null;
+    const planId = plan._id as mongoose.Types.ObjectId;
     const studentOid = new mongoose.Types.ObjectId(studentId);
     const classOid = new mongoose.Types.ObjectId(classId);
 
@@ -100,9 +124,7 @@ export class FinancialRecordService {
             netFee: feeConfig.tuitionFee,
             status: FeeStatus.UNPAID,
             totalPaid: 0,
-            installments: plan
-              ? this.buildInstallments(feeConfig.tuitionFee, plan)
-              : this.buildSingleInstallment(feeConfig.tuitionFee),
+            installments: this.buildInstallments(feeConfig.tuitionFee, plan),
           },
           bus: { enrolled: false, serviceType: 'both', fee: 0, netFee: 0, totalPaid: 0, status: FeeStatus.UNPAID, installments: [] },
           trips: [],
@@ -123,9 +145,7 @@ export class FinancialRecordService {
           const unpaidInstallments = record.tuition.installments.filter(i => i.status !== 'paid');
           const totalUnpaid = feeConfig.tuitionFee - record.tuition.totalPaid;
           if (unpaidInstallments.length > 0 && totalUnpaid > 0) {
-            const rebuilt = plan
-              ? this.buildInstallments(totalUnpaid, plan)
-              : this.buildSingleInstallment(totalUnpaid);
+            const rebuilt = this.buildInstallments(totalUnpaid, plan);
             unpaidInstallments.forEach((inst, i) => {
               inst.amount = rebuilt[i]?.amount ?? inst.amount;
             });
@@ -139,7 +159,10 @@ export class FinancialRecordService {
 
   async find(filters: any = {}, pagination: any = {}) {
     const query: any = {};
-    if (filters.academicYear) query.academicYear = filters.academicYear;
+    const ayId = filters.academicYearId || filters.academicYear;
+    if (ayId && mongoose.Types.ObjectId.isValid(ayId)) {
+      query.academicYearId = new mongoose.Types.ObjectId(ayId);
+    }
     if (filters.classId && mongoose.Types.ObjectId.isValid(filters.classId)) {
       query.classId = new mongoose.Types.ObjectId(filters.classId);
     }
@@ -183,10 +206,10 @@ export class FinancialRecordService {
     return { message: 'تم استرجاع السجلات المالية بنجاح', data };
   }
 
-  async findOne(studentId: string) {
-    this.validateObjectId(studentId, 'الطالب');
+  async findOne(studentId: string, academicYearId?: string) {
+    const query = this.buildStudentQuery(studentId, academicYearId);
     const record = await this.recordModel
-      .findOne({ studentId: new mongoose.Types.ObjectId(studentId) })
+      .findOne(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
       .populate('classId', 'roomNumber academicYear gender')
@@ -217,14 +240,14 @@ export class FinancialRecordService {
     return { message: 'تم استرجاع السجل المالي بنجاح', data };
   }
 
-  async findMyRecord(studentId: string) {
-    return this.findOne(studentId);
+  async findMyRecord(studentId: string, academicYearId?: string) {
+    return this.findOne(studentId, academicYearId);
   }
 
-  async getSummary(studentId: string) {
-    this.validateObjectId(studentId, 'الطالب');
+  async getSummary(studentId: string, academicYearId?: string) {
+    const query = this.buildStudentQuery(studentId, academicYearId);
     const record = await this.recordModel
-      .findOne({ studentId: new mongoose.Types.ObjectId(studentId) })
+      .findOne(query)
       .sort({ createdAt: -1 })
       .lean()
       .exec();
@@ -274,12 +297,12 @@ export class FinancialRecordService {
     };
   }
 
-  async getMyTripsOverview(studentId: string) {
-    this.validateObjectId(studentId, 'الطالب');
+  async getMyTripsOverview(studentId: string, academicYearId?: string) {
+    const query = this.buildStudentQuery(studentId, academicYearId);
 
     const [record, templates] = await Promise.all([
       this.recordModel
-        .findOne({ studentId: new mongoose.Types.ObjectId(studentId) })
+        .findOne(query)
         .sort({ createdAt: -1 })
         .lean()
         .exec(),
@@ -356,9 +379,9 @@ export class FinancialRecordService {
   }
 
   async payTuition(studentId: string, dto: RecordPaymentDto, adminId: string) {
-    this.validateObjectId(studentId, 'الطالب');
+    const query = this.buildStudentQuery(studentId, dto.academicYearId);
     const record = await this.recordModel
-      .findOne({ studentId: new mongoose.Types.ObjectId(studentId) })
+      .findOne(query)
       .sort({ createdAt: -1 })
       .exec();
     if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
@@ -368,8 +391,11 @@ export class FinancialRecordService {
     if (inst.status === PaymentStatus.PAID) {
       throw new BadRequestException(`القسط رقم ${dto.installmentNumber} تم سداده بالفعل`);
     }
-    if (dto.amount !== inst.amount) {
-      throw new BadRequestException(`مبلغ القسط الصحيح هو ${inst.amount} جنيه`);
+    const remaining = inst.amount - inst.paidAmount;
+    if (dto.amount <= 0 || dto.amount > remaining) {
+      throw new BadRequestException(
+        `المبلغ يجب أن يكون بين 1 و ${remaining} جنيه (المتبقي من القسط)`,
+      );
     }
 
     (inst.payments as any[]).push({
@@ -377,9 +403,10 @@ export class FinancialRecordService {
       paidAt: new Date(dto.paidAt),
       recordedBy: new mongoose.Types.ObjectId(adminId),
       notes: dto.notes,
+      type: 'payment',
     });
-    inst.paidAmount = dto.amount;
-    inst.status = PaymentStatus.PAID;
+    inst.paidAmount += dto.amount;
+    inst.status = inst.paidAmount >= inst.amount ? PaymentStatus.PAID : PaymentStatus.PARTIAL;
     record.tuition.totalPaid = record.tuition.installments.reduce((s, i) => s + i.paidAmount, 0);
     record.tuition.status = this.computeFeeStatus(record.tuition.installments);
 
@@ -387,9 +414,51 @@ export class FinancialRecordService {
     return { message: 'تم تسجيل دفعة القسط بنجاح', data: record.tuition };
   }
 
-  async switchTuitionInstallmentPlan(studentId: string, installmentPlanId?: string | null) {
-    this.validateObjectId(studentId, 'الطالب');
+  async refundTuition(studentId: string, dto: RefundPaymentDto, adminId: string) {
+    const query = this.buildStudentQuery(studentId, dto.academicYearId);
+    const record = await this.recordModel
+      .findOne(query)
+      .sort({ createdAt: -1 })
+      .exec();
+    if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
 
+    const inst = record.tuition.installments.find(i => i.installmentNumber === dto.installmentNumber);
+    if (!inst) throw new NotFoundException(`القسط رقم ${dto.installmentNumber} غير موجود`);
+
+    if (inst.paidAmount <= 0) {
+      throw new BadRequestException(`لا توجد مدفوعات مسجلة على القسط رقم ${dto.installmentNumber} لاستردادها`);
+    }
+
+    if (dto.amount <= 0 || dto.amount > inst.paidAmount) {
+      throw new BadRequestException(
+        `المبلغ المسترد يجب أن يكون بين 1 و ${inst.paidAmount} جنيه (المبلغ المدفوع حالياً من القسط)`,
+      );
+    }
+
+    (inst.payments as any[]).push({
+      amount: dto.amount,
+      paidAt: dto.refundedAt ? new Date(dto.refundedAt) : new Date(),
+      recordedBy: new mongoose.Types.ObjectId(adminId),
+      notes: dto.reason,
+      type: 'refund',
+    });
+
+    inst.paidAmount -= dto.amount;
+    inst.status =
+      inst.paidAmount >= inst.amount
+        ? PaymentStatus.PAID
+        : inst.paidAmount > 0
+        ? PaymentStatus.PARTIAL
+        : PaymentStatus.PENDING;
+
+    record.tuition.totalPaid = record.tuition.installments.reduce((s, i) => s + i.paidAmount, 0);
+    record.tuition.status = this.computeFeeStatus(record.tuition.installments);
+
+    await record.save();
+    return { message: 'تم تسجيل استرداد المبلغ بنجاح', data: record.tuition };
+  }
+
+  async switchTuitionInstallmentPlan(studentId: string, installmentPlanId?: string | null, academicYearId?: string) {
     let plan: InstallmentPlan | null = null;
     if (installmentPlanId) {
       this.validateObjectId(installmentPlanId, 'خطة التقسيط');
@@ -399,8 +468,9 @@ export class FinancialRecordService {
       }
     }
 
+    const query = this.buildStudentQuery(studentId, academicYearId);
     const record = await this.recordModel
-      .findOne({ studentId: new mongoose.Types.ObjectId(studentId) })
+      .findOne(query)
       .sort({ createdAt: -1 })
       .exec();
 
