@@ -14,6 +14,7 @@ import jwtConfig from './config/jwt.config';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { CaslModule } from 'src/casl/casl.module';
 import { PermissionsModule } from 'src/permissions/permissions.module';
+import { EmailModule } from 'src/email/email.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PermissionsModule } from 'src/permissions/permissions.module';
     ),
     CaslModule,
     PermissionsModule,
+    EmailModule,
     MongooseModule.forFeature([
       { name: Admin.name, schema: AdminSchema },
       { name: Teacher.name, schema: TeacherSchema },

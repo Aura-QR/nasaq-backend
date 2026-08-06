@@ -332,10 +332,7 @@ export class StudentsService {
       throw new NotFoundException('البريد الإلكتروني غير مسجل');
     }
 
-    if (student.hasPassword) {
-      throw new BadRequestException('لديك كلمة مرور بالفعل، يرجى تسجيل الدخول');
-    }
-
+    // Allow OTP request for both first-time setup AND forgot-password scenarios
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
@@ -347,9 +344,9 @@ export class StudentsService {
       { skipTenantScope: true },
     );
 
-    await this.emailService.sendOtp(email, otp);
+    await this.emailService.sendPasswordResetOtp(cleanEmail, otp);
 
-    return { message: 'تم إرسال كود التحقق إلى بريدك الإلكتروني' };
+    return { message: 'تم إرسال رمز التحقق إلى بريدك الإلكتروني' };
   }
 
   async setPassword(email: string, otp: string, newPassword: string) {
@@ -365,20 +362,17 @@ export class StudentsService {
       throw new NotFoundException('البريد الإلكتروني غير مسجل');
     }
 
-    if (student.hasPassword) {
-      throw new BadRequestException('لديك كلمة مرور بالفعل');
-    }
-
+    // Allow password reset regardless of hasPassword (covers first-time setup AND forgot-password)
     if (!student.otp || !student.otpExpiry) {
-      throw new BadRequestException('يرجى طلب كود التحقق أولاً');
+      throw new BadRequestException('يرجى طلب رمز التحقق أولاً');
     }
 
     if (new Date() > student.otpExpiry) {
-      throw new BadRequestException('انتهت صلاحية كود التحقق، يرجى طلب كود جديد');
+      throw new BadRequestException('انتهت صلاحية رمز التحقق، يرجى طلب رمز جديد');
     }
 
     if (student.otp !== otp) {
-      throw new BadRequestException('كود التحقق غير صحيح');
+      throw new BadRequestException('رمز التحقق غير صحيح');
     }
 
     student.password = await PasswordUtil.hash(newPassword);

@@ -116,9 +116,9 @@ export class StudentsController {
     return await this.studentsService.remove(id);
   }
 
-  @ApiOperation({ summary: 'Request OTP to set password for first-time login' })
-  @ApiResponse({ status: 200, description: 'OTP sent to email' })
-  @ApiResponse({ status: 404, description: 'Email not found' })
+  @ApiOperation({ summary: 'طلب رمز OTP لإعادة تعيين كلمة المرور أو تعيينها لأول مرة (للطلاب)' })
+  @ApiResponse({ status: 200, description: 'تم إرسال رمز التحقق إلى البريد الإلكتروني' })
+  @ApiResponse({ status: 404, description: 'البريد الإلكتروني غير مسجل' })
   @Public()
   @Post('request-password-setup')
   @HttpCode(HttpStatus.OK)
@@ -126,9 +126,9 @@ export class StudentsController {
     return await this.studentsService.requestPasswordSetup(body.email);
   }
 
-  @ApiOperation({ summary: 'Set password using OTP' })
-  @ApiResponse({ status: 200, description: 'Password set successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  @ApiOperation({ summary: 'تعيين أو إعادة تعيين كلمة المرور باستخدام رمز OTP (للطلاب)' })
+  @ApiResponse({ status: 200, description: 'تم تغيير كلمة المرور بنجاح' })
+  @ApiResponse({ status: 400, description: 'رمز التحقق غير صحيح أو منتهي الصلاحية' })
   @Public()
   @Post('set-password')
   @HttpCode(HttpStatus.OK)

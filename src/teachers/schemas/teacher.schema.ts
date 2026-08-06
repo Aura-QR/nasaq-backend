@@ -40,6 +40,12 @@ export class Teacher extends Document {
   @Prop({ required: true })
   password: string;
 
+  @Prop({ select: false })
+  otp?: string;
+
+  @Prop({ select: false })
+  otpExpiry?: Date;
+
   @Prop({ default: false })
   isManager: boolean;
 

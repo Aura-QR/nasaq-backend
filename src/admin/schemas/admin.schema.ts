@@ -18,6 +18,12 @@ export class Admin extends Document {
 
   @Prop({ type: [String], default: [] })
   permissions: string[];
+
+  @Prop({ select: false })
+  otp?: string;
+
+  @Prop({ select: false })
+  otpExpiry?: Date;
 }
 
 export const AdminSchema = SchemaFactory.createForClass(Admin);
