@@ -110,6 +110,18 @@ export class StudentsService {
           },
           { upsert: true, new: true, setDefaultsOnInsert: true },
         );
+
+        // Create/update the student's financial record for this academic year
+        try {
+          await this.financialRecordService.createOrUpdateRecord(
+            (student._id as any).toString(),
+            (targetClass._id as any).toString(),
+          );
+        } catch (error: any) {
+          console.warn(
+            `[Students] Financial record creation skipped for student ${student._id}: ${error.message}`,
+          );
+        }
       }
     }
 
@@ -279,6 +291,18 @@ export class StudentsService {
           },
           { upsert: true, new: true, setDefaultsOnInsert: true },
         );
+
+        // Create/update the student's financial record for this academic year
+        try {
+          await this.financialRecordService.createOrUpdateRecord(
+            (student._id as any).toString(),
+            (targetClass._id as any).toString(),
+          );
+        } catch (error: any) {
+          console.warn(
+            `[Students] Financial record creation skipped for student ${student._id}: ${error.message}`,
+          );
+        }
       }
     }
 
