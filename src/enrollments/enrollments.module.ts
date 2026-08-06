@@ -6,6 +6,7 @@ import { Enrollment, EnrollmentSchema } from './schemas/enrollment.schema';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-level.schema';
+import { GradesCriteriaModule } from '../grades-criteria/grades-criteria.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-leve
       { name: Class.name, schema: ClassSchema },
       { name: GradeLevel.name, schema: GradeLevelSchema },
     ]),
+    GradesCriteriaModule,
   ],
   controllers: [EnrollmentsController],
   providers: [EnrollmentsService],

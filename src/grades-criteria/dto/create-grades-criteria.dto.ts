@@ -76,4 +76,11 @@ export class CreateGradesCriteriaDto {
   @Min(1)
   @ApiProperty({ description: 'Number of quizzes', example: 2 })
   quizzesCount: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(100)
+  @ApiProperty({ description: 'Passing grade threshold (optional, falls back to school default)', required: false, example: 50 })
+  passingGrade?: number;
 }

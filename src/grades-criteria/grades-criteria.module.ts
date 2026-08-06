@@ -15,6 +15,9 @@ import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.schema';
 import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
+import { Term, TermSchema } from '../terms/schemas/term.schema';
+import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
+import { TenancyModule } from '../tenancy/tenancy.module';
 
 @Module({
   imports: [
@@ -31,8 +34,11 @@ import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/sch
       { name: ProjectSubmission.name, schema: ProjectSubmissionSchema },
       { name: Enrollment.name, schema: EnrollmentSchema },
       { name: SubjectOffering.name, schema: SubjectOfferingSchema },
+      { name: Term.name, schema: TermSchema },
+      { name: School.name, schema: SchoolSchema },
     ]),
     CaslModule,
+    TenancyModule,
   ],
   controllers: [GradesCriteriaController],
   providers: [GradesCriteriaService],

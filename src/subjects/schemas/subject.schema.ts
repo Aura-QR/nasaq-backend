@@ -9,6 +9,9 @@ export class Subject extends Document {
 
   @Prop({ required: false })
   subjectCode?: string;
+
+  @Prop({ default: true })
+  isRequiredForPromotion: boolean;
 }
 
 export const SubjectSchema = SchemaFactory.createForClass(Subject);

@@ -35,6 +35,9 @@ export class GradesCriteria extends Document {
 
   @Prop({ required: true, min: 1 })
   quizzesCount: number;
+
+  @Prop({ type: Number, required: false })
+  passingGrade?: number;
 }
 
 export const GradesCriteriaSchema = SchemaFactory.createForClass(GradesCriteria);

@@ -14,6 +14,9 @@ export class SchoolSettings {
 
   @Prop({ default: 3, min: 1 })
   termsPerYear: number;
+
+  @Prop({ default: 50, min: 0, max: 100 })
+  defaultPassingGrade: number;
 }
 
 const SchoolSettingsSchema = SchemaFactory.createForClass(SchoolSettings);

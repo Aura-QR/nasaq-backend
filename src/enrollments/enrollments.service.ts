@@ -8,6 +8,7 @@ import { Class } from '../classes/schemas/class.schema';
 import { GradeLevel } from '../grade-levels/schemas/grade-level.schema';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 import { BulkPromoteDto } from './dto/bulk-promote.dto';
+import { GradesCriteriaService } from '../grades-criteria/grades-criteria.service';
 
 @Injectable()
 export class EnrollmentsService {
@@ -16,6 +17,7 @@ export class EnrollmentsService {
     @InjectModel(Student.name) private readonly studentModel: Model<Student>,
     @InjectModel(Class.name) private readonly classModel: Model<Class>,
     @InjectModel(GradeLevel.name) private readonly gradeLevelModel: Model<GradeLevel>,
+    private readonly gradesCriteriaService: GradesCriteriaService,
   ) {}
 
   async enroll(createEnrollmentDto: CreateEnrollmentDto) {
@@ -188,6 +190,24 @@ export class EnrollmentsService {
         isGraduating = true;
       }
 
+      const sourceYearId = previousAcademicYearId || enc.academicYearId?.toString();
+      let subjectResults: any[] = [];
+      let overallPassed = true;
+
+      const gradeLevelId = currentClass.gradeLevelId._id ?? currentClass.gradeLevelId;
+
+      if (sourceYearId && gradeLevelId) {
+        subjectResults = await this.gradesCriteriaService.calculateStudentYearlySubjectResults(
+          student._id.toString(),
+          gradeLevelId.toString(),
+          sourceYearId,
+        );
+
+        overallPassed = subjectResults
+          .filter((s) => s.isRequiredForPromotion !== false)
+          .every((s) => s.passed);
+      }
+
       previewList.push({
         studentId: student._id,
         studentName: `${student.firstName} ${student.fatherName || ''} ${student.familyName}`.trim(),
@@ -199,6 +219,8 @@ export class EnrollmentsService {
         suggestedNextGrade,
         isGraduating,
         availableTargetClasses: availableClasses,
+        subjectResults,
+        overallPassed,
       });
     }
 

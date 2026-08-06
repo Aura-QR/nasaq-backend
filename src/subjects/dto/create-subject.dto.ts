@@ -8,6 +8,7 @@ import {
   IsEnum,
   Min,
   IsArray,
+  IsBoolean,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 // export enum AcademicLevel {
@@ -27,6 +28,11 @@ export class CreateSubjectDto {
   @IsOptional()
   @ApiProperty({ description: 'The code of the subject' })
   subjectCode?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  @ApiProperty({ description: 'Whether the subject is required for promotion', default: true })
+  isRequiredForPromotion?: boolean;
 
   // @IsNumber()
   // @IsNotEmpty()
