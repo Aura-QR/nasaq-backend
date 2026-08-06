@@ -739,7 +739,80 @@ Enroll a student into a class for an academic year.
 List enrollments with pagination and filters (`Query: studentId, classId, academicYearId, status`).
 
 #### `GET /enrollments/promotion-preview/:targetAcademicYearId` 🔐
-Preview bulk student promotion mapping to next grade level classes.
+Preview bulk student promotion mapping to next grade level classes with automatic per-subject pass/fail computation and student `overallPassed` eligibility.
+
+**Query Parameters:**
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `previousAcademicYearId` | `string` | ❌ | Source academic year MongoID to evaluate grades from (defaults to active year) |
+
+**Response Payload (JSON):**
+```json
+{
+  "targetAcademicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "totalStudents": 3,
+  "students": [
+    {
+      "studentId": "6650a1b2c3d4e5f6a7b8c9d1",
+      "studentName": "Ahmed Salem",
+      "currentClass": {
+        "id": "6650a1b2c3d4e5f6a7b8c9d2",
+        "name": "1/1",
+        "gradeName": "Grade 1"
+      },
+      "suggestedNextGrade": {
+        "id": "6650a1b2c3d4e5f6a7b8c9d3",
+        "name": "Grade 2",
+        "order": 2
+      },
+      "isGraduating": false,
+      "availableTargetClasses": [
+        {
+          "id": "6650a1b2c3d4e5f6a7b8c9d4",
+          "name": "2/1",
+          "roomNumber": "101",
+          "maxCapacity": 30
+        }
+      ],
+      "subjectResults": [
+        {
+          "subjectId": "6650a1b2c3d4e5f6a7b8c9d5",
+          "subjectName": "Math",
+          "finalGrade": 78,
+          "passingGrade": 50,
+          "passed": true,
+          "isRequiredForPromotion": true
+        },
+        {
+          "subjectId": "6650a1b2c3d4e5f6a7b8c9d6",
+          "subjectName": "Arabic",
+          "finalGrade": 65,
+          "passingGrade": 50,
+          "passed": true,
+          "isRequiredForPromotion": true
+        },
+        {
+          "subjectId": "6650a1b2c3d4e5f6a7b8c9d7",
+          "subjectName": "Computer Studies",
+          "finalGrade": 85,
+          "passingGrade": 50,
+          "passed": true,
+          "isRequiredForPromotion": true
+        },
+        {
+          "subjectId": "6650a1b2c3d4e5f6a7b8c9d8",
+          "subjectName": "Art",
+          "finalGrade": 90,
+          "passingGrade": 50,
+          "passed": true,
+          "isRequiredForPromotion": false
+        }
+      ],
+      "overallPassed": true
+    }
+  ]
+}
+```
 
 #### `POST /enrollments/bulk-promote/:targetAcademicYearId` 🔐
 Execute bulk promotion of students into target year classes.
@@ -865,12 +938,13 @@ Create a new master subject in the tenant catalog.
 }
 ```
 
-**Field Specifications (`CreateSubjectDto`):**
+**Field Specifications (`CreateSubjectDto` / `UpdateSubjectDto`):**
 | Field | Type | Required | Rules & Description |
 |---|---|---|---|
 | `subjectName` | `string` | ✅ | Name of the subject (min length: 2) |
 | `subjectCode` | `string` | ❌ | Code of the subject (e.g. `"MATH101"`) |
 | `classIds` | `string[]` | ❌ | Array of Class MongoIDs offering this subject |
+| `isRequiredForPromotion` | `boolean` | ❌ | Whether this subject is required for student promotion (default: `true`). Set to `false` for electives. |
 
 #### `GET /subjects` 🔐
 List master subjects.
@@ -1284,11 +1358,12 @@ Create grade weighting criteria for a subject and academic year.
 }
 ```
 
-**Field Specifications (`CreateGradesCriteriaDto`):**
+**Field Specifications (`CreateGradesCriteriaDto` / `UpdateGradesCriteriaDto`):**
 | Field | Type | Required | Rules & Description |
 |---|---|---|---|
-| `subjectId` | `string` | ✅ | Subject MongoID |
-| `academicYearId` | `string` | ✅ | AcademicYear MongoID |
+| `subjectOfferingId` | `string` | ❌ | SubjectOffering MongoID |
+| `subjectId` | `string` | ❌ | Alternative Subject MongoID |
+| `academicYearId` | `string` | ❌ | AcademicYear MongoID |
 | `final` | `number` | ✅ | Final exam weight (1–100) |
 | `assignments` | `number` | ✅ | Total assignments weight (1–100) |
 | `assignmentsCount` | `number` | ✅ | Number of assignments (min: 1) |
@@ -1297,6 +1372,7 @@ Create grade weighting criteria for a subject and academic year.
 | `projectsCount` | `number` | ✅ | Number of projects (min: 1) |
 | `quizzes` | `number` | ✅ | Total quizzes weight (1–100) |
 | `quizzesCount` | `number` | ✅ | Number of quizzes (min: 1) |
+| `passingGrade` | `number` | ❌ | Passing grade threshold for this subject (0–100). If omitted, falls back to `SchoolSettings.defaultPassingGrade`. |
 
 #### `GET /gradesCriteria` 🔐
 List grade criteria.
