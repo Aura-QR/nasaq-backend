@@ -215,4 +215,32 @@ export class SchoolsService {
       .findByIdAndUpdate(id, updateDto, { new: true })
       .setOptions({ skipTenantScope: true });
   }
+
+  async getMySettings(schoolId: string) {
+    const school = await this.schoolModel
+      .findById(schoolId, { settings: 1 })
+      .setOptions({ skipTenantScope: true })
+      .lean();
+    if (!school) {
+      throw new NotFoundException(`المدرسة غير موجودة`);
+    }
+    return school.settings;
+  }
+
+  async updateMySettings(schoolId: string, settingsDto: Partial<Record<string, any>>) {
+    const updateFields: Record<string, any> = {};
+    for (const [key, value] of Object.entries(settingsDto)) {
+      updateFields[`settings.${key}`] = value;
+    }
+
+    const updated = await this.schoolModel
+      .findByIdAndUpdate(schoolId, { $set: updateFields }, { new: true, select: 'settings' })
+      .setOptions({ skipTenantScope: true })
+      .lean();
+
+    if (!updated) {
+      throw new NotFoundException(`المدرسة غير موجودة`);
+    }
+    return updated.settings;
+  }
 }

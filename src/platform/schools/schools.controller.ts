@@ -2,10 +2,12 @@ import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/co
 import { SchoolsService } from './schools.service';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
+import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { TenantGuard } from 'src/tenancy/guards/tenant.guard';
 import { PlatformOnly } from 'src/tenancy/decorators/platform-only.decorator';
 import { Public } from 'src/auth/decorators/public.decorator';
+import { CurrentSchool } from 'src/tenancy/decorators/current-school.decorator';
 
 @Controller()
 export class SchoolsController {
@@ -50,5 +52,20 @@ export class SchoolsController {
   @UseGuards(JwtAuthGuard, TenantGuard)
   async activate(@Param('id') id: string) {
     return this.schoolsService.update(id, { isActive: true, subscriptionStatus: 'active' });
+  }
+
+  @Get('schools/me/settings')
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  async getMySettings(@CurrentSchool() schoolId: string) {
+    return this.schoolsService.getMySettings(schoolId);
+  }
+
+  @Patch('schools/me/settings')
+  @UseGuards(JwtAuthGuard, TenantGuard)
+  async updateMySettings(
+    @CurrentSchool() schoolId: string,
+    @Body() updateSettingsDto: UpdateSchoolSettingsDto,
+  ) {
+    return this.schoolsService.updateMySettings(schoolId, updateSettingsDto);
   }
 }
