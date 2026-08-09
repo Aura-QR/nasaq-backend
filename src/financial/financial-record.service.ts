@@ -77,16 +77,32 @@ export class FinancialRecordService {
   // schoolId is passed explicitly rather than read from AsyncLocalStorage because
   // ALS context may not reliably propagate through all NestJS interceptor boundaries.
   async createOrUpdateRecord(studentId: string, classId: string, schoolId: string): Promise<void> {
-    const student = await this.studentModel.findById(studentId).exec();
+    const schoolOid = new mongoose.Types.ObjectId(schoolId);
+
+    // All queries below use explicit schoolId + skipTenantScope: true.
+    // Without this, the tenantScopedPlugin's fallback branch injects { schoolId: null }
+    // when AsyncLocalStorage has no active store (common inside Observable-wrapped handlers),
+    // causing every lookup to silently return null.
+    const student = await this.studentModel
+      .findOne({ _id: new mongoose.Types.ObjectId(studentId), schoolId: schoolOid })
+      .setOptions({ skipTenantScope: true })
+      .exec();
     if (!student) return;
 
-    const cls = await this.classModel.findById(classId).exec();
+    const cls = await this.classModel
+      .findOne({ _id: new mongoose.Types.ObjectId(classId), schoolId: schoolOid })
+      .setOptions({ skipTenantScope: true })
+      .exec();
     if (!cls) return;
 
-    const feeConfig = await this.feeConfigModel.findOne({
-      academicYearId: cls.academicYearId,
-      gradeLevelId: cls.gradeLevelId,
-    }).exec();
+    const feeConfig = await this.feeConfigModel
+      .findOne({
+        schoolId: schoolOid,
+        academicYearId: cls.academicYearId,
+        gradeLevelId: cls.gradeLevelId,
+      })
+      .setOptions({ skipTenantScope: true })
+      .exec();
     if (!feeConfig) {
       throw new BadRequestException(
         `لا توجد معايير رسوم للعام الدراسي والمرحلة الدراسية المحددة. يرجى إنشاؤها أولاً قبل إضافة الطالب للفصل.`,
@@ -95,10 +111,16 @@ export class FinancialRecordService {
 
     let plan: InstallmentPlan | null = null;
     if ((student as any).installmentPlanId) {
-      plan = await this.planModel.findById((student as any).installmentPlanId).exec();
+      plan = await this.planModel
+        .findOne({ _id: (student as any).installmentPlanId, schoolId: schoolOid })
+        .setOptions({ skipTenantScope: true })
+        .exec();
     }
     if (!plan) {
-      plan = await this.planModel.findOne({ isDefault: true, isActive: true }).exec();
+      plan = await this.planModel
+        .findOne({ schoolId: schoolOid, isDefault: true, isActive: true })
+        .setOptions({ skipTenantScope: true })
+        .exec();
     }
     if (!plan) {
       throw new BadRequestException(
@@ -110,43 +132,46 @@ export class FinancialRecordService {
     const studentOid = new mongoose.Types.ObjectId(studentId);
     const classOid = new mongoose.Types.ObjectId(classId);
 
-    // schoolId is passed in explicitly — do NOT read from AsyncLocalStorage here.
-    // ALS context is not guaranteed to propagate reliably across all async
-    // boundaries inside NestJS interceptor-wrapped Observables.
-    const schoolOid = new mongoose.Types.ObjectId(schoolId);
-
     // Use findOneAndUpdate with upsert to make this atomic and avoid race conditions.
     // $setOnInsert only runs when a new document is created; $set runs on both create and update.
-    const existing = await this.recordModel.findOneAndUpdate(
-      { studentId: studentOid, academicYearId: cls.academicYearId },
-      {
-        $set: {
-          classId: classOid,
-          feeConfigId: feeConfig._id,
-          installmentPlanId: planId,
-        },
-        $setOnInsert: {
-          schoolId: schoolOid,
-          tuition: {
-            fee: feeConfig.tuitionFee,
-            netFee: feeConfig.tuitionFee,
-            status: FeeStatus.UNPAID,
-            totalPaid: 0,
-            installments: this.buildInstallments(feeConfig.tuitionFee, plan),
+    // schoolId is in both the filter (so MongoDB includes it in the upserted document)
+    // AND in $setOnInsert (belt-and-suspenders for safety).
+    const existing = await this.recordModel
+      .findOneAndUpdate(
+        { schoolId: schoolOid, studentId: studentOid, academicYearId: cls.academicYearId },
+        {
+          $set: {
+            classId: classOid,
+            feeConfigId: feeConfig._id,
+            installmentPlanId: planId,
           },
-          bus: { enrolled: false, serviceType: 'both', fee: 0, netFee: 0, totalPaid: 0, status: FeeStatus.UNPAID, installments: [] },
-          trips: [],
+          $setOnInsert: {
+            schoolId: schoolOid,
+            tuition: {
+              fee: feeConfig.tuitionFee,
+              netFee: feeConfig.tuitionFee,
+              status: FeeStatus.UNPAID,
+              totalPaid: 0,
+              installments: this.buildInstallments(feeConfig.tuitionFee, plan),
+            },
+            bus: { enrolled: false, serviceType: 'both', fee: 0, netFee: 0, totalPaid: 0, status: FeeStatus.UNPAID, installments: [] },
+            trips: [],
+          },
         },
-      },
-      { upsert: true, new: false },
-    ).exec();
+        { upsert: true, new: false, skipTenantScope: true } as any,
+      )
+      .exec();
 
     // If the record already existed (existing !== null), check if the fee config changed
     // and rebuild unpaid installments accordingly.
     if (existing) {
-      const feeChanged = existing.feeConfigId.toString() !== (feeConfig._id as mongoose.Types.ObjectId).toString();
+      const feeChanged = (existing as any).feeConfigId?.toString() !== (feeConfig._id as mongoose.Types.ObjectId).toString();
+
       if (feeChanged) {
-        const record = await this.recordModel.findOne({ studentId: studentOid, academicYearId: cls.academicYearId }).exec();
+        const record = await this.recordModel
+          .findOne({ schoolId: schoolOid, studentId: studentOid, academicYearId: cls.academicYearId })
+          .setOptions({ skipTenantScope: true })
+          .exec();
         if (record) {
           record.tuition.fee = feeConfig.tuitionFee;
           record.tuition.netFee = feeConfig.tuitionFee;
