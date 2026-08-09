@@ -31,11 +31,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       } else {
         message = exceptionResponse as string;
       }
-    } else if (exception?.code === 11000 || exception?.name === 'MongoServerError') {
+    } else if (exception?.code === 11000) {
       // MongoDB duplicate key error — map to 409 Conflict
       status = HttpStatus.CONFLICT;
       message = 'البيانات المُدخلة مكررة — يوجد سجل بنفس المعلومات مسبقاً';
     } else {
+      console.error('[GlobalExceptionFilter] Unhandled exception:', exception);
       message = exception.message || 'خطأ داخلي في الخادم';
     }
 
