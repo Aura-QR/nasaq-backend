@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, Model } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { AdditionalFee, AdditionalFeeTarget } from './schemas/additional-fee.schema';
 import { StudentFinancialRecord } from './schemas/student-financial-record.schema';
@@ -12,7 +12,6 @@ import { PaymentStatus } from './enums/payment-status.enum';
 @Injectable()
 export class AdditionalFeeService {
   constructor(
-    @InjectConnection() private readonly connection: Connection,
     @InjectModel(AdditionalFee.name) private additionalFeeModel: Model<AdditionalFee>,
     @InjectModel(StudentFinancialRecord.name) private recordModel: Model<StudentFinancialRecord>,
     @InjectModel(Student.name) private studentModel: Model<Student>,
@@ -78,7 +77,7 @@ export class AdditionalFeeService {
   }
 
   async create(dto: CreateAdditionalFeeDto, adminId: string) {
-    // Guard against duplicate fee name within the same school (to avoid ambiguous 409 from stale DB indexes)
+    // Guard against duplicate fee name within the same school
     const existing = await this.additionalFeeModel.findOne({ name: dto.name }).lean().exec();
     if (existing) {
       throw new BadRequestException(`رسوم إضافية باسم "${dto.name}" موجودة مسبقاً — استخدم اسماً مختلفاً`);
@@ -87,51 +86,41 @@ export class AdditionalFeeService {
     const studentIds = await this.getAffectedStudentIds(dto);
     if (studentIds.length === 0) throw new BadRequestException('لا يوجد طلاب في النطاق المحدد');
 
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    const targetIdObj = (dto.targetId && mongoose.Types.ObjectId.isValid(dto.targetId))
+      ? new mongoose.Types.ObjectId(dto.targetId)
+      : null;
+
+    const fee = await this.additionalFeeModel.create({
+      ...dto,
+      targetId: targetIdObj,
+      createdBy: new mongoose.Types.ObjectId(adminId),
+    });
+
+    const entry = {
+      additionalFeeId: fee._id,
+      name: fee.name,
+      description: fee.description,
+      amount: fee.amount,
+      status: 'unpaid',
+      paidAmount: 0,
+      payments: [],
+    };
 
     try {
-      const targetIdObj = (dto.targetId && mongoose.Types.ObjectId.isValid(dto.targetId))
-        ? new mongoose.Types.ObjectId(dto.targetId)
-        : null;
-
-      const [fee] = await this.additionalFeeModel.create(
-        [{
-          ...dto,
-          targetId: targetIdObj,
-          createdBy: new mongoose.Types.ObjectId(adminId),
-        }],
-        { session },
-      );
-
-      const entry = {
-        additionalFeeId: fee._id,
-        name: fee.name,
-        description: fee.description,
-        amount: fee.amount,
-        status: 'unpaid',
-        paidAmount: 0,
-        payments: [],
-      };
-
       await this.recordModel.updateMany(
         { studentId: { $in: studentIds } },
         { $push: { additionalFees: entry } },
-        { session },
       );
-
-      await session.commitTransaction();
-
-      return {
-        message: `تم إنشاء الرسوم الإضافية وإضافتها لـ ${studentIds.length} طالب`,
-        data: fee,
-      };
     } catch (err) {
-      await session.abortTransaction();
+      // Rollback: remove the fee if student records update failed
+      await this.additionalFeeModel.findByIdAndDelete(fee._id).exec();
       throw err;
-    } finally {
-      session.endSession();
     }
+
+    return {
+      message: `تم إنشاء الرسوم الإضافية وإضافتها لـ ${studentIds.length} طالب`,
+      data: fee,
+    };
   }
 
   async find() {
