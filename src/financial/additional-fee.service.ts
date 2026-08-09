@@ -48,14 +48,13 @@ export class AdditionalFeeService {
       }
 
       case AdditionalFeeTarget.ACADEMIC_YEAR: {
-        const yearParam = dto.targetAcademicYear || dto.targetId;
-        if (!yearParam) throw new BadRequestException('targetAcademicYear أو targetId مطلوب عند الاستهداف بسنة دراسية');
-        let classFilter: any = {};
-        if (mongoose.Types.ObjectId.isValid(yearParam)) {
-          classFilter = { academicYearId: new mongoose.Types.ObjectId(yearParam) };
-        } else {
-          classFilter = { academicYear: yearParam };
+        // Accept either targetId or targetAcademicYear — both must be a valid ObjectId
+        const yearParam = dto.targetId || dto.targetAcademicYear;
+        if (!yearParam) throw new BadRequestException('targetId مطلوب عند الاستهداف بسنة دراسية (أرسل معرف السنة الدراسية في targetId)');
+        if (!mongoose.Types.ObjectId.isValid(yearParam)) {
+          throw new BadRequestException('معرف السنة الدراسية غير صحيح — أرسل ObjectId الخاص بالسنة الدراسية في حقل targetId');
         }
+        const classFilter = { academicYearId: new mongoose.Types.ObjectId(yearParam) };
         const classes = await this.classModel.find(classFilter, { _id: 1 }).lean().exec();
         const classIds = classes.map((c: any) => c._id);
         if (classIds.length === 0) return [];
@@ -79,6 +78,12 @@ export class AdditionalFeeService {
   }
 
   async create(dto: CreateAdditionalFeeDto, adminId: string) {
+    // Guard against duplicate fee name within the same school (to avoid ambiguous 409 from stale DB indexes)
+    const existing = await this.additionalFeeModel.findOne({ name: dto.name }).lean().exec();
+    if (existing) {
+      throw new BadRequestException(`رسوم إضافية باسم "${dto.name}" موجودة مسبقاً — استخدم اسماً مختلفاً`);
+    }
+
     const studentIds = await this.getAffectedStudentIds(dto);
     if (studentIds.length === 0) throw new BadRequestException('لا يوجد طلاب في النطاق المحدد');
 
