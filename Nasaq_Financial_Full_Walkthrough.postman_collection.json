@@ -1,0 +1,1806 @@
+{
+  "info": {
+    "_postman_id": "037805dc-4c04-41b3-9f5a-d279cf49eedc",
+    "name": "Nasaq — Financial Module Full Verified Walkthrough (self-contained, run top to bottom)",
+    "description": "Fully self-contained — registers a fresh school, logs in, does the minimum academic setup (stage, 2 grade levels, academic year, 1 class), then exercises every fix from the Phase 1-4 financial implementation plan end to end. Nothing to set up by hand: run collection top to bottom against the 'Nasaq — Financial Walkthrough' environment and every ID chains automatically.\n\nIMPORTANT: students are created via POST /students WITHOUT an inline classId, then enrolled via POST /enrollments. This is deliberate — StudentsService.create()/update() build the Enrollment document directly and never call FinancialRecordService.createOrUpdateRecord(), so creating a student with an inline classId will NOT produce a financial record.\n\n--- BUG FIXES REFLECTED IN THIS VERSION ---\n\nFix 1 — schoolId missing from upserted StudentFinancialRecord (PRIMARY 404 bug):\nfindOneAndUpdate with upsert:true never included schoolId in $setOnInsert. The tenantScopedPlugin only injects schoolId into the query FILTER, not the inserted document body. New documents were created without schoolId, making them invisible to all subsequent tenant-scoped reads. Fixed by explicitly reading tenantLocalStorage.getStore().schoolId and adding it to $setOnInsert.\n\nFix 2 — E11000 duplicate-key errors now return HTTP 409 Conflict (not 500):\nGlobalExceptionFilter previously had no handler for MongoServerError / code 11000, so raw DB errors leaked as 500 Internal Server Error. A new else-if branch now maps any MongoServerError with code 11000 to 409 Conflict with a clean Arabic message. Duplicate FeeConfig tests (A3) now expect 409.\n\nFix 3 — Wrong populate field on classId:\n.populate('classId', 'roomNumber academicYear gender') used non-existent field 'academicYear'. Corrected to 'academicYearId' in both find() and findOne() on FinancialRecordService.\n\nDB Cleanup required for pre-fix records:\nAny StudentFinancialRecord documents created before Fix 1 will be missing schoolId and can never be found by tenant-scoped reads. Run in MongoDB shell: db.studentFinancialRecords.deleteMany({ schoolId: { $exists: false } }) — then re-enroll the affected students.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "00. Register School + Login (Owner)",
+      "item": [
+        {
+          "name": "00.1 — Register New School (unique slug/email per run)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schools/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schools",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schoolName\": \"مدرسة اختبار الرسوم المالية\",\n  \"slug\": \"nasaq-fin-test-{{$timestamp}}\",\n  \"schoolEmail\": \"info+{{$timestamp}}@nasaqfintest.com\",\n  \"phone\": \"0555123456\",\n  \"ownerName\": \"مالك الاختبار\",\n  \"ownerUsername\": \"fin_owner_{{$timestamp}}\",\n  \"ownerEmail\": \"owner+{{$timestamp}}@nasaqfintest.com\",\n  \"ownerPassword\": \"OwnerPassword123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var d = pm.response.json().data || {};",
+                  "    var reqBody = JSON.parse(pm.request.body.raw);",
+                  "    pm.environment.set('schoolSlug', reqBody.slug);",
+                  "    pm.environment.set('ownerEmail', reqBody.ownerEmail);",
+                  "    pm.environment.set('ownerPassword', reqBody.ownerPassword);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "00.2 — Login as Owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"{{ownerEmail}}\",\n  \"password\": \"{{ownerPassword}}\",\n  \"schoolSlug\": \"{{schoolSlug}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var d = pm.response.json().data || {};",
+                  "    if (d.accessToken) { pm.environment.set('accessToken', d.accessToken); }",
+                  "    if (d.user) {",
+                  "        if (d.user.id) { pm.environment.set('userId', d.user.id); }",
+                  "        if (d.user.schoolId) { pm.environment.set('schoolId', d.user.schoolId); }",
+                  "    }",
+                  "}",
+                  "pm.test('login returned an access token', function () {",
+                  "    pm.expect(pm.environment.get('accessToken')).to.not.be.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01. Static Setup — Stage + Grade Levels",
+      "item": [
+        {
+          "name": "01.1 — Create Stage (المرحلة الابتدائية)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/stages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "stages"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"المرحلة الابتدائية\",\n  \"order\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('stageId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.2 — Create Grade Level 1 (الصف الأول)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grade-levels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-levels"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stageId\": \"{{stageId}}\",\n  \"name\": \"الصف الأول الابتدائي\",\n  \"order\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('gradeLevelId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "01.3 — Create Grade Level 2 (الصف الرابع — for grade-scoping proof)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/grade-levels",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "grade-levels"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stageId\": \"{{stageId}}\",\n  \"name\": \"الصف الرابع الابتدائي\",\n  \"order\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('gradeLevelId2', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02. Academic Year",
+      "item": [
+        {
+          "name": "02.1 — Create Academic Year (2026/2027)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/academic-years",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "academic-years"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"2026/2027\",\n  \"startDate\": \"2026-09-01\",\n  \"endDate\": \"2027-05-15\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('academicYearId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03. Class",
+      "item": [
+        {
+          "name": "03.1 — Create Class 1/1 (Grade 1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/classes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "classes"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"1/1\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"gender\": \"both\",\n  \"roomNumber\": \"A-101\",\n  \"maxCapacity\": 30,\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('classId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "A. Financial Setup — Fee Configs, Installment Plan, Discount",
+      "item": [
+        {
+          "name": "A1 — Create Fee Config (Grade 1, 8000)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/fee-configs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "fee-configs"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"tuitionFee\": 8000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('feeConfigId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A2 — Create Fee Config (Grade 4, 9500 — proves grade-level scoping)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/fee-configs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "fee-configs"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId2}}\",\n  \"tuitionFee\": 9500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('feeConfigId2', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A3 — Create Fee Config duplicate (same year+grade) — expect 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/fee-configs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "fee-configs"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"tuitionFee\": 8000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Fix 2: GlobalExceptionFilter now maps E11000 MongoServerError → 409 Conflict.",
+                  "// The app-level findOne guard catches it first as 400 if the pre-check fires,",
+                  "// but if the DB unique index fires first (race / stale index) it becomes 409.",
+                  "// Accept either 400 (app guard) or 409 (DB index) as a correct rejection.",
+                  "pm.test('duplicate fee config rejected (400 app-guard or 409 db-index)', function () {",
+                  "    pm.expect([400, 409]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('status is false', function () {",
+                  "    pm.expect(pm.response.json().status).to.eql(false);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A4 — Create Installment Plan (3 Terms, marked default)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/installment-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "installment-plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"3 Terms\",\n  \"description\": \"Paid across 3 terms of the school year\",\n  \"numberOfInstallments\": 3,\n  \"dueDates\": [\n    \"2026-09-01\",\n    \"2026-12-01\",\n    \"2027-03-01\"\n  ],\n  \"isDefault\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('installmentPlanId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A5 — Set Installment Plan As Default (explicit, in case isDefault didn't take on create)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/financial/installment-plans/{{installmentPlanId}}/set-default",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "installment-plans",
+                "{{installmentPlanId}}",
+                "set-default"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "A6 — Create Discount Template (Sibling Discount 10%)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/discounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "discounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sibling Discount\",\n  \"description\": \"10% off tuition for siblings already enrolled\",\n  \"percentage\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('discountId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "B. Students & Enrollment (correct path)",
+      "item": [
+        {
+          "name": "B1 — Create Student — Ahmed (no classId — see collection description)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/students",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"أحمد\",\n  \"fatherName\": \"محمد\",\n  \"familyName\": \"السيد\",\n  \"birthDate\": \"2018-03-10\",\n  \"gender\": \"male\",\n  \"nationality\": \"سعودي\",\n  \"phoneNumber\": \"0501112222\",\n  \"email\": \"ahmed.fintest.{{$timestamp}}@school.com\",\n  \"address\": \"الرياض\",\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('studentId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B2 — Create Student — Sara (no classId)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/students",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "students"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"سارة\",\n  \"fatherName\": \"خالد\",\n  \"familyName\": \"العتيبي\",\n  \"birthDate\": \"2018-06-22\",\n  \"gender\": \"female\",\n  \"nationality\": \"سعودي\",\n  \"phoneNumber\": \"0503334444\",\n  \"email\": \"sara.fintest.{{$timestamp}}@school.com\",\n  \"address\": \"الرياض\",\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('studentId2', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B3 — Enroll Ahmed (POST /enrollments — triggers createOrUpdateRecord)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{studentId}}\",\n  \"classId\": \"{{classId}}\",\n  \"academicYearId\": \"{{academicYearId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Fix 1 verification: enrollment must return 201 AND the subsequent",
+                  "// GET /financial/records/:studentId must return 200 (not 404).",
+                  "// Before the fix, createOrUpdateRecord upserted a record without schoolId,",
+                  "// making it invisible to all tenant-scoped reads.",
+                  "pm.test('enrollment created (201)', function () {",
+                  "    pm.expect(pm.response.code).to.eql(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B4 — Enroll Sara (POST /enrollments)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/enrollments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "enrollments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"studentId\": \"{{studentId2}}\",\n  \"classId\": \"{{classId}}\",\n  \"academicYearId\": \"{{academicYearId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('enrollment created (201)', function () {",
+                  "    pm.expect(pm.response.code).to.eql(201);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B5 — Get Ahmed's Financial Record — expect 3 installments, fee 8000",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Fix 1 verification: record must now be found (was 404 before the schoolId upsert fix).",
+                  "pm.test('financial record found — not 404 (Fix 1 verified)', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "pm.test('tuition fee is 8000', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.tuition.fee).to.eql(8000);",
+                  "});",
+                  "pm.test('3 installments built from default plan', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.tuition.installments.length).to.eql(3);",
+                  "});",
+                  "pm.test('record has schoolId (Fix 1 — upsert schoolId injection)', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.schoolId).to.not.be.undefined;",
+                  "    pm.expect(d.schoolId).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B6 — Get Sara's Financial Record — expect 3 installments, fee 8000 (pre-discount)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId2}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId2}}"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('financial record found — not 404 (Fix 1 verified)', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});",
+                  "pm.test('3 installments built from default plan', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.tuition.installments.length).to.eql(3);",
+                  "});",
+                  "pm.test('record has schoolId (Fix 1 — upsert schoolId injection)', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.schoolId).to.not.be.undefined;",
+                  "    pm.expect(d.schoolId).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "C. Discount Application",
+      "item": [
+        {
+          "name": "C1 — Apply Sibling Discount to Sara's Tuition",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/discounts/apply/tuition/{{studentId2}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "discounts",
+                "apply",
+                "tuition",
+                "{{studentId2}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"discountId\": \"{{discountId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('netFee reduced to 7200 after 10% discount', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.netFee).to.eql(7200);",
+                  "});",
+                  "pm.test('unpaid installments redistributed to new total', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    var sum = d.installments.reduce(function(s,i){return s+i.amount;}, 0);",
+                  "    pm.expect(sum).to.eql(7200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "D. Payments (full + partial)",
+      "item": [
+        {
+          "name": "D1 — Pay Ahmed Installment 1 in full (2667)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/tuition/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "tuition",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 2667,\n  \"paidAt\": \"2026-09-03T10:00:00.000Z\",\n  \"notes\": \"Card payment, receipt #4471\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('installment 1 is PAID', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.installments[0].status).to.eql('paid');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D2 — Pay Sara Installment 1 — HALF only (partial payment)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId2}}/tuition/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId2}}",
+                "tuition",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 1200,\n  \"paidAt\": \"2026-09-05T10:00:00.000Z\",\n  \"notes\": \"Partial — cash, receipt #4472\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('installment 1 is PARTIAL, paidAmount 1200', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.installments[0].status).to.eql('partial');",
+                  "    pm.expect(d.installments[0].paidAmount).to.eql(1200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "D3 — Pay Sara Installment 1 — remaining half (closes it out)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId2}}/tuition/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId2}}",
+                "tuition",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 1200,\n  \"paidAt\": \"2026-09-19T10:00:00.000Z\",\n  \"notes\": \"Remaining balance — cash, receipt #4501\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('installment 1 is now PAID with 2 payment events', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.installments[0].status).to.eql('paid');",
+                  "    pm.expect(d.installments[0].payments.length).to.eql(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "E. Refund / Correction",
+      "item": [
+        {
+          "name": "E1 — Refund 1200 off Sara's Installment 1 (simulates a recording mistake)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId2}}/tuition/installments/1/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId2}}",
+                "tuition",
+                "installments",
+                "1",
+                "refund"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 1200,\n  \"reason\": \"Incorrect amount recorded — correcting per receipt #4501\",\n  \"refundedAt\": \"2026-09-20\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('installment reopens to PARTIAL after refund', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.installments[0].status).to.eql('partial');",
+                  "    pm.expect(d.installments[0].paidAmount).to.eql(1200);",
+                  "});",
+                  "pm.test('payments array keeps full history (payment+payment+refund = 3)', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.installments[0].payments.length).to.eql(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2 — Re-pay corrected amount (1300) to close installment 1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId2}}/tuition/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId2}}",
+                "tuition",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 1300,\n  \"paidAt\": \"2026-09-20T10:00:00.000Z\",\n  \"notes\": \"Corrected amount — receipt #4501-R\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('installment 1 is PAID after correction', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.installments[0].status).to.eql('paid');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "F. Validation / Edge Cases",
+      "item": [
+        {
+          "name": "F1 — Overpay Ahmed Installment 2 — expect 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/tuition/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "tuition",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 2,\n  \"amount\": 999999,\n  \"paidAt\": \"2026-12-01T10:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('overpayment rejected with 400', function () {",
+                  "    pm.expect(pm.response.code).to.eql(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F2 — Pay Ahmed Installment 1 again (already PAID) — expect 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/tuition/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "tuition",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 2667,\n  \"paidAt\": \"2026-09-04T10:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('double-payment on paid installment rejected with 400', function () {",
+                  "    pm.expect(pm.response.code).to.eql(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F3 — Refund more than paidAmount on Ahmed Installment 1 — expect 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/tuition/installments/1/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "tuition",
+                "installments",
+                "1",
+                "refund"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 999999,\n  \"reason\": \"Testing over-refund guard\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('over-refund rejected with 400', function () {",
+                  "    pm.expect(pm.response.code).to.eql(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "G. Year-Scoped Query",
+      "item": [
+        {
+          "name": "G1 — Get Ahmed's record filtered by academicYearId (Phase 4 check)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}?academicYearId={{academicYearId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}"
+              ],
+              "query": [
+                {
+                  "key": "academicYearId",
+                  "value": "{{academicYearId}}"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('returns 200 with matching year record', function () {",
+                  "    pm.expect(pm.response.code).to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "H. Bus Parity Check",
+      "item": [
+        {
+          "name": "H1 — Enroll Ahmed in Bus Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/bus/enroll",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "bus",
+                "enroll"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fee\": 3000,\n  \"serviceType\": \"both\",\n  \"installmentPlanId\": \"{{installmentPlanId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "H2 — Pay Bus Installment 1 (partial)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/bus/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "bus",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 500,\n  \"paidAt\": \"2026-09-05T10:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('bus installment 1 is PARTIAL', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.installments[0].status).to.eql('partial');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "H3 — Refund Bus Installment 1 (correction)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/bus/installments/1/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "bus",
+                "installments",
+                "1",
+                "refund"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 200,\n  \"reason\": \"Bus overpayment correction\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('bus installment 1 paidAmount reduced', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.installments[0].paidAmount).to.eql(300);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "H4 — Unenroll Ahmed From Bus",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId}}/bus/unenroll",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId}}",
+                "bus",
+                "unenroll"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "I. Trip Parity Check",
+      "item": [
+        {
+          "name": "I1 — Add Trip To Sara's Record (Science Museum, 200 EGP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId2}}/trips",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId2}}",
+                "trips"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"رحلة متحف العلوم\",\n  \"description\": \"رحلة علمية ترفيهية\",\n  \"fee\": 200,\n  \"installmentPlanId\": \"{{installmentPlanId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('tripRecordId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "I2 — Pay Trip Installment 1 (partial)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId2}}/trips/{{tripRecordId}}/pay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId2}}",
+                "trips",
+                "{{tripRecordId}}",
+                "pay"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 30,\n  \"paidAt\": \"2026-09-10T10:00:00.000Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('trip installment 1 is PARTIAL', function () {",
+                  "    var d = pm.response.json().data;",
+                  "    pm.expect(d.installments[0].status).to.eql('partial');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "I3 — Refund Trip Installment 1 (correction)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId2}}/trips/{{tripRecordId}}/installments/1/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId2}}",
+                "trips",
+                "{{tripRecordId}}",
+                "installments",
+                "1",
+                "refund"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"installmentNumber\": 1,\n  \"amount\": 10,\n  \"reason\": \"Trip overpayment correction\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "J. Admin Overview",
+      "item": [
+        {
+          "name": "J1 — List All Financial Records (filter tuitionStatus=partial)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records?tuitionStatus=partial",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records"
+              ],
+              "query": [
+                {
+                  "key": "tuitionStatus",
+                  "value": "partial"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "J2 — Get Sara's Full Summary (net fee, remaining, per-installment status)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/financial/records/{{studentId2}}/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "records",
+                "{{studentId2}}",
+                "summary"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

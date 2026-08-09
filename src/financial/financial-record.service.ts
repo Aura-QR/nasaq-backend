@@ -12,6 +12,7 @@ import { RecordPaymentDto } from './dto/record-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
 import { getPagination } from '../pagination/common/paginationUtils';
+import { tenantLocalStorage } from '../tenancy/tenant-storage';
 
 @Injectable()
 export class FinancialRecordService {
@@ -108,6 +109,17 @@ export class FinancialRecordService {
     const studentOid = new mongoose.Types.ObjectId(studentId);
     const classOid = new mongoose.Types.ObjectId(classId);
 
+    // Resolve the schoolId from the tenant context — the tenant plugin injects schoolId
+    // into query FILTERS automatically, but $setOnInsert is part of the update payload
+    // and is NOT processed by the plugin. Without explicitly setting it here, an upserted
+    // document would be created without schoolId, making it invisible to all future
+    // tenant-scoped reads (which always filter by schoolId from the ALS store).
+    const store = tenantLocalStorage.getStore();
+    if (!store?.schoolId) {
+      throw new BadRequestException('Tenant context missing: cannot create financial record without schoolId.');
+    }
+    const schoolOid = new mongoose.Types.ObjectId(store.schoolId);
+
     // Use findOneAndUpdate with upsert to make this atomic and avoid race conditions.
     // $setOnInsert only runs when a new document is created; $set runs on both create and update.
     const existing = await this.recordModel.findOneAndUpdate(
@@ -119,6 +131,7 @@ export class FinancialRecordService {
           installmentPlanId: planId,
         },
         $setOnInsert: {
+          schoolId: schoolOid,
           tuition: {
             fee: feeConfig.tuitionFee,
             netFee: feeConfig.tuitionFee,
@@ -189,7 +202,7 @@ export class FinancialRecordService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYear gender')
+      .populate('classId', 'roomNumber academicYearId gender')
       .populate('installmentPlanId', 'name numberOfInstallments');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
@@ -212,7 +225,7 @@ export class FinancialRecordService {
       .findOne(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYear gender')
+      .populate('classId', 'roomNumber academicYearId gender')
       .populate('installmentPlanId', 'name numberOfInstallments dueDates')
       .lean()
       .exec();
