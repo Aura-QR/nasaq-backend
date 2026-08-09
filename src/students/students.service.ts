@@ -116,6 +116,7 @@ export class StudentsService {
           await this.financialRecordService.createOrUpdateRecord(
             (student._id as any).toString(),
             (targetClass._id as any).toString(),
+            (targetClass as any).schoolId?.toString() ?? '',
           );
         } catch (error: any) {
           console.warn(
@@ -297,6 +298,7 @@ export class StudentsService {
           await this.financialRecordService.createOrUpdateRecord(
             (student._id as any).toString(),
             (targetClass._id as any).toString(),
+            (targetClass as any).schoolId?.toString() ?? '',
           );
         } catch (error: any) {
           console.warn(

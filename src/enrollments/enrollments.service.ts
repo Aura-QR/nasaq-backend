@@ -70,14 +70,15 @@ export class EnrollmentsService {
 
     const savedEnrollment = await enrollment.save();
 
-    // Create/update the student's financial record for this academic year
-    try {
-      await this.financialRecordService.createOrUpdateRecord(studentId, classId);
-    } catch (error: any) {
-      // Log but don't fail enrollment — FeeConfig or InstallmentPlan may not be set up yet
-      console.warn(
-        `[Enrollment] Financial record creation skipped for student ${studentId}: ${error.message}`,
-      );
+    // Create/update the student's financial record for this academic year.
+    // schoolId is read from the class document (which is already tenant-scoped)
+    // and passed explicitly — do NOT rely on AsyncLocalStorage inside the service.
+    // Re-throw any error here so the client gets a clear 400 explaining WHY
+    // (missing FeeConfig or InstallmentPlan) instead of silently returning 201
+    // and then getting a 404 on every subsequent financial record read.
+    const schoolIdStr = (targetClass as any).schoolId?.toString();
+    if (schoolIdStr) {
+      await this.financialRecordService.createOrUpdateRecord(studentId, classId, schoolIdStr);
     }
 
     // Keep student.classId synchronized
@@ -268,13 +269,18 @@ export class EnrollmentsService {
         await enrollment.save();
         createdDocs.push(enrollment);
 
-        // Create/update the student's financial record for the new academic year
-        try {
-          await this.financialRecordService.createOrUpdateRecord(promo.studentId, promo.targetClassId);
-        } catch (financialError: any) {
-          console.warn(
-            `[BulkPromote] Financial record creation skipped for student ${promo.studentId}: ${financialError.message}`,
-          );
+        // Create/update the student's financial record for the new academic year.
+        // Look up the target class to get its schoolId, then pass it explicitly.
+        const targetCls = await this.classModel.findById(promo.targetClassId).exec();
+        const schoolIdStr = targetCls ? (targetCls as any).schoolId?.toString() : undefined;
+        if (schoolIdStr) {
+          try {
+            await this.financialRecordService.createOrUpdateRecord(promo.studentId, promo.targetClassId, schoolIdStr);
+          } catch (financialError: any) {
+            console.warn(
+              `[BulkPromote] Financial record creation skipped for student ${promo.studentId}: ${financialError.message}`,
+            );
+          }
         }
       } catch (err: any) {
         errors.push({

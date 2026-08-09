@@ -12,7 +12,6 @@ import { RecordPaymentDto } from './dto/record-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
 import { getPagination } from '../pagination/common/paginationUtils';
-import { tenantLocalStorage } from '../tenancy/tenant-storage';
 
 @Injectable()
 export class FinancialRecordService {
@@ -74,8 +73,10 @@ export class FinancialRecordService {
     }];
   }
 
-  // Called by ClassesService when a student is added to a class
-  async createOrUpdateRecord(studentId: string, classId: string): Promise<void> {
+  // Called by EnrollmentsService when a student is enrolled into a class.
+  // schoolId is passed explicitly rather than read from AsyncLocalStorage because
+  // ALS context may not reliably propagate through all NestJS interceptor boundaries.
+  async createOrUpdateRecord(studentId: string, classId: string, schoolId: string): Promise<void> {
     const student = await this.studentModel.findById(studentId).exec();
     if (!student) return;
 
@@ -109,16 +110,10 @@ export class FinancialRecordService {
     const studentOid = new mongoose.Types.ObjectId(studentId);
     const classOid = new mongoose.Types.ObjectId(classId);
 
-    // Resolve the schoolId from the tenant context — the tenant plugin injects schoolId
-    // into query FILTERS automatically, but $setOnInsert is part of the update payload
-    // and is NOT processed by the plugin. Without explicitly setting it here, an upserted
-    // document would be created without schoolId, making it invisible to all future
-    // tenant-scoped reads (which always filter by schoolId from the ALS store).
-    const store = tenantLocalStorage.getStore();
-    if (!store?.schoolId) {
-      throw new BadRequestException('Tenant context missing: cannot create financial record without schoolId.');
-    }
-    const schoolOid = new mongoose.Types.ObjectId(store.schoolId);
+    // schoolId is passed in explicitly — do NOT read from AsyncLocalStorage here.
+    // ALS context is not guaranteed to propagate reliably across all async
+    // boundaries inside NestJS interceptor-wrapped Observables.
+    const schoolOid = new mongoose.Types.ObjectId(schoolId);
 
     // Use findOneAndUpdate with upsert to make this atomic and avoid race conditions.
     // $setOnInsert only runs when a new document is created; $set runs on both create and update.
