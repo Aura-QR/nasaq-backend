@@ -25,6 +25,13 @@ export class InstallmentPlan extends Document {
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
+    ref: 'Discount',
+    default: null,
+  })
+  linkedDiscountId?: mongoose.Types.ObjectId | null;
+
+  @Prop({
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',
     required: true,
   })

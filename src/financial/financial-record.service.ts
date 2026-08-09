@@ -5,6 +5,7 @@ import * as mongoose from 'mongoose';
 import { StudentFinancialRecord } from './schemas/student-financial-record.schema';
 import { FeeConfig } from './schemas/fee-config.schema';
 import { InstallmentPlan } from './schemas/installment-plan.schema';
+import { Discount } from './schemas/discount.schema';
 import { Student } from '../students/schemas/student.schema';
 import { Class } from '../classes/schemas/class.schema';
 import { FinancialTrip } from './schemas/financial-trip.schema';
@@ -19,6 +20,7 @@ export class FinancialRecordService {
     @InjectModel(StudentFinancialRecord.name) private recordModel: Model<StudentFinancialRecord>,
     @InjectModel(FeeConfig.name) private feeConfigModel: Model<FeeConfig>,
     @InjectModel(InstallmentPlan.name) private planModel: Model<InstallmentPlan>,
+    @InjectModel(Discount.name) private discountModel: Model<Discount>,
     @InjectModel(Student.name) private studentModel: Model<Student>,
     @InjectModel(Class.name) private classModel: Model<Class>,
     @InjectModel(FinancialTrip.name) private tripTemplateModel: Model<FinancialTrip>,
@@ -46,7 +48,7 @@ export class FinancialRecordService {
     const remainder = fee - base * n;
     return plan.dueDates.map((dueDate, i) => ({
       installmentNumber: i + 1,
-      amount: i === n - 1 ? base + remainder : base,
+      amount: i < remainder ? base + 1 : base,
       dueDate: new Date(dueDate),
       status: PaymentStatus.PENDING,
       paidAmount: 0,
@@ -128,6 +130,26 @@ export class FinancialRecordService {
       );
     }
 
+    let initialNetFee = feeConfig.tuitionFee;
+    let initialDiscount: any = null;
+
+    if (plan.linkedDiscountId) {
+      const discount = await this.discountModel
+        .findOne({ _id: plan.linkedDiscountId, schoolId: schoolOid })
+        .setOptions({ skipTenantScope: true })
+        .exec();
+      if (discount && discount.isActive) {
+        const discountAmount = Math.round((feeConfig.tuitionFee * discount.percentage) / 100);
+        initialNetFee = feeConfig.tuitionFee - discountAmount;
+        initialDiscount = {
+          discountId: discount._id as mongoose.Types.ObjectId,
+          name: discount.name,
+          percentage: discount.percentage,
+          discountAmount,
+        };
+      }
+    }
+
     const planId = plan._id as mongoose.Types.ObjectId;
     const studentOid = new mongoose.Types.ObjectId(studentId);
     const classOid = new mongoose.Types.ObjectId(classId);
@@ -149,10 +171,11 @@ export class FinancialRecordService {
             schoolId: schoolOid,
             tuition: {
               fee: feeConfig.tuitionFee,
-              netFee: feeConfig.tuitionFee,
+              discount: initialDiscount,
+              netFee: initialNetFee,
               status: FeeStatus.UNPAID,
               totalPaid: 0,
-              installments: this.buildInstallments(feeConfig.tuitionFee, plan),
+              installments: this.buildInstallments(initialNetFee, plan),
             },
             bus: { enrolled: false, serviceType: 'both', fee: 0, netFee: 0, totalPaid: 0, status: FeeStatus.UNPAID, installments: [] },
             trips: [],
@@ -162,21 +185,42 @@ export class FinancialRecordService {
       )
       .exec();
 
-    // If the record already existed (existing !== null), check if the fee config changed
+    // If the record already existed (existing !== null), check if the fee config changed or linked discount applies
     // and rebuild unpaid installments accordingly.
     if (existing) {
-      const feeChanged = (existing as any).feeConfigId?.toString() !== (feeConfig._id as mongoose.Types.ObjectId).toString();
+      const record = await this.recordModel
+        .findOne({ schoolId: schoolOid, studentId: studentOid, academicYearId: cls.academicYearId })
+        .setOptions({ skipTenantScope: true })
+        .exec();
+      if (record) {
+        let modified = false;
+        if (!record.tuition.discount && plan.linkedDiscountId) {
+          const discount = await this.discountModel
+            .findOne({ _id: plan.linkedDiscountId, schoolId: schoolOid })
+            .setOptions({ skipTenantScope: true })
+            .exec();
+          if (discount && discount.isActive) {
+            const discountAmount = Math.round((feeConfig.tuitionFee * discount.percentage) / 100);
+            record.tuition.discount = {
+              discountId: discount._id as mongoose.Types.ObjectId,
+              name: discount.name,
+              percentage: discount.percentage,
+              discountAmount,
+            } as any;
+            record.tuition.netFee = feeConfig.tuitionFee - discountAmount;
+            modified = true;
+          }
+        }
 
-      if (feeChanged) {
-        const record = await this.recordModel
-          .findOne({ schoolId: schoolOid, studentId: studentOid, academicYearId: cls.academicYearId })
-          .setOptions({ skipTenantScope: true })
-          .exec();
-        if (record) {
+        const feeChanged = (existing as any).feeConfigId?.toString() !== (feeConfig._id as mongoose.Types.ObjectId).toString();
+
+        if (feeChanged || modified) {
           record.tuition.fee = feeConfig.tuitionFee;
-          record.tuition.netFee = feeConfig.tuitionFee;
+          if (!record.tuition.discount) {
+            record.tuition.netFee = feeConfig.tuitionFee;
+          }
           const unpaidInstallments = record.tuition.installments.filter(i => i.status !== 'paid');
-          const totalUnpaid = feeConfig.tuitionFee - record.tuition.totalPaid;
+          const totalUnpaid = record.tuition.netFee - record.tuition.totalPaid;
           if (unpaidInstallments.length > 0 && totalUnpaid > 0) {
             const rebuilt = this.buildInstallments(totalUnpaid, plan);
             unpaidInstallments.forEach((inst, i) => {
@@ -223,7 +267,7 @@ export class FinancialRecordService {
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
       .populate('classId', 'roomNumber academicYearId gender')
-      .populate('installmentPlanId', 'name numberOfInstallments');
+      .populate('installmentPlanId', 'name numberOfInstallments linkedDiscountId');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const data = await q.exec();
@@ -246,7 +290,7 @@ export class FinancialRecordService {
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
       .populate('classId', 'roomNumber academicYearId gender')
-      .populate('installmentPlanId', 'name numberOfInstallments dueDates')
+      .populate('installmentPlanId', 'name numberOfInstallments dueDates linkedDiscountId')
       .lean()
       .exec();
     if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
@@ -520,6 +564,20 @@ export class FinancialRecordService {
 
     if (hasAnyTuitionPayment) {
       throw new BadRequestException('لا يمكن تغيير خطة التقسيط بعد سداد أي قسط دراسي');
+    }
+
+    if (plan && plan.linkedDiscountId && !record.tuition.discount) {
+      const discount = await this.discountModel.findById(plan.linkedDiscountId).exec();
+      if (discount && discount.isActive) {
+        const discountAmount = Math.round((record.tuition.fee * discount.percentage) / 100);
+        record.tuition.discount = {
+          discountId: discount._id as mongoose.Types.ObjectId,
+          name: discount.name,
+          percentage: discount.percentage,
+          discountAmount,
+        } as any;
+        record.tuition.netFee = record.tuition.fee - discountAmount;
+      }
     }
 
     const effectiveFee = record.tuition.discount ? record.tuition.netFee : record.tuition.fee;

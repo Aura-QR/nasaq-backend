@@ -5,9 +5,11 @@ import {
   IsBoolean,
   IsDateString,
   IsInt,
+  IsMongoId,
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class UpdateInstallmentPlanDto {
@@ -38,4 +40,10 @@ export class UpdateInstallmentPlanDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @ApiProperty({ required: false, description: 'Optional linked discount MongoID' })
+  @ValidateIf((o, v) => v !== null && v !== undefined)
+  @IsMongoId()
+  @IsOptional()
+  linkedDiscountId?: string | null;
 }

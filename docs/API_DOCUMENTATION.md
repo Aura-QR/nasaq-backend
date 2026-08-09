@@ -1721,6 +1721,7 @@ Create tuition installment plan template.
 | `numberOfInstallments` | `number` | ✅ | Number of installments (min: 1) |
 | `dueDates` | `string[]` | ✅ | Array of ISO Date strings (length MUST match `numberOfInstallments`) |
 | `isDefault` | `boolean` | ❌ | Set as default template (default: `false`) |
+| `linkedDiscountId` | `string` | ❌ | Optional MongoID of a Discount that auto-applies when a student is placed on this plan |
 
 #### `GET /financial/installment-plans` 🛡️
 List installment plans.

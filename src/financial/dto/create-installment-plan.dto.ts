@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsDateString,
   IsInt,
+  IsMongoId,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -42,4 +43,10 @@ export class CreateInstallmentPlanDto {
   @IsBoolean()
   @IsOptional()
   isDefault?: boolean;
+
+  @ApiProperty({ required: false, description: 'Optional linked discount MongoID' })
+  @ValidateIf((o, v) => v !== null && v !== undefined)
+  @IsMongoId()
+  @IsOptional()
+  linkedDiscountId?: string | null;
 }

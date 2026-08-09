@@ -16,6 +16,14 @@ import { tenantLocalStorage } from './tenant-storage';
  * from request data. Never decode/trust a raw Authorization header here or
  * anywhere else — that was the previous (insecure) approach and allowed
  * forged/unsigned tokens to set an arbitrary schoolId.
+ *
+ * ALS PROPAGATION NOTE:
+ * tenantLocalStorage.run() must wrap the `new Observable(...)` construction,
+ * NOT be placed inside it. Constructing a new Observable creates a synchronous
+ * closure that does NOT inherit the caller's async context. If run() is called
+ * inside the Observable factory, the async context it establishes is discarded
+ * before any `await` in the handler runs — causing every tenant-scoped query
+ * to receive { schoolId: null } from the plugin's fallback branch.
  */
 @Injectable()
 export class TenantContextInterceptor implements NestInterceptor {
@@ -28,6 +36,8 @@ export class TenantContextInterceptor implements NestInterceptor {
       isAdminContext: user?.role === 'SUPER_ADMIN',
     };
 
+    // Wrap the Observable construction inside run() so the async context
+    // is active when next.handle() subscribes and all downstream awaits execute.
     return new Observable((subscriber) => {
       tenantLocalStorage.run(store, () => {
         next.handle().subscribe({

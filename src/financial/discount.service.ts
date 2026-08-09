@@ -28,13 +28,14 @@ export class DiscountService {
 
   private redistributeUnpaidInstallments(installments: any[], newBalance: number) {
     const unpaid = installments.filter(i => i.status !== PaymentStatus.PAID);
-    if (unpaid.length === 0) return;
+    const n = unpaid.length;
+    if (n === 0) return;
 
-    const perInstallment = Math.floor(newBalance / unpaid.length);
-    const remainder = newBalance - perInstallment * (unpaid.length - 1);
+    const base = Math.floor(newBalance / n);
+    const remainder = newBalance - base * n;
 
     unpaid.forEach((inst, index) => {
-      inst.amount = index === unpaid.length - 1 ? remainder : perInstallment;
+      inst.amount = index < remainder ? base + 1 : base;
     });
   }
 

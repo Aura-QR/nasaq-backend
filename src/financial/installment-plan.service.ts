@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { InstallmentPlan } from './schemas/installment-plan.schema';
 import { StudentFinancialRecord } from './schemas/student-financial-record.schema';
+import { Discount } from './schemas/discount.schema';
 import { CreateInstallmentPlanDto } from './dto/create-installment-plan.dto';
 import { UpdateInstallmentPlanDto } from './dto/update-installment-plan.dto';
 
@@ -12,6 +13,7 @@ export class InstallmentPlanService {
   constructor(
     @InjectModel(InstallmentPlan.name) private planModel: Model<InstallmentPlan>,
     @InjectModel(StudentFinancialRecord.name) private recordModel: Model<StudentFinancialRecord>,
+    @InjectModel(Discount.name) private discountModel: Model<Discount>,
   ) {}
 
   private validateObjectId(id: string): void {
@@ -26,6 +28,11 @@ export class InstallmentPlanService {
         `عدد تواريخ الاستحقاق (${dto.dueDates.length}) يجب أن يساوي عدد الأقساط (${dto.numberOfInstallments})`,
       );
     }
+    if (dto.linkedDiscountId) {
+      this.validateObjectId(dto.linkedDiscountId);
+      const discount = await this.discountModel.findById(dto.linkedDiscountId).exec();
+      if (!discount) throw new NotFoundException('الخصم المرتبط غير موجود');
+    }
     if (dto.isDefault) {
       await this.planModel.updateMany({}, { isDefault: false }).exec();
     }
@@ -34,13 +41,13 @@ export class InstallmentPlanService {
   }
 
   async find() {
-    const data = await this.planModel.find().sort({ createdAt: -1 }).exec();
+    const data = await this.planModel.find().populate('linkedDiscountId', 'name percentage isActive').sort({ createdAt: -1 }).exec();
     return { message: 'تم استرجاع خطط التقسيط بنجاح', data };
   }
 
   async findOne(id: string) {
     this.validateObjectId(id);
-    const data = await this.planModel.findById(id).exec();
+    const data = await this.planModel.findById(id).populate('linkedDiscountId', 'name percentage isActive').exec();
     if (!data) throw new NotFoundException('خطة التقسيط غير موجودة');
     return { message: 'تم استرجاع خطة التقسيط بنجاح', data };
   }
@@ -49,6 +56,12 @@ export class InstallmentPlanService {
     this.validateObjectId(id);
     const plan = await this.planModel.findById(id).exec();
     if (!plan) throw new NotFoundException('خطة التقسيط غير موجودة');
+
+    if (dto.linkedDiscountId) {
+      this.validateObjectId(dto.linkedDiscountId);
+      const discount = await this.discountModel.findById(dto.linkedDiscountId).exec();
+      if (!discount) throw new NotFoundException('الخصم المرتبط غير موجود');
+    }
 
     const newCount = dto.numberOfInstallments ?? plan.numberOfInstallments;
     const newDates = dto.dueDates ?? plan.dueDates.map(d => d.toISOString());
