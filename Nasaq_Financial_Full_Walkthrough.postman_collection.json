@@ -648,6 +648,104 @@
               }
             }
           ]
+        },
+        {
+          "name": "A6b — Create Full Payment Discount (5%)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/discounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "discounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Full Payment Discount\",\n  \"description\": \"5% off tuition for paying in full upfront\",\n  \"percentage\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('fullPaymentDiscountId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A6c — Create Full Payment Plan (Linked to 5% Discount)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/financial/installment-plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "financial",
+                "installment-plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Full Payment Plan\",\n  \"description\": \"Pay full tuition in 1 installment with auto-applied 5% discount\",\n  \"numberOfInstallments\": 1,\n  \"dueDates\": [\n    \"2026-09-01\"\n  ],\n  \"isDefault\": false,\n  \"linkedDiscountId\": \"{{fullPaymentDiscountId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    var d = jsonData && jsonData.data;",
+                  "    if (d) {",
+                  "        pm.environment.set('fullPaymentPlanId', d._id || d.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
         }
       ]
     },

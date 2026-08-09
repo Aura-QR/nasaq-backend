@@ -30,6 +30,8 @@ export class AdditionalFeeService {
       case AdditionalFeeTarget.STUDENT: {
         if (!dto.targetId) throw new BadRequestException('targetId مطلوب عند الاستهداف بطالب');
         this.validateObjectId(dto.targetId, 'الطالب');
+        const student = await this.studentModel.findById(dto.targetId).lean().exec();
+        if (!student) throw new NotFoundException('الطالب غير موجود');
         return [new mongoose.Types.ObjectId(dto.targetId)];
       }
 
@@ -38,19 +40,40 @@ export class AdditionalFeeService {
         this.validateObjectId(dto.targetId, 'الفصل');
         const cls = await this.classModel.findById(dto.targetId).lean().exec();
         if (!cls) throw new NotFoundException('الفصل غير موجود');
-        return (cls as any).studentIds.map((id: any) => new mongoose.Types.ObjectId(id));
+        const students = await this.studentModel
+          .find({ classId: new mongoose.Types.ObjectId(dto.targetId) }, { _id: 1 })
+          .lean()
+          .exec();
+        return students.map((s: any) => new mongoose.Types.ObjectId(s._id));
       }
 
       case AdditionalFeeTarget.ACADEMIC_YEAR: {
-        if (!dto.targetAcademicYear) throw new BadRequestException('targetAcademicYear مطلوب عند الاستهداف بسنة دراسية');
-        const classes = await this.classModel.find({ academicYear: dto.targetAcademicYear }).lean().exec();
-        const ids = classes.flatMap((c: any) => c.studentIds.map((id: any) => new mongoose.Types.ObjectId(id)));
-        return [...new Map(ids.map(id => [id.toString(), id])).values()];
+        const yearParam = dto.targetAcademicYear || dto.targetId;
+        if (!yearParam) throw new BadRequestException('targetAcademicYear أو targetId مطلوب عند الاستهداف بسنة دراسية');
+        let classFilter: any = {};
+        if (mongoose.Types.ObjectId.isValid(yearParam)) {
+          classFilter = { academicYearId: new mongoose.Types.ObjectId(yearParam) };
+        } else {
+          classFilter = { academicYear: yearParam };
+        }
+        const classes = await this.classModel.find(classFilter, { _id: 1 }).lean().exec();
+        const classIds = classes.map((c: any) => c._id);
+        if (classIds.length === 0) return [];
+        const students = await this.studentModel
+          .find({ classId: { $in: classIds } }, { _id: 1 })
+          .lean()
+          .exec();
+        return students.map((s: any) => new mongoose.Types.ObjectId(s._id));
       }
 
-      case AdditionalFeeTarget.SCHOOL: {
+      case AdditionalFeeTarget.SCHOOL:
+      case AdditionalFeeTarget.ALL: {
         const students = await this.studentModel.find({}, { _id: 1 }).lean().exec();
         return students.map((s: any) => new mongoose.Types.ObjectId(s._id));
+      }
+
+      default: {
+        throw new BadRequestException('نوع الاستهداف غير مدعوم');
       }
     }
   }
@@ -63,10 +86,14 @@ export class AdditionalFeeService {
     session.startTransaction();
 
     try {
+      const targetIdObj = (dto.targetId && mongoose.Types.ObjectId.isValid(dto.targetId))
+        ? new mongoose.Types.ObjectId(dto.targetId)
+        : null;
+
       const [fee] = await this.additionalFeeModel.create(
         [{
           ...dto,
-          targetId: dto.targetId ? new mongoose.Types.ObjectId(dto.targetId) : null,
+          targetId: targetIdObj,
           createdBy: new mongoose.Types.ObjectId(adminId),
         }],
         { session },

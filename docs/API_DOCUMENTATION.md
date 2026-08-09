@@ -1709,7 +1709,8 @@ Create tuition installment plan template.
     "2026-01-01",
     "2026-03-01"
   ],
-  "isDefault": true
+  "isDefault": true,
+  "linkedDiscountId": "6650a1b2c3d4e5f6a7b8c9d0"
 }
 ```
 

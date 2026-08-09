@@ -8,6 +8,7 @@ export enum AdditionalFeeTarget {
   CLASS = 'class',
   ACADEMIC_YEAR = 'academicYear',
   SCHOOL = 'school',
+  ALL = 'all',
 }
 
 @Schema({ collection: 'additionalFees', timestamps: true })
