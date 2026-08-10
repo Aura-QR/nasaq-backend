@@ -10,6 +10,7 @@ import { CreateLibraryDto } from './dto/create-library.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
 import { Library } from './schemas/library.schema';
 import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.schema';
+import { Term } from '../terms/schemas/term.schema';
 import { transformLibraryResponse } from './transforms/response.transform';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
@@ -20,7 +21,7 @@ export class LibraryService {
     path: 'subjectOfferingId',
     populate: [
       { path: 'subjectId', select: 'subjectCode subjectName' },
-      { path: 'termId', select: 'name startDate endDate' },
+      { path: 'termId', select: 'name startDate endDate academicYearId' },
       { path: 'gradeLevelId', select: 'name' },
     ],
   };
@@ -30,6 +31,8 @@ export class LibraryService {
     private readonly libraryModel: Model<Library>,
     @InjectModel(SubjectOffering.name)
     private readonly subjectOfferingModel: Model<SubjectOffering>,
+    @InjectModel(Term.name)
+    private readonly termModel: Model<Term>,
   ) {}
 
   private async validateSubjectOffering(subjectOfferingId?: string): Promise<void> {
@@ -41,6 +44,59 @@ export class LibraryService {
     if (!offering) {
       throw new NotFoundException(`Subject offering with ID ${subjectOfferingId} not found`);
     }
+  }
+
+  private async resolveSubjectOfferingId(
+    subjectOfferingId?: string,
+    subjectId?: string,
+    academicYearId?: string,
+    fallbackOfferingId?: mongoose.Types.ObjectId,
+  ): Promise<string | undefined> {
+    if (subjectOfferingId) {
+      await this.validateSubjectOffering(subjectOfferingId);
+      return subjectOfferingId;
+    }
+
+    let effSubjectId = subjectId;
+    let effAcademicYearId = academicYearId;
+
+    if (!effSubjectId && fallbackOfferingId) {
+      const currentOffering = await this.subjectOfferingModel.findById(fallbackOfferingId);
+      if (currentOffering) {
+        effSubjectId = currentOffering.subjectId.toString();
+      }
+    }
+
+    if (!effSubjectId && !effAcademicYearId) {
+      return undefined;
+    }
+
+    const offeringQuery: any = {};
+    if (effSubjectId) {
+      if (!mongoose.Types.ObjectId.isValid(effSubjectId)) {
+        throw new BadRequestException('صيغة معرف المادة غير صحيحة');
+      }
+      offeringQuery.subjectId = new mongoose.Types.ObjectId(effSubjectId);
+    }
+
+    if (effAcademicYearId) {
+      if (!mongoose.Types.ObjectId.isValid(effAcademicYearId)) {
+        throw new BadRequestException('صيغة معرف السنة الدراسية غير صحيحة');
+      }
+      const terms = await this.termModel
+        .find({ academicYearId: new mongoose.Types.ObjectId(effAcademicYearId) })
+        .select('_id')
+        .exec();
+      const termIds = terms.map((t) => t._id);
+      offeringQuery.termId = { $in: termIds };
+    }
+
+    const offering = await this.subjectOfferingModel.findOne(offeringQuery);
+    if (!offering) {
+      throw new NotFoundException('لم يتم العثور على عرض لهذه المادة للسنة الدراسية المحددة');
+    }
+
+    return offering._id.toString();
   }
 
   private async checkForDuplicate(title: string, link: string, excludeId?: string): Promise<void> {
@@ -55,10 +111,22 @@ export class LibraryService {
   }
 
   async create(createLibraryDto: CreateLibraryDto) {
-    await this.checkForDuplicate(createLibraryDto.title, createLibraryDto.link);
-    await this.validateSubjectOffering(createLibraryDto.subjectOfferingId);
+    const { subjectOfferingId, subjectId, academicYearId, ...libraryFields } = createLibraryDto as any;
 
-    const library = new this.libraryModel(createLibraryDto);
+    const resolvedOfferingId = await this.resolveSubjectOfferingId(
+      subjectOfferingId,
+      subjectId,
+      academicYearId,
+    );
+
+    await this.checkForDuplicate(createLibraryDto.title, createLibraryDto.link);
+
+    const libraryData: any = { ...libraryFields };
+    if (resolvedOfferingId) {
+      libraryData.subjectOfferingId = new mongoose.Types.ObjectId(resolvedOfferingId);
+    }
+
+    const library = new this.libraryModel(libraryData);
     await library.save();
 
     await library.populate(LibraryService.SUBJECT_OFFERING_POPULATE);
@@ -76,29 +144,40 @@ export class LibraryService {
   }
 
   async update(id: string, updateLibraryDto: UpdateLibraryDto) {
+    const currentLibrary = await this.libraryModel.findById(id);
+
+    if (!currentLibrary) {
+      throw new NotFoundException(`Library item with ID ${id} not found`);
+    }
+
     if (updateLibraryDto.title || updateLibraryDto.link) {
-      const currentLibrary = await this.libraryModel.findById(id);
-
-      if (!currentLibrary) {
-        throw new NotFoundException(`Library item with ID ${id} not found`);
-      }
-
       const title = updateLibraryDto.title || currentLibrary.title;
       const link = updateLibraryDto.link || currentLibrary.link;
 
       await this.checkForDuplicate(title, link, id);
     }
 
-    await this.validateSubjectOffering(updateLibraryDto.subjectOfferingId);
+    const { subjectOfferingId, subjectId, academicYearId, ...otherFields } = updateLibraryDto as any;
+
+    let resolvedOfferingId: string | undefined;
+    if (subjectOfferingId || subjectId || academicYearId) {
+      resolvedOfferingId = await this.resolveSubjectOfferingId(
+        subjectOfferingId,
+        subjectId,
+        academicYearId,
+        currentLibrary.subjectOfferingId,
+      );
+    }
+
+    const updatePayload: any = { ...otherFields };
+    if (resolvedOfferingId !== undefined) {
+      updatePayload.subjectOfferingId = new mongoose.Types.ObjectId(resolvedOfferingId);
+    }
 
     const library = await this.libraryModel
-      .findByIdAndUpdate(id, updateLibraryDto, { new: true })
+      .findByIdAndUpdate(id, updatePayload, { new: true })
       .populate(LibraryService.SUBJECT_OFFERING_POPULATE)
       .exec();
-
-    if (!library) {
-      throw new NotFoundException(`Library item with ID ${id} not found`);
-    }
 
     return {
       message: 'Library item updated successfully',
@@ -134,20 +213,46 @@ export class LibraryService {
 
   async filtering(filters: any, pagination: PaginationDto = {}) {
     const query: any = {};
+    const offeringQuery: any = {};
+    let filterByOffering = false;
 
-    const textSearchFields = ['title', 'academicYear'];
-    const referenceFields = ['subjectOfferingId'];
+    if (filters.subjectOfferingId) {
+      if (mongoose.Types.ObjectId.isValid(String(filters.subjectOfferingId))) {
+        query.subjectOfferingId = new mongoose.Types.ObjectId(String(filters.subjectOfferingId));
+      }
+    } else {
+      if (filters.subjectId) {
+        if (mongoose.Types.ObjectId.isValid(String(filters.subjectId))) {
+          offeringQuery.subjectId = new mongoose.Types.ObjectId(String(filters.subjectId));
+          filterByOffering = true;
+        }
+      }
+      if (filters.academicYearId) {
+        if (mongoose.Types.ObjectId.isValid(String(filters.academicYearId))) {
+          const terms = await this.termModel
+            .find({ academicYearId: new mongoose.Types.ObjectId(String(filters.academicYearId)) })
+            .select('_id')
+            .exec();
+          offeringQuery.termId = { $in: terms.map((t) => t._id) };
+          filterByOffering = true;
+        }
+      }
+
+      if (filterByOffering) {
+        const offerings = await this.subjectOfferingModel.find(offeringQuery).select('_id').exec();
+        const offeringIds = offerings.map((o) => o._id);
+        query.subjectOfferingId = { $in: offeringIds };
+      }
+    }
 
     for (const [key, value] of Object.entries(filters)) {
       if (value === undefined || value === null || value === '') continue;
-      if (key === 'page' || key === 'limit') continue;
+      if (['page', 'limit', 'subjectOfferingId', 'subjectId', 'academicYearId'].includes(key)) continue;
 
       const stringValue = String(value);
 
-      if (textSearchFields.includes(key)) {
+      if (key === 'title' || key === 'academicYear') {
         query[key] = { $regex: stringValue, $options: 'i' };
-      } else if (referenceFields.includes(key)) {
-        query[key] = new mongoose.Types.ObjectId(stringValue);
       } else {
         query[key] = stringValue;
       }
@@ -181,5 +286,4 @@ export class LibraryService {
 
     return libraries.map((library) => transformLibraryResponse(library));
   }
-
 }

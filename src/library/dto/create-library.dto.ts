@@ -28,4 +28,20 @@ export class CreateLibraryDto {
     required: false,
   })
   subjectOfferingId?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  @ApiProperty({
+    description: 'The Subject ID (alternative to subjectOfferingId)',
+    required: false,
+  })
+  subjectId?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  @ApiProperty({
+    description: 'The Academic Year ID (optional)',
+    required: false,
+  })
+  academicYearId?: string;
 }

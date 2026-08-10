@@ -1594,7 +1594,8 @@ Add a new resource link to digital library.
 {
   "title": "كتاب العلوم الصف الأول",
   "link": "https://library.school.com/books/science1.pdf",
-  "subjectOfferingId": "6650a1b2c3d4e5f6a7b8c9d0"
+  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1"
 }
 ```
 
@@ -1604,15 +1605,24 @@ Add a new resource link to digital library.
 | `title` | `string` | ✅ | Resource title (min length: 2) |
 | `link` | `string` | ✅ | Valid URL string |
 | `subjectOfferingId` | `string` | ❌ | Associated SubjectOffering MongoID (optional) |
+| `subjectId` | `string` | ❌ | Alternative Subject MongoID (optional) |
+| `academicYearId` | `string` | ❌ | AcademicYear MongoID (optional) |
 
 #### `GET /library` 🔐
-List library resources (`Query: page, limit, subjectOfferingId`).
+List library resources.
+
+**Query Parameters:**
+- `subjectId` (`string`, optional): Filter library items by Subject ID.
+- `academicYearId` (`string`, optional): Filter library items by Academic Year ID.
+- `subjectOfferingId` (`string`, optional): Filter library items by SubjectOffering ID.
+- `page` (`number`, optional): Page number.
+- `limit` (`number`, optional): Page size.
 
 #### `GET /library/:id` 🔐
 Get library resource details.
 
 #### `PATCH /library/:id` 🔐
-Update library resource. Accepts partial fields from `CreateLibraryDto`.
+Update library resource. Accepts partial fields from `CreateLibraryDto` (`title`, `link`, `subjectOfferingId`, `subjectId`, `academicYearId`).
 
 #### `DELETE /library/:id` 🔐
 Delete library resource.

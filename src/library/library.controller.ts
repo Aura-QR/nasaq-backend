@@ -37,6 +37,9 @@ export class LibraryController {
   @ApiResponse({ status: 404, description: 'Library items not found' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
+  @ApiQuery({ name: 'subjectOfferingId', required: false, type: String, description: 'Filter by SubjectOffering ID' })
+  @ApiQuery({ name: 'subjectId', required: false, type: String, description: 'Filter by Subject ID' })
+  @ApiQuery({ name: 'academicYearId', required: false, type: String, description: 'Filter by Academic Year ID' })
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(@Query() queryParams: any) {

@@ -3440,7 +3440,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Khan Academy - Algebra\",\n  \"link\": \"https://www.khanacademy.org/math/algebra\",\n  \"subjectOfferingId\": \"6650a1b2c3d4e5f6a7b8c9d0\"\n}",
+              "raw": "{\n  \"title\": \"Khan Academy - Algebra\",\n  \"link\": \"https://www.khanacademy.org/math/algebra\",\n  \"subjectId\": \"{{subjectId}}\",\n  \"academicYearId\": \"{{academicYearId}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"

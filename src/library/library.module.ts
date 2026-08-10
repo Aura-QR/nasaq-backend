@@ -4,12 +4,14 @@ import { LibraryController } from './library.controller';
 import { LibraryService } from './library.service';
 import { Library, LibrarySchema } from './schemas/library.schema';
 import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
+import { Term, TermSchema } from '../terms/schemas/term.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Library.name, schema: LibrarySchema },
       { name: SubjectOffering.name, schema: SubjectOfferingSchema },
+      { name: Term.name, schema: TermSchema },
     ]),
   ],
   controllers: [LibraryController],
