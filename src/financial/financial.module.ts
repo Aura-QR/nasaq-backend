@@ -27,6 +27,8 @@ import { DiscountService } from './discount.service';
 import { DiscountController } from './discount.controller';
 import { FinancialTrip, FinancialTripSchema } from './schemas/financial-trip.schema';
 
+import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -39,6 +41,7 @@ import { FinancialTrip, FinancialTripSchema } from './schemas/financial-trip.sch
       { name: Class.name, schema: ClassSchema },
       { name: GradeLevel.name, schema: GradeLevelSchema },
       { name: FinancialTrip.name, schema: FinancialTripSchema },
+      { name: School.name, schema: SchoolSchema },
     ]),
     CaslModule,
   ],

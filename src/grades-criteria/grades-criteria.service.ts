@@ -62,9 +62,59 @@ export class GradesCriteriaService {
       populate: [
         { path: 'subjectId', select: 'subjectName subjectCode' },
         { path: 'gradeLevelId', select: 'name order' },
-        { path: 'termId', select: 'name status order' },
+        { path: 'termId', select: 'name status order academicYearId' },
       ],
     };
+  }
+
+  private async resolveSubjectOfferingId(
+    subjectOfferingId?: string,
+    subjectId?: string,
+    academicYearId?: string,
+    fallbackOfferingId?: mongoose.Types.ObjectId,
+  ): Promise<string> {
+    if (subjectOfferingId) {
+      this.validateObjectId(subjectOfferingId, 'subjectOffering');
+      const offering = await this.subjectOfferingModel.findById(subjectOfferingId);
+      if (!offering) {
+        throw new NotFoundException(`عرض المادة (SubjectOffering) ذات المعرف ${subjectOfferingId} غير موجود`);
+      }
+      return subjectOfferingId;
+    }
+
+    let effSubjectId = subjectId;
+    let effAcademicYearId = academicYearId;
+
+    if (!effSubjectId && fallbackOfferingId) {
+      const currentOffering = await this.subjectOfferingModel.findById(fallbackOfferingId);
+      if (currentOffering) {
+        effSubjectId = currentOffering.subjectId.toString();
+      }
+    }
+
+    if (!effSubjectId) {
+      throw new BadRequestException('يرجى تحديد subjectOfferingId أو subjectId');
+    }
+
+    this.validateObjectId(effSubjectId, 'subject');
+    const offeringQuery: any = { subjectId: new mongoose.Types.ObjectId(effSubjectId) };
+
+    if (effAcademicYearId) {
+      this.validateObjectId(effAcademicYearId, 'academicYear');
+      const terms = await this.termModel
+        .find({ academicYearId: new mongoose.Types.ObjectId(effAcademicYearId) })
+        .select('_id')
+        .exec();
+      const termIds = terms.map((t) => t._id);
+      offeringQuery.termId = { $in: termIds };
+    }
+
+    const offering = await this.subjectOfferingModel.findOne(offeringQuery);
+    if (!offering) {
+      throw new NotFoundException(`لم يتم العثور على عرض لهذه المادة للسنة الدراسية المحددة`);
+    }
+
+    return offering._id.toString();
   }
 
   async getMyGradesCriteria(studentId: string, subjectOfferingId?: string, subjectId?: string) {
@@ -436,34 +486,18 @@ export class GradesCriteriaService {
   }
 
   async create(createGradesCriteriaDto: CreateGradesCriteriaDto) {
-    let { subjectOfferingId } = createGradesCriteriaDto;
-    const { subjectId } = createGradesCriteriaDto as any;
+    const { subjectOfferingId, subjectId, academicYearId, ...criteriaFields } = createGradesCriteriaDto as any;
 
-    if (!subjectOfferingId && subjectId) {
-      this.validateObjectId(subjectId, 'subject');
-      const offering = await this.subjectOfferingModel.findOne({
-        subjectId: new mongoose.Types.ObjectId(subjectId),
-      });
-      if (!offering) {
-        throw new NotFoundException(`لم يتم العثور على عرض لهذه المادة (SubjectOffering) للمادة ${subjectId}`);
-      }
-      subjectOfferingId = offering._id.toString();
-    }
+    const resolvedOfferingId = await this.resolveSubjectOfferingId(
+      subjectOfferingId,
+      subjectId,
+      academicYearId,
+    );
 
-    if (!subjectOfferingId) {
-      throw new BadRequestException('يرجى تحديد subjectOfferingId أو subjectId لإنشاء معايير التقييم');
-    }
-
-    this.validateObjectId(subjectOfferingId, 'subjectOffering');
     this.validateGradesSum(createGradesCriteriaDto);
 
-    const offering = await this.subjectOfferingModel.findById(subjectOfferingId);
-    if (!offering) {
-      throw new NotFoundException(`عرض المادة (SubjectOffering) ذات المعرف ${subjectOfferingId} غير موجود`);
-    }
-
     const existingCriteria = await this.gradesCriteriaModel.findOne({
-      subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
+      subjectOfferingId: new mongoose.Types.ObjectId(resolvedOfferingId),
     });
 
     if (existingCriteria) {
@@ -471,8 +505,8 @@ export class GradesCriteriaService {
     }
 
     const newGradesCriteria = new this.gradesCriteriaModel({
-      ...createGradesCriteriaDto,
-      subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
+      ...criteriaFields,
+      subjectOfferingId: new mongoose.Types.ObjectId(resolvedOfferingId),
     });
 
     await newGradesCriteria.save();
@@ -483,17 +517,42 @@ export class GradesCriteriaService {
 
   async filtering(filters: any, pagination: PaginationDto = {}, user?: any) {
     const query: any = {};
+    const offeringQuery: any = {};
+    let filterByOffering = false;
+
+    if (filters.subjectOfferingId) {
+      this.validateObjectId(String(filters.subjectOfferingId), 'subjectOffering');
+      query.subjectOfferingId = new mongoose.Types.ObjectId(String(filters.subjectOfferingId));
+    } else {
+      if (filters.subjectId) {
+        this.validateObjectId(String(filters.subjectId), 'subject');
+        offeringQuery.subjectId = new mongoose.Types.ObjectId(String(filters.subjectId));
+        filterByOffering = true;
+      }
+      if (filters.academicYearId) {
+        this.validateObjectId(String(filters.academicYearId), 'academicYear');
+        const terms = await this.termModel
+          .find({ academicYearId: new mongoose.Types.ObjectId(String(filters.academicYearId)) })
+          .select('_id')
+          .exec();
+        offeringQuery.termId = { $in: terms.map((t) => t._id) };
+        filterByOffering = true;
+      }
+
+      if (filterByOffering) {
+        const offerings = await this.subjectOfferingModel.find(offeringQuery).select('_id').exec();
+        const offeringIds = offerings.map((o) => o._id);
+        query.subjectOfferingId = { $in: offeringIds };
+      }
+    }
 
     for (const [key, value] of Object.entries(filters)) {
       if (value === undefined || value === null || value === '') continue;
-      if (key === 'page' || key === 'limit') continue;
+      if (['page', 'limit', 'subjectOfferingId', 'subjectId', 'academicYearId'].includes(key)) continue;
 
       const stringValue = String(value);
 
-      if (key === 'subjectOfferingId') {
-        this.validateObjectId(stringValue, 'subjectOffering');
-        query[key] = new mongoose.Types.ObjectId(stringValue);
-      } else if (['final', 'assignments', 'activities', 'projects', 'quizzes'].includes(key)) {
+      if (['final', 'assignments', 'activities', 'projects', 'quizzes'].includes(key)) {
         query[key] = Number(stringValue);
       } else {
         query[key] = stringValue;
@@ -545,26 +604,45 @@ export class GradesCriteriaService {
       throw new NotFoundException(`معايير التقييم ذات المعرف ${id} غير موجودة`);
     }
 
-    if (updateGradesCriteriaDto.subjectOfferingId) {
-      this.validateObjectId(updateGradesCriteriaDto.subjectOfferingId, 'subjectOffering');
-      const offering = await this.subjectOfferingModel.findById(updateGradesCriteriaDto.subjectOfferingId);
-      if (!offering) {
-        throw new NotFoundException(`عرض المادة (SubjectOffering) ذات المعرف ${updateGradesCriteriaDto.subjectOfferingId} غير موجود`);
+    const { subjectOfferingId, subjectId, academicYearId, ...otherFields } = updateGradesCriteriaDto as any;
+
+    let targetOfferingId: string | null = null;
+    if (subjectOfferingId || subjectId || academicYearId) {
+      targetOfferingId = await this.resolveSubjectOfferingId(
+        subjectOfferingId,
+        subjectId,
+        academicYearId,
+        existingGradesCriteria.subjectOfferingId,
+      );
+    }
+
+    if (targetOfferingId && targetOfferingId !== existingGradesCriteria.subjectOfferingId.toString()) {
+      const conflict = await this.gradesCriteriaModel.findOne({
+        subjectOfferingId: new mongoose.Types.ObjectId(targetOfferingId),
+        _id: { $ne: new mongoose.Types.ObjectId(id) },
+      });
+      if (conflict) {
+        throw new BadRequestException(`معايير التقييم موجودة بالفعل لعرض المادة هذا`);
       }
     }
 
+    const updatePayload: any = { ...otherFields };
+    if (targetOfferingId) {
+      updatePayload.subjectOfferingId = new mongoose.Types.ObjectId(targetOfferingId);
+    }
+
     const mergedData = {
-      final: updateGradesCriteriaDto.final ?? existingGradesCriteria.final,
-      assignments: updateGradesCriteriaDto.assignments ?? existingGradesCriteria.assignments,
-      activities: updateGradesCriteriaDto.activities ?? existingGradesCriteria.activities,
-      projects: updateGradesCriteriaDto.projects ?? existingGradesCriteria.projects,
-      quizzes: updateGradesCriteriaDto.quizzes ?? existingGradesCriteria.quizzes,
+      final: updatePayload.final ?? existingGradesCriteria.final,
+      assignments: updatePayload.assignments ?? existingGradesCriteria.assignments,
+      activities: updatePayload.activities ?? existingGradesCriteria.activities,
+      projects: updatePayload.projects ?? existingGradesCriteria.projects,
+      quizzes: updatePayload.quizzes ?? existingGradesCriteria.quizzes,
     };
 
     this.validateGradesSum(mergedData);
 
     const updatedGradesCriteria = await this.gradesCriteriaModel
-      .findByIdAndUpdate(id, updateGradesCriteriaDto, { new: true, runValidators: true })
+      .findByIdAndUpdate(id, updatePayload, { new: true, runValidators: true })
       .populate(this.getPopulateOptions());
 
     return transformGradesCriteriaResponse(updatedGradesCriteria);

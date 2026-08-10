@@ -1,4 +1,5 @@
-import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { NATIONALITY_CODES } from '../../../common/constants/nationalities.constant';
 
 export class UpdateSchoolSettingsDto {
   @IsString()
@@ -19,4 +20,10 @@ export class UpdateSchoolSettingsDto {
   @Max(100)
   @IsOptional()
   defaultPassingGrade?: number;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsIn(NATIONALITY_CODES, { each: true })
+  @IsOptional()
+  localNationalityCodes?: string[];
 }

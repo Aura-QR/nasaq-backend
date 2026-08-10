@@ -119,9 +119,12 @@ export class StudentsService {
             (targetClass as any).schoolId?.toString() ?? '',
           );
         } catch (error: any) {
-          console.warn(
-            `[Students] Financial record creation skipped for student ${student._id}: ${error.message}`,
-          );
+          await this.enrollmentModel.findOneAndDelete({
+            studentId: student._id,
+            academicYearId: targetClass.academicYearId,
+          }).exec();
+          await this.studentModel.findByIdAndDelete(student._id).exec();
+          throw error;
         }
       }
     }
@@ -294,18 +297,16 @@ export class StudentsService {
         );
 
         // Create/update the student's financial record for this academic year
-        try {
-          await this.financialRecordService.createOrUpdateRecord(
-            (student._id as any).toString(),
-            (targetClass._id as any).toString(),
-            (targetClass as any).schoolId?.toString() ?? '',
-          );
-        } catch (error: any) {
-          console.warn(
-            `[Students] Financial record creation skipped for student ${student._id}: ${error.message}`,
-          );
-        }
+        await this.financialRecordService.createOrUpdateRecord(
+          (student._id as any).toString(),
+          (targetClass._id as any).toString(),
+          (targetClass as any).schoolId?.toString() ?? '',
+        );
       }
+    }
+
+    if (cleanUpdateData.nationalityCode) {
+      await this.financialRecordService.recalculateForStudent(id);
     }
 
     return {

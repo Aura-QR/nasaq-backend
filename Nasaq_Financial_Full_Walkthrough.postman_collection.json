@@ -403,7 +403,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"tuitionFee\": 8000\n}",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"tuitionFee\": 8000,\n  \"expatriateSurchargePercentage\": 15\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -773,7 +773,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"أحمد\",\n  \"fatherName\": \"محمد\",\n  \"familyName\": \"السيد\",\n  \"birthDate\": \"2018-03-10\",\n  \"gender\": \"male\",\n  \"nationality\": \"سعودي\",\n  \"phoneNumber\": \"0501112222\",\n  \"email\": \"ahmed.fintest.{{$timestamp}}@school.com\",\n  \"address\": \"الرياض\",\n  \"isActive\": true\n}",
+              "raw": "{\n  \"firstName\": \"أحمد\",\n  \"fatherName\": \"محمد\",\n  \"familyName\": \"السيد\",\n  \"birthDate\": \"2018-03-10\",\n  \"gender\": \"male\",\n  \"nationality\": \"مصري\",\n  \"nationalityCode\": \"EG\",\n  \"phoneNumber\": \"0501112222\",\n  \"email\": \"ahmed.fintest.{{$timestamp}}@school.com\",\n  \"address\": \"الرياض\",\n  \"isActive\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -821,7 +821,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"سارة\",\n  \"fatherName\": \"خالد\",\n  \"familyName\": \"العتيبي\",\n  \"birthDate\": \"2018-06-22\",\n  \"gender\": \"female\",\n  \"nationality\": \"سعودي\",\n  \"phoneNumber\": \"0503334444\",\n  \"email\": \"sara.fintest.{{$timestamp}}@school.com\",\n  \"address\": \"الرياض\",\n  \"isActive\": true\n}",
+              "raw": "{\n  \"firstName\": \"سارة\",\n  \"fatherName\": \"خالد\",\n  \"familyName\": \"العتيبي\",\n  \"birthDate\": \"2018-06-22\",\n  \"gender\": \"female\",\n  \"nationality\": \"سعودي\",\n  \"nationalityCode\": \"SA\",\n  \"phoneNumber\": \"0503334444\",\n  \"email\": \"sara.fintest.{{$timestamp}}@school.com\",\n  \"address\": \"الرياض\",\n  \"isActive\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"

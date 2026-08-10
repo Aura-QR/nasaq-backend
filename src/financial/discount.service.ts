@@ -104,8 +104,9 @@ export class DiscountService {
       throw new BadRequestException('يوجد خصم مطبق بالفعل على الرسوم الدراسية — قم بإزالته أولاً');
     }
 
-    const discountAmount = this.computeDiscountAmount(record.tuition.fee, discount.percentage);
-    const netFee = record.tuition.fee - discountAmount;
+    const grossFee = record.tuition.grossFee || record.tuition.fee;
+    const discountAmount = this.computeDiscountAmount(grossFee, discount.percentage);
+    const netFee = grossFee - discountAmount;
     const newBalance = netFee - record.tuition.totalPaid;
 
     record.tuition.discount = {
@@ -127,9 +128,10 @@ export class DiscountService {
   async removeFromTuition(studentId: string, academicYearId?: string) {
     const record = await this.getRecord(studentId, academicYearId);
 
+    const grossFee = record.tuition.grossFee || record.tuition.fee;
     record.tuition.discount = null;
-    record.tuition.netFee = record.tuition.fee;
-    const newBalance = record.tuition.fee - record.tuition.totalPaid;
+    record.tuition.netFee = grossFee;
+    const newBalance = grossFee - record.tuition.totalPaid;
     this.redistributeUnpaidInstallments(record.tuition.installments, Math.max(newBalance, 0));
     record.markModified('tuition');
     await record.save();

@@ -20,8 +20,11 @@ export class Student extends Document {
   @Prop({ required: true, enum: ['male', 'female'] })
   gender: string;
 
-  @Prop({ required: true })
-  nationality: string;
+  @Prop({ required: false })
+  nationality?: string;
+
+  @Prop({ required: false, index: true })
+  nationalityCode?: string;
 
   @Prop({ required: true, index: true })
   phoneNumber: string;

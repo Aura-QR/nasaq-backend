@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { StudentsController } from './students.controller';
+import { NationalitiesController } from '../common/nationalities.controller';
 import { StudentsService } from './students.service';
 import { Student, StudentSchema } from './schemas/student.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
@@ -20,7 +21,7 @@ import { FinancialModule } from 'src/financial/financial.module';
     EmailModule,
     FinancialModule,
   ],
-  controllers: [StudentsController],
+  controllers: [StudentsController, NationalitiesController],
   providers: [StudentsService],
   exports: [StudentsService, MongooseModule],
 })

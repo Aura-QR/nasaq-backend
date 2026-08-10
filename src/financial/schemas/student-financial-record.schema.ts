@@ -21,6 +21,19 @@ class DiscountSnapshot {
 const DiscountSnapshotSchema = SchemaFactory.createForClass(DiscountSnapshot);
 
 @Schema({ _id: false })
+export class SurchargeSnapshot {
+  @Prop({ required: true, min: 0 })
+  percentage: number;
+
+  @Prop({ required: true, min: 0 })
+  amount: number;
+
+  @Prop({ required: true })
+  nationalityCode: string;
+}
+export const SurchargeSnapshotSchema = SchemaFactory.createForClass(SurchargeSnapshot);
+
+@Schema({ _id: false })
 class PaymentEvent {
   @Prop({ required: true, min: 0 })
   amount: number;
@@ -130,6 +143,12 @@ const BusRecordSchema = SchemaFactory.createForClass(BusRecord);
 class TuitionRecord {
   @Prop({ required: true, min: 0 })
   fee: number;
+
+  @Prop({ type: SurchargeSnapshotSchema, default: null })
+  surcharge: SurchargeSnapshot | null;
+
+  @Prop({ default: 0 })
+  grossFee: number;
 
   @Prop({ type: DiscountSnapshotSchema, default: null })
   discount: DiscountSnapshot | null;

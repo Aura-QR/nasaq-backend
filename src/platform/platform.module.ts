@@ -13,11 +13,15 @@ import { ConfigModule } from '@nestjs/config';
 import jwtConfig from 'src/auth/config/jwt.config';
 import { TenancyModule } from 'src/tenancy/tenancy.module';
 
+import { forwardRef } from '@nestjs/common';
+import { FinancialModule } from 'src/financial/financial.module';
+
 @Module({
   imports: [
     ConfigModule.forFeature(jwtConfig),
     JwtModule.registerAsync(jwtConfig.asProvider()),
     TenancyModule,
+    forwardRef(() => FinancialModule),
     MongooseModule.forFeature([
       { name: School.name, schema: SchoolSchema },
       { name: PlatformAdmin.name, schema: PlatformAdminSchema },

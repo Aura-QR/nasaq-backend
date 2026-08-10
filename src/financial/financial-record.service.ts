@@ -9,6 +9,7 @@ import { Discount } from './schemas/discount.schema';
 import { Student } from '../students/schemas/student.schema';
 import { Class } from '../classes/schemas/class.schema';
 import { FinancialTrip } from './schemas/financial-trip.schema';
+import { School } from '../platform/schools/schemas/school.schema';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
@@ -24,6 +25,7 @@ export class FinancialRecordService {
     @InjectModel(Student.name) private studentModel: Model<Student>,
     @InjectModel(Class.name) private classModel: Model<Class>,
     @InjectModel(FinancialTrip.name) private tripTemplateModel: Model<FinancialTrip>,
+    @InjectModel(School.name) private schoolModel: Model<School>,
   ) {}
 
   private validateObjectId(id: string, name = 'المعرف'): void {
@@ -73,6 +75,125 @@ export class FinancialRecordService {
       paidAmount: 0,
       payments: [],
     }];
+  }
+
+  async assertCanCreateRecord(studentId: string, classId: string, schoolId: string): Promise<void> {
+    const schoolOid = new mongoose.Types.ObjectId(schoolId);
+    const cls = await this.classModel
+      .findOne({ _id: new mongoose.Types.ObjectId(classId), schoolId: schoolOid })
+      .setOptions({ skipTenantScope: true })
+      .exec();
+    if (!cls) return;
+
+    const feeConfig = await this.feeConfigModel
+      .findOne({
+        schoolId: schoolOid,
+        academicYearId: cls.academicYearId,
+        gradeLevelId: cls.gradeLevelId,
+      })
+      .setOptions({ skipTenantScope: true })
+      .exec();
+    if (!feeConfig) {
+      throw new BadRequestException(
+        `لا توجد معايير رسوم للعام الدراسي والمرحلة الدراسية المحددة. يرجى إنشاؤها أولاً قبل إضافة الطالب للفصل.`,
+      );
+    }
+
+    const student = await this.studentModel
+      .findOne({ _id: new mongoose.Types.ObjectId(studentId), schoolId: schoolOid })
+      .setOptions({ skipTenantScope: true })
+      .exec();
+
+    let plan: InstallmentPlan | null = null;
+    if ((student as any)?.installmentPlanId) {
+      plan = await this.planModel
+        .findOne({ _id: (student as any).installmentPlanId, schoolId: schoolOid })
+        .setOptions({ skipTenantScope: true })
+        .exec();
+    }
+    if (!plan) {
+      plan = await this.planModel
+        .findOne({ schoolId: schoolOid, isDefault: true, isActive: true })
+        .setOptions({ skipTenantScope: true })
+        .exec();
+    }
+    if (!plan) {
+      throw new BadRequestException(
+        `لا توجد خطة تقسيط افتراضية. يرجى إنشاء خطة تقسيط وتعيينها كافتراضية قبل تسجيل الطلاب.`,
+      );
+    }
+  }
+
+  async recalculateForStudent(studentId: string, academicYearId?: string): Promise<void> {
+    this.validateObjectId(studentId, 'الطالب');
+    const studentOid = new mongoose.Types.ObjectId(studentId);
+    const query: any = { studentId: studentOid };
+    if (academicYearId) {
+      this.validateObjectId(academicYearId, 'العام الدراسي');
+      query.academicYearId = new mongoose.Types.ObjectId(academicYearId);
+    }
+    const record = await this.recordModel.findOne(query).sort({ createdAt: -1 }).setOptions({ skipTenantScope: true }).exec();
+    if (!record) return;
+
+    const feeConfig = await this.feeConfigModel.findById(record.feeConfigId).setOptions({ skipTenantScope: true }).exec();
+    if (!feeConfig) return;
+
+    const student = await this.studentModel.findById(studentOid).setOptions({ skipTenantScope: true }).exec();
+    if (!student) return;
+
+    const school = await this.schoolModel.findById((record as any).schoolId).setOptions({ skipTenantScope: true }).exec();
+    const localNationalityCodes = school?.settings?.localNationalityCodes || [];
+    const isExpatriate = student.nationalityCode ? !localNationalityCodes.includes(student.nationalityCode) : false;
+
+    const baseFee = feeConfig.tuitionFee;
+    const surchargePct = feeConfig.expatriateSurchargePercentage || 0;
+    const surchargeAmount = (isExpatriate && surchargePct > 0)
+      ? Math.round((baseFee * surchargePct) / 100)
+      : 0;
+    const surchargeSnapshot = (isExpatriate && surchargePct > 0)
+      ? { percentage: surchargePct, amount: surchargeAmount, nationalityCode: student.nationalityCode }
+      : null;
+
+    const grossFee = baseFee + surchargeAmount;
+
+    record.tuition.fee = baseFee;
+    record.tuition.surcharge = surchargeSnapshot as any;
+    record.tuition.grossFee = grossFee;
+
+    if (record.tuition.discount) {
+      const pct = record.tuition.discount.percentage;
+      const discountAmount = Math.round((grossFee * pct) / 100);
+      record.tuition.discount.discountAmount = discountAmount;
+      record.tuition.netFee = grossFee - discountAmount;
+    } else {
+      record.tuition.netFee = grossFee;
+    }
+
+    const unpaidInstallments = record.tuition.installments.filter(i => i.status !== 'paid');
+    const totalUnpaid = record.tuition.netFee - record.tuition.totalPaid;
+    if (unpaidInstallments.length > 0 && totalUnpaid > 0) {
+      const n = unpaidInstallments.length;
+      const base = Math.floor(totalUnpaid / n);
+      const remainder = totalUnpaid - base * n;
+      unpaidInstallments.forEach((inst, i) => {
+        inst.amount = i < remainder ? base + 1 : base;
+      });
+    }
+
+    record.markModified('tuition');
+    await record.save();
+  }
+
+  async recalculateForSchool(schoolId: string): Promise<void> {
+    this.validateObjectId(schoolId, 'المدرسة');
+    const records = await this.recordModel
+      .find({ schoolId: new mongoose.Types.ObjectId(schoolId) })
+      .setOptions({ skipTenantScope: true })
+      .exec();
+
+    for (const record of records) {
+      await this.recalculateForStudent(record.studentId.toString(), record.academicYearId.toString());
+    }
   }
 
   // Called by EnrollmentsService when a student is enrolled into a class.
@@ -130,7 +251,22 @@ export class FinancialRecordService {
       );
     }
 
-    let initialNetFee = feeConfig.tuitionFee;
+    const school = await this.schoolModel.findById(schoolOid).setOptions({ skipTenantScope: true }).exec();
+    const localNationalityCodes = school?.settings?.localNationalityCodes || [];
+    const isExpatriate = student.nationalityCode ? !localNationalityCodes.includes(student.nationalityCode) : false;
+
+    const baseFee = feeConfig.tuitionFee;
+    const surchargePct = feeConfig.expatriateSurchargePercentage || 0;
+    const surchargeAmount = (isExpatriate && surchargePct > 0)
+      ? Math.round((baseFee * surchargePct) / 100)
+      : 0;
+    const surchargeSnapshot = (isExpatriate && surchargePct > 0)
+      ? { percentage: surchargePct, amount: surchargeAmount, nationalityCode: student.nationalityCode }
+      : null;
+
+    const grossFee = baseFee + surchargeAmount;
+
+    let initialNetFee = grossFee;
     let initialDiscount: any = null;
 
     if (plan.linkedDiscountId) {
@@ -139,8 +275,8 @@ export class FinancialRecordService {
         .setOptions({ skipTenantScope: true })
         .exec();
       if (discount && discount.isActive) {
-        const discountAmount = Math.round((feeConfig.tuitionFee * discount.percentage) / 100);
-        initialNetFee = feeConfig.tuitionFee - discountAmount;
+        const discountAmount = Math.round((grossFee * discount.percentage) / 100);
+        initialNetFee = grossFee - discountAmount;
         initialDiscount = {
           discountId: discount._id as mongoose.Types.ObjectId,
           name: discount.name,
@@ -170,7 +306,9 @@ export class FinancialRecordService {
           $setOnInsert: {
             schoolId: schoolOid,
             tuition: {
-              fee: feeConfig.tuitionFee,
+              fee: baseFee,
+              surcharge: surchargeSnapshot,
+              grossFee: grossFee,
               discount: initialDiscount,
               netFee: initialNetFee,
               status: FeeStatus.UNPAID,
@@ -200,37 +338,110 @@ export class FinancialRecordService {
             .setOptions({ skipTenantScope: true })
             .exec();
           if (discount && discount.isActive) {
-            const discountAmount = Math.round((feeConfig.tuitionFee * discount.percentage) / 100);
+            const discountAmount = Math.round((grossFee * discount.percentage) / 100);
             record.tuition.discount = {
               discountId: discount._id as mongoose.Types.ObjectId,
               name: discount.name,
               percentage: discount.percentage,
               discountAmount,
             } as any;
-            record.tuition.netFee = feeConfig.tuitionFee - discountAmount;
+            record.tuition.netFee = grossFee - discountAmount;
             modified = true;
           }
         }
 
-        const feeChanged = (existing as any).feeConfigId?.toString() !== (feeConfig._id as mongoose.Types.ObjectId).toString();
+        const feeChanged = record.tuition.fee !== baseFee
+          || record.tuition.grossFee !== grossFee
+          || record.tuition.surcharge?.percentage !== surchargePct
+          || record.tuition.surcharge?.nationalityCode !== student.nationalityCode
+          || (existing as any).feeConfigId?.toString() !== (feeConfig._id as mongoose.Types.ObjectId).toString();
 
         if (feeChanged || modified) {
-          record.tuition.fee = feeConfig.tuitionFee;
-          if (!record.tuition.discount) {
-            record.tuition.netFee = feeConfig.tuitionFee;
+          record.tuition.fee = baseFee;
+          record.tuition.surcharge = surchargeSnapshot as any;
+          record.tuition.grossFee = grossFee;
+
+          if (record.tuition.discount) {
+            const pct = record.tuition.discount.percentage;
+            const discountAmount = Math.round((grossFee * pct) / 100);
+            record.tuition.discount.discountAmount = discountAmount;
+            record.tuition.netFee = grossFee - discountAmount;
+          } else {
+            record.tuition.netFee = grossFee;
           }
+
           const unpaidInstallments = record.tuition.installments.filter(i => i.status !== 'paid');
           const totalUnpaid = record.tuition.netFee - record.tuition.totalPaid;
           if (unpaidInstallments.length > 0 && totalUnpaid > 0) {
-            const rebuilt = this.buildInstallments(totalUnpaid, plan);
+            const n = unpaidInstallments.length;
+            const base = Math.floor(totalUnpaid / n);
+            const remainder = totalUnpaid - base * n;
             unpaidInstallments.forEach((inst, i) => {
-              inst.amount = rebuilt[i]?.amount ?? inst.amount;
+              inst.amount = i < remainder ? base + 1 : base;
             });
           }
           record.markModified('tuition');
           await record.save();
         }
       }
+    }
+  }
+
+  async recalculateForFeeConfig(feeConfigId: string): Promise<void> {
+    this.validateObjectId(feeConfigId, 'معايير الرسوم');
+    const feeConfig = await this.feeConfigModel.findById(feeConfigId).setOptions({ skipTenantScope: true }).exec();
+    if (!feeConfig) return;
+
+    const records = await this.recordModel
+      .find({ feeConfigId: new mongoose.Types.ObjectId(feeConfigId) })
+      .setOptions({ skipTenantScope: true })
+      .exec();
+
+    for (const record of records) {
+      const student = await this.studentModel.findById(record.studentId).setOptions({ skipTenantScope: true }).exec();
+      if (!student) continue;
+
+      const school = await this.schoolModel.findById((record as any).schoolId).setOptions({ skipTenantScope: true }).exec();
+      const localNationalityCodes = school?.settings?.localNationalityCodes || [];
+      const isExpatriate = student.nationalityCode ? !localNationalityCodes.includes(student.nationalityCode) : false;
+
+      const baseFee = feeConfig.tuitionFee;
+      const surchargePct = feeConfig.expatriateSurchargePercentage || 0;
+      const surchargeAmount = (isExpatriate && surchargePct > 0)
+        ? Math.round((baseFee * surchargePct) / 100)
+        : 0;
+      const surchargeSnapshot = (isExpatriate && surchargePct > 0)
+        ? { percentage: surchargePct, amount: surchargeAmount, nationalityCode: student.nationalityCode }
+        : null;
+
+      const grossFee = baseFee + surchargeAmount;
+
+      record.tuition.fee = baseFee;
+      record.tuition.surcharge = surchargeSnapshot as any;
+      record.tuition.grossFee = grossFee;
+
+      if (record.tuition.discount) {
+        const pct = record.tuition.discount.percentage;
+        const discountAmount = Math.round((grossFee * pct) / 100);
+        record.tuition.discount.discountAmount = discountAmount;
+        record.tuition.netFee = grossFee - discountAmount;
+      } else {
+        record.tuition.netFee = grossFee;
+      }
+
+      const unpaidInstallments = record.tuition.installments.filter(i => i.status !== 'paid');
+      const totalUnpaid = record.tuition.netFee - record.tuition.totalPaid;
+      if (unpaidInstallments.length > 0 && totalUnpaid > 0) {
+        const n = unpaidInstallments.length;
+        const base = Math.floor(totalUnpaid / n);
+        const remainder = totalUnpaid - base * n;
+        unpaidInstallments.forEach((inst, i) => {
+          inst.amount = i < remainder ? base + 1 : base;
+        });
+      }
+
+      record.markModified('tuition');
+      await record.save();
     }
   }
 
@@ -551,7 +762,9 @@ export class FinancialRecordService {
       .sort({ createdAt: -1 })
       .exec();
 
-    if (!record) return;
+    if (!record) {
+      throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
+    }
 
     const hasAnyTuitionPayment =
       Number(record.tuition.totalPaid || 0) > 0 ||
@@ -566,21 +779,23 @@ export class FinancialRecordService {
       throw new BadRequestException('لا يمكن تغيير خطة التقسيط بعد سداد أي قسط دراسي');
     }
 
+    const grossFee = record.tuition.grossFee || record.tuition.fee;
+
     if (plan && plan.linkedDiscountId && !record.tuition.discount) {
       const discount = await this.discountModel.findById(plan.linkedDiscountId).exec();
       if (discount && discount.isActive) {
-        const discountAmount = Math.round((record.tuition.fee * discount.percentage) / 100);
+        const discountAmount = Math.round((grossFee * discount.percentage) / 100);
         record.tuition.discount = {
           discountId: discount._id as mongoose.Types.ObjectId,
           name: discount.name,
           percentage: discount.percentage,
           discountAmount,
         } as any;
-        record.tuition.netFee = record.tuition.fee - discountAmount;
+        record.tuition.netFee = grossFee - discountAmount;
       }
     }
 
-    const effectiveFee = record.tuition.discount ? record.tuition.netFee : record.tuition.fee;
+    const effectiveFee = record.tuition.discount ? record.tuition.netFee : grossFee;
     const rebuiltInstallments = plan
       ? this.buildInstallments(effectiveFee, plan)
       : this.buildSingleInstallment(effectiveFee);
@@ -592,5 +807,6 @@ export class FinancialRecordService {
     record.markModified('tuition');
 
     await record.save();
+    return { message: 'تم تغيير خطة التقسيط بنجاح', data: record.tuition };
   }
 }

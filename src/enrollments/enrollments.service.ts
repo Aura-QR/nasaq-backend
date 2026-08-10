@@ -50,14 +50,21 @@ export class EnrollmentsService {
       );
     }
 
-    // Check existing enrollment for student in this year
+    // Check existing active enrollment for student in this year
     const existing = await this.enrollmentModel.findOne({
       studentId: new mongoose.Types.ObjectId(studentId),
       academicYearId: new mongoose.Types.ObjectId(academicYearId),
+      status: 'active',
     }).exec();
 
     if (existing) {
       throw new ConflictException(`Student is already enrolled in an academic year class`);
+    }
+
+    // Pre-validate financial record preconditions before saving the enrollment document
+    const schoolIdStr = (targetClass as any).schoolId?.toString();
+    if (schoolIdStr) {
+      await this.financialRecordService.assertCanCreateRecord(studentId, classId, schoolIdStr);
     }
 
     const enrollment = new this.enrollmentModel({
@@ -71,14 +78,13 @@ export class EnrollmentsService {
     const savedEnrollment = await enrollment.save();
 
     // Create/update the student's financial record for this academic year.
-    // schoolId is read from the class document (which is already tenant-scoped)
-    // and passed explicitly — do NOT rely on AsyncLocalStorage inside the service.
-    // Re-throw any error here so the client gets a clear 400 explaining WHY
-    // (missing FeeConfig or InstallmentPlan) instead of silently returning 201
-    // and then getting a 404 on every subsequent financial record read.
-    const schoolIdStr = (targetClass as any).schoolId?.toString();
     if (schoolIdStr) {
-      await this.financialRecordService.createOrUpdateRecord(studentId, classId, schoolIdStr);
+      try {
+        await this.financialRecordService.createOrUpdateRecord(studentId, classId, schoolIdStr);
+      } catch (error) {
+        await this.enrollmentModel.findByIdAndDelete(savedEnrollment._id).exec();
+        throw error;
+      }
     }
 
     // Keep student.classId synchronized

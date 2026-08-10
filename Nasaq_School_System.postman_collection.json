@@ -2356,7 +2356,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"subjectId\": \"6650a1b2c3d4e5f6a7b8c9d0\",\n  \"academicYear\": \"2024-2025\",\n  \"final\": 50,\n  \"assignments\": 5,\n  \"assignmentsCount\": 3,\n  \"activities\": 10,\n  \"projects\": 15,\n  \"projectsCount\": 2,\n  \"quizzes\": 5,\n  \"quizzesCount\": 4\n}",
+              "raw": "{\n  \"subjectId\": \"{{subjectId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"final\": 40,\n  \"assignments\": 15,\n  \"assignmentsCount\": 3,\n  \"activities\": 15,\n  \"projects\": 15,\n  \"projectsCount\": 2,\n  \"quizzes\": 15,\n  \"quizzesCount\": 3,\n  \"passingGrade\": 50\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2371,12 +2371,22 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/gradesCriteria",
+              "raw": "{{baseUrl}}/gradesCriteria?subjectId={{subjectId}}&academicYearId={{academicYearId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "gradesCriteria"
+              ],
+              "query": [
+                {
+                  "key": "subjectId",
+                  "value": "{{subjectId}}"
+                },
+                {
+                  "key": "academicYearId",
+                  "value": "{{academicYearId}}"
+                }
               ]
             },
             "auth": {
@@ -2529,7 +2539,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"final\": 55\n}",
+              "raw": "{\n  \"subjectId\": \"{{subjectId}}\",\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"final\": 45,\n  \"assignments\": 15\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -3868,7 +3878,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"tuitionFee\": 8000\n}",
+              "raw": "{\n  \"academicYearId\": \"{{academicYearId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"tuitionFee\": 8000,\n  \"expatriateSurchargePercentage\": 15\n}",
               "options": {
                 "raw": {
                   "language": "json"

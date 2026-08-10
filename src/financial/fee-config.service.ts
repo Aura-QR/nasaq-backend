@@ -7,11 +7,14 @@ import { StudentFinancialRecord } from './schemas/student-financial-record.schem
 import { CreateFeeConfigDto } from './dto/create-fee-config.dto';
 import { UpdateFeeConfigDto } from './dto/update-fee-config.dto';
 
+import { FinancialRecordService } from './financial-record.service';
+
 @Injectable()
 export class FeeConfigService {
   constructor(
     @InjectModel(FeeConfig.name) private feeConfigModel: Model<FeeConfig>,
     @InjectModel(StudentFinancialRecord.name) private recordModel: Model<StudentFinancialRecord>,
+    private readonly financialRecordService: FinancialRecordService,
   ) {}
 
   private validateObjectId(id: string): void {
@@ -62,6 +65,10 @@ export class FeeConfigService {
       .findByIdAndUpdate(id, dto, { new: true, runValidators: true })
       .exec();
     if (!data) throw new NotFoundException('معايير الرسوم غير موجودة');
+
+    // Propagate fee changes to active student financial records
+    await this.financialRecordService.recalculateForFeeConfig(id);
+
     return { message: 'تم تحديث معايير الرسوم بنجاح', data };
   }
 

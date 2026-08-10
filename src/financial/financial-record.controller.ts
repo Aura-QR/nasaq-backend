@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AbilitiesGuard } from '../casl/guards/abilities.guard';
@@ -7,6 +7,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { FinancialRecordService } from './financial-record.service';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
+import { SwitchPlanDto } from './dto/switch-plan.dto';
 
 @Controller('financial/records')
 @UseGuards(JwtAuthGuard, AbilitiesGuard)
@@ -142,5 +143,20 @@ export class FinancialRecordController {
       dto.academicYearId = academicYearId;
     }
     return this.financialRecordService.refundTuition(studentId, dto, user.userId);
+  }
+
+  @Patch(':studentId/tuition/switch-plan')
+  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Switch student tuition installment plan (Admin)' })
+  async switchTuitionInstallmentPlan(
+    @Param('studentId') studentId: string,
+    @Body() dto: SwitchPlanDto,
+  ) {
+    return this.financialRecordService.switchTuitionInstallmentPlan(
+      studentId,
+      dto.installmentPlanId,
+      dto.academicYearId,
+    );
   }
 }

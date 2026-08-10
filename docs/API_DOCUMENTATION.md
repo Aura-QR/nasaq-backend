@@ -1081,7 +1081,8 @@ Create a new student profile.
 | `familyName` | `string` | ✅ | Family/last name (min length: 2) |
 | `birthDate` | `string` | ✅ | ISO Date String (`YYYY-MM-DD`) |
 | `gender` | `string` | ✅ | Enum: `'male'` \| `'female'` |
-| `nationality` | `string` | ✅ | Student nationality |
+| `nationality` | `string` | ❌ | Student nationality display label |
+| `nationalityCode` | `string` | ❌ | ISO 3166-1 alpha-2 nationality code (e.g. `'SA'`, `'EG'`). Used for expatriate surcharge evaluation |
 | `phoneNumber` | `string` | ✅ | Phone number |
 | `email` | `string` | ✅ | Valid email format |
 | `address` | `string` | ✅ | Living address |
@@ -1375,22 +1376,73 @@ Create grade weighting criteria for a subject and academic year.
 | `passingGrade` | `number` | ❌ | Passing grade threshold for this subject (0–100). If omitted, falls back to `SchoolSettings.defaultPassingGrade`. |
 
 #### `GET /gradesCriteria` 🔐
-List grade criteria.
+List grade criteria with optional filters and pagination.
+
+**Query Parameters:**
+- `subjectId` (`string`, optional): Filter criteria by Subject ID.
+- `academicYearId` (`string`, optional): Filter criteria by Academic Year ID.
+- `subjectOfferingId` (`string`, optional): Filter criteria directly by SubjectOffering ID.
+- `page` (`number`, optional): Page number for pagination.
+- `limit` (`number`, optional): Number of items per page.
+
+**Response Structure (JSON):**
+```json
+{
+  "_id": "6650a1b2c3d4e5f6a7b8c9d9",
+  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1",
+  "subjectOfferingId": "6650a1b2c3d4e5f6a7b8c9d2",
+  "final": 40,
+  "assignments": 15,
+  "assignmentsCount": 3,
+  "activities": 15,
+  "projects": 15,
+  "projectsCount": 2,
+  "quizzes": 15,
+  "quizzesCount": 3,
+  "passingGrade": 50,
+  "subjectOffering": {
+    "_id": "6650a1b2c3d4e5f6a7b8c9d2",
+    "subjectId": {
+      "_id": "6650a1b2c3d4e5f6a7b8c9d0",
+      "subjectName": "اللغة العربية",
+      "subjectCode": "ARB101"
+    },
+    "termId": {
+      "_id": "6650a1b2c3d4e5f6a7b8c9d5",
+      "name": "الفصل الأول",
+      "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1"
+    }
+  }
+}
+```
 
 #### `GET /gradesCriteria/student/me` 🔐 (STUDENT)
-Get grade criteria for student's subjects.
+Get grade criteria for student's subjects (`?subjectId=...` or `?subjectOfferingId=...`).
 
 #### `GET /gradesCriteria/student/me/subjects` 🔐 (STUDENT)
 Get student's subjects list.
 
 #### `GET /gradesCriteria/student/me/grades` 🔐 (STUDENT)
-Get student's computed grades breakdown (`?subjectId=...`).
+Get student's computed grades breakdown (`?subjectId=...` or `?subjectOfferingId=...`).
 
 #### `GET /gradesCriteria/:id` 🔐
-Get criteria details.
+Get criteria details by ID. Returns top-level `subjectId` and `academicYearId`.
 
 #### `PATCH /gradesCriteria/:id` 🔐
-Update grade criteria percentages. Accepts partial fields from `CreateGradesCriteriaDto`.
+Update grade criteria percentages, or update the target subject/academic year.
+
+**Request Payload (JSON):**
+Accepts partial fields from `CreateGradesCriteriaDto`:
+```json
+{
+  "subjectId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d4",
+  "final": 45,
+  "assignments": 15
+}
+```
+*Note: When `subjectId` or `academicYearId` is updated, the backend resolves the new `subjectOfferingId` automatically, verifies uniqueness, and returns top-level `subjectId` and `academicYearId` in the response object.*
 
 #### `DELETE /gradesCriteria/:id` 🔐
 Delete grade criteria.
@@ -1635,6 +1687,23 @@ Record a refund / payment correction on a tuition installment.
 | `refundedAt` | `string` | ❌ | Optional date refund was processed (`YYYY-MM-DD`) |
 | `academicYearId` | `string` | ❌ | Optional AcademicYear MongoID |
 
+#### `PATCH /financial/records/:studentId/tuition/switch-plan` 🛡️
+Switch student tuition installment plan (Admin).
+
+**Request Payload (JSON):**
+```json
+{
+  "installmentPlanId": "6650a1b2c3d4e5f6a7b8c9d0",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d1"
+}
+```
+
+**Field Specifications (`SwitchPlanDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `installmentPlanId` | `string` | ❌ | Target InstallmentPlan MongoID (or null to revert to single full-payment) |
+| `academicYearId` | `string` | ❌ | Optional AcademicYear MongoID |
+
 ---
 
 ### 5.26 Financial — Fee Configs
@@ -1649,7 +1718,8 @@ Create annual tuition fee configuration for a specific grade level and academic 
 {
   "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
   "gradeLevelId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "tuitionFee": 10000
+  "tuitionFee": 10000,
+  "expatriateSurchargePercentage": 15
 }
 ```
 
@@ -1659,6 +1729,7 @@ Create annual tuition fee configuration for a specific grade level and academic 
 | `academicYearId` | `string` | ✅ | AcademicYear MongoID |
 | `gradeLevelId` | `string` | ✅ | GradeLevel MongoID |
 | `tuitionFee` | `number` | ✅ | Annual tuition fee amount in EGP (min: 0) |
+| `expatriateSurchargePercentage` | `number` | ❌ | Surcharge % applied to non-local expatriate students (0–100, default: 0) |
 
 #### `GET /financial/fee-configs` 🛡️
 List fee configurations (populates `academicYearId` and `gradeLevelId`).
@@ -1674,7 +1745,8 @@ Update fee configuration.
 {
   "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0",
   "gradeLevelId": "6650a1b2c3d4e5f6a7b8c9d1",
-  "tuitionFee": 12000
+  "tuitionFee": 12000,
+  "expatriateSurchargePercentage": 15
 }
 ```
 
@@ -1684,6 +1756,7 @@ Update fee configuration.
 | `academicYearId` | `string` | ❌ | Associated AcademicYear MongoID |
 | `gradeLevelId` | `string` | ❌ | Associated GradeLevel MongoID |
 | `tuitionFee` | `number` | ❌ | Updated tuition fee amount (min: 0) |
+| `expatriateSurchargePercentage` | `number` | ❌ | Updated expatriate surcharge % (0–100) |
 
 #### `DELETE /financial/fee-configs/:id` 🛡️
 Delete fee configuration.
@@ -1846,7 +1919,25 @@ Get additional fee details.
 Delete additional fee.
 
 #### `POST /financial/additional-fees/:feeId/pay/:studentId` 🛡️
-Record student payment for additional fee.
+Record student payment for additional fee (requires exact fee amount).
+
+**Request Payload (JSON):**
+```json
+{
+  "amount": 500,
+  "paidAt": "2026-09-15",
+  "notes": "سداد رسوم الكتب",
+  "academicYearId": "6650a1b2c3d4e5f6a7b8c9d0"
+}
+```
+
+**Field Specifications (`PayAdditionalFeeDto`):**
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `amount` | `number` | ✅ | Exact payment amount (must match fee amount) |
+| `paidAt` | `string` | ✅ | Payment date (`YYYY-MM-DD`) |
+| `notes` | `string` | ❌ | Optional payment notes |
+| `academicYearId` | `string` | ❌ | Optional AcademicYear MongoID |
 
 ---
 

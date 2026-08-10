@@ -41,20 +41,20 @@ export class BusService {
   }
 
   async enroll(studentId: string, dto: EnrollBusDto) {
-    this.validateObjectId(studentId, 'Ø§Ù„Ø·Ø§Ù„Ø¨');
+    this.validateObjectId(studentId, 'الطالب');
     const record = await this.getRecord(studentId);
 
     if (record.bus.enrolled) {
-      throw new BadRequestException('Ø§Ù„Ø·Ø§Ù„Ø¨ Ù…Ø³Ø¬Ù„ Ø¨Ø§Ù„ÙØ¹Ù„ ÙÙŠ Ø®Ø¯Ù…Ø© Ø§Ù„Ø¨Ø§Øµ â€” Ù‚Ù… Ø¨Ø¥Ù„ØºØ§Ø¡ Ø§Ù„ØªØ³Ø¬ÙŠÙ„ Ø£ÙˆÙ„Ø§Ù‹');
+      throw new BadRequestException('الطالب مسجل بالفعل في خدمة الباص — قم بإلغاء التسجيل أولاً');
     }
 
     let installments: any[] = [];
     let planId: mongoose.Types.ObjectId | null = null;
 
     if (dto.installmentPlanId) {
-      this.validateObjectId(dto.installmentPlanId, 'Ø®Ø·Ø© Ø§Ù„ØªÙ‚Ø³ÙŠØ·');
+      this.validateObjectId(dto.installmentPlanId, 'خطة التقسيط');
       const plan = await this.planModel.findById(dto.installmentPlanId).exec();
-      if (!plan) throw new NotFoundException('Ø®Ø·Ø© Ø§Ù„ØªÙ‚Ø³ÙŠØ· ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©');
+      if (!plan) throw new NotFoundException('خطة التقسيط غير موجودة');
       installments = this.financialRecordService.buildInstallments(dto.fee, plan);
       planId = plan._id as mongoose.Types.ObjectId;
     } else {
@@ -80,29 +80,29 @@ export class BusService {
     } as any;
 
     await record.save();
-    return { message: 'ØªÙ… ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø·Ø§Ù„Ø¨ ÙÙŠ Ø®Ø¯Ù…Ø© Ø§Ù„Ø¨Ø§Øµ Ø¨Ù†Ø¬Ø§Ø­', data: record.bus };
+    return { message: 'تم تسجيل الطالب في خدمة الباص بنجاح', data: record.bus };
   }
 
   async findOne(studentId: string) {
-    this.validateObjectId(studentId, 'Ø§Ù„Ø·Ø§Ù„Ø¨');
+    this.validateObjectId(studentId, 'الطالب');
     const record = await this.getRecord(studentId);
-    return { message: 'ØªÙ… Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¨Ø§Øµ Ø¨Ù†Ø¬Ø§Ø­', data: record.bus };
+    return { message: 'تم استرجاع بيانات الباص بنجاح', data: record.bus };
   }
 
   async findProfile(studentId: string) {
-    this.validateObjectId(studentId, 'Ø§Ù„Ø·Ø§Ù„Ø¨');
+    this.validateObjectId(studentId, 'الطالب');
     const record = await this.recordModel
       .findOne({ studentId: new mongoose.Types.ObjectId(studentId) })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYear gender')
+      .populate('classId', 'roomNumber academicYearId gender')
       .populate('bus.installmentPlanId', 'name numberOfInstallments dueDates')
       .lean()
       .exec();
 
-    if (!record) throw new NotFoundException('Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø³Ø¬Ù„ Ù…Ø§Ù„ÙŠ Ù„Ù‡Ø°Ø§ Ø§Ù„Ø·Ø§Ù„Ø¨');
+    if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
 
     return {
-      message: 'ØªÙ… Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ù…Ù„Ù Ø§Ù„Ø¨Ø§Øµ Ø¨Ù†Ø¬Ø§Ø­',
+      message: 'تم استرجاع ملف الباص بنجاح',
       data: {
         student: record.studentId,
         class: record.classId,
@@ -132,7 +132,7 @@ export class BusService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYear gender')
+      .populate('classId', 'roomNumber academicYearId gender')
       .populate('bus.installmentPlanId', 'name numberOfInstallments');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
@@ -147,14 +147,14 @@ export class BusService {
 
     if (isPaginated) {
       return {
-        message: 'ØªÙ… Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ø·Ù„Ø§Ø¨ Ø®Ø¯Ù…Ø© Ø§Ù„Ø¨Ø§Øµ Ø¨Ù†Ø¬Ø§Ø­',
+        message: 'تم استرجاع طلاب خدمة الباص بنجاح',
         data,
         totalDocs: paginationMeta.total,
         totalPages: paginationMeta.totalPages,
       };
     }
 
-    return { message: 'ØªÙ… Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ø·Ù„Ø§Ø¨ Ø®Ø¯Ù…Ø© Ø§Ù„Ø¨Ø§Øµ Ø¨Ù†Ø¬Ø§Ø­', data };
+    return { message: 'تم استرجاع طلاب خدمة الباص بنجاح', data };
   }
 
   async findCandidates(filters: any = {}, pagination: any = {}) {
@@ -173,7 +173,7 @@ export class BusService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYear gender');
+      .populate('classId', 'roomNumber academicYearId gender');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const records = await q.exec();

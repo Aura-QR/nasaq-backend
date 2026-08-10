@@ -14,6 +14,9 @@ export class FeeConfig extends Document {
   @Prop({ required: true, min: 0 })
   tuitionFee: number;
 
+  @Prop({ required: false, min: 0, max: 100, default: 0 })
+  expatriateSurchargePercentage: number;
+
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Admin',

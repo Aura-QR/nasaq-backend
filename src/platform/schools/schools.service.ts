@@ -10,6 +10,9 @@ import { PasswordUtil } from 'src/auth/utils/password.util';
 import { JwtService } from '@nestjs/jwt';
 import { TenantContextService } from 'src/tenancy/tenant-context.service';
 
+import { Inject, Optional, forwardRef } from '@nestjs/common';
+import { FinancialRecordService } from 'src/financial/financial-record.service';
+
 @Injectable()
 export class SchoolsService {
   constructor(
@@ -19,6 +22,7 @@ export class SchoolsService {
     @InjectConnection() private readonly connection: Connection,
     private readonly jwtService: JwtService,
     private readonly tenantContext: TenantContextService,
+    @Optional() @Inject(forwardRef(() => FinancialRecordService)) private readonly financialRecordService?: FinancialRecordService,
   ) {}
 
   async register(dto: RegisterSchoolDto) {
@@ -241,6 +245,11 @@ export class SchoolsService {
     if (!updated) {
       throw new NotFoundException(`المدرسة غير موجودة`);
     }
+
+    if (settingsDto.localNationalityCodes && this.financialRecordService) {
+      await this.financialRecordService.recalculateForSchool(schoolId);
+    }
+
     return updated.settings;
   }
 }

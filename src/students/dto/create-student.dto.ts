@@ -9,8 +9,10 @@ import {
   Matches,
   IsBoolean,
   IsArray,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { NATIONALITY_CODES } from '../../common/constants/nationalities.constant';
 
 export class CreateStudentDto {
   @IsString()
@@ -42,9 +44,15 @@ export class CreateStudentDto {
   gender: string;
 
   @IsString()
-  @IsNotEmpty()
-  @ApiProperty({ description: 'The nationality of the student' })
-  nationality: string;
+  @IsOptional()
+  @ApiProperty({ description: 'The nationality label of the student', required: false })
+  nationality?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(NATIONALITY_CODES)
+  @ApiProperty({ description: 'The ISO 3166-1 alpha-2 nationality code of the student (e.g. SA, EG)', required: false })
+  nationalityCode?: string;
 
   @IsString()
   @IsNotEmpty()

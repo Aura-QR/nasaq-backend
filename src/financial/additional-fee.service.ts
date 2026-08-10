@@ -7,7 +7,6 @@ import { StudentFinancialRecord } from './schemas/student-financial-record.schem
 import { Student } from '../students/schemas/student.schema';
 import { Class } from '../classes/schemas/class.schema';
 import { CreateAdditionalFeeDto } from './dto/create-additional-fee.dto';
-import { PaymentStatus } from './enums/payment-status.enum';
 
 @Injectable()
 export class AdditionalFeeService {
@@ -47,7 +46,6 @@ export class AdditionalFeeService {
       }
 
       case AdditionalFeeTarget.ACADEMIC_YEAR: {
-        // Accept either targetId or targetAcademicYear — both must be a valid ObjectId
         const yearParam = dto.targetId || dto.targetAcademicYear;
         if (!yearParam) throw new BadRequestException('targetId مطلوب عند الاستهداف بسنة دراسية (أرسل معرف السنة الدراسية في targetId)');
         if (!mongoose.Types.ObjectId.isValid(yearParam)) {
@@ -77,7 +75,6 @@ export class AdditionalFeeService {
   }
 
   async create(dto: CreateAdditionalFeeDto, adminId: string) {
-    // Guard against duplicate fee name within the same school
     const existing = await this.additionalFeeModel.findOne({ name: dto.name }).lean().exec();
     if (existing) {
       throw new BadRequestException(`رسوم إضافية باسم "${dto.name}" موجودة مسبقاً — استخدم اسماً مختلفاً`);
@@ -112,7 +109,6 @@ export class AdditionalFeeService {
         { $push: { additionalFees: entry } },
       );
     } catch (err) {
-      // Rollback: remove the fee if student records update failed
       await this.additionalFeeModel.findByIdAndDelete(fee._id).exec();
       throw err;
     }
@@ -146,13 +142,25 @@ export class AdditionalFeeService {
     return { message: 'تم حذف الرسوم الإضافية وإزالتها من سجلات الطلاب' };
   }
 
-  async pay(studentId: string, feeId: string, amount: number, paidAt: string, adminId: string, notes?: string) {
+  async pay(
+    studentId: string,
+    feeId: string,
+    amount: number,
+    paidAt: string,
+    adminId: string,
+    notes?: string,
+    academicYearId?: string,
+  ) {
     this.validateObjectId(studentId, 'الطالب');
     this.validateObjectId(feeId, 'الرسوم');
 
-    const record = await this.recordModel
-      .findOne({ studentId: new mongoose.Types.ObjectId(studentId) })
-      .exec();
+    const query: any = { studentId: new mongoose.Types.ObjectId(studentId) };
+    if (academicYearId) {
+      this.validateObjectId(academicYearId, 'العام الدراسي');
+      query.academicYearId = new mongoose.Types.ObjectId(academicYearId);
+    }
+
+    const record = await this.recordModel.findOne(query).sort({ createdAt: -1 }).exec();
     if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
 
     const fee = record.additionalFees.find(f => (f as any).additionalFeeId.toString() === feeId);

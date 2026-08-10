@@ -41,6 +41,11 @@ export class UpdateInstallmentPlanDto {
   @IsOptional()
   isActive?: boolean;
 
+  @ApiProperty({ required: false })
+  @IsBoolean()
+  @IsOptional()
+  isDefault?: boolean;
+
   @ApiProperty({ required: false, description: 'Optional linked discount MongoID' })
   @ValidateIf((o, v) => v !== null && v !== undefined)
   @IsMongoId()

@@ -70,6 +70,9 @@ export class InstallmentPlanService {
         `عدد تواريخ الاستحقاق (${newDates.length}) يجب أن يساوي عدد الأقساط (${newCount})`,
       );
     }
+    if (dto.isDefault === true) {
+      await this.planModel.updateMany({ _id: { $ne: id } }, { isDefault: false }).exec();
+    }
     Object.assign(plan, dto);
     await plan.save();
     return { message: 'تم تحديث خطة التقسيط بنجاح', data: plan };
@@ -77,11 +80,14 @@ export class InstallmentPlanService {
 
   async setDefault(id: string) {
     this.validateObjectId(id);
-    const plan = await this.planModel.findById(id).exec();
-    if (!plan) throw new NotFoundException('خطة التقسيط غير موجودة');
-    await this.planModel.updateMany({}, { isDefault: false }).exec();
-    plan.isDefault = true;
-    await plan.save();
+    const exists = await this.planModel.exists({ _id: id });
+    if (!exists) throw new NotFoundException('خطة التقسيط غير موجودة');
+
+    await this.planModel.updateMany({ _id: { $ne: id } }, { isDefault: false }).exec();
+    const plan = await this.planModel
+      .findByIdAndUpdate(id, { isDefault: true }, { new: true })
+      .exec();
+
     return { message: 'تم تعيين الخطة الافتراضية بنجاح', data: plan };
   }
 

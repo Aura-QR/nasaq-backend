@@ -6,7 +6,7 @@ import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { AdditionalFeeService } from './additional-fee.service';
 import { CreateAdditionalFeeDto } from './dto/create-additional-fee.dto';
-import { RecordPaymentDto } from './dto/record-payment.dto';
+import { PayAdditionalFeeDto } from './dto/pay-additional-fee.dto';
 
 @Controller('financial/additional-fees')
 @UseGuards(JwtAuthGuard, AbilitiesGuard)
@@ -54,9 +54,17 @@ export class AdditionalFeeController {
   async pay(
     @Param('studentId') studentId: string,
     @Param('feeId') feeId: string,
-    @Body() dto: RecordPaymentDto,
+    @Body() dto: PayAdditionalFeeDto,
     @CurrentUser() user: any,
   ) {
-    return this.additionalFeeService.pay(studentId, feeId, dto.amount, dto.paidAt, user.userId, dto.notes);
+    return this.additionalFeeService.pay(
+      studentId,
+      feeId,
+      dto.amount,
+      dto.paidAt,
+      user.userId,
+      dto.notes,
+      dto.academicYearId,
+    );
   }
 }

@@ -17,6 +17,9 @@ export class SchoolSettings {
 
   @Prop({ default: 50, min: 0, max: 100 })
   defaultPassingGrade: number;
+
+  @Prop({ type: [String], default: [] })
+  localNationalityCodes: string[];
 }
 
 const SchoolSettingsSchema = SchemaFactory.createForClass(SchoolSettings);
