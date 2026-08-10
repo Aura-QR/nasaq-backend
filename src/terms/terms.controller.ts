@@ -72,7 +72,7 @@ export class TermsController {
     return await this.termsService.copyFromYear(
       targetYearId,
       sourceYearId,
-      body.termOverrides,
+      body?.termOverrides,
     );
   }
 
