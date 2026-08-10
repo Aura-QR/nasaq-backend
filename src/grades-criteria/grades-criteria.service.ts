@@ -72,6 +72,8 @@ export class GradesCriteriaService {
     subjectId?: string,
     academicYearId?: string,
     fallbackOfferingId?: mongoose.Types.ObjectId,
+    gradeLevelId?: string,
+    termId?: string,
   ): Promise<string> {
     if (subjectOfferingId) {
       this.validateObjectId(subjectOfferingId, 'subjectOffering');
@@ -109,12 +111,27 @@ export class GradesCriteriaService {
       offeringQuery.termId = { $in: termIds };
     }
 
-    const offering = await this.subjectOfferingModel.findOne(offeringQuery);
-    if (!offering) {
-      throw new NotFoundException(`لم يتم العثور على عرض لهذه المادة للسنة الدراسية المحددة`);
+    if (gradeLevelId) {
+      this.validateObjectId(gradeLevelId, 'gradeLevel');
+      offeringQuery.gradeLevelId = new mongoose.Types.ObjectId(gradeLevelId);
     }
 
-    return offering._id.toString();
+    if (termId) {
+      this.validateObjectId(termId, 'term');
+      offeringQuery.termId = new mongoose.Types.ObjectId(termId);
+    }
+
+    const matches = await this.subjectOfferingModel.find(offeringQuery).limit(2).exec();
+    if (matches.length === 0) {
+      throw new NotFoundException(`لم يتم العثور على عرض لهذه المادة للسنة والمرحلة المحددتين`);
+    }
+    if (matches.length > 1) {
+      throw new BadRequestException(
+        'أكثر من عرض مادة يطابق البيانات المرسلة — يرجى تحديد gradeLevelId و termId',
+      );
+    }
+
+    return matches[0]._id.toString();
   }
 
   async getMyGradesCriteria(studentId: string, subjectOfferingId?: string, subjectId?: string) {
@@ -315,12 +332,12 @@ export class GradesCriteriaService {
       .exec();
 
     if (!criteria) {
-      return { finalGrade: 0, passingGrade: undefined };
+      return { finalGrade: 0, passingGrade: undefined, hasGrade: false };
     }
 
-    const assignmentsCount = criteria.assignmentsCount || 1;
-    const quizzesCount = criteria.quizzesCount || 1;
-    const projectsCount = criteria.projectsCount || 1;
+    const assignmentsCount = criteria.assignmentsCount ?? 0;
+    const quizzesCount = criteria.quizzesCount ?? 0;
+    const projectsCount = criteria.projectsCount ?? 0;
 
     const offeringObj = criteria.subjectOfferingId as any;
     const sId = offeringObj?.subjectId?._id ?? offeringObj?.subjectId;
@@ -373,6 +390,8 @@ export class GradesCriteriaService {
     );
     const projectGradeFor = (projectId: string) => projectResultMap.get(projectId) ?? 0;
 
+    const hasGrade = results.length > 0 || projectSubmissions.length > 0;
+
     const finalScore = byType.final[0] ? gradeFor(byType.final[0]) : 0;
     const activityScore = byType.activity[0] ? gradeFor(byType.activity[0]) : 0;
 
@@ -398,6 +417,7 @@ export class GradesCriteriaService {
     return {
       finalGrade: termFinalGrade,
       passingGrade: criteria.passingGrade,
+      hasGrade,
     };
   }
 
@@ -454,31 +474,48 @@ export class GradesCriteriaService {
       subjectOfferingItems.sort((a, b) => b.termOrder - a.termOrder);
 
       let totalGradeSum = 0;
+      let gradedTermCount = 0;
       let resolvedPassingGrade: number | undefined = undefined;
+      let resolvedPassingGradeSource: string = 'إعدادات المدرسة الافتراضية';
 
       for (const item of subjectOfferingItems) {
-        const { finalGrade, passingGrade } = await this.calculateStudentTermGrade(
+        const { finalGrade, passingGrade, hasGrade } = await this.calculateStudentTermGrade(
           studentId,
           item.offering._id.toString(),
         );
-        totalGradeSum += finalGrade;
+
         if (resolvedPassingGrade === undefined && passingGrade !== undefined && passingGrade !== null) {
           resolvedPassingGrade = passingGrade;
+          const termDoc = terms.find((t) => t._id.toString() === item.offering.termId.toString());
+          resolvedPassingGradeSource = (termDoc as any)?.name ? (termDoc as any).name : `الفصل ${item.termOrder}`;
         }
+
+        if (!hasGrade) continue;
+        totalGradeSum += finalGrade;
+        gradedTermCount++;
       }
 
-      const N = subjectOfferingItems.length;
-      const yearlyFinalGrade = N > 0 ? totalGradeSum / N : 0;
+      const totalTermCount = subjectOfferingItems.length;
       const finalPassingGrade = resolvedPassingGrade ?? defaultPassingGrade;
-      const passed = yearlyFinalGrade >= finalPassingGrade;
+
+      let yearlyFinalGrade: number | null = null;
+      let passed: boolean | null = null;
+
+      if (gradedTermCount > 0) {
+        yearlyFinalGrade = Math.round((totalGradeSum / gradedTermCount) * 100) / 100;
+        passed = yearlyFinalGrade >= finalPassingGrade;
+      }
 
       subjectResults.push({
         subjectId: subjectIdStr,
         subjectName,
-        finalGrade: Math.round(yearlyFinalGrade * 100) / 100,
+        finalGrade: yearlyFinalGrade,
         passingGrade: finalPassingGrade,
+        passingGradeSource: resolvedPassingGradeSource,
         passed,
         isRequiredForPromotion,
+        gradedTermCount,
+        totalTermCount,
       });
     }
 
@@ -486,12 +523,15 @@ export class GradesCriteriaService {
   }
 
   async create(createGradesCriteriaDto: CreateGradesCriteriaDto) {
-    const { subjectOfferingId, subjectId, academicYearId, ...criteriaFields } = createGradesCriteriaDto as any;
+    const { subjectOfferingId, subjectId, academicYearId, gradeLevelId, termId, ...criteriaFields } = createGradesCriteriaDto as any;
 
     const resolvedOfferingId = await this.resolveSubjectOfferingId(
       subjectOfferingId,
       subjectId,
       academicYearId,
+      undefined,
+      gradeLevelId,
+      termId,
     );
 
     this.validateGradesSum(createGradesCriteriaDto);
@@ -604,15 +644,17 @@ export class GradesCriteriaService {
       throw new NotFoundException(`معايير التقييم ذات المعرف ${id} غير موجودة`);
     }
 
-    const { subjectOfferingId, subjectId, academicYearId, ...otherFields } = updateGradesCriteriaDto as any;
+    const { subjectOfferingId, subjectId, academicYearId, gradeLevelId, termId, ...otherFields } = updateGradesCriteriaDto as any;
 
     let targetOfferingId: string | null = null;
-    if (subjectOfferingId || subjectId || academicYearId) {
+    if (subjectOfferingId || subjectId || academicYearId || gradeLevelId || termId) {
       targetOfferingId = await this.resolveSubjectOfferingId(
         subjectOfferingId,
         subjectId,
         academicYearId,
         existingGradesCriteria.subjectOfferingId,
+        gradeLevelId,
+        termId,
       );
     }
 

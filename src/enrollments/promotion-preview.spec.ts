@@ -154,7 +154,7 @@ describe('Promotion Preview Automatic Pass/Fail Calculation Unit Tests', () => {
 
     jest.spyOn(service, 'calculateStudentTermGrade').mockImplementation(async (studentId, offeringId) => {
       const grade = termGradesMap[studentId]?.[offeringId] ?? 0;
-      return { finalGrade: grade, passingGrade: 50 };
+      return { finalGrade: grade, passingGrade: 50, hasGrade: true };
     });
 
     const gradeLevelId = new mongoose.Types.ObjectId().toString();

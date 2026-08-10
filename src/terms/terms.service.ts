@@ -26,7 +26,8 @@ export class TermsService {
     }
 
     const term = new this.termModel(createTermDto);
-    return term.save();
+    const saved = await term.save();
+    return { message: 'تم إنشاء الفصل الدراسي بنجاح', data: saved };
   }
 
   async createBulk(academicYearId: string, terms: TermItemDto[]) {

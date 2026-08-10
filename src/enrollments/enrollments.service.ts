@@ -92,7 +92,7 @@ export class EnrollmentsService {
       classId: new mongoose.Types.ObjectId(classId),
     }).exec();
 
-    return savedEnrollment;
+    return { message: 'تم تسجيل الطالب بنجاح', data: savedEnrollment };
   }
 
   async findByYearAndClass(academicYearId?: string, classId?: string, status?: string) {
@@ -222,9 +222,16 @@ export class EnrollmentsService {
           sourceYearId,
         );
 
-        overallPassed = subjectResults
-          .filter((s) => s.isRequiredForPromotion !== false)
-          .every((s) => s.passed);
+        const requiredSubjects = subjectResults.filter((s) => s.isRequiredForPromotion !== false);
+        if (requiredSubjects.length === 0) {
+          overallPassed = null;
+        } else if (requiredSubjects.some((s) => s.passed === false)) {
+          overallPassed = false;
+        } else if (requiredSubjects.some((s) => s.passed === null)) {
+          overallPassed = null;
+        } else {
+          overallPassed = true;
+        }
       }
 
       previewList.push({
@@ -264,6 +271,17 @@ export class EnrollmentsService {
       if (excludedSet.has(promo.studentId)) continue;
 
       try {
+        const targetCls = await this.classModel.findById(promo.targetClassId).exec();
+        const schoolIdStr = targetCls ? (targetCls as any).schoolId?.toString() : undefined;
+
+        if (schoolIdStr) {
+          await this.financialRecordService.assertCanCreateRecord(
+            promo.studentId,
+            promo.targetClassId,
+            schoolIdStr,
+          );
+        }
+
         const enrollment = new this.enrollmentModel({
           studentId: new mongoose.Types.ObjectId(promo.studentId),
           classId: new mongoose.Types.ObjectId(promo.targetClassId),
@@ -273,21 +291,21 @@ export class EnrollmentsService {
         });
 
         await enrollment.save();
-        createdDocs.push(enrollment);
 
-        // Create/update the student's financial record for the new academic year.
-        // Look up the target class to get its schoolId, then pass it explicitly.
-        const targetCls = await this.classModel.findById(promo.targetClassId).exec();
-        const schoolIdStr = targetCls ? (targetCls as any).schoolId?.toString() : undefined;
         if (schoolIdStr) {
           try {
-            await this.financialRecordService.createOrUpdateRecord(promo.studentId, promo.targetClassId, schoolIdStr);
-          } catch (financialError: any) {
-            console.warn(
-              `[BulkPromote] Financial record creation skipped for student ${promo.studentId}: ${financialError.message}`,
+            await this.financialRecordService.createOrUpdateRecord(
+              promo.studentId,
+              promo.targetClassId,
+              schoolIdStr,
             );
+          } catch (financialError: any) {
+            await this.enrollmentModel.findByIdAndDelete(enrollment._id).exec();
+            throw financialError;
           }
         }
+
+        createdDocs.push(enrollment);
       } catch (err: any) {
         errors.push({
           studentId: promo.studentId,

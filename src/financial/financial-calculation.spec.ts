@@ -1,3 +1,5 @@
+import { FinancialRecordService } from './financial-record.service';
+
 describe('Financial Calculation Invariants & Expatriate Surcharge', () => {
   function computeFinancials(
     fee: number,
@@ -89,9 +91,10 @@ describe('Financial Calculation Invariants & Expatriate Surcharge', () => {
     expect(res.grossFee).toBe(8000);
   });
 
-  it('should defensively read grossFee ?? fee for legacy records (B2)', () => {
-    const legacyTuition: any = { fee: 8000, discount: null, netFee: 8000 }; // grossFee undefined
-    const effectiveGrossFee = legacyTuition.grossFee ?? legacyTuition.fee;
+  it('should defensively read grossFee || fee for legacy records (B2)', () => {
+    const legacyTuitionWithZeroGross: any = { fee: 8000, grossFee: 0, discount: null, netFee: 8000 };
+    // grossFee hydrated as 0 by Mongoose on legacy doc requires || instead of ??
+    const effectiveGrossFee = legacyTuitionWithZeroGross.grossFee || legacyTuitionWithZeroGross.fee;
     expect(effectiveGrossFee).toBe(8000);
   });
 
@@ -116,7 +119,7 @@ describe('Financial Calculation Invariants & Expatriate Surcharge', () => {
     expect(redistributed.reduce((a, b) => a + b, 0)).toBe(remainingUnpaid);
   });
 
-  it('should satisfy all mathematical invariants', () => {
+  it('should satisfy all mathematical invariants and verify against FinancialRecordService instance', () => {
     const fee = 9500;
     const surchargePct = 15;
     const discountPct = 10;
@@ -131,5 +134,16 @@ describe('Financial Calculation Invariants & Expatriate Surcharge', () => {
     const remainingUnpaid = res.netFee - totalPaid;
     const shares = redistributeUnpaidInstallments(unpaidCount, remainingUnpaid);
     expect(shares.reduce((a, b) => a + b, 0)).toBe(remainingUnpaid);
+
+    const recordService = new FinancialRecordService(
+      {} as any, {} as any, {} as any, {} as any,
+      {} as any, {} as any, {} as any, {} as any,
+    );
+    const plan = {
+      numberOfInstallments: 3,
+      dueDates: [new Date(), new Date(), new Date()],
+    } as any;
+    const serviceInstallments = recordService.buildInstallments(8000, plan);
+    expect(serviceInstallments.map((i) => i.amount)).toEqual([2667, 2667, 2666]);
   });
 });
