@@ -35,6 +35,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       // MongoDB duplicate key error — map to 409 Conflict
       status = HttpStatus.CONFLICT;
       message = 'البيانات المُدخلة مكررة — يوجد سجل بنفس المعلومات مسبقاً';
+    } else if (exception?.name === 'ValidationError' && exception?.errors) {
+      status = HttpStatus.BAD_REQUEST;
+      const first = Object.values(exception.errors)[0] as any;
+      message = first?.message || 'البيانات المُدخلة غير صحيحة';
+    } else if (exception?.name === 'CastError') {
+      status = HttpStatus.BAD_REQUEST;
+      message = 'صيغة المعرف غير صحيحة';
     } else {
       console.error('[GlobalExceptionFilter] Unhandled exception:', exception);
       message = exception.message || 'خطأ داخلي في الخادم';

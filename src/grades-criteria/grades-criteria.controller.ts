@@ -56,6 +56,8 @@ export class GradesCriteriaController {
   @ApiOperation({ summary: 'Get grades of the authenticated student for a subject offering' })
   @ApiQuery({ name: 'subjectOfferingId', required: false, type: String, description: 'SubjectOffering ID' })
   @ApiQuery({ name: 'subjectId', required: false, type: String, description: 'Subject ID' })
+  @ApiQuery({ name: 'academicYearId', required: false, type: String, description: 'Academic Year ID' })
+  @ApiQuery({ name: 'termId', required: false, type: String, description: 'Term ID' })
   @ApiResponse({ status: 200, description: 'Grades fetched successfully' })
   @ApiResponse({ status: 400, description: 'Subject offering missing' })
   @ApiResponse({ status: 404, description: 'Student or grading criteria not found' })
@@ -67,8 +69,16 @@ export class GradesCriteriaController {
     @CurrentUser() user: any,
     @Query('subjectOfferingId') subjectOfferingId?: string,
     @Query('subjectId') subjectId?: string,
+    @Query('academicYearId') academicYearId?: string,
+    @Query('termId') termId?: string,
   ) {
-    return await this.gradesCriteriaService.getMyGrades(user.userId, subjectOfferingId, subjectId);
+    return await this.gradesCriteriaService.getMyGrades(
+      user.userId,
+      subjectOfferingId,
+      subjectId,
+      academicYearId,
+      termId,
+    );
   }
 
   @ApiOperation({ summary: 'Get all grading criteria or filter with query params' })

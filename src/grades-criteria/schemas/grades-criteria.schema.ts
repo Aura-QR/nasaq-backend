@@ -18,7 +18,7 @@ export class GradesCriteria extends Document {
   @Prop({ required: true })
   assignments: number;
 
-  @Prop({ required: true, min: 1 })
+  @Prop({ required: true, min: 0 })
   assignmentsCount: number;
 
   @Prop({ required: true })
@@ -27,13 +27,13 @@ export class GradesCriteria extends Document {
   @Prop({ required: true })
   projects: number;
 
-  @Prop({ required: true, min: 1 })
+  @Prop({ required: true, min: 0 })
   projectsCount: number;
 
   @Prop({ required: true })
   quizzes: number;
 
-  @Prop({ required: true, min: 1 })
+  @Prop({ required: true, min: 0 })
   quizzesCount: number;
 
   @Prop({ type: Number, required: false })

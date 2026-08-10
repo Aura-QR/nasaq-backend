@@ -208,22 +208,32 @@ export class GradesCriteriaService {
     };
   }
 
-  async getMyGrades(studentId: string, subjectOfferingId?: string, subjectId?: string) {
-    let targetOfferingId = subjectOfferingId;
-
-    if (!targetOfferingId && subjectId) {
-      this.validateObjectId(subjectId, 'subject');
-      const offering = await this.subjectOfferingModel.findOne({ subjectId });
-      if (offering) {
-        targetOfferingId = offering._id.toString();
+  async getMyGrades(
+    studentId: string,
+    subjectOfferingId?: string,
+    subjectId?: string,
+    academicYearId?: string,
+    termId?: string,
+  ) {
+    let effGradeLevelId: string | undefined = undefined;
+    if (!subjectOfferingId && subjectId) {
+      const studentDoc = await this.studentModel.findById(studentId).select('classId').exec();
+      if (studentDoc?.classId) {
+        const cls = await this.classModel.findById(studentDoc.classId).select('gradeLevelId').exec();
+        if (cls?.gradeLevelId) {
+          effGradeLevelId = cls.gradeLevelId.toString();
+        }
       }
     }
 
-    if (!targetOfferingId) {
-      throw new BadRequestException('يرجى تحديد عرض المادة subjectOfferingId');
-    }
-
-    this.validateObjectId(targetOfferingId, 'subjectOffering');
+    const targetOfferingId = await this.resolveSubjectOfferingId(
+      subjectOfferingId,
+      subjectId,
+      academicYearId,
+      undefined,
+      effGradeLevelId,
+      termId,
+    );
 
     const criteria = await this.gradesCriteriaModel
       .findOne({ subjectOfferingId: new mongoose.Types.ObjectId(targetOfferingId) })
@@ -234,9 +244,9 @@ export class GradesCriteriaService {
       throw new NotFoundException('لا توجد معايير تقييم لهذه المادة');
     }
 
-    const assignmentsCount = criteria.assignmentsCount || 1;
-    const quizzesCount = criteria.quizzesCount || 1;
-    const projectsCount = criteria.projectsCount || 1;
+    const assignmentsCount = criteria.assignmentsCount ?? 0;
+    const quizzesCount = criteria.quizzesCount ?? 0;
+    const projectsCount = criteria.projectsCount ?? 0;
 
     const gradePerAssignment = criteria.assignments / assignmentsCount;
     const gradePerQuiz = criteria.quizzes / quizzesCount;
