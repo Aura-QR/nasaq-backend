@@ -33,6 +33,7 @@ import { GradeLevelsModule } from './grade-levels/grade-levels.module';
 import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { SubjectOfferingsModule } from './subject-offerings/subject-offerings.module';
 import { TeacherAssignmentsModule } from './teacher-assignments/teacher-assignments.module';
+import { TeacherAttendanceModule } from './teacher-attendance/teacher-attendance.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -75,6 +76,7 @@ import { TenantGuard } from './tenancy/guards/tenant.guard';
     LecturesModule,
     LibraryModule,
     AttendanceModule,
+    TeacherAttendanceModule,
     GradesCriteriaModule,
     ExamsModule,
     ProjectsModule,

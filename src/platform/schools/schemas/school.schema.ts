@@ -20,6 +20,18 @@ export class SchoolSettings {
 
   @Prop({ type: [String], default: [] })
   localNationalityCodes: string[];
+
+  @Prop({ type: { lat: Number, lng: Number }, default: null })
+  location: { lat: number; lng: number } | null;
+
+  @Prop({ default: 150, min: 20, max: 2000 })
+  checkInRadiusMeters: number;
+
+  @Prop({ type: [String], default: [] })
+  schoolNetworkIps: string[];
+
+  @Prop({ default: false })
+  teacherCheckInEnabled: boolean;
 }
 
 const SchoolSettingsSchema = SchemaFactory.createForClass(SchoolSettings);

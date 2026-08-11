@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection } from 'mongoose';
 import * as mongoose from 'mongoose';
@@ -232,6 +232,18 @@ export class SchoolsService {
   }
 
   async updateMySettings(schoolId: string, settingsDto: Partial<Record<string, any>>) {
+    if (settingsDto.teacherCheckInEnabled === true) {
+      const school = await this.schoolModel
+        .findById(schoolId, { settings: 1 })
+        .setOptions({ skipTenantScope: true })
+        .lean();
+
+      const effectiveLocation = settingsDto.location !== undefined ? settingsDto.location : school?.settings?.location;
+      if (!effectiveLocation || typeof effectiveLocation.lat !== 'number' || typeof effectiveLocation.lng !== 'number') {
+        throw new BadRequestException('لا يمكن تفعيل خدمة التسجيل الذاتي دون تحديد موقع المدرسة');
+      }
+    }
+
     const updateFields: Record<string, any> = {};
     for (const [key, value] of Object.entries(settingsDto)) {
       updateFields[`settings.${key}`] = value;
