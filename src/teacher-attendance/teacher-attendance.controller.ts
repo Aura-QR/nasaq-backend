@@ -22,7 +22,7 @@ import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.d
 import { CreateManualTeacherAttendanceDto } from './dto/create-manual-teacher-attendance.dto';
 import { QueryTeacherAttendanceDto } from './dto/query-teacher-attendance.dto';
 import { UpdateTeacherAttendanceDto } from './dto/update-teacher-attendance.dto';
-import { TeacherAttendanceService } from './teacher-attendance.service';
+import { extractClientIp, TeacherAttendanceService } from './teacher-attendance.service';
 
 @Controller('teacher-attendance')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,6 +30,14 @@ import { TeacherAttendanceService } from './teacher-attendance.service';
 @ApiBearerAuth()
 export class TeacherAttendanceController {
   constructor(private readonly teacherAttendanceService: TeacherAttendanceService) {}
+
+  @Get('detect-ip')
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Detect current client public IP for school network configuration (Admin only)' })
+  async detectClientIp(@Req() req: any) {
+    return { ip: extractClientIp(req) };
+  }
 
   @Post('check-in')
   @Roles(Role.TEACHER)
