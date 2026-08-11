@@ -58,25 +58,25 @@ export class LibraryController {
     return await this.libraryService.list();
   }
 
-  // @ApiOperation({ summary: 'Get library items by subject ID' })
-  // @ApiResponse({ status: 200, description: 'Library items fetched successfully' })
-  // @ApiResponse({ status: 400, description: 'Bad request' })
-  // @ApiResponse({ status: 404, description: 'Library items not found' })
-  // @Get('by-subject/:subjectId')
-  // @HttpCode(HttpStatus.OK)
-  // async findBySubject(@Param('subjectId') subjectId: string) {
-  //   return await this.libraryService.findBySubject(subjectId);
-  // }
+  @ApiOperation({ summary: 'Get library items by subject ID' })
+  @ApiResponse({ status: 200, description: 'Library items fetched successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 404, description: 'Library items not found' })
+  @Get('by-subject/:subjectId')
+  @HttpCode(HttpStatus.OK)
+  async findBySubject(@Param('subjectId') subjectId: string) {
+    return await (this.libraryService as any).findBySubject(subjectId);
+  }
 
-  // @ApiOperation({ summary: 'Get a library item by ID' })
-  // @ApiResponse({ status: 200, description: 'Library item fetched successfully' })
-  // @ApiResponse({ status: 400, description: 'Bad request' })
-  // @ApiResponse({ status: 404, description: 'Library item not found' })
-  // @Get(':id')
-  // @HttpCode(HttpStatus.OK)
-  // async findOne(@Param('id') id: string) {
-  //   return await this.libraryService.findOne(id);
-  // }
+  @ApiOperation({ summary: 'Get a library item by ID' })
+  @ApiResponse({ status: 200, description: 'Library item fetched successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 404, description: 'Library item not found' })
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  async findOne(@Param('id') id: string) {
+    return await (this.libraryService as any).findOne(id);
+  }
 
   @ApiOperation({ summary: 'Update a library item' })
   @ApiResponse({ status: 200, description: 'Library item updated successfully' })
