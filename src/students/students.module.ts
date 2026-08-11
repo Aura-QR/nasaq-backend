@@ -10,6 +10,8 @@ import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.
 import { EmailModule } from 'src/email/email.module';
 import { FinancialModule } from 'src/financial/financial.module';
 
+import { StudentFinancialRecord, StudentFinancialRecordSchema } from '../financial/schemas/student-financial-record.schema';
+
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -17,6 +19,7 @@ import { FinancialModule } from 'src/financial/financial.module';
       { name: Class.name, schema: ClassSchema },
       { name: Counter.name, schema: CounterSchema },
       { name: Enrollment.name, schema: EnrollmentSchema },
+      { name: StudentFinancialRecord.name, schema: StudentFinancialRecordSchema },
     ]),
     EmailModule,
     FinancialModule,

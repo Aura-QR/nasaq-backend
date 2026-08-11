@@ -18,6 +18,7 @@ import { Counter } from 'src/Counter/Schema/counter.schema';
 import { PasswordUtil } from 'src/auth/utils/password.util';
 import { EmailService } from 'src/email/email.service';
 import { FinancialRecordService } from 'src/financial/financial-record.service';
+import { StudentFinancialRecord } from '../financial/schemas/student-financial-record.schema';
 
 @Injectable()
 export class StudentsService {
@@ -30,6 +31,8 @@ export class StudentsService {
     private readonly counterModel: Model<Counter>,
     @InjectModel(Enrollment.name)
     private readonly enrollmentModel: Model<Enrollment>,
+    @InjectModel(StudentFinancialRecord.name)
+    private readonly financialRecordModel: Model<StudentFinancialRecord>,
     private readonly emailService: EmailService,
     private readonly financialRecordService: FinancialRecordService,
   ) { }
@@ -331,6 +334,9 @@ export class StudentsService {
       );
     }
 
+    const studentOid = new mongoose.Types.ObjectId(id);
+    await this.financialRecordModel.deleteMany({ studentId: studentOid }).exec();
+    await this.enrollmentModel.deleteMany({ studentId: studentOid }).exec();
     await this.studentModel.findByIdAndDelete(id).exec();
 
     return {

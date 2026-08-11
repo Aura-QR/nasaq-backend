@@ -138,12 +138,14 @@ export class BusService {
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const records = await q.exec();
 
-    const data = records.map((record: any) => ({
-      student: record.studentId,
-      class: record.classId,
-      academicYear: record.academicYear,
-      bus: record.bus,
-    }));
+    const data = records
+      .filter((record: any) => record.studentId !== null)
+      .map((record: any) => ({
+        student: record.studentId,
+        class: record.classId,
+        academicYear: record.academicYear,
+        bus: record.bus,
+      }));
 
     if (isPaginated) {
       return {
@@ -178,11 +180,13 @@ export class BusService {
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const records = await q.exec();
 
-    const data = records.map((record: any) => ({
-      student: record.studentId,
-      class: record.classId,
-      academicYear: record.academicYear,
-    }));
+    const data = records
+      .filter((record: any) => record.studentId !== null)
+      .map((record: any) => ({
+        student: record.studentId,
+        class: record.classId,
+        academicYear: record.academicYear,
+      }));
 
     if (isPaginated) {
       return {

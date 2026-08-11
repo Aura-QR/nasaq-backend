@@ -136,15 +136,17 @@ export class TripService {
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const records = await q.exec();
 
-    const data = records.map((record: any) => {
-      const trip = (record.trips || []).find((t: any) => t.tripTemplateId?.toString() === templateId);
-      return {
-        student: record.studentId,
-        class: record.classId,
-        academicYear: record.academicYear,
-        trip,
-      };
-    }).filter((item) => item.trip);
+    const data = records
+      .filter((record: any) => record.studentId !== null)
+      .map((record: any) => {
+        const trip = (record.trips || []).find((t: any) => t.tripTemplateId?.toString() === templateId);
+        return {
+          student: record.studentId,
+          class: record.classId,
+          academicYear: record.academicYear,
+          trip,
+        };
+      }).filter((item) => item.trip);
 
     if (isPaginated) {
       return {
@@ -190,11 +192,13 @@ export class TripService {
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const records = await q.exec();
 
-    const data = records.map((record: any) => ({
-      student: record.studentId,
-      class: record.classId,
-      academicYear: record.academicYear,
-    }));
+    const data = records
+      .filter((record: any) => record.studentId !== null)
+      .map((record: any) => ({
+        student: record.studentId,
+        class: record.classId,
+        academicYear: record.academicYear,
+      }));
 
     if (isPaginated) {
       return {

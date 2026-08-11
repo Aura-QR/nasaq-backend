@@ -481,7 +481,8 @@ export class FinancialRecordService {
       .populate('installmentPlanId', 'name numberOfInstallments linkedDiscountId');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
-    const data = await q.exec();
+    const rawData = await q.exec();
+    const data = rawData.filter((doc) => doc.studentId !== null);
 
     if (isPaginated) {
       return {
