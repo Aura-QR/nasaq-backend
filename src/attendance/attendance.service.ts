@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -12,6 +13,8 @@ import { Attendance } from './schemas/attendance.schema';
 import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { Student } from '../students/schemas/student.schema';
 import { Class } from '../classes/schemas/class.schema';
+import { Lecture } from '../lectures/schemas/lecture.schema';
+import { Term } from '../terms/schemas/term.schema';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
 import { transformAttendanceResponse } from './transforms/response.transform';
@@ -31,17 +34,126 @@ export class AttendanceService {
     private readonly studentModel: Model<Student>,
     @InjectModel(Class.name)
     private readonly classModel: Model<Class>,
+    @InjectModel(Lecture.name)
+    private readonly lectureModel: Model<Lecture>,
+    @InjectModel(Term.name)
+    private readonly termModel: Model<Term>,
   ) {}
+
+  // Index matches Date.getUTCDay(): 0 = Sunday
+  private static readonly WEEKDAYS = [
+    'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday',
+  ];
+
+  /**
+   * A teacher may only record attendance for a class they actually teach that day.
+   * Admins are unrestricted.
+   *
+   * Attendance is day-level, so whoever opens their lecture first records the day —
+   * every later teacher of the same class hits the duplicate guard instead.
+   */
+  private async assertMayRecordForClass(user: any, classId: string, date: string) {
+    if (!user || user.role !== 'TEACHER') return;
+
+    const day = new Date(date);
+    const weekday = AttendanceService.WEEKDAYS[day.getUTCDay()];
+
+    const filter: any = {
+      classId: new mongoose.Types.ObjectId(classId),
+      teacherId: new mongoose.Types.ObjectId(String(user.userId)),
+      dayOfWeek: weekday,
+    };
+
+    // Scope to the term the date falls in, so last term's timetable does not
+    // keep granting access. If the date sits outside every term, stay lenient.
+    const term = await this.termModel
+      .findOne({ startDate: { $lte: day }, endDate: { $gte: day } })
+      .select('_id')
+      .exec();
+    if (term) filter.termId = term._id;
+
+    const lecture = await this.lectureModel.findOne(filter).exec();
+    if (!lecture) {
+      throw new ForbiddenException(
+        'لا يمكنك تسجيل الغياب لهذا الفصل — ليس لديك حصة في جدول هذا اليوم',
+      );
+    }
+  }
+
+  /**
+   * Everything the attendance screen needs for one lecture, in a single call:
+   * the lecture, its class, the full student roster, and who is already marked
+   * absent for that date.
+   */
+  async getLectureSheet(lectureId: string, date: string, user?: any) {
+    this.validateObjectId(lectureId, 'Lecture ID');
+
+    const lecture = await this.lectureModel
+      .findById(lectureId)
+      .populate('classId', 'name roomNumber gender')
+      .populate({
+        path: 'subjectOfferingId',
+        populate: [{ path: 'subjectId', select: 'subjectName subjectCode' }],
+      })
+      .populate('teacherId', 'name')
+      .exec();
+
+    if (!lecture) {
+      throw new NotFoundException('المحاضرة غير موجودة');
+    }
+
+    if (
+      user?.role === 'TEACHER' &&
+      String((lecture as any).teacherId?._id ?? (lecture as any).teacherId) !==
+        String(user.userId)
+    ) {
+      throw new ForbiddenException('هذه ليست حصتك');
+    }
+
+    const classId = (lecture as any).classId?._id ?? (lecture as any).classId;
+    const day = new Date(date);
+
+    const [students, absences] = await Promise.all([
+      this.studentModel
+        .find({ classId, isActive: true })
+        .select('name firstName familyName schoolEmail')
+        .sort({ name: 1 })
+        .exec(),
+      this.attendanceModel.find({ classId, date: day }).select('studentId').exec(),
+    ]);
+
+    const absentIds = new Set(absences.map((a) => a.studentId.toString()));
+
+    return {
+      message: 'تم استرجاع كشف الحضور بنجاح',
+      data: {
+        lecture,
+        date,
+        alreadyRecorded: absences.length > 0,
+        students: students.map((s: any) => ({
+          _id: s._id,
+          name: s.name,
+          schoolEmail: s.schoolEmail,
+          absent: absentIds.has(s._id.toString()),
+        })),
+      },
+    };
+  }
 
   /**
    * Creates a new attendance record
    * Validates student and class existence, checks for duplicates, and creates attendance
    */
-  async create(createAttendanceDto: CreateAttendanceDto) {
+  async create(createAttendanceDto: CreateAttendanceDto, user?: any) {
     const student = await this.validateAndGetStudent(createAttendanceDto.studentId);
     const classData = await this.validateAndGetClass(createAttendanceDto.classId);
     
     await this.validateStudentBelongsToClass(student, classData);
+    await this.assertMayRecordForClass(
+      user,
+      createAttendanceDto.classId,
+      createAttendanceDto.date,
+    );
     await this.checkForDuplicateAttendance(
       createAttendanceDto.studentId,
       createAttendanceDto.classId,
@@ -53,6 +165,7 @@ export class AttendanceService {
       classId: createAttendanceDto.classId,
       date: new Date(createAttendanceDto.date),
       name: student.name,
+      recordedBy: user?.userId ?? null,
     });
 
     await attendance.populate([

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreatePreparationDto } from './dto/create-preparation.dto';
@@ -42,8 +42,10 @@ export class PreparationService {
     let teacherName: string;
 
     if (user?.role === 'TEACHER') {
-      if (lecture.teacherId.toString() !== userId) {
-        throw new Error('المدرس لا يدرس هذه المحاضرة');
+      // teacherId is nullable — an unassigned slot belongs to nobody, so a
+      // teacher cannot prepare it either. Guard before calling toString().
+      if (!lecture.teacherId || lecture.teacherId.toString() !== userId) {
+        throw new ForbiddenException('المدرس لا يدرس هذه المحاضرة');
       }
       const teacher = await this.teacherModel.findById(userId);
       teacherId = userId;
@@ -296,7 +298,7 @@ export class PreparationService {
         user?.role === 'TEACHER' &&
         newLecture.teacherId.toString() !== user.userId
       ) {
-        throw new Error('المدرس لا يدرس هذه المحاضرة');
+        throw new ForbiddenException('المدرس لا يدرس هذه المحاضرة');
       }
 
    

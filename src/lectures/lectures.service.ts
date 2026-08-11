@@ -97,6 +97,49 @@ export class LecturesService {
       .exec();
   }
 
+  /**
+   * The caller's own timetable. Never accepts a teacherId — the id is taken from
+   * the token, so one teacher cannot read another's schedule.
+   */
+  async findMyTeacherLectures(teacherId: string, termId?: string) {
+    const resolvedTermId = termId ?? (await this.getActiveTermId());
+    return this.findAll(resolvedTermId, undefined, teacherId);
+  }
+
+  /**
+   * A student's own timetable, resolved through their active enrollment:
+   * student -> classId -> the lectures scheduled for that class.
+   */
+  async findMyStudentLectures(studentId: string, termId?: string) {
+    const student = await this.studentModel
+      .findById(studentId)
+      .select('classId')
+      .exec();
+
+    if (!student) {
+      throw new NotFoundException('الطالب غير موجود');
+    }
+    if (!student.classId) {
+      throw new BadRequestException('الطالب غير مسجل في أي فصل');
+    }
+
+    const resolvedTermId = termId ?? (await this.getActiveTermId());
+    return this.findAll(resolvedTermId, student.classId.toString(), undefined);
+  }
+
+  /**
+   * Falls back to the active term so the apps can call /me with no arguments.
+   * Returns undefined when no term is active, which makes findAll return
+   * every term rather than nothing.
+   */
+  private async getActiveTermId(): Promise<string | undefined> {
+    const activeTerm = await this.termModel
+      .findOne({ status: 'active' })
+      .select('_id')
+      .exec();
+    return activeTerm ? activeTerm._id.toString() : undefined;
+  }
+
   async findOne(id: string) {
     const lecture = await this.lectureModel
       .findById(id)

@@ -65,7 +65,7 @@ export class LibraryController {
   @Get('by-subject/:subjectId')
   @HttpCode(HttpStatus.OK)
   async findBySubject(@Param('subjectId') subjectId: string) {
-    return await (this.libraryService as any).findBySubject(subjectId);
+    return await this.libraryService.findBySubject(subjectId);
   }
 
   @ApiOperation({ summary: 'Get a library item by ID' })
@@ -75,7 +75,7 @@ export class LibraryController {
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
-    return await (this.libraryService as any).findOne(id);
+    return await this.libraryService.findOne(id);
   }
 
   @ApiOperation({ summary: 'Update a library item' })

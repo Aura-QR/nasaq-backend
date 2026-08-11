@@ -18,6 +18,7 @@ import { UpdateAttendanceDto } from './dto/update-attendance.dto';
 import { PaginationDto } from '../pagination/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @Controller('attendance')
 @ApiTags('Attendance')
@@ -25,14 +26,38 @@ export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   @Post()
+  @CheckAbilities({ action: 'create', subject: 'Attendance' })
   @ApiOperation({ summary: 'Create a new attendance record (mark student as absent)' })
   @ApiResponse({ status: 201, description: 'Attendance record created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 403, description: 'Not allowed to record attendance' })
   @ApiResponse({ status: 404, description: 'Student or Class not found' })
   @ApiResponse({ status: 409, description: 'Attendance record already exists' })
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createAttendanceDto: CreateAttendanceDto) {
-    return await this.attendanceService.create(createAttendanceDto);
+  async create(
+    @Body() createAttendanceDto: CreateAttendanceDto,
+    @CurrentUser() user: any,
+  ) {
+    return await this.attendanceService.create(createAttendanceDto, user);
+  }
+
+  @ApiOperation({
+    summary: "Attendance sheet for one lecture — the lecture, its class roster, and today's absences",
+  })
+  @ApiParam({ name: 'lectureId', description: 'Lecture ID', type: String })
+  @ApiQuery({ name: 'date', required: true, description: 'YYYY-MM-DD' })
+  @ApiResponse({ status: 200, description: 'Attendance sheet fetched successfully' })
+  @ApiResponse({ status: 403, description: 'Not the teacher of this lecture' })
+  @ApiResponse({ status: 404, description: 'Lecture not found' })
+  @Get('lecture/:lectureId/sheet')
+  @CheckAbilities({ action: 'create', subject: 'Attendance' })
+  @HttpCode(HttpStatus.OK)
+  async getLectureSheet(
+    @Param('lectureId') lectureId: string,
+    @CurrentUser() user: any,
+    @Query('date') date: string,
+  ) {
+    return await this.attendanceService.getLectureSheet(lectureId, date, user);
   }
 
   @ApiOperation({ summary: 'Get absence records for the authenticated student' })
@@ -62,6 +87,7 @@ export class AttendanceController {
   }
 
   @Patch(':id')
+  @CheckAbilities({ action: 'update', subject: 'Attendance' })
   @ApiOperation({ summary: 'Update an attendance record by ID' })
   @ApiParam({ name: 'id', description: 'Attendance record ID', type: String })
   @ApiResponse({ status: 200, description: 'Attendance record updated successfully' })
@@ -76,6 +102,7 @@ export class AttendanceController {
   }
 
   @Delete(':id')
+  @CheckAbilities({ action: 'delete', subject: 'Attendance' })
   @ApiOperation({ summary: 'Delete an attendance record by ID' })
   @ApiParam({ name: 'id', description: 'Attendance record ID', type: String })
   @ApiResponse({ status: 200, description: 'Attendance record deleted successfully' })

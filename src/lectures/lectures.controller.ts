@@ -9,11 +9,14 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { LecturesService } from './lectures.service';
 import { CreateLectureDto } from './dto/create-lecture.dto';
 import { UpdateLectureDto } from './dto/update-lecture.dto';
-import { ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Lectures')
 @Controller('lectures')
@@ -36,11 +39,45 @@ export class LecturesController {
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(
+    @CurrentUser() user: any,
     @Query('termId') termId?: string,
     @Query('classId') classId?: string,
     @Query('teacherId') teacherId?: string,
   ) {
-    return await this.lecturesService.findAll(termId, classId, teacherId);
+    // A teacher may only ever see their own timetable through this route —
+    // whatever teacherId they pass is ignored.
+    const effectiveTeacherId =
+      user?.role === 'TEACHER' ? String(user.userId) : teacherId;
+    return await this.lecturesService.findAll(termId, classId, effectiveTeacherId);
+  }
+
+  @ApiOperation({ summary: "Get the authenticated teacher's own weekly timetable" })
+  @ApiQuery({ name: 'termId', required: false, description: 'Defaults to the active term' })
+  @ApiResponse({ status: 200, description: 'Timetable fetched successfully' })
+  @Get('teacher/me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async findMyTeacherLectures(
+    @CurrentUser() user: any,
+    @Query('termId') termId?: string,
+  ) {
+    return await this.lecturesService.findMyTeacherLectures(user.userId, termId);
+  }
+
+  @ApiOperation({ summary: "Get the authenticated student's own weekly timetable" })
+  @ApiQuery({ name: 'termId', required: false, description: 'Defaults to the active term' })
+  @ApiResponse({ status: 200, description: 'Timetable fetched successfully' })
+  @ApiResponse({ status: 400, description: 'Student is not enrolled in any class' })
+  @Get('student/me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async findMyStudentLectures(
+    @CurrentUser() user: any,
+    @Query('termId') termId?: string,
+  ) {
+    return await this.lecturesService.findMyStudentLectures(user.userId, termId);
   }
 
   @ApiOperation({ summary: 'Copy schedule from a previous term/year (Wizard Step 7)' })

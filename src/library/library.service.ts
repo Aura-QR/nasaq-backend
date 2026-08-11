@@ -143,6 +143,43 @@ export class LibraryService {
     return libraries.map((library) => transformLibraryResponse(library));
   }
 
+  async findOne(id: string) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('صيغة المعرف غير صحيحة');
+    }
+
+    const library = await this.libraryModel
+      .findById(id)
+      .populate(LibraryService.SUBJECT_OFFERING_POPULATE)
+      .exec();
+
+    if (!library) {
+      throw new NotFoundException(`العنصر ذو المعرف ${id} غير موجود في المكتبة`);
+    }
+
+    return transformLibraryResponse(library);
+  }
+
+  async findBySubject(subjectId: string) {
+    if (!mongoose.Types.ObjectId.isValid(subjectId)) {
+      throw new BadRequestException('صيغة معرف المادة غير صحيحة');
+    }
+
+    // A subject has one offering per (grade level x term), so collect them all
+    // before looking up the library items attached to any of them.
+    const offerings = await this.subjectOfferingModel
+      .find({ subjectId: new mongoose.Types.ObjectId(subjectId) })
+      .select('_id')
+      .exec();
+
+    const libraries = await this.libraryModel
+      .find({ subjectOfferingId: { $in: offerings.map((o) => o._id) } })
+      .populate(LibraryService.SUBJECT_OFFERING_POPULATE)
+      .exec();
+
+    return libraries.map((library) => transformLibraryResponse(library));
+  }
+
   async update(id: string, updateLibraryDto: UpdateLibraryDto) {
     const currentLibrary = await this.libraryModel.findById(id);
 

@@ -25,6 +25,10 @@ export class Attendance extends Document {
 
   @Prop({ index: true })
   name: string;
+
+  // Who recorded this absence. Without it a disputed record has no author.
+  @Prop({ type: mongoose.Schema.Types.ObjectId, default: null })
+  recordedBy: mongoose.Types.ObjectId | null;
 }
 
 export const AttendanceSchema = SchemaFactory.createForClass(Attendance);
