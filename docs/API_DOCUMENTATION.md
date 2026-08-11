@@ -319,6 +319,49 @@ Dedicated login endpoint for School Admins / Owners / Managers.
 #### `POST /platform/auth/login` 🔓
 Platform Super Admin login endpoint. Uses `LoginUserDto` (`identifier` + `password`).
 
+#### `POST /auth/forgot-password` 🔓
+Request 6-digit OTP sent to registered email for password recovery. For full details, see [OTP Feature Guide](file:///d:/Work/Aura/nasaq-backend/docs/OTP_FEATURE_GUIDE.md).
+
+**Request Payload (JSON):**
+```json
+{
+  "email": "teacher@school.com",
+  "role": "TEACHER",
+  "schoolSlug": "alnoor-school"
+}
+```
+
+**Field Specifications (`ForgotPasswordDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `email` | `string` | ✅ | Registered user email address |
+| `role` | `string` | ✅ | User role: `'TEACHER'` \| `'STUDENT'` \| `'OWNER'` \| `'MANAGER'` \| `'SUPERVISOR'` |
+| `schoolSlug` | `string` | ❌ | School slug for tenant identification (optional) |
+| `schoolId` | `string` | ❌ | School MongoDB ID (optional) |
+
+#### `POST /auth/reset-password` 🔓
+Reset user password using the 6-digit OTP code received via email.
+
+**Request Payload (JSON):**
+```json
+{
+  "email": "teacher@school.com",
+  "role": "TEACHER",
+  "otp": "482910",
+  "newPassword": "NewPassword@123"
+}
+```
+
+**Field Specifications (`ResetPasswordDto`):**
+| Field | Type | Required | Rules & Description |
+|---|---|---|---|
+| `email` | `string` | ✅ | Registered user email address |
+| `role` | `string` | ✅ | User role: `'TEACHER'` \| `'STUDENT'` \| `'OWNER'` \| `'MANAGER'` \| `'SUPERVISOR'` |
+| `otp` | `string` | ✅ | 6-digit OTP code received in email |
+| `newPassword` | `string` | ✅ | New password (min length: 6) |
+| `schoolSlug` | `string` | ❌ | School slug (optional) |
+| `schoolId` | `string` | ❌ | Direct School MongoID (optional) |
+
 ---
 
 ### 5.3 Managers Management (OWNER Only)

@@ -365,8 +365,8 @@ export class StudentsService {
       throw new NotFoundException('البريد الإلكتروني غير مسجل');
     }
 
-    // Allow OTP request for both first-time setup AND forgot-password scenarios
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    // Fixed '000000' for testing environment
+    const otp = '000000';
     const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     await this.studentModel.findByIdAndUpdate(

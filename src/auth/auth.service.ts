@@ -240,7 +240,8 @@ export class AuthService {
             message: 'إذا كان البريد الإلكتروني مسجلاً، سيتم إرسال رمز التحقق إليه خلال لحظات',
         };
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        // Fixed '000000' for testing environment
+        const otp = '000000';
         const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
         try {
