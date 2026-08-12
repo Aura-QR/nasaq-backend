@@ -15,6 +15,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'خطأ داخلي في الخادم';
+    // Payload deliberately attached to a thrown HttpException. Only forwarded
+    // when the thrower supplied it, so no existing error response changes shape.
+    // Used by teacher check-in so a 409 can still carry the existing record.
+    let data: unknown;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -27,6 +31,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           message = messages[0];
         } else {
           message = messages;
+        }
+
+        if (exceptionResponse['data'] !== undefined) {
+          data = exceptionResponse['data'];
         }
       } else {
         message = exceptionResponse as string;
@@ -51,6 +59,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       status: false,
       message: message,
       statusCode: status,
+      ...(data !== undefined ? { data } : {}),
     });
   }
 }
