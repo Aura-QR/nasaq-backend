@@ -127,9 +127,28 @@ export class ProjectsController {
   @Delete('deleteAll')
   @ApiOperation({ summary: 'Delete all projects (Admin only)' })
   deleteAll(){
-    console.log('deleting all projects')
     return this.projectsService.deleteAll();
   }
+
+  // Literal paths MUST stay above @Get(':id') — Nest matches in declaration
+  // order, so a literal declared after it is swallowed by the wildcard and the
+  // segment is parsed as an ObjectId. This route lived below :id and every call
+  // to /projects/submissions returned 400 "صيغة المعرف غير صحيحة".
+  @Get('submissions')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Teacher — get all student submissions for a specific subject offering + class' })
+  @ApiQuery({ name: 'subjectOfferingId', required: true, type: String })
+  @ApiQuery({ name: 'classId', required: true, type: String })
+  @HttpCode(HttpStatus.OK)
+  async listSubmissionsBySubjectAndClass(
+    @CurrentUser() user: any,
+    @Query('subjectOfferingId') subjectOfferingId: string,
+    @Query('classId') classId: string,
+    @Req() req: any,
+  ) {
+    return this.projectsService.listSubmissionsBySubjectAndClass(user.userId, subjectOfferingId, classId, req);
+  }
+
   @Get(':id')
   @CheckAbilities({ action: 'read', subject: 'Project' })
   @ApiOperation({ summary: 'Get a single project by ID' })
@@ -258,21 +277,6 @@ export class ProjectsController {
     @Req() req: any,
   ) {
     return await this.projectsService.removeFile(id, filename, user, req);
-  }
-
-  @Get('submissions')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Teacher — get all student submissions for a specific subject offering + class' })
-  @ApiQuery({ name: 'subjectOfferingId', required: true, type: String })
-  @ApiQuery({ name: 'classId', required: true, type: String })
-  @HttpCode(HttpStatus.OK)
-  async listSubmissionsBySubjectAndClass(
-    @CurrentUser() user: any,
-    @Query('subjectOfferingId') subjectOfferingId: string,
-    @Query('classId') classId: string,
-    @Req() req: any,
-  ) {
-    return this.projectsService.listSubmissionsBySubjectAndClass(user.userId, subjectOfferingId, classId, req);
   }
 
   // ─── Student Submission Endpoints ─────────────────────────────────────────

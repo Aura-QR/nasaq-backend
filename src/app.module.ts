@@ -38,6 +38,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { TenantGuard } from './tenancy/guards/tenant.guard';
+import { CaslModule } from './casl/casl.module';
+import { AbilitiesGuard } from './casl/guards/abilities.guard';
 
 
 
@@ -92,6 +94,7 @@ import { TenantGuard } from './tenancy/guards/tenant.guard';
     EnrollmentsModule,
     SubjectOfferingsModule,
     TeacherAssignmentsModule,
+    CaslModule,
   ],
   controllers: [AppController],
   providers: [
@@ -101,8 +104,16 @@ import { TenantGuard } from './tenancy/guards/tenant.guard';
     // TenantGuard then enforces school-scoping / platform-route rules.
     // Both respect @Public() to allow genuinely public endpoints
     // (login, registration, health checks, password-setup flows).
+    //
+    // AbilitiesGuard is global so that @CheckAbilities works wherever it is
+    // written. It returns true immediately when a handler carries no
+    // @CheckAbilities metadata, so routes without it are unaffected — but a
+    // route that DOES declare abilities can no longer be left unenforced just
+    // because its controller forgot @UseGuards(AbilitiesGuard). That silent
+    // failure mode left POST /attendance wide open.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
+    { provide: APP_GUARD, useClass: AbilitiesGuard },
   ],
 })
 export class AppModule {}

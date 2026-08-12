@@ -33,17 +33,28 @@ export function tenantScopedPlugin(schema: Schema) {
     }
   };
 
-  // Register pre-hooks for read/update/delete queries
+  // Register pre-hooks for read/update/delete queries.
+  //
+  // Every method that can reach a document by _id alone must be listed here,
+  // otherwise a caller holding an id from another school reaches that school's
+  // data. Note the Model helpers compile down to these:
+  //   findById          -> findOne
+  //   findByIdAndUpdate -> findOneAndUpdate
+  //   findByIdAndDelete -> findOneAndDelete   <-- was missing
   const queryMethods = [
     'find',
     'findOne',
     'findOneAndUpdate',
+    'findOneAndDelete',
+    'findOneAndReplace',
+    'replaceOne',
     'updateOne',
     'updateMany',
     'deleteOne',
     'deleteMany',
     'countDocuments',
     'count',
+    'distinct',
   ];
 
   queryMethods.forEach((method) => {

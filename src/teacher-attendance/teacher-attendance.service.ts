@@ -60,15 +60,22 @@ export function parseCheckInTime(dateInput: string | Date, timeOrIsoStr: string)
   return new Date(timeOrIsoStr);
 }
 
+/**
+ * The client's real IP.
+ *
+ * Reads ONLY req.ip. Express derives that from X-Forwarded-For using the
+ * `trust proxy` hop count configured in main.ts, which means a value the caller
+ * prepended to the header is discarded.
+ *
+ * Do NOT read req.headers['x-forwarded-for'] here. That header is set by the
+ * client, so trusting its first element would let any teacher check in from
+ * anywhere by sending the school's public IP in a header — the school-network
+ * check would pass with no app and no network access.
+ */
 export function extractClientIp(req: any): string {
   if (!req) return '';
-  const xForwardedFor = req.headers?.['x-forwarded-for'];
-  const rawIp =
-    (typeof xForwardedFor === 'string' ? xForwardedFor.split(',')[0].trim() : null) ||
-    req.ip ||
-    req.socket?.remoteAddress ||
-    '';
-  return rawIp.replace(/^::ffff:/, '');
+  const rawIp = req.ip || req.socket?.remoteAddress || '';
+  return String(rawIp).replace(/^::ffff:/, '');
 }
 
 @Injectable()
@@ -113,11 +120,15 @@ export class TeacherAttendanceService {
     });
 
     if (existing) {
+      // 409, but carrying the existing record so a double tap can show
+      // "you checked in at 07:52" without a second round trip. The global
+      // exception filter forwards `data` when it is explicitly supplied.
       throw new HttpException(
         {
-          status: true,
+          status: false,
           message: 'تم تسجيل حضورك اليوم بالفعل',
           data: {
+            alreadyCheckedIn: true,
             checkInAt: existing.checkInAt,
             distanceMeters: existing.distanceMeters,
             verification: existing.verification,
@@ -185,6 +196,14 @@ export class TeacherAttendanceService {
     }
 
     const normDate = normalizeDate(dto.date);
+
+    // Attendance is a record of what happened, not a plan. Without this an
+    // admin can pre-fill next month and the "who was absent" report silently
+    // counts people who have not come to work yet.
+    if (normDate.getTime() > normalizeDate(new Date()).getTime()) {
+      throw new BadRequestException('لا يمكن تسجيل حضور بتاريخ مستقبلي');
+    }
+
     const existing = await this.teacherAttendanceModel.findOne({
       teacherId: new Types.ObjectId(dto.teacherId),
       date: normDate,

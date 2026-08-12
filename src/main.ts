@@ -1,12 +1,38 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './filters/http-exception.filter';
 import { ResponseInterceptor } from './interceptors/response.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Number of reverse proxies in front of this app.
+  //
+  // This MUST be a number, never `true`. With a number, Express walks
+  // X-Forwarded-For from the RIGHT and skips exactly that many trusted hops,
+  // so anything a client prepended to the header is ignored and req.ip is the
+  // real peer. With `true` the whole chain is trusted and any caller can claim
+  // any IP — which would defeat the school-network check in teacher check-in.
+  //
+  // Set TRUST_PROXY_HOPS to match the real deployment (Coolify/Traefik = 1,
+  // add 1 for Cloudflare or any extra proxy in front).
+  //
+  // Validated rather than passed straight through: a typo would otherwise
+  // become NaN or 0 and silently degrade the check with no visible symptom.
+  const rawHops = process.env.TRUST_PROXY_HOPS;
+  const parsedHops = rawHops === undefined ? 1 : Number(rawHops);
+  const trustProxyHops =
+    Number.isInteger(parsedHops) && parsedHops >= 0 ? parsedHops : 1;
+
+  if (parsedHops !== trustProxyHops) {
+    console.warn(
+      `⚠️  TRUST_PROXY_HOPS="${rawHops}" is not a non-negative integer — falling back to 1.`,
+    );
+  }
+  app.set('trust proxy', trustProxyHops);
 
 app.enableCors({
   origin: (origin, callback) => {
