@@ -19,13 +19,17 @@ import { PaginationDto } from '../pagination/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
-import { AbilitiesGuard } from '../casl/guards/abilities.guard';
 
-// AbilitiesGuard is now an APP_GUARD (see app.module.ts), so this is redundant
-// — kept for consistency with the other sixteen controllers that declare it.
-// It used to be required, and this controller was the one that forgot it,
-// which left POST /attendance open to students despite @CheckAbilities.
-@UseGuards(JwtAuthGuard, AbilitiesGuard)
+// NO class-level @UseGuards(AbilitiesGuard) here, deliberately.
+//
+// AbilitiesGuard is an APP_GUARD (app.module.ts), so @CheckAbilities below is
+// already enforced. Declaring it locally as well is not merely redundant — it
+// makes Nest construct the guard inside THIS module's injector, and
+// AttendanceModule does not import CaslModule, so CaslAbilityFactory cannot be
+// resolved and the whole app fails to boot with UnknownDependenciesException.
+//
+// The other sixteen controllers get away with the local @UseGuards only
+// because their modules do import CaslModule.
 @Controller('attendance')
 @ApiTags('Attendance')
 export class AttendanceController {
