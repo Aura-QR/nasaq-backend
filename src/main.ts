@@ -17,8 +17,22 @@ async function bootstrap() {
   // real peer. With `true` the whole chain is trusted and any caller can claim
   // any IP — which would defeat the school-network check in teacher check-in.
   //
-  // Set TRUST_PROXY_HOPS to match the real deployment (Coolify/Traefik = 1).
-  app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
+  // Set TRUST_PROXY_HOPS to match the real deployment (Coolify/Traefik = 1,
+  // add 1 for Cloudflare or any extra proxy in front).
+  //
+  // Validated rather than passed straight through: a typo would otherwise
+  // become NaN or 0 and silently degrade the check with no visible symptom.
+  const rawHops = process.env.TRUST_PROXY_HOPS;
+  const parsedHops = rawHops === undefined ? 1 : Number(rawHops);
+  const trustProxyHops =
+    Number.isInteger(parsedHops) && parsedHops >= 0 ? parsedHops : 1;
+
+  if (parsedHops !== trustProxyHops) {
+    console.warn(
+      `⚠️  TRUST_PROXY_HOPS="${rawHops}" is not a non-negative integer — falling back to 1.`,
+    );
+  }
+  app.set('trust proxy', trustProxyHops);
 
 app.enableCors({
   origin: (origin, callback) => {
