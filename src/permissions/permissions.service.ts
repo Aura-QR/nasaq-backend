@@ -222,7 +222,12 @@ export class PermissionsService implements OnModuleInit {
           subjects: { read: false, add: false, edit: false, delete: false },
           lectures: { read: true, add: false, edit: false, delete: false },
           library: { read: true, add: false, edit: false, delete: false },
-          attendance: { read: false, add: true, edit: true, delete: false },
+          // delete is the UNDO for a mistaken absence — attendance is
+          // absence-based, so removing the record is what marks a student
+          // present again. A teacher who can record but not remove cannot fix
+          // their own mistake. Scoped by assertMayTouchRecord() in
+          // AttendanceService to the classes they actually teach.
+          attendance: { read: false, add: true, edit: true, delete: true },
           gradesCriteria: { read: true, add: false, edit: false, delete: false },
           exams: { read: true, add: true, edit: true, delete: true },
           projects: { read: true, add: true, edit: true, delete: true },

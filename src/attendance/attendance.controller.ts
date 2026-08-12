@@ -103,8 +103,9 @@ export class AttendanceController {
   async update(
     @Param('id') id: string,
     @Body() updateAttendanceDto: UpdateAttendanceDto,
+    @CurrentUser() user: any,
   ) {
-    return await this.attendanceService.update(id, updateAttendanceDto);
+    return await this.attendanceService.update(id, updateAttendanceDto, user);
   }
 
   @Delete(':id')
@@ -115,7 +116,7 @@ export class AttendanceController {
   @ApiResponse({ status: 400, description: 'Invalid ID format' })
   @ApiResponse({ status: 404, description: 'Attendance record not found' })
   @HttpCode(HttpStatus.OK)
-  async delete(@Param('id') id: string) {
-    return await this.attendanceService.delete(id);
+  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+    return await this.attendanceService.delete(id, user);
   }
 }

@@ -52,7 +52,7 @@ export class AttendanceService {
    * Attendance is day-level, so whoever opens their lecture first records the day —
    * every later teacher of the same class hits the duplicate guard instead.
    */
-  private async assertMayRecordForClass(user: any, classId: string, date: string) {
+  private async assertMayRecordForClass(user: any, classId: string, date: string | Date) {
     if (!user || user.role !== 'TEACHER') return;
 
     const day = new Date(date);
@@ -78,6 +78,31 @@ export class AttendanceService {
         'لا يمكنك تسجيل الغياب لهذا الفصل — ليس لديك حصة في جدول هذا اليوم',
       );
     }
+  }
+
+  /**
+   * A teacher may only edit or delete a record for a class they teach on that
+   * record's own date — the same rule as recording it. Admins are unrestricted.
+   *
+   * Deleting is how a teacher undoes a mistake: attendance is absence-based, so
+   * removing the record is what marks the student present again. Without this
+   * check, granting teachers delete would let any teacher clear any absence in
+   * the school, which is why the permission and the check ship together.
+   */
+  private async assertMayTouchRecord(user: any, attendanceId: string) {
+    if (!user || user.role !== 'TEACHER') return;
+
+    const record = await this.attendanceModel
+      .findById(attendanceId)
+      .select('classId date')
+      .exec();
+
+    // Missing record is not this method's error to report — let the caller's
+    // own lookup raise the 404 so the message stays consistent.
+    if (!record) return;
+
+    const classId = String((record as any).classId?._id ?? (record as any).classId);
+    await this.assertMayRecordForClass(user, classId, (record as any).date);
   }
 
   /**
@@ -214,8 +239,10 @@ export class AttendanceService {
   /**
    * Updates an existing attendance record
    */
-  async update(id: string, updateAttendanceDto: UpdateAttendanceDto) {
+  async update(id: string, updateAttendanceDto: UpdateAttendanceDto, user?: any) {
     this.validateObjectId(id, 'Attendance ID');
+
+    await this.assertMayTouchRecord(user, id);
 
     const attendance = await this.attendanceModel
       .findByIdAndUpdate(id, updateAttendanceDto, { new: true })
@@ -251,8 +278,10 @@ export class AttendanceService {
   /**
    * Deletes an attendance record by ID
    */
-  async delete(id: string) {
+  async delete(id: string, user?: any) {
     this.validateObjectId(id, 'Attendance ID');
+
+    await this.assertMayTouchRecord(user, id);
 
     const attendance = await this.attendanceModel.findByIdAndDelete(id);
 
