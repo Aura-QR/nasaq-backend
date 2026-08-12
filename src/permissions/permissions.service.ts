@@ -2,6 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Permission } from './schemas/permission.schema';
+import { getDefaultPermissionsForRole } from './default-permissions';
 
 @Injectable()
 export class PermissionsService implements OnModuleInit {
@@ -195,66 +196,8 @@ export class PermissionsService implements OnModuleInit {
   }
 
   private getDefaultPermissions(role: string) {
-    switch (role) {
-      case 'SUPERVISOR':
-      case 'OWNER':
-        return {
-          students: { read: true, add: true, edit: true, delete: true },
-          teachers: { read: true, add: true, edit: true, delete: true },
-          classes: { read: true, add: true, edit: true, delete: true },
-          subjects: { read: true, add: true, edit: true, delete: true },
-          lectures: { read: true, add: true, edit: true, delete: true },
-          library: { read: true, add: true, edit: true, delete: true },
-          attendance: { read: true, add: true, edit: true, delete: true },
-          gradesCriteria: { read: true, add: true, edit: true, delete: true },
-          exams: { read: true, add: false, edit: false, delete: true },
-          projects: { read: true, add: false, edit: false, delete: true },
-          grades: { read: true, add: true, edit: true, delete: true },
-          preparation: { read: true, add: false, edit: false, delete: true },
-          financial: { read: true, add: true, edit: true, delete: true },
-        };
-
-      case 'TEACHER':
-        return {
-          students: { read: true, add: false, edit: false, delete: false },
-          teachers: { read: false, add: false, edit: false, delete: false },
-          classes: { read: true, add: false, edit: false, delete: false },
-          subjects: { read: false, add: false, edit: false, delete: false },
-          lectures: { read: true, add: false, edit: false, delete: false },
-          library: { read: true, add: false, edit: false, delete: false },
-          // delete is the UNDO for a mistaken absence — attendance is
-          // absence-based, so removing the record is what marks a student
-          // present again. A teacher who can record but not remove cannot fix
-          // their own mistake. Scoped by assertMayTouchRecord() in
-          // AttendanceService to the classes they actually teach.
-          attendance: { read: false, add: true, edit: true, delete: true },
-          gradesCriteria: { read: true, add: false, edit: false, delete: false },
-          exams: { read: true, add: true, edit: true, delete: true },
-          projects: { read: true, add: true, edit: true, delete: true },
-          grades: { read: true, add: true, edit: true, delete: false },
-          preparation: { read: true, add: true, edit: true, delete: true },
-          financial: { read: false, add: false, edit: false, delete: false },
-        };
-
-      case 'STUDENT':
-        return {
-          students: { read: false, add: false, edit: false, delete: false },
-          teachers: { read: false, add: false, edit: false, delete: false },
-          classes: { read: false, add: false, edit: false, delete: false },
-          subjects: { read: false, add: false, edit: false, delete: false },
-          lectures: { read: false, add: false, edit: false, delete: false },
-          library: { read: true, add: false, edit: false, delete: false },
-          attendance: { read: true, add: false, edit: false, delete: false },
-          gradesCriteria: { read: false, add: false, edit: false, delete: false },
-          exams: { read: false, add: false, edit: false, delete: false },
-          projects: { read: false, add: false, edit: false, delete: false },
-          grades: { read: false, add: false, edit: false, delete: false },
-          preparation: { read: false, add: false, edit: false, delete: false },
-          financial: { read: false, add: false, edit: false, delete: false },
-        };
-
-      default:
-        return {};
-    }
+    // Single source of truth — shared with SchoolsService.register(), which seeds
+    // the per-school documents. See src/permissions/default-permissions.ts.
+    return getDefaultPermissionsForRole(role);
   }
 }

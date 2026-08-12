@@ -5,6 +5,7 @@ import * as mongoose from 'mongoose';
 import { School } from './schemas/school.schema';
 import { Admin } from 'src/admin/schemas/admin.schema';
 import { Permission } from 'src/permissions/schemas/permission.schema';
+import { STUDENT_PERMISSIONS, TEACHER_PERMISSIONS } from 'src/permissions/default-permissions';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { PasswordUtil } from 'src/auth/utils/password.util';
 import { JwtService } from '@nestjs/jwt';
@@ -81,42 +82,15 @@ export class SchoolsService {
           school.ownerId = owner._id as any;
           await school.save();
 
-          // 5. Seed default permissions for the school
-          const defaultTeacherPerms = {
-            students: { read: true, add: false, edit: false, delete: false },
-            teachers: { read: false, add: false, edit: false, delete: false },
-            classes: { read: true, add: false, edit: false, delete: false },
-            subjects: { read: false, add: false, edit: false, delete: false },
-            lectures: { read: true, add: false, edit: false, delete: false },
-            library: { read: true, add: false, edit: false, delete: false },
-            attendance: { read: false, add: true, edit: true, delete: false },
-            gradesCriteria: { read: true, add: false, edit: false, delete: false },
-            exams: { read: true, add: true, edit: true, delete: true },
-            projects: { read: true, add: true, edit: true, delete: true },
-            grades: { read: true, add: true, edit: true, delete: false },
-            preparation: { read: true, add: true, edit: true, delete: true },
-            financial: { read: false, add: false, edit: false, delete: false },
-          };
-
-          const defaultStudentPerms = {
-            students: { read: false, add: false, edit: false, delete: false },
-            teachers: { read: false, add: false, edit: false, delete: false },
-            classes: { read: false, add: false, edit: false, delete: false },
-            subjects: { read: false, add: false, edit: false, delete: false },
-            lectures: { read: false, add: false, edit: false, delete: false },
-            library: { read: true, add: false, edit: false, delete: false },
-            attendance: { read: true, add: false, edit: false, delete: false },
-            gradesCriteria: { read: false, add: false, edit: false, delete: false },
-            exams: { read: false, add: false, edit: false, delete: false },
-            projects: { read: false, add: false, edit: false, delete: false },
-            grades: { read: false, add: false, edit: false, delete: false },
-            preparation: { read: false, add: false, edit: false, delete: false },
-            financial: { read: false, add: false, edit: false, delete: false },
-          };
-
+          // 5. Seed default permissions for the school.
+          //
+          // These tables live in src/permissions/default-permissions.ts and MUST NOT be
+          // inlined here again. They used to be, and because this path is what every real
+          // school is seeded from, the copy in PermissionsService was only ever a fallback
+          // — editing it changed nothing for anybody, with no error to show for it.
           await this.permissionModel.create([
-            { role: 'TEACHER', schoolId: school._id, permissions: defaultTeacherPerms },
-            { role: 'STUDENT', schoolId: school._id, permissions: defaultStudentPerms },
+            { role: 'TEACHER', schoolId: school._id, permissions: TEACHER_PERMISSIONS },
+            { role: 'STUDENT', schoolId: school._id, permissions: STUDENT_PERMISSIONS },
           ]);
 
           return { owner };
