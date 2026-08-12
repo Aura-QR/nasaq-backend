@@ -39,7 +39,6 @@ export class ExamsController {
   async create(
     @CurrentUser() user: any,
     @Body() createExamDto: CreateExamDto) {
-      console.log(user)
     return await this.examsService.create(createExamDto, user);
   }
 
