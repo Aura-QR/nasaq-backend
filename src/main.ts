@@ -1,12 +1,24 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './filters/http-exception.filter';
 import { ResponseInterceptor } from './interceptors/response.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Number of reverse proxies in front of this app.
+  //
+  // This MUST be a number, never `true`. With a number, Express walks
+  // X-Forwarded-For from the RIGHT and skips exactly that many trusted hops,
+  // so anything a client prepended to the header is ignored and req.ip is the
+  // real peer. With `true` the whole chain is trusted and any caller can claim
+  // any IP — which would defeat the school-network check in teacher check-in.
+  //
+  // Set TRUST_PROXY_HOPS to match the real deployment (Coolify/Traefik = 1).
+  app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
 
 app.enableCors({
   origin: (origin, callback) => {

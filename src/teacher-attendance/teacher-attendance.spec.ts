@@ -25,6 +25,21 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
     schoolNetworkIps: ['192.168.1.100', '10.0.0.1'],
   };
 
+  // extractClientIp reads req.ip ONLY. Express derives that from
+  // X-Forwarded-For using the `trust proxy` hop count set in main.ts, so a
+  // header the caller prepended never reaches us. These fixtures deliberately
+  // carry a hostile x-forwarded-for to prove it is ignored — an earlier version
+  // read the header directly, which let any teacher check in from home by
+  // claiming the school's IP.
+  const onSchoolNetwork = {
+    ip: '192.168.1.100',
+    headers: { 'x-forwarded-for': '203.0.113.5' },
+  };
+  const offSchoolNetwork = {
+    ip: '203.0.113.5',
+    headers: { 'x-forwarded-for': '192.168.1.100' },
+  };
+
   beforeEach(() => {
     teacherAttendanceModel = {
       findOne: jest.fn(),
@@ -152,7 +167,7 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
         verification: { gps: true, network: true },
       });
 
-      const mockReq = { headers: { 'x-forwarded-for': '192.168.1.100' } };
+      const mockReq = onSchoolNetwork;
 
       const result = await service.checkIn(
         teacherUser,
@@ -190,7 +205,7 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
         verification: { gps: true, network: false },
       });
 
-      const mockReq = { headers: { 'x-forwarded-for': '203.0.113.5' } };
+      const mockReq = offSchoolNetwork;
 
       const result = await service.checkIn(
         teacherUser,
@@ -221,7 +236,7 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
       });
 
       // Coordinates ~500m away (lat offset 0.005)
-      const mockReq = { headers: { 'x-forwarded-for': '192.168.1.100' } };
+      const mockReq = onSchoolNetwork;
 
       const result = await service.checkIn(
         teacherUser,
@@ -243,10 +258,33 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
       teacherAttendanceModel.findOne.mockResolvedValue(null);
 
       // Coordinates ~500m away and unrecognized IP
-      const mockReq = { headers: { 'x-forwarded-for': '203.0.113.5' } };
+      const mockReq = offSchoolNetwork;
 
       await expect(
         service.checkIn(teacherUser, { lat: 24.7186, lng: 46.6753 }, mockReq),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should ignore a spoofed X-Forwarded-For claiming the school IP', async () => {
+      schoolModel.findById.mockReturnValue({
+        setOptions: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({ settings: defaultSchoolSettings }),
+        }),
+      });
+
+      teacherAttendanceModel.findOne.mockResolvedValue(null);
+
+      // A teacher at home: real peer is off-network, but the request carries
+      // "X-Forwarded-For: 192.168.1.100" — the school's own IP. If that header
+      // were trusted the network check would pass and this would be recorded
+      // as "was on the school network".
+      const spoofed = {
+        ip: '203.0.113.5',
+        headers: { 'x-forwarded-for': '192.168.1.100' },
+      };
+
+      await expect(
+        service.checkIn(teacherUser, { lat: 24.7186, lng: 46.6753 }, spoofed),
       ).rejects.toThrow(ForbiddenException);
     });
   });
@@ -258,6 +296,16 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
       role: 'OWNER',
     };
 
+    // Derived, not hard-coded — a literal date silently becomes a future date
+    // once the calendar passes it, and the test would start failing on its own.
+    const dayOffset = (days: number) => {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0, 10);
+    };
+    const yesterday = dayOffset(-1);
+    const tomorrow = dayOffset(1);
+
     it('should create a manual attendance record with recordedBy set to admin ID', async () => {
       teacherModel.findById.mockResolvedValue({ _id: mockTeacherId, name: 'فاطمة علي' });
       teacherAttendanceModel.findOne.mockResolvedValue(null);
@@ -265,7 +313,7 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
 
       const result = await service.createManual(adminUser, {
         teacherId: mockTeacherId,
-        date: '2026-09-20',
+        date: yesterday,
         checkInAt: '07:45',
         notes: 'عطل في تحديد الموقع',
       });
@@ -276,13 +324,25 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
       expect(result.name).toBe('فاطمة علي');
     });
 
+    it('should reject a future date', async () => {
+      teacherModel.findById.mockResolvedValue({ _id: mockTeacherId, name: 'فاطمة علي' });
+
+      await expect(
+        service.createManual(adminUser, {
+          teacherId: mockTeacherId,
+          date: tomorrow,
+          checkInAt: '07:45',
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should throw 404 if teacher is not found', async () => {
       teacherModel.findById.mockResolvedValue(null);
 
       await expect(
         service.createManual(adminUser, {
           teacherId: mockTeacherId,
-          date: '2026-09-20',
+          date: yesterday,
           checkInAt: '07:45',
         }),
       ).rejects.toThrow(NotFoundException);
