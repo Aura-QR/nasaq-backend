@@ -108,14 +108,28 @@ export class ExamsService {
 
     this.validateObjectId(subjectOfferingId, 'subjectOffering');
 
-    // If user is a teacher, verify they teach these classes with this subject offering
-    if (user?.role === 'TEACHER') {
-      await this.verifyTeacherClassAccess(
-        user.userId,
-        classIds,
-        subjectOfferingId,
+    // Exams are set by the teacher who gives them. This is enforced here rather
+    // than through permissions because OWNER and SUPERVISOR log in with ['*'],
+    // which CASL expands to can('manage','all') — it bypasses every
+    // @CheckAbilities, so the stored `exams.add: false` on those roles never
+    // takes effect.
+    //
+    // It is also what keeps createdBy honest: the field is declared
+    // ref: 'Teacher', so an admin-authored exam stored an id that resolves to
+    // nothing — every populate returned null and the exam never appeared in
+    // GET /exams/teacher/me for the teacher who actually gives it.
+    if (user?.role !== 'TEACHER') {
+      throw new ForbiddenException(
+        'إنشاء الامتحانات متاح للمعلمين فقط — الامتحان يُنسب للمعلم الذي يقوم بتدريس الحصة',
       );
     }
+
+    // Verify the teacher actually teaches these classes with this subject offering
+    await this.verifyTeacherClassAccess(
+      user.userId,
+      classIds,
+      subjectOfferingId,
+    );
 
     for (const classId of classIds) {
       this.validateObjectId(classId, 'class');
