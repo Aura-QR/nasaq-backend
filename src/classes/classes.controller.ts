@@ -9,11 +9,14 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UseGuards,
 } from '@nestjs/common';
 import { ClassesService } from './classes.service';
 import { CreateClassDto } from './dto/create-class.dto';
 import { UpdateClassDto } from './dto/update-class.dto';
-import { ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('classes')
 @Controller('classes')
@@ -62,6 +65,29 @@ export class ClassesController {
     @Param('sourceYearId') sourceYearId: string,
   ) {
     return await this.classesService.copyClassesFromYear(targetYearId, sourceYearId);
+  }
+
+  // MUST stay above @Get(':id'). Nest matches in declaration order, so a literal
+  // path declared after the wildcard is swallowed by it: the request becomes
+  // findOne('teacher') and fails the ObjectId cast with
+  // 400 "صيغة معرف class غير صحيحة" — a message that blames the caller for a
+  // route that does not exist. GET /classes/my-classes hit exactly that.
+  @ApiOperation({
+    summary: "The classes the authenticated teacher teaches, derived from their timetable",
+  })
+  @ApiQuery({ name: 'termId', required: false, description: 'Defaults to the active term' })
+  @ApiResponse({ status: 200, description: 'Classes fetched successfully' })
+  @ApiBearerAuth()
+  @Get('teacher/me')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async findMyTeacherClasses(
+    @CurrentUser() user: any,
+    @Query('termId') termId?: string,
+  ) {
+    // The id comes from the token, never from the query, so one teacher cannot
+    // enumerate another's classes.
+    return await this.classesService.findMyTeacherClasses(user.userId, termId);
   }
 
   @ApiOperation({ summary: 'Get class by ID' })
