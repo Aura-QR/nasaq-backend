@@ -10,7 +10,9 @@ export class Admin extends Document {
   @Prop({ required: true })
   email: string;
 
-  @Prop({ required: true })
+  // select: false — see the note on Teacher.password. Queries that need the hash
+  // must ask for it explicitly with .select('+password')
+  @Prop({ required: true, select: false })
   password: string;
 
   @Prop({ default: 'OWNER', enum: ['OWNER', 'MANAGER', 'SUPERVISOR'] })

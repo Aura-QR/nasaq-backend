@@ -75,11 +75,28 @@ export class LecturesService {
     return this.findOne(newLecture._id.toString());
   }
 
-  async findAll(termId?: string, classId?: string, teacherId?: string) {
+  async findAll(
+    termId?: string,
+    classId?: string,
+    teacherId?: string,
+    dayOfWeek?: string,
+    slot?: number | string,
+  ) {
     const filter: any = {};
     if (termId) filter.termId = new mongoose.Types.ObjectId(termId);
     if (classId) filter.classId = new mongoose.Types.ObjectId(classId);
     if (teacherId) filter.teacherId = new mongoose.Types.ObjectId(teacherId);
+
+    // dayOfWeek is stored lowercase ('sunday'). Normalise so a caller sending
+    // 'Sunday' does not silently match nothing.
+    if (dayOfWeek) filter.dayOfWeek = String(dayOfWeek).toLowerCase();
+
+    // slot arrives as a query string. Number('') is 0, so guard on '' explicitly
+    // rather than relying on falsiness.
+    if (slot !== undefined && slot !== null && String(slot) !== '') {
+      const n = Number(slot);
+      if (!Number.isNaN(n)) filter.slot = n;
+    }
 
     return this.lectureModel
       .find(filter)

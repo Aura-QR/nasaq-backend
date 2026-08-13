@@ -36,6 +36,8 @@ export class LecturesController {
   @ApiQuery({ name: 'termId', required: false })
   @ApiQuery({ name: 'classId', required: false })
   @ApiQuery({ name: 'teacherId', required: false })
+  @ApiQuery({ name: 'dayOfWeek', required: false, description: "Lowercase, e.g. 'sunday'" })
+  @ApiQuery({ name: 'slot', required: false, type: Number })
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(
@@ -43,12 +45,20 @@ export class LecturesController {
     @Query('termId') termId?: string,
     @Query('classId') classId?: string,
     @Query('teacherId') teacherId?: string,
+    @Query('dayOfWeek') dayOfWeek?: string,
+    @Query('slot') slot?: string,
   ) {
     // A teacher may only ever see their own timetable through this route —
     // whatever teacherId they pass is ignored.
     const effectiveTeacherId =
       user?.role === 'TEACHER' ? String(user.userId) : teacherId;
-    return await this.lecturesService.findAll(termId, classId, effectiveTeacherId);
+    return await this.lecturesService.findAll(
+      termId,
+      classId,
+      effectiveTeacherId,
+      dayOfWeek,
+      slot,
+    );
   }
 
   @ApiOperation({ summary: "Get the authenticated teacher's own weekly timetable" })

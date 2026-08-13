@@ -7,10 +7,11 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  Query,
 } from '@nestjs/common';
 import { TeacherAssignmentsService } from './teacher-assignments.service';
 import { CreateTeacherAssignmentDto } from './dto/create-teacher-assignment.dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('teacher-assignments')
 @Controller('teacher-assignments')
@@ -24,6 +25,23 @@ export class TeacherAssignmentsController {
   @ApiResponse({ status: 409, description: 'Teacher already assigned to this offering' })
   async create(@Body() dto: CreateTeacherAssignmentDto) {
     return await this.teacherAssignmentsService.create(dto);
+  }
+
+  // Declared above the two by-* routes purely for readability; they are literal
+  // paths so there is no wildcard here to shadow them.
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'List teacher assignments, optionally filtered' })
+  @ApiQuery({ name: 'teacherId', required: false })
+  @ApiQuery({ name: 'subjectOfferingId', required: false })
+  @ApiQuery({ name: 'termId', required: false })
+  @ApiResponse({ status: 200, description: 'Assignments fetched successfully' })
+  async findAll(
+    @Query('teacherId') teacherId?: string,
+    @Query('subjectOfferingId') subjectOfferingId?: string,
+    @Query('termId') termId?: string,
+  ) {
+    return await this.teacherAssignmentsService.findAll({ teacherId, subjectOfferingId, termId });
   }
 
   @Get('by-offering/:subjectOfferingId')

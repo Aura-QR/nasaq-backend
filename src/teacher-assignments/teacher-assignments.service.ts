@@ -30,6 +30,44 @@ export class TeacherAssignmentsService {
     return assignment.save();
   }
 
+  /**
+   * The whole assignment table for the school, optionally narrowed.
+   *
+   * findByOffering and findByTeacher both require an id up front, so an admin
+   * screen had no way to render the list before choosing something — it had to
+   * fetch every teacher and fan out one request each.
+   */
+  async findAll(filters: { teacherId?: string; subjectOfferingId?: string; termId?: string } = {}) {
+    const query: any = {};
+    if (filters.teacherId) {
+      query.teacherId = new mongoose.Types.ObjectId(filters.teacherId);
+    }
+    if (filters.subjectOfferingId) {
+      query.subjectOfferingId = new mongoose.Types.ObjectId(filters.subjectOfferingId);
+    }
+
+    const rows = await this.teacherAssignmentModel
+      .find(query)
+      .populate('teacherId', 'name email phoneNumber specialization')
+      .populate({
+        path: 'subjectOfferingId',
+        populate: [
+          { path: 'subjectId', select: 'subjectName subjectCode' },
+          { path: 'gradeLevelId', select: 'name order' },
+          { path: 'termId', select: 'name order status' },
+        ],
+      })
+      .exec();
+
+    // termId lives on the offering, not on the assignment, so it cannot be part
+    // of the Mongo query without an aggregation. Filtered here instead.
+    if (!filters.termId) return rows;
+    return rows.filter((r: any) => {
+      const t = r.subjectOfferingId?.termId;
+      return String(t?._id ?? t) === String(filters.termId);
+    });
+  }
+
   async findByOffering(subjectOfferingId: string) {
     return this.teacherAssignmentModel
       .find({ subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId) })

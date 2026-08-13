@@ -59,9 +59,10 @@ export class AdminService {
   async login(loginAdminDto: LoginAdminDto) {
     const { identifier, password } = loginAdminDto;
 
+    // +password: the hash is select:false on the schema and must be requested.
     const admin = await this.adminModel.findOne({
       $or: [{ username: identifier }, { email: identifier }],
-    });
+    }).select('+password');
 
     if (!admin) {
       throw new UnauthorizedException('بيانات الدخول غير صحيحة');

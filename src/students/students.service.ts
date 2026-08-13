@@ -132,9 +132,15 @@ export class StudentsService {
       }
     }
 
+    // `select: false` hides the hash from QUERIES, but this document was just
+    // built in memory, so it still carries it. Strip it explicitly or the create
+    // response leaks what every read is careful not to.
+    const { password: _hash, otp: _otp, otpExpiry: _exp, ...safeStudent } =
+      transformStudentResponse(student) as any;
+
     return {
       message: 'تم إضافة الطالب بنجاح',
-      data: transformStudentResponse(student),
+      data: safeStudent,
     };
   }
 

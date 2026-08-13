@@ -97,7 +97,11 @@ export class AuthService {
         if (filterSchoolId) {
             adminQuery.schoolId = filterSchoolId;
         }
-        const admins = await this.adminModel.find(adminQuery).setOptions({ skipTenantScope: true });
+        // +password: the hash is select:false on the schema, so it must be asked
+        // for explicitly here. Removing this locks every admin out of the system.
+        const admins = await this.adminModel.find(adminQuery)
+            .select('+password')
+            .setOptions({ skipTenantScope: true });
 
         if (admins.length > 0) {
             if (admins.length > 1 && !filterSchoolId) {
@@ -111,7 +115,10 @@ export class AuthService {
             if (filterSchoolId) {
                 teacherQuery.schoolId = filterSchoolId;
             }
-            const teachers = await this.teacherModel.find(teacherQuery).setOptions({ skipTenantScope: true });
+            // +password: select:false on the schema — see the admin lookup above.
+            const teachers = await this.teacherModel.find(teacherQuery)
+                .select('+password')
+                .setOptions({ skipTenantScope: true });
 
             if (teachers.length > 0) {
                 if (teachers.length > 1 && !filterSchoolId) {

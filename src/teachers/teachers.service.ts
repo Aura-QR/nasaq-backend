@@ -51,9 +51,14 @@ export class TeachersService {
     });
     await teacher.save();
 
+    // `select: false` hides the hash from QUERIES, but this document was just
+    // built in memory, so it still carries it. Strip it explicitly or the
+    // create response leaks what every read is careful not to.
+    const { password: _hash, otp: _otp, ...safeTeacher } = teacher.toObject() as any;
+
     return {
       message: 'تم إضافة المعلم بنجاح',
-      teacher: teacher.toObject(),
+      teacher: safeTeacher,
     };
   }
 

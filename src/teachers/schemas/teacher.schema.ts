@@ -37,7 +37,10 @@ export class Teacher extends Document {
   @Prop({ default: 'TEACHER' })
   role: string;
 
-  @Prop({ required: true })
+  // select: false — the bcrypt hash must never leave the server. Without this it
+  // was returned by every teacher read (list, findAll, findOne, update).
+  // Queries that genuinely need it must ask: .select('+password')
+  @Prop({ required: true, select: false })
   password: string;
 
   @Prop({ select: false })
