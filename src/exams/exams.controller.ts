@@ -59,6 +59,35 @@ export class ExamsController {
     return await this.examsService.getMyExams(user.userId, filters, { page, limit });
   }
 
+  // Must stay above @Get(':id') — a literal path declared after the wildcard is
+  // swallowed by it and 'teacher' gets parsed as an exam id.
+  //
+  // exams was the only module without a teacher/me route; projects, subjects and
+  // lectures all have one, so the frontend reasonably assumed it existed and got
+  // a bare 404. The behaviour was already there — filtering() forces
+  // createdBy = the caller when the caller is a TEACHER — it just had no
+  // predictable address.
+  @ApiOperation({ summary: "Exams authored by the authenticated teacher" })
+  @ApiResponse({ status: 200, description: 'Exams fetched successfully' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'examType', required: false, type: String })
+  @ApiQuery({ name: 'subjectOfferingId', required: false, type: String })
+  @Get('teacher/me')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async getMyTeacherExams(@CurrentUser() user: any, @Query() queryParams: any) {
+    const { page, limit, ...filters } = queryParams;
+    // Never trust a createdBy from the query — the caller's own id wins, so one
+    // teacher cannot read another's exams through this route.
+    delete filters.createdBy;
+    return await this.examsService.filtering(
+      filters,
+      { page, limit },
+      { ...user, role: 'TEACHER' },
+    );
+  }
+
   @ApiOperation({ summary: 'Get all exams or filter with query params' })
   @ApiResponse({ status: 200, description: 'Exams fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
