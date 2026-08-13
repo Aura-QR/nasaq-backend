@@ -74,8 +74,17 @@ export class TeachersController {
   @ApiResponse({ status: 200, description: 'Teacher profile fetched successfully' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, AbilitiesGuard)
-  @CheckAbilities({ action: 'read', subject: 'Teacher' })
+  // Deliberately NO @CheckAbilities here.
+  //
+  // 'read Teacher' is permission to read the teacher DIRECTORY, and the TEACHER
+  // role does not have it (teachers: NONE in default-permissions.ts). Requiring
+  // it here meant no teacher could load their own profile — every call returned
+  // 403 'ليس لديك صلاحية للقيام بهذا الإجراء'.
+  //
+  // Reading yourself is identity, not directory access. The service scopes to
+  // user.userId from the verified JWT, so there is nothing to authorise beyond
+  // being logged in. GET /students/me is built the same way.
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   @HttpCode(HttpStatus.OK)
   async getMyProfile(@CurrentUser() user: any) {
