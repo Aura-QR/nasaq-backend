@@ -4811,6 +4811,865 @@
           ]
         }
       ]
+    },
+    {
+      "name": "11 · Grade weights are school policy",
+      "description": "The weight distribution decides how 100 marks split across the final, quizzes, assignments, activities and projects, and it sets the subject's passing grade. Two students in 1/1 and 1/2 are compared against each other at promotion time, so they have to be measured with the same ruler — which means the distribution is set by the school, and a teacher works inside it.\n\nEvery request here used to pass. POST/PATCH/DELETE /gradesCriteria carried no @CheckAbilities, PATCH /schools/me/settings carried no role check, and POST /exams invented a criteria when none existed — handing the distribution to whichever teacher created the first exam.",
+      "item": [
+        {
+          "name": "11.1 Teacher sets the grade weights → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/gradesCriteria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "gradesCriteria"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherAToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"final\": 40,\n  \"assignments\": 20,\n  \"assignmentsCount\": 4,\n  \"activities\": 10,\n  \"projects\": 15,\n  \"projectsCount\": 1,\n  \"quizzes\": 15,\n  \"quizzesCount\": 3,\n  \"passingGrade\": 60,\n  \"subjectOfferingId\": \"{{mathT1}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a teacher may not set the weight distribution', () => pm.expect(pm.response.code,",
+                  "  'a teacher may not set the weight distribution').to.eql(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.2 Student sets the grade weights → 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/gradesCriteria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "gradesCriteria"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"final\": 40,\n  \"assignments\": 20,\n  \"assignmentsCount\": 4,\n  \"activities\": 10,\n  \"projects\": 15,\n  \"projectsCount\": 1,\n  \"quizzes\": 15,\n  \"quizzesCount\": 3,\n  \"passingGrade\": 60,\n  \"subjectOfferingId\": \"{{mathT1}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a student may not set the weight distribution', () => pm.expect(pm.response.code,",
+                  "  'a student may not set the weight distribution').to.eql(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.3 Teacher edits the weights → 403",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/gradesCriteria/{{mathT1Criteria}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "gradesCriteria",
+                "{{mathT1Criteria}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherAToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"passingGrade\": 90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a teacher may not raise the passing grade', () => pm.expect(pm.response.code,",
+                  "  'a teacher may not raise the passing grade').to.eql(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.4 Teacher deletes the weights → 403",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/gradesCriteria/{{mathT1Criteria}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "gradesCriteria",
+                "{{mathT1Criteria}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherAToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a teacher may not delete the distribution', () => pm.expect(pm.response.code,",
+                  "  'a teacher may not delete the distribution').to.eql(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.5 Teacher can still READ the weights",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/gradesCriteria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "gradesCriteria"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherAToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a teacher must still see the distribution they teach inside', () => pm.expect(pm.response.code,",
+                  "  'a teacher must still see the distribution they teach inside').to.eql(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.6 Teacher reads one by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/gradesCriteria/{{mathT1Criteria}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "gradesCriteria",
+                "{{mathT1Criteria}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherAToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('reading a single criteria stays open to teachers', () => pm.expect(pm.response.code,",
+                  "  'reading a single criteria stays open to teachers').to.eql(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.7 Teacher changes school settings → 403",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schools/me/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schools",
+                "me",
+                "settings"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherAToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"defaultPassingGrade\": 90\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a teacher may not move the school-wide passing grade', () => pm.expect(pm.response.code,",
+                  "  'a teacher may not move the school-wide passing grade').to.eql(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.8 Student changes school settings → 403",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schools/me/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schools",
+                "me",
+                "settings"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{studentToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"defaultPassingGrade\": 10,\n  \"teacherCheckInEnabled\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('a student may not touch settings — this reaches the check-in location, radius and trusted IPs too', () => pm.expect(pm.response.code,",
+                  "  'a student may not touch settings — this reaches the check-in location, radius and trusted IPs too').to.eql(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.9 Owner still can",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/schools/me/settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "schools",
+                "me",
+                "settings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"defaultPassingGrade\": 55\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the owner is unaffected', () => pm.expect(pm.response.code,",
+                  "  'the owner is unaffected').to.eql(200));",
+                  "pm.test('and it saved', () =>",
+                  "  pm.expect(pm.response.json().data.defaultPassingGrade).to.eql(55));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.10 Owner adds a subject with NO weights yet",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subjects",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subjects"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjectName\": \"العلوم\",\n  \"subjectCode\": \"SCI101\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('subject created', () => pm.expect(pm.response.code,",
+                  "  'subject created').to.eql(201));",
+                  "",
+                  "// POST /subjects returns the document at data.subject, not data — reading",
+                  "// data._id gives undefined, the variable is set to nothing in silence, and",
+                  "// the run fails several requests later pointing at the wrong place.",
+                  "function pickId(body) {",
+                  "  const b = (body && body.data) ? body.data : body;",
+                  "  if (!b || typeof b !== 'object') return null;",
+                  "  if (b._id || b.id) return b._id || b.id;",
+                  "  const keys = Object.keys(b);",
+                  "  for (let i = 0; i < keys.length; i++) {",
+                  "    const v = b[keys[i]];",
+                  "    if (v && typeof v === 'object' && !Array.isArray(v) && (v._id || v.id)) return v._id || v.id;",
+                  "    if (Array.isArray(v) && v[0] && (v[0]._id || v[0].id)) return v[0]._id || v[0].id;",
+                  "  }",
+                  "  return null;",
+                  "}",
+                  "const id = pickId(pm.response.json());",
+                  "pm.test('captured subjectScienceId', () => pm.expect(id,",
+                  "  'no id in the response — everything using {{subjectScienceId}} would fail for the wrong reason'",
+                  ").to.be.a('string').and.not.empty);",
+                  "if (id) pm.collectionVariables.set('subjectScienceId', id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.11 Offering for it",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subject-offerings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subject-offerings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjectId\": \"{{subjectScienceId}}\",\n  \"gradeLevelId\": \"{{gradeLevelId}}\",\n  \"termId\": \"{{termId1}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('offering created', () => pm.expect(pm.response.code,",
+                  "  'offering created').to.eql(201));",
+                  "",
+                  "// POST /subjects returns the document at data.subject, not data — reading",
+                  "// data._id gives undefined, the variable is set to nothing in silence, and",
+                  "// the run fails several requests later pointing at the wrong place.",
+                  "function pickId(body) {",
+                  "  const b = (body && body.data) ? body.data : body;",
+                  "  if (!b || typeof b !== 'object') return null;",
+                  "  if (b._id || b.id) return b._id || b.id;",
+                  "  const keys = Object.keys(b);",
+                  "  for (let i = 0; i < keys.length; i++) {",
+                  "    const v = b[keys[i]];",
+                  "    if (v && typeof v === 'object' && !Array.isArray(v) && (v._id || v.id)) return v._id || v.id;",
+                  "    if (Array.isArray(v) && v[0] && (v[0]._id || v[0].id)) return v[0]._id || v[0].id;",
+                  "  }",
+                  "  return null;",
+                  "}",
+                  "const id = pickId(pm.response.json());",
+                  "pm.test('captured scienceT1', () => pm.expect(id,",
+                  "  'no id in the response — everything using {{scienceT1}} would fail for the wrong reason'",
+                  ").to.be.a('string').and.not.empty);",
+                  "if (id) pm.collectionVariables.set('scienceT1', id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.12 Assign teacher A to it",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/teacher-assignments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "teacher-assignments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"teacherId\": \"{{teacherAId}}\",\n  \"subjectOfferingId\": \"{{scienceT1}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('assigned', () => pm.expect(pm.response.code,",
+                  "  'assigned').to.eql(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.13 And give them a lecture for it",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/lectures",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "lectures"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"classId\": \"{{classId}}\",\n  \"subjectOfferingId\": \"{{scienceT1}}\",\n  \"termId\": \"{{termId1}}\",\n  \"teacherId\": \"{{teacherAId}}\",\n  \"dayOfWeek\": \"wednesday\",\n  \"slot\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('timetabled', () => pm.expect(pm.response.code,",
+                  "  'timetabled').to.eql(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.14 Exam for a subject with no weights → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exams",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exams"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherAToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjectOfferingId\": \"{{scienceT1}}\",\n  \"classIds\": [\n    \"{{classId}}\"\n  ],\n  \"examType\": \"quiz\",\n  \"startDate\": \"{{examStart}}\",\n  \"endDate\": \"{{examEnd}}\",\n  \"duration\": 30,\n  \"questions\": [\n    {\n      \"question\": \"١ + ١\",\n      \"options\": [\n        \"١\",\n        \"٢\"\n      ],\n      \"correctAnswer\": \"٢\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('refused instead of inventing a distribution', () =>",
+                  "  pm.expect(pm.response.code,",
+                  "    'POST /exams used to persist a 40/20/10/15/15 criteria here, silently ' +",
+                  "    'handing school policy to whichever teacher acted first'",
+                  "  ).to.eql(400));",
+                  "pm.test('and it names what is missing', () =>",
+                  "  pm.expect(pm.response.json().message).to.include('توزيع درجات'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.15 No criteria was created behind our back",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/gradesCriteria?subjectOfferingId={{scienceT1}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "gradesCriteria"
+              ],
+              "query": [
+                {
+                  "key": "subjectOfferingId",
+                  "value": "{{scienceT1}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "const raw = pm.response.json().data;",
+                  "const rows = Array.isArray(raw) ? raw : (raw.data || []);",
+                  "pm.test('the refused exam left nothing behind', () =>",
+                  "  pm.expect(rows.length,",
+                  "    'a criteria exists for a subject the admin never configured'",
+                  "  ).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.16 Owner sets the weights, and the exam now works",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/gradesCriteria",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "gradesCriteria"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"final\": 40,\n  \"assignments\": 20,\n  \"assignmentsCount\": 4,\n  \"activities\": 10,\n  \"projects\": 15,\n  \"projectsCount\": 1,\n  \"quizzes\": 15,\n  \"quizzesCount\": 3,\n  \"passingGrade\": 60,\n  \"subjectOfferingId\": \"{{scienceT1}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('the admin configures the subject', () => pm.expect(pm.response.code,",
+                  "  'the admin configures the subject').to.eql(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11.17 Teacher creates the exam → 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exams",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exams"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{teacherAToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subjectOfferingId\": \"{{scienceT1}}\",\n  \"classIds\": [\n    \"{{classId}}\"\n  ],\n  \"examType\": \"quiz\",\n  \"startDate\": \"{{examStart}}\",\n  \"endDate\": \"{{examEnd}}\",\n  \"duration\": 30,\n  \"questions\": [\n    {\n      \"question\": \"١ + ١\",\n      \"options\": [\n        \"١\",\n        \"٢\"\n      ],\n      \"correctAnswer\": \"٢\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('created once the distribution exists', () =>",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+                  "const b = pm.response.json().data || {};",
+                  "const exam = b.exam || b;",
+                  "pm.test('the mark is DERIVED from the weights (15 / 3 quizzes = 5)', () =>",
+                  "  pm.expect(exam.grade,",
+                  "    'the teacher does not choose the mark — ExamsService computes it'",
+                  "  ).to.eql(5));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
@@ -5043,6 +5902,14 @@
       "key": "examEnd",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "subjectScienceId",
+      "value": ""
+    },
+    {
+      "key": "scienceT1",
+      "value": ""
     }
   ]
 }
