@@ -4,6 +4,9 @@ import { RegisterSchoolDto } from './dto/register-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
 import { UpdateSchoolSettingsDto } from './dto/update-school-settings.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { Role } from 'src/auth/enums/role.enum';
 import { TenantGuard } from 'src/tenancy/guards/tenant.guard';
 import { PlatformOnly } from 'src/tenancy/decorators/platform-only.decorator';
 import { Public } from 'src/auth/decorators/public.decorator';
@@ -60,8 +63,20 @@ export class SchoolsController {
     return this.schoolsService.getMySettings(schoolId);
   }
 
+  // Admins only. This one PATCH reaches the passing grade every student in the
+  // school is measured against, the active academic year, and the entire teacher
+  // check-in security model — location, radius, trusted network IPs, and the
+  // on/off switch. It previously carried no role check at all, so any
+  // authenticated user in the tenant, a student included, could move all of it.
+  //
+  // RolesGuard depends only on Reflector, so attaching it here is safe. That is
+  // what makes it different from AbilitiesGuard, which must never be attached
+  // locally — see the note in grades-criteria.controller.ts.
+  //
+  // GET stays open on purpose: the teacher check-in screen reads it.
   @Patch('schools/me/settings')
-  @UseGuards(JwtAuthGuard, TenantGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   async updateMySettings(
     @CurrentSchool() schoolId: string,
     @Body() updateSettingsDto: UpdateSchoolSettingsDto,

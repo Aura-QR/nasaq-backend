@@ -15,10 +15,28 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 export class GradesCriteriaController {
   constructor(private readonly gradesCriteriaService: GradesCriteriaService) {}
 
+  // The weight distribution is school policy, not a per-teacher choice: two
+  // students in different classes of the same grade are compared against each
+  // other at promotion time, so they have to be measured with the same ruler.
+  // A teacher works INSIDE the distribution — ExamsService derives each exam's
+  // mark from it — but must not change it.
+  //
+  // The permission table already said exactly this
+  // (TEACHER gradesCriteria.add = false, STUDENT = none) and had no effect for
+  // as long as these three handlers carried no @CheckAbilities: AbilitiesGuard
+  // returns true when a handler asks for nothing. A student's token could
+  // rewrite the weights, and the passing grade with them.
+  //
+  // Do NOT add @UseGuards(AbilitiesGuard) here. It is already global in
+  // app.module.ts; a class-level @UseGuards constructs it in this module's
+  // injector, which does not import CaslModule, and the app fails to boot.
   @Post()
-  @ApiOperation({ summary: 'Create a grading criteria for a subject offering' })
+  @CheckAbilities({ action: 'create', subject: 'GradesCriteria' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a grading criteria for a subject offering (school admins only)' })
   @ApiResponse({ status: 201, description: 'Grading criteria created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - validation failed' })
+  @ApiResponse({ status: 403, description: 'Only school admins may set the weight distribution' })
   @ApiResponse({ status: 404, description: 'Subject offering not found' })
   @ApiResponse({ status: 409, description: 'Grading criteria already exists for this subject offering' })
   create(@Body() createGradesCriteriaDto: CreateGradesCriteriaDto) {
@@ -107,24 +125,32 @@ export class GradesCriteriaController {
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Grades criteria not found' })
   @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Invalid ID format' })
   @Get(':id')
+  @CheckAbilities({ action: 'read', subject: 'GradesCriteria' })
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
     return await this.gradesCriteriaService.findOne(id);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update a grading criteria by ID' })
+  @CheckAbilities({ action: 'update', subject: 'GradesCriteria' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a grading criteria by ID (school admins only)' })
   @ApiResponse({ status: 200, description: 'Grading criteria updated successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - Invalid ID or validation failed' })
+  @ApiResponse({ status: 403, description: 'Only school admins may change the weight distribution' })
   @ApiResponse({ status: 404, description: 'GradesCriteria not found' })
   update(@Param('id') id: string, @Body() updateGradesCriteriaDto: UpdateGradesCriteriaDto) {
     return this.gradesCriteriaService.update(id, updateGradesCriteriaDto);
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete a grading criteria by ID' })
+  @CheckAbilities({ action: 'delete', subject: 'GradesCriteria' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a grading criteria by ID (school admins only)' })
   @ApiResponse({ status: 200, description: 'Grading criteria deleted successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - Invalid ID format' })
+  @ApiResponse({ status: 403, description: 'Only school admins may delete the weight distribution' })
   @ApiResponse({ status: 404, description: 'GradesCriteria not found' })
   remove(@Param('id') id: string) {
     return this.gradesCriteriaService.remove(id);

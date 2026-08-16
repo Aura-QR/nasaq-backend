@@ -139,22 +139,23 @@ export class ExamsService {
       }
     }
 
-    let gradesCriteria = await this.gradesCriteriaModel.findOne({
+    const gradesCriteria = await this.gradesCriteriaModel.findOne({
       subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
     }).exec();
 
+    // This used to invent a criteria (40/20/10/15/15) and persist it whenever a
+    // teacher created the first exam for a subject that had none. That silently
+    // handed the weight distribution — school policy — to whichever teacher
+    // happened to act first, and it stayed the subject's official distribution
+    // for the rest of the year with the admin never asked and never told.
+    //
+    // It also reopened the hole that @CheckAbilities on POST /gradesCriteria
+    // closes: locking the front door means nothing while this writes the same
+    // document through a side one. Refuse, and name what is missing.
     if (!gradesCriteria) {
-      gradesCriteria = await new this.gradesCriteriaModel({
-        subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
-        final: 40,
-        assignments: 20,
-        assignmentsCount: 4,
-        activities: 10,
-        projects: 15,
-        projectsCount: 1,
-        quizzes: 15,
-        quizzesCount: 3,
-      }).save();
+      throw new BadRequestException(
+        'لا يوجد توزيع درجات لهذه المادة. يجب على إدارة المدرسة تحديد توزيع الدرجات قبل إنشاء الامتحانات.',
+      );
     }
 
     const validExamTypes = {
