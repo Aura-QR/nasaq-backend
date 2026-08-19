@@ -16,7 +16,7 @@ import { CreateExamDto, QuestionDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { SubmitAnswersDto } from './dto/submit-answers.dto';
-import { ApiOperation, ApiResponse, ApiQuery, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AbilitiesGuard } from 'src/casl/guards/abilities.guard';
 import { CheckAbilities } from 'src/casl/decorators/check-abilities.decorator';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
@@ -102,6 +102,23 @@ export class ExamsController {
     const { page, limit, ...filters } = queryParams;
     const pagination = { page, limit };
     return await this.examsService.filtering(filters, pagination,user);
+  }
+
+  // MUST stay above @Get(':id'). Nest matches in declaration order, so a
+  // literal path declared after the wildcard is swallowed by it and the
+  // segment is cast as an ObjectId — the caller gets 400 "invalid id" for a
+  // route that exists. Hit three times in this codebase already.
+  @ApiOperation({ summary: "Who sat this exam and what they scored (teacher must teach the subject)" })
+  @ApiParam({ name: 'examId', description: 'Exam ID' })
+  @ApiResponse({ status: 200, description: 'Results fetched successfully' })
+  @ApiResponse({ status: 403, description: 'Teacher does not teach this subject' })
+  @ApiResponse({ status: 404, description: 'Exam not found' })
+  @Get(':examId/results')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async listResults(@Param('examId') examId: string, @CurrentUser() user: any) {
+    return await this.examsService.listResults(examId, user);
   }
 
   @ApiOperation({ summary: 'Edit a student exam grade (Teacher only — must teach this subject in the student class)' })

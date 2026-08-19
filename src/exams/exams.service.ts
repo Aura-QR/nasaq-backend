@@ -753,6 +753,81 @@ export class ExamsService {
     };
   }
 
+  /**
+   * Who sat this exam, and what they scored.
+   *
+   * PATCH /exams/:examId/students/:studentId/grade existed with nothing to
+   * drive it: GET /exams/:id returns the exam, its questions and its classes
+   * but no results, so a teacher could set a mark and never read one. They
+   * could not see who had taken the exam, what it currently said, or why a
+   * student they picked answered 404 — editStudentGrade requires an existing
+   * ExamResult, which only exists once the student has started the exam.
+   *
+   * Mirrors GET /projects/:id/submissions, which is the same question asked
+   * of a project and has worked all along.
+   *
+   * Ownership is checked the same way editStudentGrade checks it — a lecture
+   * for this teacher on this offering — so read and write agree. Without that,
+   * a teacher could enumerate another subject's results and simply be refused
+   * on the write.
+   */
+  async listResults(examId: string, user: any) {
+    this.validateObjectId(examId, 'exam');
+
+    const exam = await this.examModel
+      .findById(examId)
+      .select('_id grade examType subjectOfferingId classIds')
+      .exec();
+    if (!exam) {
+      throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
+    }
+
+    if (user?.role === 'TEACHER') {
+      const lecture = await this.lectureModel.findOne({
+        teacherId: new mongoose.Types.ObjectId(String(user.userId)),
+        subjectOfferingId: exam.subjectOfferingId,
+      });
+      if (!lecture) {
+        throw new ForbiddenException('ليس لديك صلاحية لعرض نتائج هذه المادة');
+      }
+    }
+
+    const results = await this.examResultModel
+      .find({ examId: new mongoose.Types.ObjectId(examId) })
+      .populate({ path: 'studentId', select: 'name schoolEmail classId' })
+      .sort({ createdAt: 1 })
+      .exec();
+
+    // A student who has not started the exam has no result row at all, so the
+    // count of results is not the size of the class. Both numbers are returned
+    // because the difference is exactly what the teacher is looking for.
+    const enrolled = await this.studentModel
+      .countDocuments({ classId: { $in: exam.classIds } })
+      .exec();
+
+    return {
+      message: 'تم استرجاع نتائج الامتحان بنجاح',
+      data: {
+        examId: exam._id,
+        examType: exam.examType,
+        totalGrade: exam.grade,
+        enrolledCount: enrolled,
+        startedCount: results.length,
+        gradedCount: results.filter((r) => r.achievedGrade !== undefined && r.achievedGrade !== null).length,
+        results: results.map((r: any) => ({
+          studentId: r.studentId?._id ?? r.studentId,
+          studentName: r.studentId?.name ?? null,
+          schoolEmail: r.studentId?.schoolEmail ?? null,
+          startedAt: r.startedAt,
+          submitted: r.submitted,
+          achievedGrade: r.achievedGrade ?? null,
+          percentage: r.percentage ?? null,
+          passed: r.passed ?? null,
+        })),
+      },
+    };
+  }
+
   async editStudentGrade(examId: string, studentId: string, achievedGrade: number, teacher: any) {
     this.validateObjectId(examId, 'exam');
     this.validateObjectId(studentId, 'student');
