@@ -21,6 +21,7 @@ import { PermissionsService } from 'src/permissions/permissions.service';
 import { EmailService } from 'src/email/email.service';
 
 import { PlatformAdmin } from 'src/platform/platform-admins/schemas/platform-admin.schema';
+import { generateOtp, otpExpiry as otpExpiryDate } from '../common/utils/otp.util';
 
 @Injectable()
 export class AuthService {
@@ -247,9 +248,8 @@ export class AuthService {
             message: 'إذا كان البريد الإلكتروني مسجلاً، سيتم إرسال رمز التحقق إليه خلال لحظات',
         };
 
-        // Fixed '000000' for testing environment
-        const otp = '000000';
-        const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+        const otp = generateOtp();
+        const otpExpiry = otpExpiryDate();
 
         try {
             if (role === Role.TEACHER) {

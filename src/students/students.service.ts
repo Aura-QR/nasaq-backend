@@ -19,6 +19,7 @@ import { PasswordUtil } from 'src/auth/utils/password.util';
 import { EmailService } from 'src/email/email.service';
 import { FinancialRecordService } from 'src/financial/financial-record.service';
 import { StudentFinancialRecord } from '../financial/schemas/student-financial-record.schema';
+import { generateOtp, otpExpiry as otpExpiryDate } from '../common/utils/otp.util';
 
 @Injectable()
 export class StudentsService {
@@ -371,9 +372,8 @@ export class StudentsService {
       throw new NotFoundException('البريد الإلكتروني غير مسجل');
     }
 
-    // Fixed '000000' for testing environment
-    const otp = '000000';
-    const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    const otp = generateOtp();
+    const otpExpiry = otpExpiryDate();
 
     await this.studentModel.findByIdAndUpdate(
       student._id,
