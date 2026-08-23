@@ -45,7 +45,8 @@ export class TeachersService {
       createTeacherDto.hireDate = new Date().toISOString().split('T')[0];
     }
 
-    const { status, subjects, password, ...teacherFields } = createTeacherDto as any;
+    const { status, subjects, subjectIds, subjectOfferingIds, password, ...teacherFields } =
+      createTeacherDto as any;
     const hashedPassword = await PasswordUtil.hash(password || 'Teacher@123');
 
     const teacher = new this.teacherModel({
@@ -54,17 +55,16 @@ export class TeachersService {
     });
     await teacher.save();
 
-    // `select: false` hides the hash from QUERIES, but this document was just
-    // built in memory, so it still carries it. Strip it explicitly or the
-    // create response leaks what every read is careful not to.
-    const { password: _hash, otp: _otp, ...safeTeacher } = teacher.toObject() as any;
+    if (Array.isArray(subjectOfferingIds) && subjectOfferingIds.length > 0) {
+      await this.syncAssignments(teacher._id.toString(), subjectOfferingIds);
+    }
+
+    const teacherWithSubjects = await this.withSubjects(teacher);
+    const { password: _hash, otp: _otp, ...safeTeacher } = teacherWithSubjects;
 
     return {
       message: 'تم إضافة المعلم بنجاح',
-      // Always empty at this point — assignments are created separately through
-      // POST /teacher-assignments — but present so the client can rely on the
-      // same shape it gets from every other teacher route.
-      teacher: { ...safeTeacher, subjects: [], subjectIds: [], subjectOfferings: [] },
+      teacher: safeTeacher,
     };
   }
 

@@ -35,6 +35,23 @@ export class SubjectOfferingsService {
     return offering.save();
   }
 
+  async findAll(filters: { termId?: string; gradeLevelId?: string } = {}) {
+    const filter: any = {};
+    if (filters.termId) {
+      filter.termId = new mongoose.Types.ObjectId(filters.termId);
+    }
+    if (filters.gradeLevelId) {
+      filter.gradeLevelId = new mongoose.Types.ObjectId(filters.gradeLevelId);
+    }
+
+    return this.subjectOfferingModel
+      .find(filter)
+      .populate('subjectId', 'subjectName subjectCode')
+      .populate('gradeLevelId', 'name order')
+      .populate('termId', 'name order status')
+      .exec();
+  }
+
   async findByTerm(termId: string, gradeLevelId?: string) {
     const filter: any = { termId: new mongoose.Types.ObjectId(termId) };
     if (gradeLevelId) {

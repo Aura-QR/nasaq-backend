@@ -27,6 +27,19 @@ export class SubjectOfferingsController {
     return await this.subjectOfferingsService.create(dto);
   }
 
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Get all subject offerings, optionally filtered' })
+  @ApiQuery({ name: 'termId', required: false, type: String })
+  @ApiQuery({ name: 'gradeLevelId', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Subject offerings fetched successfully' })
+  async findAll(
+    @Query('termId') termId?: string,
+    @Query('gradeLevelId') gradeLevelId?: string,
+  ) {
+    return await this.subjectOfferingsService.findAll({ termId, gradeLevelId });
+  }
+
   @Get('by-term/:termId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get subject offerings for a term' })
