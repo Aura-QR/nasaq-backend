@@ -29,15 +29,17 @@ export class ExpenseController {
   @ApiOperation({ summary: 'List all expenses with filters and pagination' })
   @ApiQuery({ name: 'name', required: false })
   @ApiQuery({ name: 'categoryId', required: false })
-  @ApiQuery({ name: 'academicYear', required: false })
+  @ApiQuery({ name: 'academicYearId', required: false })
+  @ApiQuery({ name: 'academicYear', required: false, deprecated: true, description: 'Year name; use academicYearId' })
   @ApiQuery({ name: 'dateFrom', required: false })
   @ApiQuery({ name: 'dateTo', required: false })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   async find(@Query() query: any) {
-    const { page, limit, name, categoryId, academicYear, dateFrom, dateTo } = query;
+    const { page, limit, name, categoryId, academicYearId, academicYear, dateFrom, dateTo } =
+      query;
     return this.expenseService.find(
-      { name, categoryId, academicYear, dateFrom, dateTo },
+      { name, categoryId, academicYearId, academicYear, dateFrom, dateTo },
       { page, limit },
     );
   }
