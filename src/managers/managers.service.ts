@@ -34,7 +34,11 @@ export class ManagersService {
       email,
       password: hashedPassword,
       role,
-      permissions: role === 'SUPERVISOR' ? ['*'] : dto.permissions,
+      // A supervisor really does carry ['*']; a manager carries nothing,
+      // because its rights are read from the school's MANAGER row at login.
+      // dto.permissions is deliberately not stored — writing it would leave a
+      // list on the document that nothing reads.
+      permissions: role === 'SUPERVISOR' ? ['*'] : [],
       schoolId: new Types.ObjectId(schoolId),
     });
 
@@ -47,14 +51,19 @@ export class ManagersService {
     };
   }
 
-  async promoteTeacher(teacherId: string, permissions: string[]) {
+  /**
+   * A promoted teacher gets the school's MANAGER rights merged on top of their
+   * own at login, so there is nothing to pass here any more. The parameter is
+   * kept so the existing route signature still binds; it is not stored.
+   */
+  async promoteTeacher(teacherId: string, _permissions?: string[]) {
     const teacher = await this.teacherModel.findById(teacherId);
     if (!teacher) {
       throw new NotFoundException('المعلم المطلوب غير موجود');
     }
 
     teacher.isManager = true;
-    teacher.managerPermissions = permissions;
+    teacher.managerPermissions = [];
     await teacher.save();
 
     return {

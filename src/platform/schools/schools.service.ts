@@ -5,7 +5,11 @@ import * as mongoose from 'mongoose';
 import { School } from './schemas/school.schema';
 import { Admin } from 'src/admin/schemas/admin.schema';
 import { Permission } from 'src/permissions/schemas/permission.schema';
-import { STUDENT_PERMISSIONS, TEACHER_PERMISSIONS } from 'src/permissions/default-permissions';
+import {
+  MANAGER_PERMISSIONS,
+  STUDENT_PERMISSIONS,
+  TEACHER_PERMISSIONS,
+} from 'src/permissions/default-permissions';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { PasswordUtil } from 'src/auth/utils/password.util';
 import { JwtService } from '@nestjs/jwt';
@@ -89,6 +93,7 @@ export class SchoolsService {
           // school is seeded from, the copy in PermissionsService was only ever a fallback
           // — editing it changed nothing for anybody, with no error to show for it.
           await this.permissionModel.create([
+            { role: 'MANAGER', schoolId: school._id, permissions: MANAGER_PERMISSIONS },
             { role: 'TEACHER', schoolId: school._id, permissions: TEACHER_PERMISSIONS },
             { role: 'STUDENT', schoolId: school._id, permissions: STUDENT_PERMISSIONS },
           ]);

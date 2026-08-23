@@ -38,6 +38,42 @@ export const OWNER_PERMISSIONS: RolePermissions = {
   financial: ALL,
 };
 
+/**
+ * MANAGER — the school's administrative staff account.
+ *
+ * There was no entry here at all, so getDefaultPermissionsForRole('MANAGER')
+ * fell through to `{}` and no school was ever seeded with a manager row. Each
+ * manager instead carried its own hand-written array on its admin document,
+ * which meant two managers in the same school could differ arbitrarily and
+ * there was nowhere to look up "what a manager can do".
+ *
+ * It is a real role now, defined once, exactly like TEACHER and STUDENT.
+ *
+ * Deliberately the same operational reach as the OWNER: a manager runs the
+ * school day to day. What separates them is not this table — it is the
+ * explicit role checks in ManagersController, which keep the owner-only
+ * actions (creating a supervisor, editing another admin, removing the owner)
+ * out of a manager's hands no matter what is written here.
+ *
+ * exams / projects / preparation stay read+delete for the same reason they do
+ * on OWNER: creation is a teacher-only action enforced in the services.
+ */
+export const MANAGER_PERMISSIONS: RolePermissions = {
+  students: ALL,
+  teachers: ALL,
+  classes: ALL,
+  subjects: ALL,
+  lectures: ALL,
+  library: ALL,
+  attendance: ALL,
+  gradesCriteria: ALL,
+  exams: { read: true, add: false, edit: false, delete: true },
+  projects: { read: true, add: false, edit: false, delete: true },
+  grades: ALL,
+  preparation: { read: true, add: false, edit: false, delete: true },
+  financial: ALL,
+};
+
 export const TEACHER_PERMISSIONS: RolePermissions = {
   students: { read: true, add: false, edit: false, delete: false },
   teachers: NONE,
@@ -89,6 +125,8 @@ export function getDefaultPermissionsForRole(role: string): RolePermissions | {}
     case 'SUPERVISOR':
     case 'OWNER':
       return OWNER_PERMISSIONS;
+    case 'MANAGER':
+      return MANAGER_PERMISSIONS;
     case 'TEACHER':
       return TEACHER_PERMISSIONS;
     case 'STUDENT':

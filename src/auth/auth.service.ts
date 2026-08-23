@@ -181,14 +181,35 @@ export class AuthService {
         if (role === 'OWNER' || role === 'SUPERVISOR') {
             permissions = ['*'];
         } else if (role === 'MANAGER') {
-            permissions = user.permissions || [];
+            // The school's MANAGER row, not the array on this admin document.
+            //
+            // Every manager used to carry its own hand-written list, so the
+            // role meant something different for each account and there was no
+            // single place to read or change it. It is one role now, defined in
+            // default-permissions.ts and adjustable per school through
+            // PATCH /permissions/MANAGER.
+            //
+            // admin.permissions is left on the document untouched — it is no
+            // longer read for authorisation.
+            permissions = await this.permissionsService.getFlatPermissions(
+                'MANAGER',
+                user.schoolId?.toString(),
+            );
         } else if (role === Role.TEACHER) {
             const basePerms = await this.permissionsService.getFlatPermissions(
                 Role.TEACHER,
                 user.schoolId?.toString()
             );
-            if (user.isManager && user.managerPermissions) {
-                permissions = Array.from(new Set([...basePerms, ...user.managerPermissions]));
+            if (user.isManager) {
+                // A promoted teacher gets the same MANAGER set as an admin
+                // manager, merged on top of their own teaching rights — so
+                // "manager" means one thing regardless of which door you came
+                // through. teacher.managerPermissions is no longer read.
+                const managerPerms = await this.permissionsService.getFlatPermissions(
+                    'MANAGER',
+                    user.schoolId?.toString(),
+                );
+                permissions = Array.from(new Set([...basePerms, ...managerPerms]));
             } else {
                 permissions = basePerms;
             }

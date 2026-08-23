@@ -110,6 +110,36 @@ export class PermissionsService implements OnModuleInit {
     return list;
   }
 
+  /**
+   * Replace one role's permissions for one school.
+   *
+   * The read side (GET /permissions) has always existed with no write side, so
+   * a school could look at its defaults and never change them. Upserts, so a
+   * school registered before its row existed gets one on first edit.
+   *
+   * OWNER and SUPERVISOR are rejected by the caller: they authenticate with
+   * ['*'] by role, so a stored row for them would be read by nobody and would
+   * only look like it worked.
+   */
+  async updateRolePermissions(role: string, permissions: any, schoolId?: string) {
+    const query: any = { role, userId: null };
+    query.schoolId = schoolId ? new Types.ObjectId(schoolId) : null;
+
+    await this.permissionModel.updateOne(
+      query,
+      { $set: { permissions } },
+      { upsert: true },
+    );
+
+    const updated = await this.permissionModel.findOne(query).lean();
+    return {
+      message: 'تم تحديث الصلاحيات بنجاح',
+      role,
+      permissions: updated?.permissions ?? permissions,
+      note: 'الصلاحيات محفوظة في التوكن، فلن تسري على من هو مسجّل دخوله الآن حتى يعيد تسجيل الدخول',
+    };
+  }
+
   async updateAttendancePermissionByRole(role: string, data: any, entity: string, schoolId?: string) {
     const query: any = { role };
     if (schoolId) {

@@ -1,4 +1,4 @@
-import { Controller, UseGuards, Post, Body, Param, Patch, Delete, Get, ForbiddenException, Req, Query } from '@nestjs/common';
+import { Controller, UseGuards, Post, Body, Param, Patch, Delete, Get, ForbiddenException, BadRequestException, Req, Query } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { TenantGuard } from 'src/tenancy/guards/tenant.guard';
 import { CurrentSchool } from 'src/tenancy/decorators/current-school.decorator';
@@ -41,15 +41,22 @@ export class ManagersController {
     return this.managersService.demoteTeacher(teacherId);
   }
 
+  /**
+   * Gone: a manager's rights are no longer per-account.
+   *
+   * This route used to write a list onto one admin or one teacher. Those lists
+   * are not read at login any more, so leaving it in place would accept the
+   * request, return 200, and change nothing anyone could observe — the exact
+   * failure mode this refactor exists to remove. It fails loudly and names its
+   * replacement instead.
+   */
   @Patch(':id/permissions')
-  async updatePermissions(
-    @Req() req: any,
-    @Param('id') id: string,
-    @Body() dto: UpdateManagerPermissionsDto,
-    @Query('type') type: 'admin' | 'teacher',
-  ) {
+  async updatePermissions(@Req() req: any) {
     this.checkOwnerOrSupervisor(req);
-    return this.managersService.updatePermissions(id, type, dto.permissions, req.user?.role);
+    throw new BadRequestException(
+      'صلاحيات المدير أصبحت موحّدة على مستوى المدرسة ولم تعد تُضبط لكل حساب على حدة. ' +
+        'استخدم PATCH /permissions/MANAGER لتعديلها لجميع المدراء.',
+    );
   }
 
   @Get()
