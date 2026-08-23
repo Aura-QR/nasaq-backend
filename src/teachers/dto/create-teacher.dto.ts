@@ -32,11 +32,41 @@ export class CreateTeacherDto {
   @ApiProperty({ description: 'The phone number of the teacher' })
   phoneNumber?: string;
 
+  /*
+   * IGNORED ON WRITE. A Teacher document has no subject field: the relation is
+   * teacher -> teacherAssignment -> subjectOffering -> subject, and a bare
+   * subject id cannot name an offering (an offering is subject x grade x term).
+   *
+   * Kept only so an existing client sending it does not get a 400 from
+   * forbidNonWhitelisted. Teacher reads DO return `subjects`, `subjectIds` and
+   * `subjectOfferings`, joined from the assignment table.
+   *
+   * To change what a teacher teaches, send `subjectOfferingIds` to
+   * PATCH /teachers/:id, or use POST/DELETE /teacher-assignments.
+   */
   @IsArray()
   @IsOptional()
   @IsMongoId({ each: true })
-  @ApiProperty({ description: 'Subject IDs (deprecated, use TeacherAssignments)', required: false })
+  @ApiProperty({
+    description: 'IGNORED on write. Read it back from the response instead.',
+    required: false,
+    deprecated: true,
+  })
   subjectIds?: string[];
+
+  /**
+   * Replaces the teacher's assignments wholesale on PATCH /teachers/:id.
+   * Omit it and the assignments are left alone; send [] to clear them.
+   */
+  @IsArray()
+  @IsOptional()
+  @IsMongoId({ each: true })
+  @ApiProperty({
+    description: 'Subject offerings this teacher teaches. Replaces the current set.',
+    required: false,
+    type: [String],
+  })
+  subjectOfferingIds?: string[];
 
   @IsString()
   @IsOptional()

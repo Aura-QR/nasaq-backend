@@ -5,11 +5,12 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreateTeacherDto } from './dto/create-teacher.dto';
 import { UpdateTeacherDto } from './dto/update-teacher.dto';
 import { Teacher } from './schemas/teacher.schema';
 import { Subject } from '../subjects/schemas/subject.schema';
+import { TeacherAssignment } from '../teacher-assignments/schemas/teacher-assignment.schema';
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
@@ -20,6 +21,8 @@ export class TeachersService {
   constructor(
     @InjectModel(Teacher.name) private readonly teacherModel: Model<Teacher>,
     @InjectModel(Subject.name) private readonly subjectModel: Model<Subject>,
+    @InjectModel(TeacherAssignment.name)
+    private readonly teacherAssignmentModel: Model<TeacherAssignment>,
     @InjectModel(Lecture.name) private readonly lectureModel: Model<Lecture>,
   ) {}
 
@@ -58,12 +61,158 @@ export class TeachersService {
 
     return {
       message: 'تم إضافة المعلم بنجاح',
-      teacher: safeTeacher,
+      // Always empty at this point — assignments are created separately through
+      // POST /teacher-assignments — but present so the client can rely on the
+      // same shape it gets from every other teacher route.
+      teacher: { ...safeTeacher, subjects: [], subjectIds: [], subjectOfferings: [] },
     };
   }
 
+  /**
+   * The subjects a teacher teaches, read from the assignment table.
+   *
+   * A Teacher document has no subject field and never had one — the relation
+   * lives in `teacherAssignments` (teacher -> subjectOffering -> subject).
+   * Every teacher read therefore came back with nothing to show, and the
+   * `subjectIds` the DTO still accepts on create/update was dropped by
+   * mongoose on save. Reading it back has to be a join.
+   *
+   * Returns a map keyed by teacher id so a list costs one extra query, not one
+   * per row.
+   */
+  private async loadSubjectsByTeacher(
+    teacherIds: any[],
+  ): Promise<Map<string, { subjects: any[]; subjectIds: string[]; subjectOfferings: any[] }>> {
+    const result = new Map<string, { subjects: any[]; subjectIds: string[]; subjectOfferings: any[] }>();
+    if (!teacherIds.length) return result;
+
+    const assignments = await this.teacherAssignmentModel
+      .find({ teacherId: { $in: teacherIds.map((id) => new Types.ObjectId(String(id))) } })
+      .populate({
+        path: 'subjectOfferingId',
+        populate: [
+          { path: 'subjectId', select: 'subjectName subjectCode' },
+          { path: 'gradeLevelId', select: 'name order' },
+          { path: 'termId', select: 'name order status' },
+        ],
+      })
+      .lean()
+      .exec();
+
+    for (const assignment of assignments as any[]) {
+      const teacherKey = String(assignment.teacherId);
+      const offering = assignment.subjectOfferingId;
+      if (!offering) continue; // offering deleted out from under the assignment
+
+      const entry =
+        result.get(teacherKey) ?? { subjects: [], subjectIds: [], subjectOfferings: [] };
+
+      const subject = offering.subjectId;
+      if (subject?._id) {
+        const subjectKey = String(subject._id);
+        // One subject taught to three grades is still one subject in the
+        // directory column, so dedupe here and keep the detail in
+        // subjectOfferings.
+        if (!entry.subjectIds.includes(subjectKey)) {
+          entry.subjectIds.push(subjectKey);
+          entry.subjects.push({
+            _id: subject._id,
+            subjectName: subject.subjectName,
+            subjectCode: subject.subjectCode,
+          });
+        }
+      }
+
+      entry.subjectOfferings.push({
+        assignmentId: assignment._id,
+        subjectOfferingId: offering._id,
+        subjectName: subject?.subjectName ?? null,
+        subjectCode: subject?.subjectCode ?? null,
+        gradeLevel: offering.gradeLevelId?.name ?? null,
+        term: offering.termId?.name ?? null,
+      });
+
+      result.set(teacherKey, entry);
+    }
+
+    return result;
+  }
+
+  /** Attach the joined subjects to one teacher document (lean or hydrated). */
+  private async withSubjects(teacher: any) {
+    if (!teacher) return teacher;
+    const plain = typeof teacher.toObject === 'function' ? teacher.toObject() : { ...teacher };
+    const map = await this.loadSubjectsByTeacher([plain._id]);
+    const entry = map.get(String(plain._id));
+    return {
+      ...plain,
+      subjects: entry?.subjects ?? [],
+      subjectIds: entry?.subjectIds ?? [],
+      subjectOfferings: entry?.subjectOfferings ?? [],
+    };
+  }
+
+  /**
+   * Make the teacher's assignments match the given offerings exactly.
+   *
+   * Additive rather than delete-then-insert: an assignment that is staying put
+   * keeps its _id, so nothing referencing it breaks, and a failure part-way
+   * cannot leave the teacher with no subjects at all.
+   */
+  private async syncAssignments(teacherId: string, offeringIds: string[]) {
+    const teacherObjectId = new Types.ObjectId(teacherId);
+    const wanted = new Set(offeringIds.map(String));
+
+    const current = await this.teacherAssignmentModel
+      .find({ teacherId: teacherObjectId })
+      .select('subjectOfferingId')
+      .lean()
+      .exec();
+
+    const currentIds = new Set(
+      (current as any[]).map((a) => String(a.subjectOfferingId)),
+    );
+
+    const toAdd = [...wanted].filter((offeringId) => !currentIds.has(offeringId));
+    const toRemove = [...currentIds].filter((offeringId) => !wanted.has(offeringId));
+
+    if (toAdd.length) {
+      await this.teacherAssignmentModel.insertMany(
+        toAdd.map((offeringId) => ({
+          teacherId: teacherObjectId,
+          subjectOfferingId: new Types.ObjectId(offeringId),
+        })),
+      );
+    }
+
+    if (toRemove.length) {
+      await this.teacherAssignmentModel.deleteMany({
+        teacherId: teacherObjectId,
+        subjectOfferingId: { $in: toRemove.map((o) => new Types.ObjectId(o)) },
+      });
+    }
+  }
+
+  /** Same, for a list — one join query for the whole page. */
+  private async withSubjectsMany(teachers: any[]) {
+    if (!teachers.length) return [];
+    const plain = teachers.map((t) =>
+      typeof t.toObject === 'function' ? t.toObject() : { ...t },
+    );
+    const map = await this.loadSubjectsByTeacher(plain.map((t) => t._id));
+    return plain.map((t) => {
+      const entry = map.get(String(t._id));
+      return {
+        ...t,
+        subjects: entry?.subjects ?? [],
+        subjectIds: entry?.subjectIds ?? [],
+        subjectOfferings: entry?.subjectOfferings ?? [],
+      };
+    });
+  }
+
   async findAll() {
-    return this.teacherModel.find().exec();
+    return this.withSubjectsMany(await this.teacherModel.find().exec());
   }
 
   async findOne(id: string) {
@@ -71,7 +220,7 @@ export class TeachersService {
     if (!teacher) {
       throw new NotFoundException(`المعلم بمعرف ${id} غير موجود`);
     }
-    return teacher;
+    return this.withSubjects(teacher);
   }
 
   async update(id: string, updateTeacherDto: UpdateTeacherDto) {
@@ -84,7 +233,12 @@ export class TeachersService {
       updateTeacherDto.isActive = updateTeacherDto.status === 'active' || updateTeacherDto.status === 'true';
     }
 
-    const { status, subjects, ...cleanUpdateData } = updateTeacherDto as any;
+    // subjects / subjectIds are read-only projections; subjectOfferingIds is
+    // handled below against the assignment table. None of them is a path on
+    // the Teacher schema, so leaving them in would let mongoose drop them
+    // silently and the caller would never learn the write did nothing.
+    const { status, subjects, subjectIds, subjectOfferingIds, ...cleanUpdateData } =
+      updateTeacherDto as any;
 
     if (cleanUpdateData.email) {
       const existingTeacher = await this.teacherModel.findOne({
@@ -105,9 +259,13 @@ export class TeachersService {
       .findByIdAndUpdate(id, cleanUpdateData, { new: true })
       .exec();
 
+    if (Array.isArray(subjectOfferingIds)) {
+      await this.syncAssignments(id, subjectOfferingIds);
+    }
+
     return {
       message: 'تم تحديث بيانات المعلم بنجاح',
-      teacher: updatedTeacher,
+      teacher: await this.withSubjects(updatedTeacher),
     };
   }
 
@@ -195,7 +353,7 @@ export class TeachersService {
       teachersQuery = teachersQuery.skip(paginationMate.skip).limit(paginationMate.limit);
     }
 
-    const teachers = await teachersQuery.exec();
+    const teachers = await this.withSubjectsMany(await teachersQuery.exec());
 
     if (isPaginationRequested) {
       return {
@@ -214,7 +372,7 @@ export class TeachersService {
       throw new NotFoundException(`المعلم بمعرف ${teacherId} غير موجود`);
     }
 
-    const teacherObject = teacher.toObject();
+    const teacherObject = await this.withSubjects(teacher);
     const { password, ...rest } = teacherObject;
 
     return {
