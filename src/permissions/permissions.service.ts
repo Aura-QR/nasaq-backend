@@ -23,11 +23,64 @@ export class PermissionsService implements OnModuleInit {
         this.logger.log('Legacy index "role_1" dropped successfully.');
       }
       await this.permissionModel.syncIndexes();
+      await this.backfillAllPermissions();
     } catch (err: any) {
       if (err?.codeName !== 'NamespaceNotFound') {
         this.logger.warn(`Permission index sync warning: ${err?.message}`);
       }
     }
+  }
+
+  /**
+   * Backfill missing permission keys from defaults across all existing permission documents.
+   */
+  async backfillAllPermissions() {
+    try {
+      const docs = await this.permissionModel.find({}).setOptions({ skipTenantScope: true }).exec();
+      for (const doc of docs) {
+        if (doc.role) {
+          await this.ensureDefaultsMerged(doc, doc.role);
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Permission backfill warning: ${err?.message}`);
+    }
+  }
+
+  /**
+   * Checks a permission document against default permissions for the role,
+   * merging and saving any missing keys (e.g. newly added modules like financial/financialSettings).
+   */
+  async ensureDefaultsMerged(permissionDoc: any, role: string): Promise<any> {
+    if (!permissionDoc || !permissionDoc.permissions) return permissionDoc;
+    const defaults = this.getDefaultPermissions(role);
+    if (!defaults) return permissionDoc;
+
+    let hasMissing = false;
+    const currentPermissions = { ...permissionDoc.permissions };
+
+    for (const [key, defaultVal] of Object.entries(defaults)) {
+      if (currentPermissions[key] === undefined || currentPermissions[key] === null) {
+        currentPermissions[key] = defaultVal;
+        hasMissing = true;
+      }
+    }
+
+    if (hasMissing) {
+      this.logger.log(`Backfilling missing default permissions for role ${role} (id: ${permissionDoc._id})`);
+      permissionDoc.permissions = currentPermissions;
+      if (permissionDoc.markModified) {
+        permissionDoc.markModified('permissions');
+        await permissionDoc.save();
+      } else if (permissionDoc._id) {
+        await this.permissionModel.updateOne(
+          { _id: permissionDoc._id },
+          { $set: { permissions: currentPermissions } },
+        );
+      }
+    }
+
+    return permissionDoc;
   }
 
   async findAll() {
@@ -36,7 +89,7 @@ export class PermissionsService implements OnModuleInit {
 
   async getPermissionsByRole(role: string, schoolId?: string) {
     let query: any = { role, userId: null };
-    if (schoolId) {
+    if (schoolId && Types.ObjectId.isValid(schoolId)) {
       query.schoolId = new Types.ObjectId(schoolId);
     } else {
       query.schoolId = null;
@@ -48,10 +101,12 @@ export class PermissionsService implements OnModuleInit {
       const defaultPermissions = this.getDefaultPermissions(role);
       permission = await this.permissionModel.create({
         role,
-        schoolId: schoolId ? new Types.ObjectId(schoolId) : null,
+        schoolId: schoolId && Types.ObjectId.isValid(schoolId) ? new Types.ObjectId(schoolId) : null,
         userId: null,
         permissions: defaultPermissions,
       });
+    } else {
+      permission = await this.ensureDefaultsMerged(permission, role);
     }
 
     return permission?.permissions || null;
@@ -69,7 +124,7 @@ export class PermissionsService implements OnModuleInit {
         .setOptions({ skipTenantScope: true });
     }
 
-    if (!permissionDoc && schoolId) {
+    if (!permissionDoc && schoolId && Types.ObjectId.isValid(schoolId)) {
       permissionDoc = await this.permissionModel.findOne({
         schoolId: new Types.ObjectId(schoolId),
         role,
@@ -92,6 +147,8 @@ export class PermissionsService implements OnModuleInit {
         userId: null,
         permissions: defaultPermissionsObj,
       });
+    } else {
+      permissionDoc = await this.ensureDefaultsMerged(permissionDoc, role);
     }
 
     return this.convertPermissionsToStrings(permissionDoc.permissions);
@@ -165,20 +222,47 @@ export class PermissionsService implements OnModuleInit {
 
   async syncFinancialPermissions(schoolId?: string) {
     const sId = schoolId ? new Types.ObjectId(schoolId) : null;
+    const query = (role: string) => (schoolId ? { role, schoolId: sId } : { role });
+
     const results = await Promise.all([
-      this.permissionModel.updateOne(
-        { role: 'SUPERVISOR', schoolId: sId },
-        { $set: { 'permissions.financial': { read: true, add: true, edit: true, delete: true } } },
+      this.permissionModel.updateMany(
+        query('SUPERVISOR'),
+        {
+          $set: {
+            'permissions.financial': { read: true, add: true, edit: true, delete: true },
+            'permissions.financialSettings': { read: true, add: true, edit: true, delete: true },
+          },
+        },
         { upsert: true },
       ),
-      this.permissionModel.updateOne(
-        { role: 'TEACHER', schoolId: sId },
-        { $set: { 'permissions.financial': { read: false, add: false, edit: false, delete: false } } },
+      this.permissionModel.updateMany(
+        query('MANAGER'),
+        {
+          $set: {
+            'permissions.financial': { read: true, add: true, edit: true, delete: true },
+            'permissions.financialSettings': { read: true, add: false, edit: false, delete: false },
+          },
+        },
         { upsert: true },
       ),
-      this.permissionModel.updateOne(
-        { role: 'STUDENT', schoolId: sId },
-        { $set: { 'permissions.financial': { read: false, add: false, edit: false, delete: false } } },
+      this.permissionModel.updateMany(
+        query('TEACHER'),
+        {
+          $set: {
+            'permissions.financial': { read: false, add: false, edit: false, delete: false },
+            'permissions.financialSettings': { read: false, add: false, edit: false, delete: false },
+          },
+        },
+        { upsert: true },
+      ),
+      this.permissionModel.updateMany(
+        query('STUDENT'),
+        {
+          $set: {
+            'permissions.financial': { read: false, add: false, edit: false, delete: false },
+            'permissions.financialSettings': { read: false, add: false, edit: false, delete: false },
+          },
+        },
         { upsert: true },
       ),
     ]);
@@ -187,8 +271,9 @@ export class PermissionsService implements OnModuleInit {
       message: 'Financial permissions synced successfully',
       data: {
         SUPERVISOR: results[0],
-        TEACHER: results[1],
-        STUDENT: results[2],
+        MANAGER: results[1],
+        TEACHER: results[2],
+        STUDENT: results[3],
       },
     };
   }
