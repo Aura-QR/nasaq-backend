@@ -16,7 +16,7 @@ export class InstallmentPlanController {
   constructor(private readonly installmentPlanService: InstallmentPlanService) {}
 
   @Post()
-  @CheckAbilities({ action: 'create', subject: 'Financial' })
+  @CheckAbilities({ action: 'create', subject: 'FinancialSettings' })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create an installment plan template' })
   async create(@Body() dto: CreateInstallmentPlanDto, @CurrentUser() user: any) {
@@ -40,7 +40,7 @@ export class InstallmentPlanController {
   }
 
   @Patch(':id')
-  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @CheckAbilities({ action: 'update', subject: 'FinancialSettings' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update installment plan' })
   async update(@Param('id') id: string, @Body() dto: UpdateInstallmentPlanDto) {
@@ -48,7 +48,7 @@ export class InstallmentPlanController {
   }
 
   @Patch(':id/set-default')
-  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @CheckAbilities({ action: 'update', subject: 'FinancialSettings' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Set this plan as the system default' })
   async setDefault(@Param('id') id: string) {
@@ -56,7 +56,7 @@ export class InstallmentPlanController {
   }
 
   @Delete(':id')
-  @CheckAbilities({ action: 'delete', subject: 'Financial' })
+  @CheckAbilities({ action: 'delete', subject: 'FinancialSettings' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete installment plan (blocked if used by students)' })
   async delete(@Param('id') id: string) {

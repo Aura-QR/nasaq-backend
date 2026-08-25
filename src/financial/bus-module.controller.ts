@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AbilitiesGuard } from '../casl/guards/abilities.guard';
@@ -6,6 +6,7 @@ import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BusService } from './bus.service';
 import { EnrollBusDto } from './dto/enroll-bus.dto';
+import { SwitchBusPlanDto } from './dto/switch-bus-plan.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 
 @Controller('financial/bus')
@@ -63,6 +64,14 @@ export class BusModuleController {
   @ApiOperation({ summary: 'Enroll student in bus service (Admin)' })
   async enroll(@Param('studentId') studentId: string, @Body() dto: EnrollBusDto) {
     return this.busService.enroll(studentId, dto);
+  }
+
+  @Patch(':studentId/switch-plan')
+  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Switch student bus plan (Admin)' })
+  async switchPlan(@Param('studentId') studentId: string, @Body() dto: SwitchBusPlanDto) {
+    return this.busService.switchPlan(studentId, dto);
   }
 
   @Post(':studentId/pay')

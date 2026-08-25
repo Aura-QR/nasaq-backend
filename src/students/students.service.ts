@@ -18,6 +18,7 @@ import { Counter } from 'src/Counter/Schema/counter.schema';
 import { PasswordUtil } from 'src/auth/utils/password.util';
 import { EmailService } from 'src/email/email.service';
 import { FinancialRecordService } from 'src/financial/financial-record.service';
+import { BusService } from 'src/financial/bus.service';
 import { StudentFinancialRecord } from '../financial/schemas/student-financial-record.schema';
 import { generateOtp, otpExpiry as otpExpiryDate } from '../common/utils/otp.util';
 
@@ -36,6 +37,7 @@ export class StudentsService {
     private readonly financialRecordModel: Model<StudentFinancialRecord>,
     private readonly emailService: EmailService,
     private readonly financialRecordService: FinancialRecordService,
+    private readonly busService: BusService,
   ) { }
 
 
@@ -79,7 +81,7 @@ export class StudentsService {
     const formattedCount = counter.count.toString().padStart(4, '0');
     const schoolEmail = `au${year}${formattedCount}@student.auraschool.com`;
 
-    const { password: _, status, subjects, ...studentData } = createStudentDto as any;
+    const { password: _, status, subjects, busPlanId, ...studentData } = createStudentDto as any;
     const studentFields: any = { ...studentData, schoolEmail };
 
     if (status !== undefined && studentFields.isActive === undefined) {
@@ -93,6 +95,8 @@ export class StudentsService {
 
     const student = new this.studentModel(studentFields);
     await student.save();
+
+    let busEnrollmentWarning: string | null = null;
 
     // Auto-create matching Enrollment record if classId is provided
     if (createStudentDto.classId && mongoose.Types.ObjectId.isValid(createStudentDto.classId)) {
@@ -130,7 +134,20 @@ export class StudentsService {
           await this.studentModel.findByIdAndDelete(student._id).exec();
           throw error;
         }
+
+        // Auto-enroll in bus plan if provided at creation
+        if (createStudentDto.busPlanId) {
+          try {
+            await this.busService.enroll((student._id as any).toString(), {
+              busPlanId: createStudentDto.busPlanId,
+            });
+          } catch (busError: any) {
+            busEnrollmentWarning = busError?.message || 'تعذر تسجيل الطالب في خدمة الباص';
+          }
+        }
       }
+    } else if (createStudentDto.busPlanId) {
+      busEnrollmentWarning = 'لم يتم تسجيل الطالب في خدمة الباص لعدم تحديد الفصل الدراسي';
     }
 
     // `select: false` hides the hash from QUERIES, but this document was just
@@ -138,6 +155,10 @@ export class StudentsService {
     // response leaks what every read is careful not to.
     const { password: _hash, otp: _otp, otpExpiry: _exp, ...safeStudent } =
       transformStudentResponse(student) as any;
+
+    if (busEnrollmentWarning) {
+      safeStudent.busEnrollmentWarning = busEnrollmentWarning;
+    }
 
     return {
       message: 'تم إضافة الطالب بنجاح',

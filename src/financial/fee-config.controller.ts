@@ -16,7 +16,7 @@ export class FeeConfigController {
   constructor(private readonly feeConfigService: FeeConfigService) {}
 
   @Post()
-  @CheckAbilities({ action: 'create', subject: 'Financial' })
+  @CheckAbilities({ action: 'create', subject: 'FinancialSettings' })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create fee config for a grade level (Admin only)' })
   async create(@Body() dto: CreateFeeConfigDto, @CurrentUser() user: any) {
@@ -40,7 +40,7 @@ export class FeeConfigController {
   }
 
   @Patch(':id')
-  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @CheckAbilities({ action: 'update', subject: 'FinancialSettings' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update fee config' })
   async update(@Param('id') id: string, @Body() dto: UpdateFeeConfigDto) {
@@ -48,7 +48,7 @@ export class FeeConfigController {
   }
 
   @Delete(':id')
-  @CheckAbilities({ action: 'delete', subject: 'Financial' })
+  @CheckAbilities({ action: 'delete', subject: 'FinancialSettings' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete fee config (blocked if used by students)' })
   async delete(@Param('id') id: string) {

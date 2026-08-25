@@ -113,6 +113,12 @@ class BusRecord {
   @Prop({ default: false })
   enrolled: boolean;
 
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'BusPlan', default: null })
+  busPlanId: mongoose.Types.ObjectId | null;
+
+  @Prop()
+  planName: string;
+
   @Prop({ enum: ['pickup', 'dropoff', 'both'], default: 'both' })
   serviceType: string;
 

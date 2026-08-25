@@ -3,8 +3,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { StudentFinancialRecord } from './schemas/student-financial-record.schema';
-import { InstallmentPlan } from './schemas/installment-plan.schema';
+import { BusPlan } from './schemas/bus-plan.schema';
 import { EnrollBusDto } from './dto/enroll-bus.dto';
+import { SwitchBusPlanDto } from './dto/switch-bus-plan.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
@@ -15,7 +16,7 @@ import { getPagination } from '../pagination/common/paginationUtils';
 export class BusService {
   constructor(
     @InjectModel(StudentFinancialRecord.name) private recordModel: Model<StudentFinancialRecord>,
-    @InjectModel(InstallmentPlan.name) private planModel: Model<InstallmentPlan>,
+    @InjectModel(BusPlan.name) private busPlanModel: Model<BusPlan>,
     private readonly financialRecordService: FinancialRecordService,
   ) {}
 
@@ -40,39 +41,34 @@ export class BusService {
     return record;
   }
 
-  async enroll(studentId: string, dto: EnrollBusDto) {
+  async enroll(studentId: string, dto: EnrollBusDto, academicYearId?: string) {
     this.validateObjectId(studentId, 'الطالب');
-    const record = await this.getRecord(studentId);
+    this.validateObjectId(dto.busPlanId, 'خطة الباص');
 
-    if (record.bus.enrolled) {
+    const plan = await this.busPlanModel.findById(dto.busPlanId).exec();
+    if (!plan || !plan.isActive) {
+      throw new NotFoundException('خطة الباص غير موجودة أو غير مفعلة');
+    }
+
+    const record = await this.getRecord(studentId, academicYearId);
+
+    if (record.bus?.enrolled) {
       throw new BadRequestException('الطالب مسجل بالفعل في خدمة الباص — قم بإلغاء التسجيل أولاً');
     }
 
-    let installments: any[] = [];
-    let planId: mongoose.Types.ObjectId | null = null;
-
-    if (dto.installmentPlanId) {
-      this.validateObjectId(dto.installmentPlanId, 'خطة التقسيط');
-      const plan = await this.planModel.findById(dto.installmentPlanId).exec();
-      if (!plan) throw new NotFoundException('خطة التقسيط غير موجودة');
-      installments = this.financialRecordService.buildInstallments(dto.fee, plan);
-      planId = plan._id as mongoose.Types.ObjectId;
-    } else {
-      installments = [{
-        installmentNumber: 1,
-        amount: dto.fee,
-        dueDate: new Date(),
-        status: PaymentStatus.PENDING,
-        paidAmount: 0,
-        payments: [],
-      }];
-    }
+    const { installments, planId } = await this.financialRecordService.resolveInstallments(
+      plan.fee,
+      plan.installmentPlanId ? plan.installmentPlanId.toString() : null,
+    );
 
     record.bus = {
       enrolled: true,
-      serviceType: dto.serviceType,
-      fee: dto.fee,
-      netFee: dto.fee,
+      busPlanId: plan._id as mongoose.Types.ObjectId,
+      planName: plan.name,
+      serviceType: plan.serviceType,
+      fee: plan.fee,
+      discount: null,
+      netFee: plan.fee,
       installmentPlanId: planId,
       status: FeeStatus.UNPAID,
       totalPaid: 0,
@@ -81,6 +77,62 @@ export class BusService {
 
     await record.save();
     return { message: 'تم تسجيل الطالب في خدمة الباص بنجاح', data: record.bus };
+  }
+
+  async switchPlan(studentId: string, dto: SwitchBusPlanDto) {
+    this.validateObjectId(studentId, 'الطالب');
+    this.validateObjectId(dto.busPlanId, 'خطة الباص');
+
+    const record = await this.getRecord(studentId, dto.academicYearId);
+
+    if (!record.bus?.enrolled) {
+      throw new BadRequestException('الطالب غير مسجل في خدمة الباص');
+    }
+
+    const newPlan = await this.busPlanModel.findById(dto.busPlanId).exec();
+    if (!newPlan || !newPlan.isActive) {
+      throw new NotFoundException('خطة الباص غير موجودة أو غير مفعلة');
+    }
+
+    const hasAnyBusPayment =
+      Number(record.bus.totalPaid || 0) > 0 ||
+      (record.bus.installments || []).some(
+        (inst) =>
+          inst.status === PaymentStatus.PAID ||
+          Number(inst.paidAmount || 0) > 0 ||
+          (inst.payments?.length || 0) > 0,
+      );
+
+    if (hasAnyBusPayment) {
+      throw new BadRequestException('لا يمكن تغيير خطة الباص بعد سداد أي دفعة من رسوم الباص');
+    }
+
+    let netFee = newPlan.fee;
+    if (record.bus.discount) {
+      const pct = record.bus.discount.percentage;
+      const discountAmount = Math.round((newPlan.fee * pct) / 100);
+      record.bus.discount.discountAmount = discountAmount;
+      netFee = newPlan.fee - discountAmount;
+    }
+
+    const { installments, planId } = await this.financialRecordService.resolveInstallments(
+      netFee,
+      newPlan.installmentPlanId ? newPlan.installmentPlanId.toString() : null,
+    );
+
+    record.bus.busPlanId = newPlan._id as mongoose.Types.ObjectId;
+    record.bus.planName = newPlan.name;
+    record.bus.serviceType = newPlan.serviceType;
+    record.bus.fee = newPlan.fee;
+    record.bus.netFee = netFee;
+    record.bus.installmentPlanId = planId;
+    record.bus.installments = installments as any;
+    record.bus.totalPaid = 0;
+    record.bus.status = FeeStatus.UNPAID;
+    record.markModified('bus');
+
+    await record.save();
+    return { message: 'تم تغيير خطة الباص بنجاح', data: record.bus };
   }
 
   async findOne(studentId: string) {
@@ -96,6 +148,7 @@ export class BusService {
       .populate('studentId', 'name email schoolEmail')
       .populate('classId', 'roomNumber academicYearId gender')
       .populate('bus.installmentPlanId', 'name numberOfInstallments dueDates')
+      .populate('bus.busPlanId', 'name serviceType fee')
       .lean()
       .exec();
 
@@ -133,7 +186,8 @@ export class BusService {
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
       .populate('classId', 'roomNumber academicYearId gender')
-      .populate('bus.installmentPlanId', 'name numberOfInstallments');
+      .populate('bus.installmentPlanId', 'name numberOfInstallments')
+      .populate('bus.busPlanId', 'name serviceType fee');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const records = await q.exec();

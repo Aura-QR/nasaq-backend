@@ -10,6 +10,7 @@ import {
   IsBoolean,
   IsArray,
   IsIn,
+  IsMongoId,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { NATIONALITY_CODES } from '../../common/constants/nationalities.constant';
@@ -110,4 +111,9 @@ export class CreateStudentDto {
   @IsOptional()
   @ApiProperty({ description: 'Subjects list (optional)', required: false })
   subjects?: any[];
+
+  @IsMongoId({ message: 'صيغة معرف خطة الباص غير صحيحة' })
+  @IsOptional()
+  @ApiProperty({ description: 'Optional Bus Plan ID to enroll the student at creation time', required: false })
+  busPlanId?: string;
 }

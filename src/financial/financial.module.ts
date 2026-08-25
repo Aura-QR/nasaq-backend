@@ -20,6 +20,9 @@ import { FinancialRecordController } from './financial-record.controller';
 import { BusService } from './bus.service';
 import { BusController } from './bus.controller';
 import { BusModuleController } from './bus-module.controller';
+import { BusPlan, BusPlanSchema } from './schemas/bus-plan.schema';
+import { BusPlanService } from './bus-plan.service';
+import { BusPlanController } from './bus-plan.controller';
 import { TripService } from './trip.service';
 import { TripController } from './trip.controller';
 import { TripModuleController } from './trip-module.controller';
@@ -41,6 +44,7 @@ import { School, SchoolSchema } from '../platform/schools/schemas/school.schema'
       { name: Class.name, schema: ClassSchema },
       { name: GradeLevel.name, schema: GradeLevelSchema },
       { name: FinancialTrip.name, schema: FinancialTripSchema },
+      { name: BusPlan.name, schema: BusPlanSchema },
       { name: School.name, schema: SchoolSchema },
     ]),
     CaslModule,
@@ -51,6 +55,7 @@ import { School, SchoolSchema } from '../platform/schools/schemas/school.schema'
     FinancialRecordController,
     BusController,
     BusModuleController,
+    BusPlanController,
     TripController,
     TripModuleController,
     DiscountController,
@@ -61,10 +66,12 @@ import { School, SchoolSchema } from '../platform/schools/schemas/school.schema'
     InstallmentPlanService,
     FinancialRecordService,
     BusService,
+    BusPlanService,
     TripService,
     DiscountService,
     AdditionalFeeService,
   ],
-  exports: [FinancialRecordService],
+  exports: [FinancialRecordService, BusService],
 })
 export class FinancialModule {}
+

@@ -36,6 +36,7 @@ export const OWNER_PERMISSIONS: RolePermissions = {
   grades: ALL,
   preparation: { read: true, add: false, edit: false, delete: true },
   financial: ALL,
+  financialSettings: ALL,
 };
 
 /**
@@ -72,6 +73,7 @@ export const MANAGER_PERMISSIONS: RolePermissions = {
   grades: ALL,
   preparation: { read: true, add: false, edit: false, delete: true },
   financial: ALL,
+  financialSettings: { read: true, add: false, edit: false, delete: false },
 };
 
 export const TEACHER_PERMISSIONS: RolePermissions = {

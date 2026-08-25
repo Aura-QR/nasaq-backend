@@ -18,7 +18,7 @@ describe('Financial Module — Remainder Front-Loading & Linked Discounts', () =
       {} as any,
       {} as any,
     );
-    discountService = new DiscountService({} as any, {} as any);
+    discountService = new DiscountService({} as any, {} as any, recordService);
   });
 
   describe('buildInstallments rounding remainder front-loading', () => {

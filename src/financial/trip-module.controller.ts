@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AbilitiesGuard } from '../casl/guards/abilities.guard';
 import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 import { TripService } from './trip.service';
 import { CreateFinancialTripDto } from './dto/create-financial-trip.dto';
+import { UpdateFinancialTripDto } from './dto/update-financial-trip.dto';
 import { EnrollTripStudentDto } from './dto/enroll-trip-student.dto';
 
 @Controller('financial/trips')
@@ -15,11 +16,22 @@ export class TripModuleController {
   constructor(private readonly tripService: TripService) {}
 
   @Post()
-  @CheckAbilities({ action: 'create', subject: 'Financial' })
+  @CheckAbilities({ action: 'create', subject: 'FinancialSettings' })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a trip template' })
   async createTemplate(@Body() dto: CreateFinancialTripDto) {
     return this.tripService.createTemplate(dto);
+  }
+
+  @Patch(':tripTemplateId')
+  @CheckAbilities({ action: 'update', subject: 'FinancialSettings' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Update a trip template' })
+  async updateTemplate(
+    @Param('tripTemplateId') tripTemplateId: string,
+    @Body() dto: UpdateFinancialTripDto,
+  ) {
+    return this.tripService.updateTemplate(tripTemplateId, dto);
   }
 
   @Get()

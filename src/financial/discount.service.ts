@@ -8,12 +8,14 @@ import { CreateDiscountDto } from './dto/create-discount.dto';
 import { UpdateDiscountDto } from './dto/update-discount.dto';
 import { ApplyDiscountDto } from './dto/apply-discount.dto';
 import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
+import { FinancialRecordService } from './financial-record.service';
 
 @Injectable()
 export class DiscountService {
   constructor(
     @InjectModel(Discount.name) private discountModel: Model<Discount>,
     @InjectModel(StudentFinancialRecord.name) private recordModel: Model<StudentFinancialRecord>,
+    private readonly financialRecordService: FinancialRecordService,
   ) {}
 
   private validateObjectId(id: string): void {
@@ -27,16 +29,7 @@ export class DiscountService {
   }
 
   private redistributeUnpaidInstallments(installments: any[], newBalance: number) {
-    const unpaid = installments.filter(i => i.status !== PaymentStatus.PAID);
-    const n = unpaid.length;
-    if (n === 0) return;
-
-    const base = Math.floor(newBalance / n);
-    const remainder = newBalance - base * n;
-
-    unpaid.forEach((inst, index) => {
-      inst.amount = index < remainder ? base + 1 : base;
-    });
+    this.financialRecordService.redistributeUnpaidInstallments(installments, newBalance);
   }
 
   async create(dto: CreateDiscountDto, adminId: string) {

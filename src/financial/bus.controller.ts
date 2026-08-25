@@ -6,6 +6,7 @@ import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BusService } from './bus.service';
 import { EnrollBusDto } from './dto/enroll-bus.dto';
+import { SwitchBusPlanDto } from './dto/switch-bus-plan.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 
@@ -22,6 +23,14 @@ export class BusController {
   @ApiOperation({ summary: 'Enroll student in bus service' })
   async enroll(@Param('studentId') studentId: string, @Body() dto: EnrollBusDto) {
     return this.busService.enroll(studentId, dto);
+  }
+
+  @Patch('switch-plan')
+  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Switch bus plan for a student' })
+  async switchPlan(@Param('studentId') studentId: string, @Body() dto: SwitchBusPlanDto) {
+    return this.busService.switchPlan(studentId, dto);
   }
 
   @Get()

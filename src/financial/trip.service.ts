@@ -3,7 +3,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { StudentFinancialRecord } from './schemas/student-financial-record.schema';
-import { InstallmentPlan } from './schemas/installment-plan.schema';
 import { FinancialTrip } from './schemas/financial-trip.schema';
 import { AddTripDto } from './dto/add-trip.dto';
 import { RecordPaymentDto } from './dto/record-payment.dto';
@@ -11,6 +10,7 @@ import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
 import { FinancialRecordService } from './financial-record.service';
 import { CreateFinancialTripDto } from './dto/create-financial-trip.dto';
+import { UpdateFinancialTripDto } from './dto/update-financial-trip.dto';
 import { EnrollTripStudentDto } from './dto/enroll-trip-student.dto';
 import { getPagination } from '../pagination/common/paginationUtils';
 
@@ -18,7 +18,6 @@ import { getPagination } from '../pagination/common/paginationUtils';
 export class TripService {
   constructor(
     @InjectModel(StudentFinancialRecord.name) private recordModel: Model<StudentFinancialRecord>,
-    @InjectModel(InstallmentPlan.name) private planModel: Model<InstallmentPlan>,
     @InjectModel(FinancialTrip.name) private tripTemplateModel: Model<FinancialTrip>,
     private readonly financialRecordService: FinancialRecordService,
   ) {}
@@ -45,27 +44,7 @@ export class TripService {
   }
 
   private async resolveInstallments(fee: number, installmentPlanId?: string | null) {
-    let installments: any[] = [];
-    let planId: mongoose.Types.ObjectId | null = null;
-
-    if (installmentPlanId) {
-      this.validateObjectId(installmentPlanId, 'خطة التقسيط');
-      const plan = await this.planModel.findById(installmentPlanId).exec();
-      if (!plan) throw new NotFoundException('خطة التقسيط غير موجودة');
-      installments = this.financialRecordService.buildInstallments(fee, plan);
-      planId = plan._id as mongoose.Types.ObjectId;
-    } else {
-      installments = [{
-        installmentNumber: 1,
-        amount: fee,
-        dueDate: new Date(),
-        status: PaymentStatus.PENDING,
-        paidAmount: 0,
-        payments: [],
-      }];
-    }
-
-    return { installments, planId };
+    return this.financialRecordService.resolveInstallments(fee, installmentPlanId);
   }
 
   async createTemplate(dto: CreateFinancialTripDto) {
@@ -77,6 +56,15 @@ export class TripService {
     });
 
     return { message: 'تم إنشاء الرحلة بنجاح', data: created };
+  }
+
+  async updateTemplate(templateId: string, dto: UpdateFinancialTripDto) {
+    this.validateObjectId(templateId, 'الرحلة');
+    const updated = await this.tripTemplateModel
+      .findByIdAndUpdate(templateId, dto, { new: true })
+      .exec();
+    if (!updated) throw new NotFoundException('الرحلة غير موجودة');
+    return { message: 'تم تحديث الرحلة بنجاح', data: updated };
   }
 
   async findTemplates() {

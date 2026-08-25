@@ -77,6 +77,44 @@ export class FinancialRecordService {
     }];
   }
 
+  /**
+   * Shared helper: resolve installments for a given fee and optional installment plan.
+   * Used by BusService and TripService to avoid duplicating this logic.
+   */
+  async resolveInstallments(fee: number, installmentPlanId?: string | null) {
+    let installments: any[] = [];
+    let planId: mongoose.Types.ObjectId | null = null;
+
+    if (installmentPlanId) {
+      this.validateObjectId(installmentPlanId, 'خطة التقسيط');
+      const plan = await this.planModel.findById(installmentPlanId).exec();
+      if (!plan) throw new NotFoundException('خطة التقسيط غير موجودة');
+      installments = this.buildInstallments(fee, plan);
+      planId = plan._id as mongoose.Types.ObjectId;
+    } else {
+      installments = this.buildSingleInstallment(fee);
+    }
+
+    return { installments, planId };
+  }
+
+  /**
+   * Shared helper: redistribute remaining balance across unpaid installments.
+   * Used by DiscountService and BusService when fee or discount changes.
+   */
+  redistributeUnpaidInstallments(installments: any[], newBalance: number) {
+    const unpaid = installments.filter(i => i.status !== PaymentStatus.PAID);
+    const n = unpaid.length;
+    if (n === 0) return;
+
+    const base = Math.floor(newBalance / n);
+    const remainder = newBalance - base * n;
+
+    unpaid.forEach((inst, index) => {
+      inst.amount = index < remainder ? base + 1 : base;
+    });
+  }
+
   async assertCanCreateRecord(studentId: string, classId: string, schoolId: string): Promise<void> {
     const schoolOid = new mongoose.Types.ObjectId(schoolId);
     const cls = await this.classModel
