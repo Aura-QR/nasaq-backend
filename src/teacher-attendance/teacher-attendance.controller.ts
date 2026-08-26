@@ -21,6 +21,8 @@ import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.dto';
 import { CreateManualTeacherAttendanceDto } from './dto/create-manual-teacher-attendance.dto';
 import { QueryTeacherAttendanceDto } from './dto/query-teacher-attendance.dto';
+import { CheckOutTeacherAttendanceDto } from './dto/check-out-teacher-attendance.dto';
+import { SummaryTeacherAttendanceDto } from './dto/summary-teacher-attendance.dto';
 import { UpdateTeacherAttendanceDto } from './dto/update-teacher-attendance.dto';
 import { extractClientIp, TeacherAttendanceService } from './teacher-attendance.service';
 
@@ -53,6 +55,28 @@ export class TeacherAttendanceController {
     @Req() req: any,
   ) {
     return this.teacherAttendanceService.checkIn(user, dto, req);
+  }
+
+  @Post('check-out')
+  @Roles(Role.TEACHER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Teacher self-service check-out' })
+  async checkOut(
+    @CurrentUser() user: any,
+    @Body() dto: CheckOutTeacherAttendanceDto,
+    @Req() req: any,
+  ) {
+    return this.teacherAttendanceService.checkOut(user, dto, req);
+  }
+
+  // MUST stay above @Get(':id')-style routes if any are ever added, and above
+  // nothing else here — 'summary' is a literal path.
+  @Get('summary')
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Per-teacher attendance totals for a period' })
+  async getSummary(@Query() query: SummaryTeacherAttendanceDto) {
+    return this.teacherAttendanceService.getMonthlySummary(query);
   }
 
   @Get('me')

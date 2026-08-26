@@ -56,7 +56,14 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
     };
 
     schoolModel = {
-      findById: jest.fn(),
+      // createManual and update() read workStartTime/timezone through this now,
+      // so the default has to resolve rather than be left unset — the tests
+      // that care about specific settings still override it per case.
+      findById: jest.fn().mockReturnValue({
+        setOptions: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({ settings: defaultSchoolSettings }),
+        }),
+      }),
     };
 
     service = new TeacherAttendanceService(

@@ -14,6 +14,8 @@ import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.dto';
 import { CreateManualTeacherAttendanceDto } from './dto/create-manual-teacher-attendance.dto';
 import { QueryTeacherAttendanceDto } from './dto/query-teacher-attendance.dto';
+import { CheckOutTeacherAttendanceDto } from './dto/check-out-teacher-attendance.dto';
+import { SummaryTeacherAttendanceDto } from './dto/summary-teacher-attendance.dto';
 import { UpdateTeacherAttendanceDto } from './dto/update-teacher-attendance.dto';
 import { TeacherAttendance } from './schemas/teacher-attendance.schema';
 
@@ -58,6 +60,67 @@ export function parseCheckInTime(dateInput: string | Date, timeOrIsoStr: string)
     );
   }
   return new Date(timeOrIsoStr);
+}
+
+/**
+ * How many minutes past the school's official start did this check-in land?
+ *
+ * The timezone handling here is the whole point.
+ *
+ * `checkInAt` is a real instant — `new Date()` at the moment the teacher tapped.
+ * `workStartTime` is a wall-clock string, "07:30", meaning half past seven
+ * WHERE THE SCHOOL IS. Those two cannot be compared without knowing the
+ * school's offset.
+ *
+ * Building "07:30" as a UTC instant and subtracting, which is the obvious
+ * thing to write, is wrong in a way that never raises: a school on
+ * Asia/Riyadh (UTC+3) has a teacher arriving 07:50 local — 04:50 UTC — so the
+ * subtraction gives -160, max(0, …) makes it 0, and EVERY teacher is on time
+ * forever. West of Greenwich the same code makes everyone permanently late.
+ *
+ * So the comparison is done in wall-clock terms on both sides: format the
+ * instant into the school's timezone and read the hours and minutes back out.
+ * Intl carries the tz database, including DST, with no dependency.
+ *
+ * Returns null when the school has not set a start time — lateness is not
+ * zero in that case, it is unknown, and the two must not be conflated.
+ */
+export function computeLateMinutes(
+  checkInAt: Date,
+  workStartTime?: string | null,
+  timezone?: string | null,
+): number | null {
+  if (!workStartTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(workStartTime)) return null;
+
+  const [startHours, startMinutes] = workStartTime.split(':').map(Number);
+
+  let localHours: number;
+  let localMinutes: number;
+
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone || 'UTC',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(checkInAt);
+
+    const read = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+    localHours = read('hour');
+    localMinutes = read('minute');
+
+    // Intl renders midnight as "24" in some ICU versions.
+    if (localHours === 24) localHours = 0;
+  } catch {
+    // An unknown timezone string would otherwise throw and take the whole
+    // check-in down. Losing the lateness figure is the smaller failure.
+    return null;
+  }
+
+  if (!Number.isFinite(localHours) || !Number.isFinite(localMinutes)) return null;
+
+  const diff = localHours * 60 + localMinutes - (startHours * 60 + startMinutes);
+  return Math.max(0, diff);
 }
 
 /**
@@ -164,10 +227,17 @@ export class TeacherAttendanceService {
       throw new NotFoundException('المعلم غير موجود');
     }
 
+    const checkInAt = new Date();
+
     const attendance = await this.teacherAttendanceModel.create({
       teacherId: new Types.ObjectId(user.userId),
       date: today,
-      checkInAt: new Date(),
+      checkInAt,
+      lateMinutes: computeLateMinutes(
+        checkInAt,
+        (school.settings as any).workStartTime,
+        school.settings.timezone,
+      ),
       method: 'location',
       coordinates: { lat: dto.lat, lng: dto.lng },
       distanceMeters,
@@ -183,6 +253,7 @@ export class TeacherAttendanceService {
       message: 'تم تسجيل حضورك',
       data: {
         checkInAt: attendance.checkInAt,
+        lateMinutes: attendance.lateMinutes,
         distanceMeters: attendance.distanceMeters,
         verification: attendance.verification,
       },
@@ -214,11 +285,17 @@ export class TeacherAttendanceService {
     }
 
     const checkInAtDate = parseCheckInTime(dto.date, dto.checkInAt);
+    const settings = await this.getSchoolSettings(user.schoolId);
 
     const attendance = await this.teacherAttendanceModel.create({
       teacherId: new Types.ObjectId(dto.teacherId),
       date: normDate,
       checkInAt: checkInAtDate,
+      lateMinutes: computeLateMinutes(
+        checkInAtDate,
+        settings?.workStartTime,
+        settings?.timezone,
+      ),
       method: 'manual',
       coordinates: null,
       distanceMeters: null,
@@ -348,6 +425,189 @@ export class TeacherAttendanceService {
     };
   }
 
+  /** The settings block, or null. Shared by every path that needs workStartTime. */
+  private async getSchoolSettings(schoolId: any): Promise<any | null> {
+    if (!schoolId) return null;
+    const school = await this.schoolModel
+      .findById(schoolId, { settings: 1 })
+      .setOptions({ skipTenantScope: true })
+      .lean();
+    return (school as any)?.settings ?? null;
+  }
+
+  /**
+   * Minutes between check-in and check-out.
+   *
+   * Both are real instants, so this needs no timezone handling — unlike
+   * lateness, which compares an instant against a wall-clock string.
+   */
+  private computeWorkMinutes(checkInAt: Date, checkOutAt: Date): number {
+    const minutes = Math.round((checkOutAt.getTime() - checkInAt.getTime()) / 60000);
+    if (minutes < 0) {
+      throw new BadRequestException('وقت الانصراف لا يمكن أن يسبق وقت الحضور');
+    }
+    return minutes;
+  }
+
+  /**
+   * Self-service check-out. Mirrors checkIn, and reuses the same radius and
+   * network settings — a second checkOutRadius would be a setting nobody
+   * would ever set differently.
+   */
+  async checkOut(user: any, dto: CheckOutTeacherAttendanceDto, req?: any) {
+    const settings = await this.getSchoolSettings(user.schoolId);
+    if (!settings) {
+      throw new BadRequestException('لم يتم العثور على إعدادات المدرسة');
+    }
+    if (!settings.teacherCheckInEnabled) {
+      throw new BadRequestException('التسجيل الذاتي غير مفعّل');
+    }
+    if (
+      !settings.location ||
+      typeof settings.location.lat !== 'number' ||
+      typeof settings.location.lng !== 'number'
+    ) {
+      throw new BadRequestException('لم يتم تحديد موقع المدرسة بعد');
+    }
+
+    const today = normalizeDate(new Date());
+    const record = await this.teacherAttendanceModel.findOne({
+      teacherId: new Types.ObjectId(user.userId),
+      date: today,
+    });
+
+    if (!record) {
+      throw new BadRequestException('لا يوجد تسجيل حضور لك اليوم');
+    }
+
+    if (record.checkOutAt) {
+      // Same shape as the double check-in case: carry the existing data so a
+      // second tap can say "you left at 14:05" without another round trip.
+      throw new HttpException(
+        {
+          status: false,
+          message: 'تم تسجيل انصرافك اليوم بالفعل',
+          data: {
+            alreadyCheckedOut: true,
+            checkOutAt: record.checkOutAt,
+            workMinutes: record.workMinutes,
+          },
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    const distanceMeters = calculateHaversineDistance(
+      { lat: dto.lat, lng: dto.lng },
+      settings.location,
+    );
+    const radius = settings.checkInRadiusMeters || 150;
+    const gpsPassed = distanceMeters <= radius;
+
+    const clientIp = extractClientIp(req);
+    const networkPassed =
+      Array.isArray(settings.schoolNetworkIps) && settings.schoolNetworkIps.includes(clientIp);
+
+    if (!gpsPassed && !networkPassed) {
+      throw new ForbiddenException(
+        `الموقع الشبكي والإحداثيات خارج نطاق المدرسة (المسافة: ${distanceMeters} متر)`,
+      );
+    }
+
+    const checkOutAt = new Date();
+    record.checkOutAt = checkOutAt;
+    record.checkOutMethod = 'location';
+    record.checkOutCoordinates = { lat: dto.lat, lng: dto.lng };
+    record.checkOutDistanceMeters = distanceMeters;
+    record.checkOutVerification = { gps: gpsPassed, network: networkPassed };
+    record.checkOutMockLocationSuspected = dto.mockLocationSuspected ?? false;
+    record.workMinutes = this.computeWorkMinutes(record.checkInAt, checkOutAt);
+
+    await record.save();
+
+    return {
+      status: true,
+      message: 'تم تسجيل انصرافك',
+      data: {
+        checkInAt: record.checkInAt,
+        checkOutAt: record.checkOutAt,
+        workMinutes: record.workMinutes,
+        distanceMeters: record.checkOutDistanceMeters,
+        verification: record.checkOutVerification,
+      },
+    };
+  }
+
+  /**
+   * Per-teacher totals over a period.
+   *
+   * Reads the snapshotted lateMinutes / workMinutes rather than recomputing —
+   * so the report says what was true on each day, not what today's settings
+   * would make of it.
+   */
+  async getMonthlySummary(query: SummaryTeacherAttendanceDto) {
+    const match: any = {
+      date: {
+        $gte: normalizeDate(query.dateFrom),
+        $lte: normalizeDate(query.dateTo),
+      },
+    };
+    if (query.teacherId) {
+      match.teacherId = new Types.ObjectId(query.teacherId);
+    }
+
+    const rows = await this.teacherAttendanceModel.aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: '$teacherId',
+          daysPresent: { $sum: 1 },
+          daysLate: { $sum: { $cond: [{ $gt: ['$lateMinutes', 0] }, 1, 0] } },
+          totalLateMinutes: { $sum: { $ifNull: ['$lateMinutes', 0] } },
+          totalWorkMinutes: { $sum: { $ifNull: ['$workMinutes', 0] } },
+          // The honest count. Treating a missing check-out as zero work time
+          // would quietly understate someone's hours and read as fact.
+          daysMissingCheckOut: {
+            $sum: { $cond: [{ $eq: [{ $ifNull: ['$checkOutAt', null] }, null] }, 1, 0] },
+          },
+          // null means the school had no workStartTime that day. Counting
+          // those separately keeps "not tracked" from looking like "on time".
+          daysLatenessNotTracked: {
+            $sum: { $cond: [{ $eq: [{ $ifNull: ['$lateMinutes', null] }, null] }, 1, 0] },
+          },
+          fallbackName: { $first: '$name' },
+        },
+      },
+      { $lookup: { from: 'teachers', localField: '_id', foreignField: '_id', as: 'teacher' } },
+      // preserveNullAndEmptyArrays, because a deleted teacher must not make
+      // their days vanish from the totals — that is silent under-reporting.
+      { $unwind: { path: '$teacher', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          teacherId: '$_id',
+          teacherName: { $ifNull: ['$teacher.name', '$fallbackName'] },
+          teacherDeleted: { $cond: [{ $ifNull: ['$teacher', false] }, false, true] },
+          daysPresent: 1,
+          daysLate: 1,
+          totalLateMinutes: 1,
+          totalWorkMinutes: 1,
+          daysMissingCheckOut: 1,
+          daysLatenessNotTracked: 1,
+        },
+      },
+      { $sort: { teacherName: 1 } },
+    ]);
+
+    return {
+      status: true,
+      dateFrom: query.dateFrom,
+      dateTo: query.dateTo,
+      totalTeachers: rows.length,
+      data: rows,
+    };
+  }
+
   async update(id: string, dto: UpdateTeacherAttendanceDto, user: any) {
     const record = await this.teacherAttendanceModel.findById(id);
     if (!record) {
@@ -356,6 +616,26 @@ export class TeacherAttendanceService {
 
     if (dto.checkInAt) {
       record.checkInAt = parseCheckInTime(record.date, dto.checkInAt);
+
+      // Lateness is derived from checkInAt, so correcting the time has to
+      // correct the figure with it. The plan this came from only recomputed
+      // on checkOutAt, which would have left a stale lateMinutes behind.
+      const settings = await this.getSchoolSettings(user.schoolId);
+      record.lateMinutes = computeLateMinutes(
+        record.checkInAt,
+        settings?.workStartTime,
+        settings?.timezone,
+      );
+    }
+
+    if (dto.checkOutAt) {
+      record.checkOutAt = parseCheckInTime(record.date, dto.checkOutAt);
+      record.checkOutMethod = 'manual';
+    }
+
+    // Either timestamp moving changes the duration, so this runs after both.
+    if ((dto.checkInAt || dto.checkOutAt) && record.checkOutAt) {
+      record.workMinutes = this.computeWorkMinutes(record.checkInAt, record.checkOutAt);
     }
 
     if (dto.notes !== undefined) {

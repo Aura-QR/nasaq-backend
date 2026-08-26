@@ -32,6 +32,16 @@ export class SchoolSettings {
 
   @Prop({ default: false })
   teacherCheckInEnabled: boolean;
+
+  /**
+   * Official start of the work day, "HH:mm" in the school's own `timezone`.
+   *
+   * null means lateness is simply never computed — a school that does not
+   * track it is not forced to configure anything, and nothing here assumes a
+   * default start time on its behalf.
+   */
+  @Prop({ default: null })
+  workStartTime: string | null;
 }
 
 const SchoolSettingsSchema = SchemaFactory.createForClass(SchoolSettings);
