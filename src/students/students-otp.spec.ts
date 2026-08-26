@@ -9,6 +9,7 @@ import { Counter } from '../Counter/Schema/counter.schema';
 import { Enrollment } from '../enrollments/schemas/enrollment.schema';
 import { StudentFinancialRecord } from '../financial/schemas/student-financial-record.schema';
 import { FinancialRecordService } from '../financial/financial-record.service';
+import { BusService } from '../financial/bus.service';
 
 describe('StudentsService OTP Feature', () => {
   let service: StudentsService;
@@ -46,6 +47,9 @@ describe('StudentsService OTP Feature', () => {
         StudentsService,
         { provide: EmailService, useValue: mockEmailService },
         { provide: FinancialRecordService, useValue: {} },
+        // StudentsService gained this dependency when POST /students started
+        // enrolling a student in a bus plan at creation time.
+        { provide: BusService, useValue: { enroll: jest.fn() } },
         { provide: getModelToken(Student.name), useValue: studentModelMock },
         { provide: getModelToken(Class.name), useValue: mockModel() },
         { provide: getModelToken(Counter.name), useValue: mockModel() },

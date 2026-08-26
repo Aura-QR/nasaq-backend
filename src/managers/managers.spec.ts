@@ -41,11 +41,14 @@ describe('Managers Service Integration', () => {
     await mongoose.disconnect();
   });
 
-  it('should create a manager admin correctly', async () => {
+  it('should create a manager admin without storing a per-account permission list', async () => {
     const dto = {
       username: 'testmanager',
       email: 'testmanager@school.com',
       password: 'password123',
+      // Sent, but deliberately not stored: a manager's rights come from the
+      // school's MANAGER row, resolved at login. Storing this would leave a
+      // list on the document that nothing reads.
       permissions: ['school.students.read', 'school.classes.manage'],
     };
 
@@ -53,12 +56,26 @@ describe('Managers Service Integration', () => {
       const manager = await service.createManagerAdmin(schoolId, dto);
       expect(manager.username).toEqual(dto.username);
       expect(manager.role).toEqual('MANAGER');
-      expect(manager.permissions).toEqual(dto.permissions);
+      expect(manager.permissions).toEqual([]);
 
       // Verify it exists in database
       const dbRecord = await adminModel.findById(manager.id);
       expect(dbRecord).toBeDefined();
       expect(dbRecord.schoolId.toString()).toEqual(schoolId);
+      expect(dbRecord.permissions).toEqual([]);
+    });
+  });
+
+  it('should still store ["*"] for a supervisor', async () => {
+    await contextService.runWithTenant(schoolId, false, async () => {
+      const supervisor = await service.createManagerAdmin(schoolId, {
+        username: 'testsupervisor',
+        email: 'testsupervisor@school.com',
+        password: 'password123',
+        role: 'SUPERVISOR',
+      } as any);
+      expect(supervisor.role).toEqual('SUPERVISOR');
+      expect(supervisor.permissions).toEqual(['*']);
     });
   });
 
@@ -73,14 +90,18 @@ describe('Managers Service Integration', () => {
         isActive: true,
       });
 
-      const perms = ['school.attendance.manage'];
-      const promoted = await service.promoteTeacher(teacher._id.toString(), perms);
+      // Same reason as above: a promoted teacher merges the school's MANAGER
+      // set on top of their teaching rights at login, so nothing is stored
+      // here either.
+      const promoted = await service.promoteTeacher(teacher._id.toString(), [
+        'school.attendance.manage',
+      ]);
       expect(promoted.isManager).toBe(true);
-      expect(promoted.permissions).toEqual(perms);
+      expect(promoted.permissions).toEqual([]);
 
       const dbTeacher = await teacherModel.findById(teacher._id);
       expect(dbTeacher.isManager).toBe(true);
-      expect(dbTeacher.managerPermissions).toEqual(perms);
+      expect(dbTeacher.managerPermissions).toEqual([]);
     });
   });
 
