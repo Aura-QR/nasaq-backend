@@ -86,13 +86,31 @@ export class UpdateSchoolSettingsDto {
   teacherCheckInEnabled?: boolean;
 
   /**
-   * The school week. Send the days you want to change; a day you omit is left
-   * as it was — except that sending the array at all replaces it wholesale,
-   * so read the current value first and send back the full seven.
+   * The school week. Sending the array replaces it wholesale, so read the
+   * current value first and send back the full seven days.
    */
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => WorkDayDto)
   workSchedule?: WorkDayDto[];
+
+  /**
+   * One start time for the whole week — the shape this setting shipped in
+   * first, kept working for the client already sending it.
+   *
+   * It is applied to every working day in `workSchedule`, and read back in
+   * GET when the working days share a start time. They will not once a school
+   * sets a short day, and null is the honest answer then rather than picking
+   * one of them.
+   *
+   * `workSchedule` wins if both are sent. Prefer it: this cannot express a
+   * short day or a day off.
+   */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Matches(TIME_PATTERN, {
+    message: 'workStartTime يجب أن يكون بصيغة HH:mm بنظام 24 ساعة',
+  })
+  workStartTime?: string | null;
 }

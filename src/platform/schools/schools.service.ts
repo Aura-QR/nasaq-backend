@@ -5,6 +5,7 @@ import * as mongoose from 'mongoose';
 import { School } from './schemas/school.schema';
 import { Admin } from 'src/admin/schemas/admin.schema';
 import { Permission } from 'src/permissions/schemas/permission.schema';
+import { WEEKDAYS } from './schemas/school.schema';
 import {
   MANAGER_PERMISSIONS,
   STUDENT_PERMISSIONS,
@@ -207,7 +208,7 @@ export class SchoolsService {
     if (!school) {
       throw new NotFoundException(`المدرسة غير موجودة`);
     }
-    return school.settings;
+    return withDerivedWorkStartTime(school.settings);
   }
 
   async updateMySettings(schoolId: string, settingsDto: Partial<Record<string, any>>) {
@@ -223,8 +224,37 @@ export class SchoolsService {
       }
     }
 
+    /*
+     * workStartTime is the shape this setting shipped in first, and a client
+     * is already sending it. It is one time for the whole week, which cannot
+     * express a short day or a day off, so the stored model is workSchedule —
+     * seven days, each with its own hours and an isWorkingDay flag.
+     *
+     * Rather than break the client that got there first, a workStartTime is
+     * translated into the schedule here. Both keys in one request is a
+     * contradiction, so the explicit schedule wins and the shorthand is
+     * dropped.
+     */
+    const dto: Record<string, any> = { ...settingsDto };
+    if (dto.workStartTime !== undefined) {
+      const shorthand = dto.workStartTime;
+      delete dto.workStartTime;
+
+      if (dto.workSchedule === undefined) {
+        const existing = await this.schoolModel
+          .findById(schoolId, { settings: 1 })
+          .setOptions({ skipTenantScope: true })
+          .lean();
+
+        dto.workSchedule = applyStartTimeToSchedule(
+          (existing?.settings as any)?.workSchedule,
+          shorthand,
+        );
+      }
+    }
+
     const updateFields: Record<string, any> = {};
-    for (const [key, value] of Object.entries(settingsDto)) {
+    for (const [key, value] of Object.entries(dto)) {
       updateFields[`settings.${key}`] = value;
     }
 
@@ -241,6 +271,67 @@ export class SchoolsService {
       await this.financialRecordService.recalculateForSchool(schoolId);
     }
 
-    return updated.settings;
+    return withDerivedWorkStartTime(updated.settings);
   }
+}
+
+/**
+ * Set one start time across the week, in the shape the schedule stores.
+ *
+ * With no schedule yet, all seven days are created as working days — exactly
+ * what a single workStartTime meant, since it had no notion of a day off. The
+ * school marks its weekend when it edits the schedule properly.
+ *
+ * null clears the start times and leaves the working/not-working flags alone.
+ */
+function applyStartTimeToSchedule(
+  existing: any[] | undefined,
+  startTime: string | null,
+): any[] {
+  const base =
+    Array.isArray(existing) && existing.length
+      ? existing.map((d) => ({
+          day: d.day,
+          isWorkingDay: d.isWorkingDay !== false,
+          startTime: d.startTime ?? null,
+          endTime: d.endTime ?? null,
+        }))
+      : WEEKDAYS.map((day) => ({
+          day,
+          isWorkingDay: true,
+          startTime: null,
+          endTime: null,
+        }));
+
+  return base.map((d) => ({
+    ...d,
+    // A day off has no hours to set, whatever the shorthand says.
+    startTime: d.isWorkingDay ? startTime : null,
+  }));
+}
+
+/**
+ * Report the week's start time as a single value when there is one.
+ *
+ * A client written against the original shape reads `workStartTime` back after
+ * saving. Returning null when the working days genuinely differ is the honest
+ * answer — a short Thursday cannot be reported as one time, and picking one of
+ * them would be a lie the client would then write back over the others.
+ */
+function withDerivedWorkStartTime(settings: any): any {
+  if (!settings) return settings;
+
+  const schedule = settings.workSchedule;
+  if (!Array.isArray(schedule) || schedule.length === 0) {
+    return { ...settings, workStartTime: null };
+  }
+
+  const startTimes = schedule
+    .filter((d: any) => d?.isWorkingDay !== false)
+    .map((d: any) => d?.startTime ?? null);
+
+  const allSame =
+    startTimes.length > 0 && startTimes.every((t) => t === startTimes[0]);
+
+  return { ...settings, workStartTime: allSame ? startTimes[0] : null };
 }
