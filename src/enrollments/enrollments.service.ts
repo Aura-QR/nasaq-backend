@@ -7,7 +7,7 @@ import { Student } from '../students/schemas/student.schema';
 import { Class } from '../classes/schemas/class.schema';
 import { GradeLevel } from '../grade-levels/schemas/grade-level.schema';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
-import { BulkPromoteDto } from './dto/bulk-promote.dto';
+import { BulkPromoteDto, ExclusionReason } from './dto/bulk-promote.dto';
 import { GradesCriteriaService } from '../grades-criteria/grades-criteria.service';
 import { FinancialRecordService } from '../financial/financial-record.service';
 
@@ -167,7 +167,7 @@ export class EnrollmentsService {
       sourceFilter.academicYearId = new mongoose.Types.ObjectId(previousAcademicYearId);
     }
 
-    const sourceEnrollments = await this.enrollmentModel
+    const rawSourceEnrollments = await this.enrollmentModel
       .find(sourceFilter)
       .populate('studentId', 'firstName familyName fatherName email')
       .populate({
@@ -175,7 +175,60 @@ export class EnrollmentsService {
         select: 'name gradeLevelId',
         populate: { path: 'gradeLevelId', select: 'name order' },
       })
+      .populate('academicYearId', 'name startDate')
       .exec();
+
+    /*
+     * Everyone who already has an enrollment in the target year is done —
+     * whatever the outcome. This is what makes the preview idempotent.
+     *
+     * Without it the preview simply listed every active enrollment in the
+     * source year, so a student reappeared every time the screen was reopened,
+     * with no way to tell that a decision had already been made about them. A
+     * second promotion for the same student then failed silently against the
+     * unique index and landed in `errors`.
+     *
+     * `distinct` is one of the methods tenantScopedPlugin scopes by schoolId,
+     * so this cannot reach another school's enrollments.
+     */
+    const decidedStudentIds = await this.enrollmentModel
+      .find({ academicYearId: new mongoose.Types.ObjectId(targetAcademicYearId) })
+      .distinct('studentId');
+    const decidedSet = new Set(decidedStudentIds.map((id: any) => id.toString()));
+
+    /*
+     * One row per student, from their most recent year.
+     *
+     * A promoted student keeps status 'active' on the old enrollment as well as
+     * the new one — deliberately, since 'promoted' is not in the schema's enum
+     * and the check above already keeps them out of the next preview. But when
+     * previousAcademicYearId is omitted the query spans every past year, so
+     * that student carries two active enrollments and appeared TWICE: once
+     * suggesting the grade after their old class, once after their new one.
+     *
+     * Keeping only the latest year per student is what makes the unfiltered
+     * "everything still outstanding" view usable. With previousAcademicYearId
+     * supplied there is at most one row per student anyway, so this is a no-op.
+     */
+    const latestByStudent = new Map<string, any>();
+    for (const enc of rawSourceEnrollments) {
+      const student = enc.studentId as any;
+      if (!student?._id) continue;
+
+      const key = student._id.toString();
+      const existing = latestByStudent.get(key);
+      if (!existing) {
+        latestByStudent.set(key, enc);
+        continue;
+      }
+
+      // Fall back to enrolledAt when a year has no startDate to compare on.
+      const at = (e: any) =>
+        new Date(e.academicYearId?.startDate ?? e.enrolledAt ?? 0).getTime();
+      if (at(enc) > at(existing)) latestByStudent.set(key, enc);
+    }
+
+    const sourceEnrollments = [...latestByStudent.values()];
 
     // All grade levels sorted by order
     const allGradeLevels = await this.gradeLevelModel.find().sort({ order: 1 }).exec();
@@ -190,6 +243,7 @@ export class EnrollmentsService {
       const student = enc.studentId as any;
       const currentClass = enc.classId as any;
       if (!student || !currentClass || !currentClass.gradeLevelId) continue;
+      if (decidedSet.has(student._id.toString())) continue;
 
       const currentGradeOrder = currentClass.gradeLevelId.order;
       const nextGrade = gradeOrderByOrderMap.get(currentGradeOrder + 1);
@@ -209,7 +263,12 @@ export class EnrollmentsService {
         isGraduating = true;
       }
 
-      const sourceYearId = previousAcademicYearId || enc.academicYearId?.toString();
+      // academicYearId is populated now, so read the id off the document
+      // rather than stringifying the whole object.
+      const sourceYearId =
+        previousAcademicYearId ||
+        (enc.academicYearId as any)?._id?.toString() ||
+        enc.academicYearId?.toString();
       let subjectResults: any[] = [];
       let overallPassed = true;
 
@@ -261,8 +320,27 @@ export class EnrollmentsService {
    * Wizard Step 5 — Bulk Promotion Execution
    */
   async bulkPromote(targetAcademicYearId: string, dto: BulkPromoteDto) {
-    const { promotions, excludedStudentIds = [] } = dto;
-    const excludedSet = new Set(excludedStudentIds);
+    const {
+      promotions,
+      previousAcademicYearId,
+      excludedStudents = [],
+      excludedStudentIds = [],
+    } = dto;
+
+    /*
+     * Two shapes, one list.
+     *
+     * excludedStudents carries the reason and is what the old enrollment is
+     * closed out with. excludedStudentIds is the older shape the mobile client
+     * still sends; those become 'withdrawn' — the neutral outcome, chosen over
+     * guessing 'graduated' for someone who may simply have left.
+     *
+     * excludedStudents wins on a duplicate, since it is the one with a reason.
+     */
+    const exclusions = new Map<string, ExclusionReason>();
+    for (const id of excludedStudentIds) exclusions.set(id, 'withdrawn');
+    for (const e of excludedStudents) exclusions.set(e.studentId, e.reason);
+    const excludedSet = new Set(exclusions.keys());
 
     const createdDocs = [];
     const errors = [];
@@ -314,10 +392,58 @@ export class EnrollmentsService {
       }
     }
 
+    /*
+     * Close out the excluded students' old enrollment.
+     *
+     * Nothing used to record that a decision had been made: an excluded
+     * student's enrollment stayed 'active' forever, so they resurfaced in
+     * every future preview with no trace of having been dealt with.
+     *
+     * Promoted students are deliberately NOT touched here — 'promoted' is not
+     * in the schema enum, and getPromotionPreview already excludes anyone
+     * holding an enrollment in the target year, which covers them.
+     */
+    let excludedUpdated = 0;
+    for (const [studentId, reason] of exclusions) {
+      const filter: any = {
+        studentId: new mongoose.Types.ObjectId(studentId),
+        status: 'active',
+      };
+
+      if (previousAcademicYearId) {
+        filter.academicYearId = new mongoose.Types.ObjectId(previousAcademicYearId);
+      } else {
+        // The client did not say which year. Their active enrollment outside
+        // the target year is the one being closed; a student has at most one
+        // per year thanks to the unique index, so the sort picks the newest.
+        filter.academicYearId = { $ne: new mongoose.Types.ObjectId(targetAcademicYearId) };
+      }
+
+      const target = await this.enrollmentModel
+        .findOne(filter)
+        .sort({ enrolledAt: -1 })
+        .select('_id')
+        .exec();
+
+      if (!target) {
+        errors.push({
+          studentId,
+          error: 'لا يوجد تسجيل نشط لهذا الطالب في السنة السابقة',
+        });
+        continue;
+      }
+
+      await this.enrollmentModel
+        .updateOne({ _id: target._id }, { $set: { status: reason } })
+        .exec();
+      excludedUpdated++;
+    }
+
     return {
       message: 'Bulk promotion completed',
       createdCount: createdDocs.length,
       excludedCount: excludedSet.size,
+      excludedUpdated,
       errors,
     };
   }
