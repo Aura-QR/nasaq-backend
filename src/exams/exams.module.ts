@@ -11,9 +11,11 @@ import { CaslModule } from '../casl/casl.module';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.schema';
 import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
+import { StudentClassResolverModule } from '../enrollments/student-class-resolver.module';
 
 @Module({
   imports: [
+    StudentClassResolverModule,
     MongooseModule.forFeature([
       { name: Exam.name, schema: ExamSchema },
       { name: GradesCriteria.name, schema: GradesCriteriaSchema },

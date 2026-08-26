@@ -18,6 +18,7 @@ import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.s
 import { transformExamResponse } from './transforms/response.transform';
 import { PaginationDto } from '../pagination/dto/pagination.dto';
 import { getPagination } from '../pagination/common/paginationUtils';
+import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
 
 @Injectable()
 export class ExamsService {
@@ -47,6 +48,7 @@ export class ExamsService {
     @InjectModel(ExamResult.name) private examResultModel: Model<ExamResult>,
     @InjectModel(Enrollment.name) private enrollmentModel: Model<Enrollment>,
     @InjectModel(SubjectOffering.name) private subjectOfferingModel: Model<SubjectOffering>,
+    private readonly studentClassResolver: StudentClassResolverService,
   ) {}
 
   private validateObjectId(id: string, entityName: string): void {
@@ -230,24 +232,18 @@ export class ExamsService {
 
 
   async getMyExams(studentId: string, filters: any = {}, pagination: PaginationDto = {}) {
-    const [enrollments, student] = await Promise.all([
-      this.enrollmentModel.find({ studentId }).select('classId').exec(),
-      this.studentModel.findById(studentId).select('classId').exec(),
-    ]);
+    const student = await this.studentModel.findById(studentId).select('classId').exec();
 
     if (!student) {
       throw new NotFoundException(`الطالب غير موجود`);
     }
 
-    const classIdsSet = new Set<string>();
-    if (student.classId) {
-      classIdsSet.add(student.classId.toString());
-    }
-    enrollments.forEach((e) => {
-      if (e.classId) {
-        classIdsSet.add(e.classId.toString());
-      }
-    });
+    // The student's CURRENT class only. This used to union every enrollment
+    // the student had ever had with student.classId, so anyone who had been
+    // promoted saw their previous grade's content alongside this year's.
+    const classIdsSet = new Set<string>(
+      await this.studentClassResolver.resolveClassIds(studentId),
+    );
 
     if (classIdsSet.size === 0) {
       return {

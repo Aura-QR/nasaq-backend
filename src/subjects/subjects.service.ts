@@ -21,6 +21,7 @@ import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.s
 import { TeacherAssignment } from '../teacher-assignments/schemas/teacher-assignment.schema';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
+import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
 
 @Injectable()
 export class SubjectsService {
@@ -36,6 +37,7 @@ export class SubjectsService {
     @InjectModel(Enrollment.name) private readonly enrollmentModel: Model<Enrollment>,
     @InjectModel(SubjectOffering.name) private readonly subjectOfferingModel: Model<SubjectOffering>,
     @InjectModel(TeacherAssignment.name) private readonly teacherAssignmentModel: Model<TeacherAssignment>,
+    private readonly studentClassResolver: StudentClassResolverService,
   ) {}
 
   private escapeRegex(text: string): string {
@@ -43,20 +45,10 @@ export class SubjectsService {
   }
 
   async getMySubjects(studentId: string) {
-    const [enrollments, student] = await Promise.all([
-      this.enrollmentModel.find({ studentId }).select('classId').exec(),
-      this.studentModel.findById(studentId).select('classId').exec(),
-    ]);
-
-    const classIdsSet = new Set<string>();
-    if (student?.classId) {
-      classIdsSet.add(student.classId.toString());
-    }
-    enrollments.forEach((e) => {
-      if (e.classId) {
-        classIdsSet.add(e.classId.toString());
-      }
-    });
+    // The student's CURRENT class only — see StudentClassResolverService.
+    const classIdsSet = new Set<string>(
+      await this.studentClassResolver.resolveClassIds(studentId),
+    );
 
     if (classIdsSet.size === 0) {
       return {

@@ -15,9 +15,11 @@ import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.
 import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
 import { multerConfig } from './config/multer.config';
 import { CaslModule } from 'src/casl/casl.module';
+import { StudentClassResolverModule } from '../enrollments/student-class-resolver.module';
 
 @Module({
   imports: [
+    StudentClassResolverModule,
     MongooseModule.forFeature([
       { name: Project.name, schema: ProjectSchema },
       { name: ProjectSubmission.name, schema: ProjectSubmissionSchema },

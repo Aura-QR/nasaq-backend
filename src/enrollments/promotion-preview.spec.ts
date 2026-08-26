@@ -150,6 +150,10 @@ describe('Promotion Preview Automatic Pass/Fail Calculation Unit Tests', () => {
       mockTermModel,
       mockSchoolModel,
       mockTenantContext,
+      // getMySubjects resolves a student's current class through this now.
+      // Not exercised by these tests, which call
+      // calculateStudentYearlySubjectResults directly.
+      {} as any,
     );
 
     jest.spyOn(service, 'calculateStudentTermGrade').mockImplementation(async (studentId, offeringId) => {

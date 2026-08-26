@@ -22,6 +22,7 @@ import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.s
 import { Term } from '../terms/schemas/term.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { TenantContextService } from '../tenancy/tenant-context.service';
+import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
 
 @Injectable()
 export class GradesCriteriaService {
@@ -41,6 +42,7 @@ export class GradesCriteriaService {
     @InjectModel(Term.name) private termModel: Model<Term>,
     @InjectModel(School.name) private schoolModel: Model<School>,
     private tenantContext: TenantContextService,
+    private readonly studentClassResolver: StudentClassResolverService,
   ) {}
 
   private validateObjectId(id: string, entityName: string): void {
@@ -159,20 +161,10 @@ export class GradesCriteriaService {
   }
 
   async getMySubjects(studentId: string) {
-    const [enrollments, student] = await Promise.all([
-      this.enrollmentModel.find({ studentId }).select('classId').exec(),
-      this.studentModel.findById(studentId).select('classId').exec(),
-    ]);
-
-    const classIdsSet = new Set<string>();
-    if (student?.classId) {
-      classIdsSet.add(student.classId.toString());
-    }
-    enrollments.forEach((e) => {
-      if (e.classId) {
-        classIdsSet.add(e.classId.toString());
-      }
-    });
+    // The student's CURRENT class only — see StudentClassResolverService.
+    const classIdsSet = new Set<string>(
+      await this.studentClassResolver.resolveClassIds(studentId),
+    );
 
     if (classIdsSet.size === 0) {
       return {

@@ -16,6 +16,7 @@ import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
 import { Response } from 'express';
 import { transformProjectResponse } from './transforms/response.transform';
+import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
 
 @Injectable()
 export class ProjectsService {
@@ -45,6 +46,7 @@ export class ProjectsService {
     @InjectModel(Student.name) private studentModel: Model<Student>,
     @InjectModel(Enrollment.name) private enrollmentModel: Model<Enrollment>,
     @InjectModel(SubjectOffering.name) private subjectOfferingModel: Model<SubjectOffering>,
+    private readonly studentClassResolver: StudentClassResolverService,
   ) {}
 
   /**
@@ -213,24 +215,18 @@ export class ProjectsService {
   }
 
   async getMyProjects(studentId: string, filters: any = {}, pagination: PaginationDto = {}) {
-    const [enrollments, student] = await Promise.all([
-      this.enrollmentModel.find({ studentId }).select('classId').exec(),
-      this.studentModel.findById(studentId).select('classId').exec(),
-    ]);
+    const student = await this.studentModel.findById(studentId).select('classId').exec();
 
     if (!student) {
       throw new NotFoundException(`الطالب غير موجود`);
     }
 
-    const classIdsSet = new Set<string>();
-    if (student.classId) {
-      classIdsSet.add(student.classId.toString());
-    }
-    enrollments.forEach((e) => {
-      if (e.classId) {
-        classIdsSet.add(e.classId.toString());
-      }
-    });
+    // The student's CURRENT class only. This used to union every enrollment
+    // the student had ever had with student.classId, so anyone who had been
+    // promoted saw their previous grade's content alongside this year's.
+    const classIdsSet = new Set<string>(
+      await this.studentClassResolver.resolveClassIds(studentId),
+    );
 
     if (classIdsSet.size === 0) {
       return {

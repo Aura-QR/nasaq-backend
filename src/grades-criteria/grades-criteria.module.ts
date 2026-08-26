@@ -18,9 +18,11 @@ import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/sch
 import { Term, TermSchema } from '../terms/schemas/term.schema';
 import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
 import { TenancyModule } from '../tenancy/tenancy.module';
+import { StudentClassResolverModule } from '../enrollments/student-class-resolver.module';
 
 @Module({
   imports: [
+    StudentClassResolverModule,
     MongooseModule.forFeature([
       { name: GradesCriteria.name, schema: GradesCriteriaSchema },
       { name: Subject.name, schema: SubjectSchema },

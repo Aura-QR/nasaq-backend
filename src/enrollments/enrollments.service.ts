@@ -383,6 +383,21 @@ export class EnrollmentsService {
           }
         }
 
+        /*
+         * Keep the student's own classId in step with the promotion.
+         *
+         * bulkPromote used to create the enrollment and stop, so after a
+         * promotion student.classId still named the class they had left. Any
+         * screen reading that field showed last year's class, and the resolver
+         * falls back to it when a student has no enrollment at all.
+         */
+        await this.studentModel
+          .updateOne(
+            { _id: new mongoose.Types.ObjectId(promo.studentId) },
+            { $set: { classId: new mongoose.Types.ObjectId(promo.targetClassId) } },
+          )
+          .exec();
+
         createdDocs.push(enrollment);
       } catch (err: any) {
         errors.push({
