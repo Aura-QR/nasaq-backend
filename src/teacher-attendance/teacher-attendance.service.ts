@@ -90,9 +90,50 @@ export function computeLateMinutes(
   workStartTime?: string | null,
   timezone?: string | null,
 ): number | null {
-  if (!workStartTime || !/^([01]\d|2[0-3]):[0-5]\d$/.test(workStartTime)) return null;
+  const diff = minutesFromWallClock(checkInAt, workStartTime, timezone);
+  return diff === null ? null : Math.max(0, diff);
+}
 
-  const [startHours, startMinutes] = workStartTime.split(':').map(Number);
+/**
+ * How many minutes before the school's official end did this check-out land?
+ *
+ * The mirror of computeLateMinutes, and it needs the same care: reading the
+ * instant as UTC would make everyone in a UTC+ school look like they left
+ * early, every single day.
+ *
+ * Returns null when the day has no end time — unknown, not zero.
+ */
+export function computeEarlyLeaveMinutes(
+  checkOutAt: Date,
+  workEndTime?: string | null,
+  timezone?: string | null,
+): number | null {
+  const diff = minutesFromWallClock(checkOutAt, workEndTime, timezone);
+  return diff === null ? null : Math.max(0, -diff);
+}
+
+/**
+ * Minutes between an instant and a "HH:mm" reference, both read as wall-clock
+ * time in the given timezone. Positive means the instant is later.
+ *
+ * The timezone handling here is the whole point. `instant` is a real moment;
+ * `reference` is a wall-clock string meaning that time WHERE THE SCHOOL IS.
+ * Building "07:30" as a UTC instant and subtracting — the obvious thing to
+ * write — is wrong in a way that never raises: on Asia/Riyadh (UTC+3, the
+ * default here) a teacher arriving 07:50 local is 04:50 UTC, the difference is
+ * negative, and every teacher is on time forever. West of Greenwich everyone
+ * is permanently late instead.
+ *
+ * Intl carries the tz database, including DST, with no dependency.
+ */
+function minutesFromWallClock(
+  instant: Date,
+  reference?: string | null,
+  timezone?: string | null,
+): number | null {
+  if (!reference || !/^([01]\d|2[0-3]):[0-5]\d$/.test(reference)) return null;
+
+  const [startHours, startMinutes] = reference.split(':').map(Number);
 
   let localHours: number;
   let localMinutes: number;
@@ -103,7 +144,7 @@ export function computeLateMinutes(
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
-    }).formatToParts(checkInAt);
+    }).formatToParts(instant);
 
     const read = (type: string) => Number(parts.find((p) => p.type === type)?.value);
     localHours = read('hour');
@@ -113,14 +154,78 @@ export function computeLateMinutes(
     if (localHours === 24) localHours = 0;
   } catch {
     // An unknown timezone string would otherwise throw and take the whole
-    // check-in down. Losing the lateness figure is the smaller failure.
+    // check-in down. Losing the figure is the smaller failure.
     return null;
   }
 
   if (!Number.isFinite(localHours) || !Number.isFinite(localMinutes)) return null;
 
-  const diff = localHours * 60 + localMinutes - (startHours * 60 + startMinutes);
-  return Math.max(0, diff);
+  return localHours * 60 + localMinutes - (startHours * 60 + startMinutes);
+}
+
+/** Index matches Date.getUTCDay(): 0 = Sunday. */
+const WEEKDAY_NAMES = [
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+];
+
+export interface DaySchedule {
+  isWorkingDay: boolean;
+  startTime: string | null;
+  endTime: string | null;
+  /** How long the day is meant to be, or null when its hours are not set. */
+  expectedWorkMinutes: number | null;
+}
+
+/**
+ * The school's hours for the weekday a given date falls on.
+ *
+ * `date` is the record's own normalised date — built from the intended
+ * calendar day at UTC midnight — so its UTC weekday IS the school's weekday.
+ *
+ * A school with no schedule configured gets every day treated as a working day
+ * with no hours: exactly the behaviour it has today, so nothing changes for a
+ * school that has not set this up.
+ */
+export function resolveDaySchedule(
+  settings: any,
+  date: Date,
+): DaySchedule {
+  const schedule = settings?.workSchedule;
+  const fallback: DaySchedule = {
+    isWorkingDay: true,
+    startTime: null,
+    endTime: null,
+    expectedWorkMinutes: null,
+  };
+
+  if (!Array.isArray(schedule) || schedule.length === 0) return fallback;
+
+  const weekday = WEEKDAY_NAMES[date.getUTCDay()];
+  const entry = schedule.find((d: any) => d?.day === weekday);
+  if (!entry) return fallback;
+
+  const isWorkingDay = entry.isWorkingDay !== false;
+  // A day off has no hours to measure against, whatever is stored on it.
+  const startTime = isWorkingDay ? (entry.startTime ?? null) : null;
+  const endTime = isWorkingDay ? (entry.endTime ?? null) : null;
+
+  let expectedWorkMinutes: number | null = null;
+  if (startTime && endTime) {
+    const [sh, sm] = startTime.split(':').map(Number);
+    const [eh, em] = endTime.split(':').map(Number);
+    const span = eh * 60 + em - (sh * 60 + sm);
+    // A negative span would be a day that ends before it starts. Treat it as
+    // unset rather than reporting a negative expectation.
+    expectedWorkMinutes = span > 0 ? span : null;
+  }
+
+  return { isWorkingDay, startTime, endTime, expectedWorkMinutes };
 }
 
 /**
@@ -228,6 +333,7 @@ export class TeacherAttendanceService {
     }
 
     const checkInAt = new Date();
+    const daySchedule = resolveDaySchedule(school.settings, today);
 
     const attendance = await this.teacherAttendanceModel.create({
       teacherId: new Types.ObjectId(user.userId),
@@ -235,9 +341,11 @@ export class TeacherAttendanceService {
       checkInAt,
       lateMinutes: computeLateMinutes(
         checkInAt,
-        (school.settings as any).workStartTime,
+        daySchedule.startTime,
         school.settings.timezone,
       ),
+      expectedWorkMinutes: daySchedule.expectedWorkMinutes,
+      isWorkingDay: daySchedule.isWorkingDay,
       method: 'location',
       coordinates: { lat: dto.lat, lng: dto.lng },
       distanceMeters,
@@ -254,6 +362,8 @@ export class TeacherAttendanceService {
       data: {
         checkInAt: attendance.checkInAt,
         lateMinutes: attendance.lateMinutes,
+        isWorkingDay: attendance.isWorkingDay,
+        expectedWorkMinutes: attendance.expectedWorkMinutes,
         distanceMeters: attendance.distanceMeters,
         verification: attendance.verification,
       },
@@ -286,6 +396,7 @@ export class TeacherAttendanceService {
 
     const checkInAtDate = parseCheckInTime(dto.date, dto.checkInAt);
     const settings = await this.getSchoolSettings(user.schoolId);
+    const daySchedule = resolveDaySchedule(settings, normDate);
 
     const attendance = await this.teacherAttendanceModel.create({
       teacherId: new Types.ObjectId(dto.teacherId),
@@ -293,9 +404,11 @@ export class TeacherAttendanceService {
       checkInAt: checkInAtDate,
       lateMinutes: computeLateMinutes(
         checkInAtDate,
-        settings?.workStartTime,
+        daySchedule.startTime,
         settings?.timezone,
       ),
+      expectedWorkMinutes: daySchedule.expectedWorkMinutes,
+      isWorkingDay: daySchedule.isWorkingDay,
       method: 'manual',
       coordinates: null,
       distanceMeters: null,
@@ -399,8 +512,28 @@ export class TeacherAttendanceService {
     };
   }
 
-  async findAbsent(dateStr?: string) {
+  async findAbsent(dateStr?: string, user?: any) {
     const targetDate = normalizeDate(dateStr || new Date());
+
+    /*
+     * Nobody is absent on a day the school does not work.
+     *
+     * This had no notion of a day off, so every Friday it reported every
+     * teacher in the school as absent — a number an admin would either learn
+     * to ignore or act on wrongly.
+     */
+    const settings = await this.getSchoolSettings(user?.schoolId);
+    const daySchedule = resolveDaySchedule(settings, targetDate);
+
+    if (!daySchedule.isWorkingDay) {
+      return {
+        date: targetDate,
+        isWorkingDay: false,
+        message: 'هذا اليوم إجازة رسمية للمدرسة',
+        totalAbsent: 0,
+        absentTeachers: [],
+      };
+    }
 
     const activeTeachers = await this.teacherModel
       .find({ isActive: true })
@@ -420,6 +553,7 @@ export class TeacherAttendanceService {
 
     return {
       date: targetDate,
+      isWorkingDay: true,
       totalAbsent: absentTeachers.length,
       absentTeachers,
     };
@@ -515,7 +649,14 @@ export class TeacherAttendanceService {
     }
 
     const checkOutAt = new Date();
+    const daySchedule = resolveDaySchedule(settings, record.date);
+
     record.checkOutAt = checkOutAt;
+    record.earlyLeaveMinutes = computeEarlyLeaveMinutes(
+      checkOutAt,
+      daySchedule.endTime,
+      settings.timezone,
+    );
     record.checkOutMethod = 'location';
     record.checkOutCoordinates = { lat: dto.lat, lng: dto.lng };
     record.checkOutDistanceMeters = distanceMeters;
@@ -532,6 +673,8 @@ export class TeacherAttendanceService {
         checkInAt: record.checkInAt,
         checkOutAt: record.checkOutAt,
         workMinutes: record.workMinutes,
+        expectedWorkMinutes: record.expectedWorkMinutes,
+        earlyLeaveMinutes: record.earlyLeaveMinutes,
         distanceMeters: record.checkOutDistanceMeters,
         verification: record.checkOutVerification,
       },
@@ -564,7 +707,18 @@ export class TeacherAttendanceService {
           daysPresent: { $sum: 1 },
           daysLate: { $sum: { $cond: [{ $gt: ['$lateMinutes', 0] }, 1, 0] } },
           totalLateMinutes: { $sum: { $ifNull: ['$lateMinutes', 0] } },
+          daysLeftEarly: { $sum: { $cond: [{ $gt: ['$earlyLeaveMinutes', 0] }, 1, 0] } },
+          totalEarlyLeaveMinutes: { $sum: { $ifNull: ['$earlyLeaveMinutes', 0] } },
           totalWorkMinutes: { $sum: { $ifNull: ['$workMinutes', 0] } },
+          // What the school's schedule says those days should have been. Gives
+          // totalWorkMinutes something to be read against — on its own it is a
+          // number nobody can tell is good or bad.
+          totalExpectedWorkMinutes: { $sum: { $ifNull: ['$expectedWorkMinutes', 0] } },
+          // Attendance on a day off is real and recorded, but counting it in
+          // the same averages as a normal day would distort them.
+          daysOnDayOff: {
+            $sum: { $cond: [{ $eq: ['$isWorkingDay', false] }, 1, 0] },
+          },
           // The honest count. Treating a missing check-out as zero work time
           // would quietly understate someone's hours and read as fact.
           daysMissingCheckOut: {
@@ -574,6 +728,22 @@ export class TeacherAttendanceService {
           // those separately keeps "not tracked" from looking like "on time".
           daysLatenessNotTracked: {
             $sum: { $cond: [{ $eq: [{ $ifNull: ['$lateMinutes', null] }, null] }, 1, 0] },
+          },
+          // Same distinction on the way out: a day with no end time configured
+          // is not a day somebody left exactly on time.
+          daysEarlyLeaveNotTracked: {
+            $sum: {
+              $cond: [
+                {
+                  $and: [
+                    { $ne: [{ $ifNull: ['$checkOutAt', null] }, null] },
+                    { $eq: [{ $ifNull: ['$earlyLeaveMinutes', null] }, null] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
           },
           fallbackName: { $first: '$name' },
         },
@@ -591,9 +761,14 @@ export class TeacherAttendanceService {
           daysPresent: 1,
           daysLate: 1,
           totalLateMinutes: 1,
+          daysLeftEarly: 1,
+          totalEarlyLeaveMinutes: 1,
           totalWorkMinutes: 1,
+          totalExpectedWorkMinutes: 1,
           daysMissingCheckOut: 1,
           daysLatenessNotTracked: 1,
+          daysEarlyLeaveNotTracked: 1,
+          daysOnDayOff: 1,
         },
       },
       { $sort: { teacherName: 1 } },
@@ -614,23 +789,36 @@ export class TeacherAttendanceService {
       throw new NotFoundException('سجل الحضور غير موجود');
     }
 
+    // Every derived figure is measured against the school's hours for that
+    // weekday, so the schedule is resolved once and reused below.
+    const settings =
+      dto.checkInAt || dto.checkOutAt
+        ? await this.getSchoolSettings(user.schoolId)
+        : null;
+    const daySchedule = settings ? resolveDaySchedule(settings, record.date) : null;
+
     if (dto.checkInAt) {
       record.checkInAt = parseCheckInTime(record.date, dto.checkInAt);
 
       // Lateness is derived from checkInAt, so correcting the time has to
-      // correct the figure with it. The plan this came from only recomputed
-      // on checkOutAt, which would have left a stale lateMinutes behind.
-      const settings = await this.getSchoolSettings(user.schoolId);
+      // correct the figure with it — otherwise a stale value survives the fix.
       record.lateMinutes = computeLateMinutes(
         record.checkInAt,
-        settings?.workStartTime,
+        daySchedule?.startTime,
         settings?.timezone,
       );
+      record.expectedWorkMinutes = daySchedule?.expectedWorkMinutes ?? null;
+      record.isWorkingDay = daySchedule?.isWorkingDay ?? true;
     }
 
     if (dto.checkOutAt) {
       record.checkOutAt = parseCheckInTime(record.date, dto.checkOutAt);
       record.checkOutMethod = 'manual';
+      record.earlyLeaveMinutes = computeEarlyLeaveMinutes(
+        record.checkOutAt,
+        daySchedule?.endTime,
+        settings?.timezone,
+      );
     }
 
     // Either timestamp moving changes the duration, so this runs after both.

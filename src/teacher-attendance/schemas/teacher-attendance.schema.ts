@@ -74,6 +74,32 @@ export class TeacherAttendance extends Document {
   @Prop({ type: Number, default: null })
   workMinutes: number | null;
 
+  /**
+   * Minutes short of the day's official end. The mirror of lateMinutes, and
+   * snapshotted for the same reason.
+   *
+   * null = the day had no end time configured, which is not the same as
+   * leaving exactly on time.
+   */
+  @Prop({ type: Number, default: null })
+  earlyLeaveMinutes: number | null;
+
+  /**
+   * How long this day was meant to be, from the school's schedule. Stored so a
+   * report can say "worked 340 of an expected 390" — workMinutes on its own is
+   * a raw number with nothing to compare it against.
+   */
+  @Prop({ type: Number, default: null })
+  expectedWorkMinutes: number | null;
+
+  /**
+   * Was this a working day for the school? Attendance on a day off is allowed
+   * and recorded, it just has no hours to be measured against, and it is
+   * counted separately in the summary rather than skewing the averages.
+   */
+  @Prop({ default: true })
+  isWorkingDay: boolean;
+
   schoolId?: Types.ObjectId;
 }
 

@@ -111,8 +111,8 @@ export class TeacherAttendanceController {
   @ApiOperation({ summary: 'Get list of active teachers with no attendance record on a given date (Admin only)' })
   @ApiQuery({ name: 'date', required: false, description: 'Date to check (YYYY-MM-DD), defaults to today' })
   @ApiResponse({ status: 200, description: 'Absent teachers list retrieved successfully' })
-  async findAbsent(@Query('date') date?: string) {
-    return this.teacherAttendanceService.findAbsent(date);
+  async findAbsent(@CurrentUser() user: any, @Query('date') date?: string) {
+    return this.teacherAttendanceService.findAbsent(date, user);
   }
 
   @Get()
