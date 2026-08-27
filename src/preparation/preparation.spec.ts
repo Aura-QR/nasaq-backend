@@ -13,6 +13,9 @@ import {
 import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
 import { startOfWeek, lessonDateFor, toDateOnlyString } from './utils/week.util';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 const URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/nasaq-test';
 
@@ -564,6 +567,158 @@ describe('PreparationService', () => {
       const one: any = await asTenant(() => service.findOne(String(prep.data._id), req));
       expect(one.weekOf).toBe(SAT);
       expect(one.lessonDate).toBe(SUN);
+    });
+  });
+
+  describe('createBulk', () => {
+    const bulk = (dto: any, user: any = OWNER, files: any[] = []) =>
+      asTenant(() => service.createBulk(dto, user, req, files));
+
+    it('creates one preparation per lecture from a single upload', async () => {
+      const result: any = await bulk({
+        lectureIds: [String(L1), String(L2), String(L3)],
+        lessonTitle: 'حل المعادلات',
+        weekOf: WED,
+      });
+
+      expect(result.created).toBe(3);
+      expect(result.skipped).toBe(0);
+      expect(result.weekOf).toBe(SAT);
+      expect(result.results.every((r: any) => r.status === 'created')).toBe(true);
+
+      const rows = await prepModel.collection.find({}).toArray();
+      expect(rows).toHaveLength(3);
+      expect(rows.every((r: any) => r.lessonTitle === 'حل المعادلات')).toBe(true);
+      // Each row still belongs to its own class — that is why they are separate.
+      expect(new Set(rows.map((r: any) => String(r.classId))).size).toBe(2);
+    });
+
+    it('links every new preparation back to its lecture', async () => {
+      await bulk({ lectureIds: [String(L1), String(L2)], weekOf: WED });
+
+      const lectures = await lectureModel.collection
+        .find({ _id: { $in: [L1, L2] } })
+        .toArray();
+      expect(lectures.every((l: any) => l.preparation.length === 1)).toBe(true);
+    });
+
+    it('reports lectures that already have one for the week instead of duplicating', async () => {
+      await createInTestWeek(); // L2, same week
+
+      const result: any = await bulk({
+        lectureIds: [String(L1), String(L2)],
+        weekOf: WED,
+      });
+
+      expect(result.created).toBe(1);
+      expect(result.skipped).toBe(1);
+      const skipped = result.results.find((r: any) => r.status === 'skipped');
+      expect(skipped.lectureId).toBe(String(L2));
+      expect(skipped.reason).toBe('already_exists');
+
+      expect(await prepModel.collection.countDocuments({})).toBe(2);
+    });
+
+    it('treats the same lecture listed twice as one', async () => {
+      const result: any = await bulk({
+        lectureIds: [String(L1), String(L1)],
+        weekOf: WED,
+      });
+
+      expect(result.created).toBe(1);
+      expect(await prepModel.collection.countDocuments({})).toBe(1);
+    });
+
+    it('writes nothing at all when one id in the batch is bad', async () => {
+      const ghost = new Types.ObjectId();
+
+      await expect(
+        bulk({ lectureIds: [String(L1), String(ghost)], weekOf: WED }),
+      ).rejects.toMatchObject({ status: 404 });
+
+      // The valid half must not have been created behind the failure.
+      expect(await prepModel.collection.countDocuments({})).toBe(0);
+    });
+
+    it('refuses the batch if any lecture has no teacher', async () => {
+      await expect(
+        bulk({ lectureIds: [String(L1), String(unassigned)], weekOf: WED }),
+      ).rejects.toMatchObject({ status: 400 });
+
+      expect(await prepModel.collection.countDocuments({})).toBe(0);
+    });
+
+    it('refuses a teacher filing for lectures that are not theirs', async () => {
+      await expect(
+        bulk({ lectureIds: [String(L1)], weekOf: WED }, TEACHER_B),
+      ).rejects.toMatchObject({ status: 403 });
+
+      expect(await prepModel.collection.countDocuments({})).toBe(0);
+    });
+
+    it('lets a teacher file their own lectures in one go', async () => {
+      const result: any = await bulk(
+        { lectureIds: [String(L1), String(L2), String(L3)], weekOf: WED },
+        TEACHER_A,
+      );
+
+      expect(result.created).toBe(3);
+      const rows = await prepModel.collection.find({}).toArray();
+      expect(rows.every((r: any) => String(r.submittedBy) === String(teacherA))).toBe(true);
+    });
+
+    it('defaults to the current week', async () => {
+      const result: any = await bulk({ lectureIds: [String(L1)] });
+      expect(result.weekOf).toBe(toDateOnlyString(startOfWeek(new Date())));
+    });
+
+    it('gives every preparation its own copy of the file', async () => {
+      const tmpDir = path.join(os.tmpdir(), `prep-bulk-${Date.now()}`);
+      fs.mkdirSync(tmpDir, { recursive: true });
+      const tmpFile = path.join(tmpDir, 'lesson.pdf');
+      fs.writeFileSync(tmpFile, 'pdf bytes');
+
+      const upload: any = {
+        filename: 'lesson.pdf',
+        originalname: 'lesson.pdf',
+        path: tmpFile,
+        size: 9,
+      };
+
+      const result: any = await bulk(
+        { lectureIds: [String(L1), String(L2)], weekOf: WED },
+        OWNER,
+        [upload],
+      );
+
+      const rows = await prepModel.collection.find({}).toArray();
+      expect(rows).toHaveLength(2);
+
+      for (const row of rows) {
+        expect(row.files).toHaveLength(1);
+        // Copied, not moved — deleting one preparation must not empty another.
+        expect(fs.existsSync(row.files[0].path)).toBe(true);
+      }
+      expect(rows[0].files[0].path).not.toBe(rows[1].files[0].path);
+
+      // The upload itself is swept out of temp once the batch is written.
+      expect(fs.existsSync(tmpFile)).toBe(false);
+
+      for (const row of rows) {
+        fs.rmSync(path.dirname(row.files[0].path), { recursive: true, force: true });
+      }
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      void result;
+    });
+
+    it('shows up in the weekly screen it was filed for', async () => {
+      await bulk({ lectureIds: [String(L1), String(L2), String(L3)], weekOf: WED });
+
+      const week: any = await asTenant(() =>
+        service.getWeekly({ weekOf: WED, teacherId: String(teacherA) }, OWNER, req),
+      );
+      expect(week.stats.submitted).toBe(3);
+      expect(week.stats.missing).toBe(0);
     });
   });
 

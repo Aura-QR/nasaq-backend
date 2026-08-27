@@ -19,6 +19,7 @@ import { PreparationService } from './preparation.service';
 import { CreatePreparationDto } from './dto/create-preparation.dto';
 import { UpdatePreparationDto } from './dto/update-preparation.dto';
 import { ReviewPreparationDto } from './dto/review-preparation.dto';
+import { BulkCreatePreparationDto } from './dto/bulk-create-preparation.dto';
 import {
   ApiOperation,
   ApiResponse,
@@ -96,6 +97,62 @@ export class PreparationController {
       files,
       user,
     );
+  }
+
+  @ApiOperation({
+    summary: 'Create one preparation per lecture in a single upload',
+    description:
+      'For the same lesson taught to several classes. Validation is ' +
+      'all-or-nothing, so a bad lecture id fails the whole batch rather than ' +
+      'leaving half of it created. Lectures that already have a preparation ' +
+      'for the week come back as skipped, not duplicated.',
+  })
+  @ApiResponse({ status: 201, description: 'Batch processed' })
+  @ApiResponse({ status: 400, description: 'A lecture has no teacher assigned' })
+  @ApiResponse({ status: 403, description: 'A teacher does not teach one of them' })
+  @ApiResponse({ status: 404, description: 'A lecture was not found' })
+  @Post('bulk')
+  @CheckAbilities({ action: 'create', subject: 'Preparation' })
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FilesInterceptor('files', 10, multerConfig))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        lectureIds: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Lecture IDs. Repeated field, lectureIds[], or comma-separated.',
+        },
+        lessonTitle: {
+          type: 'string',
+          description: 'Applied to every lecture in the batch',
+          example: 'حل المعادلات من الدرجة الأولى',
+        },
+        weekOf: {
+          type: 'string',
+          description:
+            'Any date inside the target week (YYYY-MM-DD). Defaults to the current week.',
+          example: '2026-11-14',
+        },
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Copied into every preparation created',
+        },
+      },
+      required: ['lectureIds'],
+    },
+  })
+  async createBulk(
+    @Body() dto: BulkCreatePreparationDto,
+    @CurrentUser() user: any,
+    @Req() req: any,
+    @UploadedFiles() files?: Express.Multer.File[],
+  ) {
+    return await this.preparationService.createBulk(dto, user, req, files);
   }
 
   @ApiOperation({ summary: 'Get all preparations or filter with query params' })

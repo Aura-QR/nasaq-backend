@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreatePreparationDto } from './dto/create-preparation.dto';
 import { UpdatePreparationDto } from './dto/update-preparation.dto';
+import { BulkCreatePreparationDto } from './dto/bulk-create-preparation.dto';
 import { Preparation } from './schemas/preparation.schema';
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { Teacher } from '../teachers/schemas/teacher.schema';
@@ -209,6 +210,187 @@ export class PreparationService {
     const owner = preparation?.submittedBy;
     if (!owner || owner.toString() !== user.userId) {
       throw new ForbiddenException(`ليس مسموحاً لك ب${action} هذا التحضير`);
+    }
+  }
+
+  /**
+   * Files one preparation per lecture in a single request.
+   *
+   * A teacher who teaches the same subject to three classes has three lectures
+   * and therefore needs three preparations — that decision stands. What they
+   * should not have to do is upload the same PDF three times, once per slot,
+   * twenty-four times a week.
+   *
+   * Validation is all-or-nothing: every lecture is checked before anything is
+   * written, so a bad id in the batch does not leave half of it created.
+   * Lectures that already have a preparation for the week are reported as
+   * skipped rather than duplicated.
+   */
+  async createBulk(
+    dto: BulkCreatePreparationDto,
+    user: any,
+    req?: any,
+    files?: Express.Multer.File[],
+  ) {
+    // Same lecture twice in one payload is a client slip, not two lessons.
+    const lectureIds = [...new Set(dto.lectureIds.map(String))];
+    const weekOf = dto.weekOf ? startOfWeek(dto.weekOf) : currentWeekOf();
+
+    const lectures = await this.lectureModel
+      .find({ _id: { $in: lectureIds } })
+      .exec();
+
+    const byId = new Map(lectures.map((l: any) => [String(l._id), l]));
+    const missing = lectureIds.filter((id) => !byId.has(id));
+    if (missing.length > 0) {
+      throw new NotFoundException(
+        `محاضرات غير موجودة: ${missing.join(', ')}`,
+      );
+    }
+
+    if (user?.role === 'TEACHER') {
+      const notMine = lectureIds.filter(
+        (id) => String(byId.get(id).teacherId ?? '') !== String(user.userId),
+      );
+      if (notMine.length > 0) {
+        throw new ForbiddenException(
+          `المدرس لا يدرس المحاضرات: ${notMine.join(', ')}`,
+        );
+      }
+    } else {
+      const unassigned = lectureIds.filter((id) => !byId.get(id).teacherId);
+      if (unassigned.length > 0) {
+        throw new BadRequestException(
+          `محاضرات مش متسندة لمدرس: ${unassigned.join(', ')}`,
+        );
+      }
+    }
+
+    const teacherIds = [
+      ...new Set(lectures.map((l: any) => String(l.teacherId))),
+    ];
+    const teachers = await this.teacherModel
+      .find({ _id: { $in: teacherIds } })
+      .exec();
+    const teacherById = new Map(teachers.map((t: any) => [String(t._id), t]));
+
+    const unknownTeachers = teacherIds.filter((id) => !teacherById.has(id));
+    if (unknownTeachers.length > 0) {
+      throw new NotFoundException(
+        `مدرسون غير موجودين: ${unknownTeachers.join(', ')}`,
+      );
+    }
+
+    // One preparation per lecture per week; a second upload is almost always a
+    // double-tap, so report it instead of quietly creating a duplicate.
+    const existing = await this.preparationModel
+      .find({ weekOf, lecture: { $in: lectureIds } })
+      .select('_id lecture')
+      .lean()
+      .exec();
+    const existingByLecture = new Map(
+      existing.map((p: any) => [this.lectureKeyOf(p.lecture), p]),
+    );
+
+    const baseUrl =
+      req?.protocol && req?.host ? `${req.protocol}://${req.host}` : '';
+    const results: any[] = [];
+    let created = 0;
+
+    for (const lectureId of lectureIds) {
+      const lecture: any = byId.get(lectureId);
+
+      const alreadyThere = existingByLecture.get(lectureId);
+      if (alreadyThere) {
+        results.push({
+          lectureId,
+          status: 'skipped',
+          reason: 'already_exists',
+          preparationId: String(alreadyThere._id),
+        });
+        continue;
+      }
+
+      const teacher: any = teacherById.get(String(lecture.teacherId));
+
+      const saved = await new this.preparationModel({
+        lecture: lectureId,
+        subject: lecture.subjectOfferingId,
+        submittedBy: teacher._id,
+        name: teacher.name,
+        lessonTitle: dto.lessonTitle ?? '',
+        classId: lecture.classId ?? null,
+        termId: lecture.termId ?? null,
+        weekOf,
+        isWeekEstimated: false,
+      }).save();
+
+      await this.lectureModel.findByIdAndUpdate(lectureId, {
+        $push: { preparation: saved._id },
+      });
+
+      if (files && files.length > 0) {
+        // Copied, not moved: each preparation owns its files outright, so
+        // deleting one does not empty the folders of its siblings.
+        saved.files = this.copyFilesInto(saved._id.toString(), files);
+        await saved.save();
+      }
+
+      created++;
+      results.push({
+        lectureId,
+        status: 'created',
+        preparationId: String(saved._id),
+      });
+    }
+
+    this.discardTempFiles(files);
+
+    const skipped = results.length - created;
+
+    return {
+      message:
+        skipped === 0
+          ? `تم إنشاء ${created} تحضير`
+          : `تم إنشاء ${created} تحضير، و${skipped} كان موجود قبل كده`,
+      weekOf: toDateOnlyString(weekOf),
+      created,
+      skipped,
+      results,
+    };
+  }
+
+  /** Copies the uploaded files into one preparation's own folder. */
+  private copyFilesInto(preparationId: string, files: Express.Multer.File[]) {
+    const folder = path.join('./uploads/preparation', preparationId);
+    if (!fs.existsSync(folder)) {
+      fs.mkdirSync(folder, { recursive: true });
+    }
+
+    return files.map((file) => {
+      const destination = path.join(folder, file.filename);
+      fs.copyFileSync(file.path, destination);
+      return {
+        filename: file.filename,
+        originalName: file.originalname,
+        path: destination,
+        size: file.size,
+      };
+    });
+  }
+
+  /**
+   * The single-create path renames the upload out of temp; the bulk path
+   * copies it, so the original has to be swept up afterwards or temp grows
+   * without bound.
+   */
+  private discardTempFiles(files?: Express.Multer.File[]) {
+    for (const file of files ?? []) {
+      try {
+        if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+      } catch {
+        // A leftover temp file is not worth failing a successful batch over.
+      }
     }
   }
 
