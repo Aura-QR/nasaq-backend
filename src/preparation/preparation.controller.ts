@@ -18,6 +18,7 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { PreparationService } from './preparation.service';
 import { CreatePreparationDto } from './dto/create-preparation.dto';
 import { UpdatePreparationDto } from './dto/update-preparation.dto';
+import { ReviewPreparationDto } from './dto/review-preparation.dto';
 import {
   ApiOperation,
   ApiResponse,
@@ -58,6 +59,17 @@ export class PreparationController {
           type: 'string',
           description: 'Lecture ID',
           example: '507f1f77bcf86cd799439011',
+        },
+        lessonTitle: {
+          type: 'string',
+          description: 'Lesson title, free text',
+          example: 'حل المعادلات من الدرجة الأولى',
+        },
+        weekOf: {
+          type: 'string',
+          description:
+            'Any date inside the target week (YYYY-MM-DD). Defaults to the current week.',
+          example: '2026-08-22',
         },
         files: {
           type: 'array',
@@ -108,7 +120,41 @@ export class PreparationController {
     name: 'lecture',
     required: false,
     type: String,
-    description: 'Filter by lecture ID',
+    description: 'Filter by lecture ID (alias: lectureId)',
+  })
+  @ApiQuery({
+    name: 'teacherId',
+    required: false,
+    type: String,
+    description: 'Filter by teacher (alias of submittedBy)',
+  })
+  @ApiQuery({ name: 'classId', required: false, type: String })
+  @ApiQuery({ name: 'termId', required: false, type: String })
+  @ApiQuery({ name: 'subject', required: false, type: String })
+  @ApiQuery({
+    name: 'weekOf',
+    required: false,
+    type: String,
+    description: 'Any date inside the week (YYYY-MM-DD)',
+  })
+  @ApiQuery({ name: 'weekFrom', required: false, type: String })
+  @ApiQuery({ name: 'weekTo', required: false, type: String })
+  @ApiQuery({
+    name: 'lessonTitle',
+    required: false,
+    type: String,
+    description: 'Partial, case-insensitive match on the lesson title',
+  })
+  @ApiQuery({
+    name: 'reviewStatus',
+    required: false,
+    enum: ['pending', 'approved', 'needs_revision'],
+  })
+  @ApiQuery({
+    name: 'name',
+    required: false,
+    type: String,
+    description: "Partial match on the TEACHER's name (not the lesson title)",
   })
   @Get()
   @CheckAbilities({ action: 'read', subject: 'Preparation' })
@@ -123,6 +169,41 @@ export class PreparationController {
     return await this.preparationService.filtering(
       filters,
       pagination,
+      user,
+      req,
+    );
+  }
+
+  @ApiOperation({
+    summary: "A teacher's whole week, submitted preparations and gaps alike",
+    description:
+      'Starts from the timetable rather than from what was uploaded, so every ' +
+      'lecture in the week comes back with its preparation or with null. ' +
+      'Omit teacherId for one summary row per teacher. A TEACHER caller always ' +
+      'gets their own week, whatever teacherId they send.',
+  })
+  @ApiResponse({ status: 200, description: 'Weekly review data' })
+  @ApiQuery({
+    name: 'weekOf',
+    required: false,
+    type: String,
+    description:
+      'Any date inside the week (YYYY-MM-DD). Defaults to the current week.',
+  })
+  @ApiQuery({ name: 'teacherId', required: false, type: String })
+  @ApiQuery({ name: 'termId', required: false, type: String })
+  @Get('weekly')
+  @CheckAbilities({ action: 'read', subject: 'Preparation' })
+  @HttpCode(HttpStatus.OK)
+  async weekly(
+    @CurrentUser() user: any,
+    @Query('weekOf') weekOf: string,
+    @Query('teacherId') teacherId: string,
+    @Query('termId') termId: string,
+    @Req() req: any,
+  ) {
+    return await this.preparationService.getWeekly(
+      { weekOf, teacherId, termId },
       user,
       req,
     );
@@ -159,6 +240,17 @@ export class PreparationController {
           description: 'Lecture ID',
           example: '507f1f77bcf86cd799439011',
         },
+        lessonTitle: {
+          type: 'string',
+          description: 'Lesson title, free text',
+          example: 'حل المعادلات من الدرجة الأولى',
+        },
+        weekOf: {
+          type: 'string',
+          description:
+            'Any date inside the target week (YYYY-MM-DD). Defaults to the current week.',
+          example: '2026-08-22',
+        },
         files: {
           type: 'array',
           items: {
@@ -185,6 +277,22 @@ export class PreparationController {
       files,
       user,
     );
+  }
+
+  @ApiOperation({ summary: 'Record the outcome of reviewing a preparation' })
+  @ApiResponse({ status: 200, description: 'Review saved' })
+  @ApiResponse({ status: 403, description: 'A teacher cannot review their own' })
+  @ApiResponse({ status: 404, description: 'Preparation not found' })
+  @Patch(':id/review')
+  @CheckAbilities({ action: 'update', subject: 'Preparation' })
+  @HttpCode(HttpStatus.OK)
+  async review(
+    @Param('id') id: string,
+    @Body() dto: ReviewPreparationDto,
+    @CurrentUser() user: any,
+    @Req() req: any,
+  ) {
+    return await this.preparationService.review(id, dto, user, req);
   }
 
   @ApiOperation({ summary: 'Delete a preparation by ID' })

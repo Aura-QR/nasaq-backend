@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CreatePreparationDto } from './dto/create-preparation.dto';
@@ -10,6 +15,44 @@ import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
 import * as fs from 'fs';
 import * as path from 'path';
+import {
+  currentWeekOf,
+  lessonDateFor,
+  startOfWeek,
+  toDateOnlyString,
+  WEEK_DAYS,
+} from './utils/week.util';
+
+/**
+ * Query keys `GET /preparation` understands. Anything else is a client bug,
+ * and used to be answered with an empty 200 — which reads as "no results"
+ * when it actually means "I have no such field". The frontend grew a whole
+ * fallback chain around that (`teacherId` → `lectureId` → `lecture`), so the
+ * aliases below are kept working rather than rejected.
+ */
+const FILTER_ALIASES: Record<string, string> = {
+  teacherId: 'submittedBy',
+  lectureId: 'lecture',
+};
+
+const TEXT_FILTERS = ['name', 'lessonTitle'];
+const EXACT_FILTERS = [
+  'lecture',
+  'subject',
+  'submittedBy',
+  'classId',
+  'termId',
+  'reviewStatus',
+];
+const WEEK_FILTERS = ['weekOf', 'weekFrom', 'weekTo'];
+const IGNORED_KEYS = ['page', 'limit'];
+
+const ALLOWED_FILTERS = [
+  ...TEXT_FILTERS,
+  ...EXACT_FILTERS,
+  ...WEEK_FILTERS,
+  ...Object.keys(FILTER_ALIASES),
+];
 
 @Injectable()
 export class PreparationService {
@@ -50,7 +93,15 @@ export class PreparationService {
       const teacher = await this.teacherModel.findById(userId);
       teacherId = userId;
       teacherName = teacher.name;
-    } else if (user?.role === 'SUPERVISOR' || user?.role === 'OWNER') {
+    } else {
+      // Every non-teacher role files on behalf of whoever teaches the slot.
+      // This used to name SUPERVISOR and OWNER explicitly, so a MANAGER fell
+      // through both branches and the row saved with submittedBy: null.
+      if (!lecture.teacherId) {
+        throw new BadRequestException(
+          `المحاضرة ${createPreparationDto.lecture} مش متسند لمدرس، فمينفعش يتعملها تحضير`,
+        );
+      }
       const teacher = await this.teacherModel.findById(lecture.teacherId);
       if (!teacher) {
         throw new NotFoundException(
@@ -61,11 +112,20 @@ export class PreparationService {
       teacherName = teacher.name;
     }
 
+    const { weekOf: requestedWeek, ...preparationFields } =
+      createPreparationDto as any;
+
     const savedPreparation = await new this.preparationModel({
-      ...createPreparationDto,
+      ...preparationFields,
       subject: lecture.subjectOfferingId,
       submittedBy: teacherId,
       name: teacherName,
+      // Denormalised on purpose — see the note on the schema. The Friday cron
+      // severs the lecture ref, so a join cannot answer "which class?" later.
+      classId: lecture.classId ?? null,
+      termId: lecture.termId ?? null,
+      weekOf: requestedWeek ? startOfWeek(requestedWeek) : currentWeekOf(),
+      isWeekEstimated: false,
     }).save();
 
   
@@ -117,7 +177,7 @@ export class PreparationService {
         path: 'lecture',
         populate: {
           path: 'classId',
-          select: 'academicYear roomNumber gender',
+          select: 'name academicYearId roomNumber gender',
         },
       })
       .populate('subject')
@@ -133,6 +193,23 @@ export class PreparationService {
       message: 'تم إنشاء التحضير بنجاح',
       data: preparationWithUrls,
     };
+  }
+
+  /**
+   * A teacher may only touch their own work. Everyone else who got past the
+   * ability guard may touch anything in their school.
+   *
+   * `submittedBy` defaults to null (and was null on every row a MANAGER
+   * created before the create() fix), so calling .toString() on it blindly —
+   * as all four call sites used to — turned a permission check into a 500.
+   */
+  private assertCanMutate(preparation: any, user: any, action: string) {
+    if (user?.role !== 'TEACHER') return;
+
+    const owner = preparation?.submittedBy;
+    if (!owner || owner.toString() !== user.userId) {
+      throw new ForbiddenException(`ليس مسموحاً لك ب${action} هذا التحضير`);
+    }
   }
 
   private addUrlsToFiles(preparation: any, baseUrl: string): any {
@@ -172,7 +249,81 @@ export class PreparationService {
       };
     }
 
+    // The teacher picks a week; the day comes from the lecture. Surfacing the
+    // resolved date means no client has to know that rule.
+    const dayOfWeek =
+      prepObj.lecture && typeof prepObj.lecture === 'object'
+        ? prepObj.lecture.dayOfWeek
+        : null;
+    prepObj.weekOf = toDateOnlyString(prepObj.weekOf);
+    prepObj.lessonDate = toDateOnlyString(
+      lessonDateFor(
+        prepObj.weekOf ? new Date(`${prepObj.weekOf}T00:00:00.000Z`) : null,
+        dayOfWeek,
+      ),
+    );
+
     return prepObj;
+  }
+
+  /**
+   * Turns query params into a Mongo filter, rejecting anything it does not
+   * understand.
+   *
+   * The previous version assigned every unrecognised key straight into the
+   * query (`query[key] = value`), so `?classId=x` — a field that does not
+   * exist on this collection — matched nothing and came back as a cheerful
+   * empty 200. "No results" and "no such filter" are very different answers.
+   */
+  private buildFilterQuery(filters: any, user?: any) {
+    const query: any = {};
+    const unknown: string[] = [];
+
+    for (const [rawKey, value] of Object.entries(filters || {})) {
+      if (value === undefined || value === null || value === '') continue;
+      if (IGNORED_KEYS.includes(rawKey)) continue;
+
+      if (!ALLOWED_FILTERS.includes(rawKey)) {
+        unknown.push(rawKey);
+        continue;
+      }
+
+      const key = FILTER_ALIASES[rawKey] ?? rawKey;
+      const stringValue = String(value);
+
+      if (TEXT_FILTERS.includes(key)) {
+        query[key] = { $regex: stringValue, $options: 'i' };
+      } else if (key === 'weekOf') {
+        // Any day inside the week resolves to the same anchor, so the client
+        // can send whatever date the user picked.
+        query.weekOf = startOfWeek(stringValue);
+      } else if (key === 'weekFrom' || key === 'weekTo') {
+        query.weekOf = query.weekOf ?? {};
+        if (typeof query.weekOf !== 'object' || query.weekOf instanceof Date) {
+          // An exact weekOf was already given; a range on top of it is a
+          // contradiction, so let the exact one win rather than build a
+          // filter that silently matches nothing.
+          continue;
+        }
+        query.weekOf[key === 'weekFrom' ? '$gte' : '$lte'] =
+          startOfWeek(stringValue, key);
+      } else {
+        query[key] = stringValue;
+      }
+    }
+
+    if (unknown.length > 0) {
+      throw new BadRequestException(
+        `فلتر غير معروف: ${unknown.join(', ')}. الفلاتر المتاحة: ${ALLOWED_FILTERS.join(', ')}`,
+      );
+    }
+
+    // A teacher only ever sees their own, whatever they asked for.
+    if (user?.role === 'TEACHER') {
+      query.submittedBy = user.userId;
+    }
+
+    return query;
   }
 
   async filtering(
@@ -181,29 +332,7 @@ export class PreparationService {
     user?: any,
     req?: any,
   ) {
-    const query: any = {};
-
-    const textSearchFields = ['name'];
-    const arrayMatchFields = ['lecture'];
-
-    for (const [key, value] of Object.entries(filters)) {
-      if (value === undefined || value === null || value === '') continue;
-      if (key === 'page' || key === 'limit') continue;
-
-      const stringValue = String(value);
-
-      if (textSearchFields.includes(key)) {
-        query[key] = { $regex: stringValue, $options: 'i' };
-      } else if (arrayMatchFields.includes(key)) {
-        query[key] = stringValue;
-      } else {
-        query[key] = stringValue;
-      }
-    }
-
-    if (user?.role === 'TEACHER') {
-      query['submittedBy'] = user.userId;
-    }
+    const query = this.buildFilterQuery(filters, user);
 
     const total = await this.preparationModel.countDocuments(query).exec();
 
@@ -234,7 +363,7 @@ export class PreparationService {
     );
     if (toPopulate.length > 0) {
       await this.preparationModel.populate(toPopulate, [
-        { path: 'lecture', populate: { path: 'classId', select: 'academicYear roomNumber gender' } },
+        { path: 'lecture', populate: { path: 'classId', select: 'name academicYearId roomNumber gender' } },
         { path: 'subject' },
       ]);
     }
@@ -264,6 +393,232 @@ export class PreparationService {
     return preparationsWithUrls;
   }
 
+  /**
+   * The weekly review screen.
+   *
+   * The plain list can only show what was submitted, which is the wrong half
+   * of the question when you are reviewing a week — what a manager needs to
+   * see is the gaps. So this starts from the teacher's timetable and hangs
+   * each preparation off its slot, leaving `null` where nothing was filed.
+   *
+   * With `teacherId`: that teacher's full week, day by day.
+   * Without it: one summary row per teacher, for a whole-school glance.
+   */
+  async getWeekly(
+    params: { weekOf?: string; teacherId?: string; termId?: string },
+    user: any,
+    req?: any,
+  ) {
+    // A teacher asking about "the week" can only mean their own.
+    const teacherId =
+      user?.role === 'TEACHER' ? user.userId : params.teacherId || null;
+
+    const weekOf = params.weekOf ? startOfWeek(params.weekOf) : currentWeekOf();
+
+    const lectureFilter: any = {};
+    if (teacherId) lectureFilter.teacherId = teacherId;
+    else lectureFilter.teacherId = { $ne: null };
+    if (params.termId) lectureFilter.termId = params.termId;
+
+    const lectures = await this.lectureModel
+      .find(lectureFilter)
+      .populate('classId', 'name roomNumber gender academicYearId')
+      .populate({ path: 'subjectOfferingId', populate: { path: 'subjectId' } })
+      .populate('teacherId', 'name email')
+      .lean()
+      .exec();
+
+    const preparations = await this.preparationModel
+      .find({
+        weekOf,
+        ...(teacherId ? { submittedBy: teacherId } : {}),
+      })
+      .lean()
+      .exec();
+
+    // A slot can only hold one preparation per week; last one filed wins.
+    const byLecture = new Map<string, any>();
+    for (const prep of preparations) {
+      const key = this.lectureKeyOf(prep.lecture);
+      if (key) byLecture.set(key, prep);
+    }
+
+    const baseUrl =
+      req?.protocol && req?.host ? `${req.protocol}://${req.host}` : '';
+
+    if (!teacherId) {
+      return this.summariseByTeacher(lectures, byLecture, weekOf);
+    }
+
+    const days = WEEK_DAYS.map((day) => {
+      const slots = lectures
+        .filter((l: any) => l.dayOfWeek === day)
+        .sort((a: any, b: any) => a.slot - b.slot)
+        .map((l: any) => {
+          const prep = byLecture.get(String(l._id));
+          return {
+            lectureId: String(l._id),
+            slot: l.slot,
+            class: l.classId
+              ? {
+                  _id: String(l.classId._id),
+                  name: l.classId.name,
+                  roomNumber: l.classId.roomNumber,
+                  gender: l.classId.gender,
+                }
+              : null,
+            subject: l.subjectOfferingId
+              ? {
+                  _id: String(l.subjectOfferingId._id),
+                  name:
+                    (l.subjectOfferingId as any)?.subjectId?.subjectName ??
+                    null,
+                }
+              : null,
+            preparation: prep
+              ? this.addUrlsToFiles({ ...prep, lecture: l }, baseUrl)
+              : null,
+          };
+        });
+
+      return {
+        dayOfWeek: day,
+        date: toDateOnlyString(lessonDateFor(weekOf, day)),
+        slots,
+      };
+    }).filter((d) => d.slots.length > 0);
+
+    const total = lectures.length;
+    const submitted = lectures.filter((l: any) =>
+      byLecture.has(String(l._id)),
+    ).length;
+
+    const teacherDoc: any = lectures.find(
+      (l: any) => l.teacherId && String(l.teacherId._id) === String(teacherId),
+    )?.teacherId;
+
+    return {
+      weekOf: toDateOnlyString(weekOf),
+      teacher: teacherDoc
+        ? { _id: String(teacherDoc._id), name: teacherDoc.name }
+        : { _id: String(teacherId), name: null },
+      stats: {
+        total,
+        submitted,
+        missing: total - submitted,
+        pending: preparations.filter((p: any) => p.reviewStatus === 'pending')
+          .length,
+        needsRevision: preparations.filter(
+          (p: any) => p.reviewStatus === 'needs_revision',
+        ).length,
+      },
+      days,
+    };
+  }
+
+  /**
+   * `preparation.lecture` is an ObjectId until the Friday cleanup cron
+   * replaces it with a snapshot object — both shapes point at the same
+   * lecture, so both have to resolve to the same key.
+   */
+  private lectureKeyOf(lecture: any): string | null {
+    if (!lecture) return null;
+    if (typeof lecture === 'object') {
+      return lecture._id ? String(lecture._id) : null;
+    }
+    return String(lecture);
+  }
+
+  private summariseByTeacher(
+    lectures: any[],
+    byLecture: Map<string, any>,
+    weekOf: Date,
+  ) {
+    const rows = new Map<string, any>();
+
+    for (const lecture of lectures) {
+      const teacher = lecture.teacherId;
+      if (!teacher) continue;
+      const id = String(teacher._id ?? teacher);
+
+      if (!rows.has(id)) {
+        rows.set(id, {
+          teacher: { _id: id, name: teacher.name ?? null },
+          total: 0,
+          submitted: 0,
+          missing: 0,
+        });
+      }
+
+      const row = rows.get(id);
+      row.total += 1;
+      if (byLecture.has(String(lecture._id))) row.submitted += 1;
+    }
+
+    const teachers = [...rows.values()].map((row) => ({
+      ...row,
+      missing: row.total - row.submitted,
+      percentage: row.total === 0 ? 0 : Math.round((row.submitted / row.total) * 100),
+    }));
+
+    // Worst coverage first — that is who needs following up.
+    teachers.sort((a, b) => a.percentage - b.percentage);
+
+    return {
+      weekOf: toDateOnlyString(weekOf),
+      teachers,
+      stats: {
+        total: teachers.reduce((sum, t) => sum + t.total, 0),
+        submitted: teachers.reduce((sum, t) => sum + t.submitted, 0),
+        missing: teachers.reduce((sum, t) => sum + t.missing, 0),
+      },
+    };
+  }
+
+  /**
+   * Records the review outcome on the preparation itself, so the next time
+   * you open the week you can see where you got to — and so the teacher finds
+   * out their sheet was sent back, with the reason, instead of by phone.
+   */
+  async review(
+    id: string,
+    dto: { reviewStatus: string; reviewNote?: string },
+    user: any,
+    req?: any,
+  ) {
+    const preparation = await this.preparationModel.findById(id);
+    if (!preparation) {
+      throw new NotFoundException(`التحضير ذو المعرف ${id} غير موجود`);
+    }
+
+    if (user?.role === 'TEACHER') {
+      throw new ForbiddenException('المدرس لا يراجع تحاضيره بنفسه');
+    }
+
+    const updated = await this.preparationModel
+      .findByIdAndUpdate(
+        id,
+        {
+          reviewStatus: dto.reviewStatus,
+          reviewNote: dto.reviewNote ?? '',
+          reviewedBy: user?.userId ?? null,
+          reviewedByName: user?.name ?? user?.email ?? '',
+          reviewedAt: new Date(),
+        },
+        { new: true },
+      )
+      .populate('submittedBy', 'name email')
+      .exec();
+
+    const baseUrl =
+      req?.protocol && req?.host ? `${req.protocol}://${req.host}` : '';
+
+    return {
+      message: 'تم حفظ نتيجة المراجعة',
+      data: this.addUrlsToFiles(updated, baseUrl),
+    };
+  }
+
   async update(
     id: string,
     updatePreparationDto: UpdatePreparationDto,
@@ -276,12 +631,7 @@ export class PreparationService {
       throw new NotFoundException(`التحضير ذو المعرف ${id} غير موجود`);
     }
 
-    if (
-      user?.role === 'TEACHER' &&
-      preparation.submittedBy.toString() !== user.userId
-    ) {
-      throw new Error('ليس مسموحاً لك بتحديث هذا التحضير');
-    }
+    this.assertCanMutate(preparation, user, 'تحديث');
 
     if (updatePreparationDto.lecture) {
       const newLecture = await this.lectureModel.findById(
@@ -317,6 +667,16 @@ export class PreparationService {
       }
 
       updatePreparationDto['subject'] = newLecture.subjectOfferingId;
+      // Moving to another lecture moves the class and term with it.
+      updatePreparationDto['classId'] = newLecture.classId ?? null;
+      updatePreparationDto['termId'] = newLecture.termId ?? null;
+    }
+
+    if (updatePreparationDto.weekOf) {
+      updatePreparationDto['weekOf'] = startOfWeek(
+        updatePreparationDto.weekOf,
+      ) as any;
+      updatePreparationDto['isWeekEstimated'] = false;
     }
 
     const baseUrl =
@@ -354,7 +714,7 @@ export class PreparationService {
         path: 'lecture',
         populate: {
           path: 'classId',
-          select: 'academicYear roomNumber gender',
+          select: 'name academicYearId roomNumber gender',
         },
       })
       .populate('subject')
@@ -378,12 +738,7 @@ export class PreparationService {
       throw new NotFoundException(`التحضير ذو المعرف ${id} غير موجود`);
     }
 
-    if (
-      user?.role === 'TEACHER' &&
-      preparation.submittedBy.toString() !== user.userId
-    ) {
-      throw new Error('ليس مسموحاً لك بحذف هذا التحضير');
-    }
+    this.assertCanMutate(preparation, user, 'حذف');
 
     const preparationFolder = path.join('./uploads/preparation', id);
     if (fs.existsSync(preparationFolder)) {
@@ -415,7 +770,7 @@ export class PreparationService {
     //only populate lecture/subject if they are still ObjectId refs
     if (Types.ObjectId.isValid(preparation.lecture as any) && String(preparation.lecture).length === 24) {
       await this.preparationModel.populate(preparation, [
-        { path: 'lecture', populate: { path: 'classId', select: 'academicYear roomNumber gender' } },
+        { path: 'lecture', populate: { path: 'classId', select: 'name academicYearId roomNumber gender' } },
       ]);
     }
     if (Types.ObjectId.isValid(preparation.subject as any) && String(preparation.subject).length === 24) {
@@ -440,18 +795,13 @@ export class PreparationService {
       throw new NotFoundException(`التحضير ذو المعرف ${id} غير موجود`);
     }
 
-    if (
-      user?.role === 'TEACHER' &&
-      preparation.submittedBy.toString() !== user.userId
-    ) {
-      throw new Error('ليس مسموحاً لك بإضافة ملفات لهذا التحضير');
-    }
+    this.assertCanMutate(preparation, user, 'إضافة ملفات ل');
 
     const baseUrl =
       req?.protocol && req?.host ? `${req.protocol}://${req.host}` : '';
 
     if (!files || files.length === 0) {
-      throw new Error('لم يتم توفير ملفات');
+      throw new BadRequestException('لم يتم توفير ملفات');
     }
 
     const preparationFolder = path.join('./uploads/preparation', id);
@@ -484,7 +834,7 @@ export class PreparationService {
         path: 'lecture',
         populate: {
           path: 'classId',
-          select: 'academicYear roomNumber gender',
+          select: 'name academicYearId roomNumber gender',
         },
       })
       .populate('subject')
@@ -508,12 +858,7 @@ export class PreparationService {
       throw new NotFoundException(`التحضير ذو المعرف ${id} غير موجود`);
     }
 
-    if (
-      user?.role === 'TEACHER' &&
-      preparation.submittedBy.toString() !== user.userId
-    ) {
-      throw new Error('ليس مسموحاً لك بإزالة ملفات من هذا التحضير');
-    }
+    this.assertCanMutate(preparation, user, 'إزالة ملفات من');
 
     const fileIndex = preparation.files.findIndex(
       (file) => file.filename === filename,
@@ -542,7 +887,7 @@ export class PreparationService {
         path: 'lecture',
         populate: {
           path: 'classId',
-          select: 'academicYear roomNumber gender',
+          select: 'name academicYearId roomNumber gender',
         },
       })
       .populate('subject')
