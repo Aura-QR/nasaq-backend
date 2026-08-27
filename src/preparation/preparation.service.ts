@@ -204,6 +204,26 @@ export class PreparationService {
    * created before the create() fix), so calling .toString() on it blindly —
    * as all four call sites used to — turned a permission check into a 500.
    */
+  /**
+   * Clears a review once the thing that was reviewed changes.
+   *
+   * Without this, a teacher could upload, get approved, then swap the PDF —
+   * and the row would still read "approved" while pointing at a file nobody
+   * ever looked at. Any content change sends it back to the queue.
+   */
+  private reviewResetFor(preparation: any) {
+    if (!preparation?.reviewStatus || preparation.reviewStatus === 'pending') {
+      return {};
+    }
+    return {
+      reviewStatus: 'pending',
+      reviewedBy: null,
+      reviewedByName: '',
+      reviewedAt: null,
+      reviewNote: '',
+    };
+  }
+
   private assertCanMutate(preparation: any, user: any, action: string) {
     if (user?.role !== 'TEACHER') return;
 
@@ -890,8 +910,20 @@ export class PreparationService {
       updatePreparationDto['files'] = newFiles;
     }
 
+    const touchesContent =
+      updatePreparationDto['files'] !== undefined ||
+      updatePreparationDto.lecture !== undefined ||
+      updatePreparationDto.lessonTitle !== undefined;
+
     const updatedPreparation = await this.preparationModel
-      .findByIdAndUpdate(id, updatePreparationDto, { new: true })
+      .findByIdAndUpdate(
+        id,
+        {
+          ...updatePreparationDto,
+          ...(touchesContent ? this.reviewResetFor(preparation) : {}),
+        },
+        { new: true },
+      )
       .populate({
         path: 'lecture',
         populate: {
@@ -1008,6 +1040,7 @@ export class PreparationService {
     }
 
     preparation.files = existingFiles;
+    Object.assign(preparation, this.reviewResetFor(preparation));
     await preparation.save();
 
     const updatedPreparation = await this.preparationModel
@@ -1058,6 +1091,7 @@ export class PreparationService {
     }
 
     preparation.files.splice(fileIndex, 1);
+    Object.assign(preparation, this.reviewResetFor(preparation));
     await preparation.save();
 
     const baseUrl =

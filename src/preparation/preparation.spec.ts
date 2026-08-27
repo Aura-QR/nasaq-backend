@@ -766,6 +766,60 @@ describe('PreparationService', () => {
     });
   });
 
+  describe('a review does not outlive what it reviewed', () => {
+    const approve = (id: string) =>
+      asTenant(() =>
+        service.review(id, { reviewStatus: 'approved', reviewNote: 'ممتاز' }, MANAGER, req),
+      );
+
+    it('sends an approved preparation back to the queue when its title changes', async () => {
+      const prep = await createByManager();
+      await approve(prep.data._id);
+
+      const updated: any = await asTenant(() =>
+        service.update(String(prep.data._id), { lessonTitle: 'درس تاني' } as any, req, [], TEACHER_A),
+      );
+
+      expect(updated.data.reviewStatus).toBe('pending');
+      expect(updated.data.reviewedByName).toBe('');
+      expect(updated.data.reviewedAt).toBeNull();
+      expect(updated.data.reviewNote).toBe('');
+    });
+
+    it('sends it back when a file is added', async () => {
+      const prep = await createByManager();
+      await approve(prep.data._id);
+
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prep-'));
+      const tmpFile = path.join(tmpDir, 'new.pdf');
+      fs.writeFileSync(tmpFile, 'x');
+
+      const result: any = await asTenant(() =>
+        service.addFiles(String(prep.data._id), req, [
+          { filename: 'new.pdf', originalname: 'new.pdf', path: tmpFile, size: 1 } as any,
+        ], OWNER),
+      );
+
+      expect(result.data.reviewStatus).toBe('pending');
+
+      fs.rmSync(path.join('./uploads/preparation', String(prep.data._id)), {
+        recursive: true,
+        force: true,
+      });
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('leaves an untouched review alone', async () => {
+      const prep = await createByManager();
+      await approve(prep.data._id);
+
+      // Not a content change — the review still stands.
+      const untouched: any = await asTenant(() => service.findOne(String(prep.data._id), req));
+      expect(untouched.reviewStatus).toBe('approved');
+      expect(untouched.reviewNote).toBe('ممتاز');
+    });
+  });
+
   describe('week maths', () => {
     it('anchors a Saturday to itself', () => {
       expect(toDateOnlyString(startOfWeek(SAT))).toBe(SAT);
