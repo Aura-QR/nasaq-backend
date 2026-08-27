@@ -848,23 +848,29 @@ export class PreparationService {
 
       if (
         user?.role === 'TEACHER' &&
-        newLecture.teacherId.toString() !== user.userId
+        String(newLecture.teacherId ?? '') !== user.userId
       ) {
+        // teacherId is nullable, so .toString() on it turned an unassigned
+        // slot into a 500 instead of a refusal.
         throw new ForbiddenException('المدرس لا يدرس هذه المحاضرة');
       }
 
-   
-      if (preparation.lecture.toString() !== updatePreparationDto.lecture) {
-        await this.lectureModel.findByIdAndUpdate(
-          preparation.lecture,
-          { $pull: { preparation: id } },
-          { new: true }
-        );
+      // After the Friday cron, `lecture` is a snapshot object rather than an
+      // id. Calling .toString() on it yields "[object Object]", which never
+      // matches — so the old id was then passed to findByIdAndUpdate as an
+      // object and threw a CastError.
+      const previousLectureId = this.lectureKeyOf(preparation.lecture);
+
+      if (previousLectureId !== updatePreparationDto.lecture) {
+        if (previousLectureId) {
+          await this.lectureModel.findByIdAndUpdate(previousLectureId, {
+            $pull: { preparation: id },
+          });
+        }
 
         await this.lectureModel.findByIdAndUpdate(
           updatePreparationDto.lecture,
           { $push: { preparation: id } },
-          { new: true }
         );
       }
 

@@ -820,6 +820,47 @@ describe('PreparationService', () => {
     });
   });
 
+  describe('moving a preparation to another lecture', () => {
+    it('works after the cron has flattened the old lecture reference', async () => {
+      const prep = await createByManager(); // on L1
+
+      // What the Friday cron leaves behind.
+      await prepModel.collection.updateOne(
+        { _id: new Types.ObjectId(prep.data._id) },
+        {
+          $set: {
+            lecture: {
+              _id: String(L1),
+              classId: { _id: String(classA), name: 'أول/١' },
+              dayOfWeek: 'sunday',
+              slot: 1,
+            },
+          },
+        },
+      );
+
+      const moved: any = await asTenant(() =>
+        service.update(String(prep.data._id), { lecture: String(L3) } as any, req, [], OWNER),
+      );
+
+      expect(String(moved.data.classId)).toBe(String(classA));
+      const raw = await prepModel.collection.findOne({
+        _id: new Types.ObjectId(prep.data._id),
+      });
+      expect(String(raw.lecture)).toBe(String(L3));
+    });
+
+    it('refuses a move onto an unassigned slot instead of crashing', async () => {
+      const prep = await createByManager();
+
+      await expect(
+        asTenant(() =>
+          service.update(String(prep.data._id), { lecture: String(unassigned) } as any, req, [], TEACHER_A),
+        ),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+  });
+
   describe('week maths', () => {
     it('anchors a Saturday to itself', () => {
       expect(toDateOnlyString(startOfWeek(SAT))).toBe(SAT);
