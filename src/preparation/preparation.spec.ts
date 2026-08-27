@@ -722,6 +722,50 @@ describe('PreparationService', () => {
     });
   });
 
+  describe('rows that predate weekOf', () => {
+    it('still returns lessonDate and weekOf as explicit nulls', async () => {
+      // Exactly what the deployed list returns before the backfill is run.
+      const legacy = await mk(prepModel, {
+        lecture: L1,
+        subject: offeringId,
+        submittedBy: teacherA,
+        name: 'أ. محمد',
+        files: [],
+        schoolId,
+        reviewStatus: 'pending',
+      });
+
+      const result: any = await asTenant(() => service.findOne(String(legacy), req));
+
+      expect(result).toHaveProperty('lessonDate');
+      expect(result.lessonDate).toBeNull();
+      expect(result.weekOf).toBeNull();
+    });
+
+    it('computes lessonDate as soon as weekOf is filled in', async () => {
+      const legacy = await mk(prepModel, {
+        lecture: L1,
+        subject: offeringId,
+        submittedBy: teacherA,
+        name: 'أ. محمد',
+        files: [],
+        schoolId,
+        reviewStatus: 'pending',
+      });
+
+      // What the backfill script writes.
+      await prepModel.collection.updateOne(
+        { _id: legacy },
+        { $set: { weekOf: startOfWeek(SAT), isWeekEstimated: true } },
+      );
+
+      const result: any = await asTenant(() => service.findOne(String(legacy), req));
+      expect(result.weekOf).toBe(SAT);
+      expect(result.lessonDate).toBe(SUN); // L1 is a sunday lecture
+      expect(result.isWeekEstimated).toBe(true);
+    });
+  });
+
   describe('week maths', () => {
     it('anchors a Saturday to itself', () => {
       expect(toDateOnlyString(startOfWeek(SAT))).toBe(SAT);
