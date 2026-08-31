@@ -23,6 +23,7 @@ import { ExamsModule } from './exams/exams.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AuthModule } from './auth/auth.module';
 import { PreparationModule } from './preparation/preparation.module';
+import { DutyModule } from './duty/duty.module';
 import { TasksModule } from './tasks/tasks.module';
 import { FinancialModule } from './financial/financial.module';
 import { ExpensesModule } from './expenses/expenses.module';
@@ -85,6 +86,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ProjectsModule,
     AuthModule,
     PreparationModule,
+    DutyModule,
     TasksModule,
     FinancialModule,
     ExpensesModule,

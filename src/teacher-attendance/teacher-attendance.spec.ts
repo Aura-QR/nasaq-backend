@@ -13,6 +13,7 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
   let teacherAttendanceModel: any;
   let teacherModel: any;
   let schoolModel: any;
+  let leaveRequestModel: any;
 
   const mockSchoolId = '60d5ecb8b5c9c22b8c8b4561';
   const mockTeacherId = '60d5ecb8b5c9c22b8c8b4562';
@@ -66,10 +67,21 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
       }),
     };
 
+    // No approved leave by default, so early-leave stays measured. The cases
+    // that care about an approved استئذان override this.
+    leaveRequestModel = {
+      findOne: jest.fn().mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue(null),
+        }),
+      }),
+    };
+
     service = new TeacherAttendanceService(
       teacherAttendanceModel as any,
       teacherModel as any,
       schoolModel as any,
+      leaveRequestModel as any,
     );
   });
 
@@ -379,6 +391,83 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
 
       expect(result.totalAbsent).toBe(2);
       expect(result.absentTeachers).toEqual([teacher1, teacher3]);
+    });
+  });
+
+  describe('an approved استئذان and leaving early', () => {
+    const leaveAt = (record: any, hhmm: string) => {
+      teacherAttendanceModel.findOne = jest.fn().mockResolvedValue(record);
+      void hhmm;
+    };
+
+    /**
+     * A check-in record with no check-out yet, ready to be closed. Anchored to
+     * now rather than a fixed date: checkOut stamps the real clock, and a
+     * fixture in the future makes the day's work come out negative.
+     */
+    const openRecord = () => {
+      const now = new Date();
+      const midnight = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+      );
+      return {
+        _id: 'rec-1',
+        teacherId: mockTeacherId,
+        date: midnight,
+        checkInAt: new Date(now.getTime() - 4 * 60 * 60 * 1000),
+        checkOutAt: null,
+        save: jest.fn().mockResolvedValue(true),
+      };
+    };
+
+    const checkOut = () =>
+      service.checkOut(
+        { userId: mockTeacherId, schoolId: mockSchoolId, role: 'TEACHER' },
+        { lat: 24.7136, lng: 46.6753 } as any,
+        onSchoolNetwork,
+      );
+
+    it('records the departure as approved when a request was approved', async () => {
+      const record: any = openRecord();
+      leaveAt(record, '11:00');
+      leaveRequestModel.findOne = jest.fn().mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue({ leaveAt: '11:00', status: 'approved' }),
+        }),
+      });
+
+      const result: any = await checkOut();
+
+      expect(record.earlyLeaveApproved).toBe(true);
+      expect(record.approvedLeaveAt).toBe('11:00');
+      expect(result.data.earlyLeaveApproved).toBe(true);
+    });
+
+    it('still records the minutes — the clock is the clock', async () => {
+      const record: any = openRecord();
+      leaveAt(record, '11:00');
+      leaveRequestModel.findOne = jest.fn().mockReturnValue({
+        lean: jest.fn().mockReturnValue({
+          exec: jest.fn().mockResolvedValue({ leaveAt: '11:00', status: 'approved' }),
+        }),
+      });
+
+      await checkOut();
+
+      // Hiding the number would make a permitted departure indistinguishable
+      // from a day that was never measured.
+      expect(record).toHaveProperty('earlyLeaveMinutes');
+    });
+
+    it('leaves the flag off when there is no approved request', async () => {
+      const record: any = openRecord();
+      leaveAt(record, '');
+
+      const result: any = await checkOut();
+
+      expect(record.earlyLeaveApproved).toBe(false);
+      expect(record.approvedLeaveAt).toBeNull();
+      expect(result.data.earlyLeaveApproved).toBe(false);
     });
   });
 });

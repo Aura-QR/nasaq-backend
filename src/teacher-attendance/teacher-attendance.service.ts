@@ -10,6 +10,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { School } from 'src/platform/schools/schemas/school.schema';
+import { LeaveRequest } from '../duty/schemas/leave-request.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.dto';
 import { CreateManualTeacherAttendanceDto } from './dto/create-manual-teacher-attendance.dto';
@@ -255,6 +256,11 @@ export class TeacherAttendanceService {
     private readonly teacherModel: Model<Teacher>,
     @InjectModel(School.name)
     private readonly schoolModel: Model<School>,
+    // The model rather than DutyService: this is one read, and injecting the
+    // service would make attendance depend on a module that already reads
+    // attendance.
+    @InjectModel(LeaveRequest.name)
+    private readonly leaveRequestModel: Model<LeaveRequest>,
   ) {}
 
   async checkIn(user: any, dto: CheckInTeacherAttendanceDto, req?: any) {
@@ -657,6 +663,23 @@ export class TeacherAttendanceService {
       daySchedule.endTime,
       settings.timezone,
     );
+
+    // An approved استئذان does not erase the minutes — the clock is the clock —
+    // it records that leaving early was sanctioned. A report that hid the
+    // number could not tell a permitted departure from a day that was never
+    // measured, and one without the flag makes every approved leave look like
+    // a fault.
+    const approvedLeave = await this.leaveRequestModel
+      .findOne({
+        teacherId: record.teacherId,
+        date: record.date,
+        status: 'approved',
+      })
+      .lean()
+      .exec();
+
+    record.earlyLeaveApproved = approvedLeave != null;
+    record.approvedLeaveAt = (approvedLeave as any)?.leaveAt ?? null;
     record.checkOutMethod = 'location';
     record.checkOutCoordinates = { lat: dto.lat, lng: dto.lng };
     record.checkOutDistanceMeters = distanceMeters;
@@ -675,6 +698,8 @@ export class TeacherAttendanceService {
         workMinutes: record.workMinutes,
         expectedWorkMinutes: record.expectedWorkMinutes,
         earlyLeaveMinutes: record.earlyLeaveMinutes,
+        earlyLeaveApproved: record.earlyLeaveApproved,
+        approvedLeaveAt: record.approvedLeaveAt,
         distanceMeters: record.checkOutDistanceMeters,
         verification: record.checkOutVerification,
       },

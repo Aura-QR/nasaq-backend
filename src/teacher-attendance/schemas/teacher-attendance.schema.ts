@@ -85,6 +85,21 @@ export class TeacherAttendance extends Document {
   earlyLeaveMinutes: number | null;
 
   /**
+   * An approved استئذان for this day, snapshotted at check-out.
+   *
+   * earlyLeaveMinutes stays a truthful record of the clock; this is what says
+   * the departure was sanctioned. Keeping them apart means a report can show
+   * "left 90 minutes early, approved" rather than having to choose between
+   * hiding the fact and implying a fault.
+   */
+  @Prop({ type: Boolean, default: false })
+  earlyLeaveApproved: boolean;
+
+  /** The time the approval was for, "HH:mm". null when there was none. */
+  @Prop({ type: String, default: null })
+  approvedLeaveAt: string | null;
+
+  /**
    * How long this day was meant to be, from the school's schedule. Stored so a
    * report can say "worked 340 of an expected 390" — workMinutes on its own is
    * a raw number with nothing to compare it against.

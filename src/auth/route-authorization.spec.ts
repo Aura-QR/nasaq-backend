@@ -34,6 +34,11 @@ const PUBLIC_FILES = [
 const SERVICE_AUTHORIZED = new Set([
   'students/students.controller.ts::POST /request-password-setup',
   'students/students.controller.ts::POST /set-password',
+  // A teacher files their own استئذان and cancels it while it is pending.
+  // DutyService scopes both to the caller; a role gate here would either lock
+  // teachers out of the feature or let one cancel a colleague's.
+  'duty/duty.controller.ts::POST /leave-requests',
+  'duty/duty.controller.ts::DELETE /leave-requests/:id',
   'attendance/attendance.controller.ts',
   'exams/exams.controller.ts',
   'projects/projects.controller.ts',

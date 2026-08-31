@@ -5,6 +5,7 @@ import { Teacher, TeacherSchema } from 'src/teachers/schemas/teacher.schema';
 import { TeacherAttendance, TeacherAttendanceSchema } from './schemas/teacher-attendance.schema';
 import { TeacherAttendanceController } from './teacher-attendance.controller';
 import { TeacherAttendanceService } from './teacher-attendance.service';
+import { LeaveRequest, LeaveRequestSchema } from '../duty/schemas/leave-request.schema';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { TeacherAttendanceService } from './teacher-attendance.service';
       { name: TeacherAttendance.name, schema: TeacherAttendanceSchema },
       { name: Teacher.name, schema: TeacherSchema },
       { name: School.name, schema: SchoolSchema },
+      { name: LeaveRequest.name, schema: LeaveRequestSchema },
     ]),
   ],
   controllers: [TeacherAttendanceController],
