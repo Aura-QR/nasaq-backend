@@ -21,6 +21,12 @@ export interface Requirement {
   teacherId: string | null;
   teacherName: string | null;
   periodsPerWeek: number;
+  /**
+   * Set only when this pair has no teacher for the term being generated, but
+   * the same subject and grade IS assigned in another term. Turns a silent
+   * gap into "the teacher is on Term 1, you are generating Term 2".
+   */
+  assignedInOtherTerm?: string | null;
 }
 
 export type ProblemType =
@@ -31,7 +37,8 @@ export type ProblemType =
   | 'subject_unassigned'
   | 'assignment_shared'
   | 'no_slot_left'
-  | 'search_exhausted';
+  | 'search_exhausted'
+  | 'assignment_wrong_term';
 
 /** One period placed on the grid. */
 interface Placement {
@@ -143,6 +150,45 @@ export class TimetableService {
       .lean()
       .exec();
 
+    /*
+     * An offering is subject × grade × TERM, so an assignment made last term
+     * points at a different offering id and cannot cover this one. That looks
+     * identical to "nobody is assigned" and is the likeliest reason a section
+     * comes back unstaffed while its neighbour resolves fine — so find those
+     * rows and name the term, rather than leaving it a mystery.
+     */
+    const sameSubjectElsewhere: any[] = await this.subjectOfferingModel
+      .find({
+        termId: { $ne: new mongoose.Types.ObjectId(termId) },
+        subjectId: { $in: offerings.map((o: any) => o.subjectId?._id ?? o.subjectId) },
+        gradeLevelId: { $in: offerings.map((o: any) => o.gradeLevelId) },
+      })
+      .populate('termId', 'name order')
+      .lean()
+      .exec();
+
+    const strandedAssignments: any[] =
+      sameSubjectElsewhere.length === 0
+        ? []
+        : await this.teacherAssignmentModel
+            .find({ subjectOfferingId: { $in: sameSubjectElsewhere.map((o) => o._id) } })
+            .lean()
+            .exec();
+
+    const strandedKey = (subjectId: any, gradeLevelId: any) =>
+      `${String(subjectId)}|${String(gradeLevelId)}`;
+    const strandedBy = new Map<string, any>();
+    for (const assignment of strandedAssignments) {
+      const offering = sameSubjectElsewhere.find(
+        (o) => String(o._id) === String(assignment.subjectOfferingId),
+      );
+      if (!offering) continue;
+      strandedBy.set(strandedKey(offering.subjectId, offering.gradeLevelId), {
+        termName: offering.termId?.name ?? null,
+        teacherId: String(assignment.teacherId),
+      });
+    }
+
     const teachers: any[] = await this.teacherModel
       .find({ _id: { $in: assignments.map((a) => a.teacherId) } })
       .select('name specialization')
@@ -211,6 +257,14 @@ export class TimetableService {
           teacherId,
           teacherName: teacherId ? (teacherById.get(teacherId)?.name ?? null) : null,
           periodsPerWeek: offering.periodsPerWeek ?? 0,
+          assignedInOtherTerm: teacherId
+            ? null
+            : (strandedBy.get(
+                strandedKey(
+                  offering.subjectId?._id ?? offering.subjectId,
+                  offering.gradeLevelId,
+                ),
+              )?.termName ?? null),
         });
       });
     }
@@ -336,7 +390,19 @@ export class TimetableService {
         subjectOfferingId: r.subjectOfferingId,
         subjectName: r.subjectName,
         periodsPerWeek: r.periodsPerWeek,
+        assignedInOtherTerm: r.assignedInOtherTerm ?? null,
       }));
+
+    const stranded = unassigned.filter((u) => u.assignedInOtherTerm);
+    if (stranded.length > 0) {
+      problems.push({
+        type: 'assignment_wrong_term',
+        message: `${stranded.length} class-subject pairs have no teacher this term, but the same subject is assigned in ${[...new Set(stranded.map((s) => s.assignedInOtherTerm))].join(', ')}. An assignment belongs to one term — re-assign for this one.`,
+        blocking: false,
+        count: stranded.length,
+        terms: [...new Set(stranded.map((s) => s.assignedInOtherTerm))],
+      });
+    }
 
     if (unassigned.length > 0) {
       problems.push({

@@ -208,6 +208,141 @@ describe('TimetableService', () => {
       expect(arabicRows[0].className).toBe('٥/١');
     });
 
+    /**
+     * Reported from the field: one teacher covers the whole grade, another is
+     * pinned to a single section. The pinned section resolved correctly, the
+     * other came back with no teacher at all.
+     */
+    describe('a grade-wide assignment alongside a pinned one', () => {
+      const mathsFor = (requirements: any[], className: string) =>
+        requirements.find(
+          (r) => r.className === className && r.subjectName === 'رياضيات',
+        );
+
+      it('covers the unpinned sections with the grade-wide teacher', async () => {
+        await assign(teachers.fatima, maths);              // whole grade
+        await assign(teachers.jihan, maths, classes.b);    // pinned to ٤/٢
+
+        const { requirements } = await asTenant(() =>
+          service.buildRequirements(String(termId)),
+        );
+
+        expect(mathsFor(requirements, '٤/٢').teacherName).toBe('أ. جيهان');
+        expect(mathsFor(requirements, '٤/١').teacherName).toBe('أ. فاطمة');
+        expect(mathsFor(requirements, '٤/١').teacherId).not.toBeNull();
+      });
+
+      it('does the same when the grade-wide row predates the classId field', async () => {
+        // Rows written before classId existed have no such key at all, rather
+        // than an explicit null.
+        await mk(models[TeacherAssignment.name], {
+          teacherId: teachers.fatima, subjectOfferingId: maths._id, schoolId,
+        });
+        await assign(teachers.jihan, maths, classes.b);
+
+        const { requirements } = await asTenant(() =>
+          service.buildRequirements(String(termId)),
+        );
+
+        expect(mathsFor(requirements, '٤/١').teacherName).toBe('أ. فاطمة');
+        expect(mathsFor(requirements, '٤/٢').teacherName).toBe('أ. جيهان');
+      });
+
+      it('reaches the preview grid, not just the requirement list', async () => {
+        await assign(teachers.fatima, maths);
+        await assign(teachers.jihan, maths, classes.b);
+
+        const result: any = await asTenant(() =>
+          service.generate({ termId: String(termId) }, schoolId),
+        );
+
+        const teacherFor = (className: string) => {
+          const cls = result.classes.find((c: any) => c.className === className);
+          for (const day of cls.days) {
+            for (const slot of day.slots) {
+              if (slot.subjectName === 'رياضيات') return slot.teacherName;
+            }
+          }
+          return null;
+        };
+
+        expect(teacherFor('٤/١')).toBe('أ. فاطمة');
+        expect(teacherFor('٤/٢')).toBe('أ. جيهان');
+      });
+
+      it('leaves the section unstaffed when the grade-wide row is for another term', async () => {
+        // The likeliest cause of the field report: an offering is subject ×
+        // grade × TERM, so an assignment made in one term points at a
+        // different offering id and cannot cover another term's classes.
+        const otherTermId = new Types.ObjectId();
+        const otherOffering = await mk(models[SubjectOffering.name], {
+          subjectId: maths.subjectId, gradeLevelId: gradeFour,
+          termId: otherTermId, periodsPerWeek: 6, schoolId,
+        });
+
+        await mk(models[TeacherAssignment.name], {
+          teacherId: teachers.fatima, subjectOfferingId: otherOffering,
+          classId: null, schoolId,
+        });
+        await assign(teachers.jihan, maths, classes.b);
+
+        const { requirements } = await asTenant(() =>
+          service.buildRequirements(String(termId)),
+        );
+
+        expect(mathsFor(requirements, '٤/٢').teacherName).toBe('أ. جيهان');
+        expect(mathsFor(requirements, '٤/١').teacherId).toBeNull();
+      });
+
+      it('names the term the teacher is actually assigned in', async () => {
+        // Otherwise this is indistinguishable from nobody being assigned at
+        // all, which is what made the field report so hard to explain.
+        const otherTermId = new Types.ObjectId();
+        await mk(models[Term.name], {
+          _id: otherTermId, academicYearId, name: 'الترم الثاني', order: 2,
+          startDate: new Date(), endDate: new Date(), status: 'upcoming', schoolId,
+        });
+        const otherOffering = await mk(models[SubjectOffering.name], {
+          subjectId: maths.subjectId, gradeLevelId: gradeFour,
+          termId: otherTermId, periodsPerWeek: 6, schoolId,
+        });
+        await mk(models[TeacherAssignment.name], {
+          teacherId: teachers.fatima, subjectOfferingId: otherOffering,
+          classId: null, schoolId,
+        });
+
+        const report: any = await asTenant(() =>
+          service.getFeasibility(String(termId), schoolId),
+        );
+
+        const problem = report.problems.find(
+          (p: any) => p.type === 'assignment_wrong_term',
+        );
+        expect(problem).toBeDefined();
+        expect(problem.blocking).toBe(false);
+        expect(problem.terms).toContain('الترم الثاني');
+        expect(problem.message).toContain('الترم الثاني');
+
+        const stranded = report.unassignedSubjects.find(
+          (u: any) => u.subjectName === 'رياضيات',
+        );
+        expect(stranded.assignedInOtherTerm).toBe('الترم الثاني');
+      });
+
+      it('says nothing when the subject is simply unassigned everywhere', async () => {
+        const report: any = await asTenant(() =>
+          service.getFeasibility(String(termId), schoolId),
+        );
+
+        expect(
+          report.problems.some((p: any) => p.type === 'assignment_wrong_term'),
+        ).toBe(false);
+        expect(
+          report.unassignedSubjects.every((u: any) => u.assignedInOtherTerm === null),
+        ).toBe(true);
+      });
+    });
+
     it('prefers a teacher pinned to the class over the grade-wide one', async () => {
       await assign(teachers.fatima, maths);              // whole grade
       await assign(teachers.jihan, maths, classes.b);    // except 4/2
