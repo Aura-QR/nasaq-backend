@@ -14,6 +14,7 @@ import { SubjectOfferingsService } from './subject-offerings.service';
 import { CreateSubjectOfferingDto } from './dto/create-subject-offering.dto';
 import { UpdateSubjectOfferingDto } from './dto/update-subject-offering.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
+import { ImportPlanDto } from './dto/import-plan.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
@@ -69,6 +70,24 @@ export class SubjectOfferingsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @Post('import-plan')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Import a teaching plan pasted from a spreadsheet',
+    description:
+      'One subject per line, name then periods. Tab, comma, pipe, semicolon ' +
+      'or plain spacing all work, so a paste straight out of Excel is taken ' +
+      'as-is, and honorifics and alef spellings are folded before matching.\n\n' +
+      'dryRun defaults to true: the report says what every line matched and ' +
+      'nothing is written until you send dryRun: false.',
+  })
+  @ApiResponse({ status: 200, description: 'Parse report, and the writes if dryRun was false' })
+  @ApiResponse({ status: 404, description: 'Term not found' })
+  async importPlan(@Body() dto: ImportPlanDto) {
+    return await this.subjectOfferingsService.importPlan(dto);
+  }
+
   @Patch('plan')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

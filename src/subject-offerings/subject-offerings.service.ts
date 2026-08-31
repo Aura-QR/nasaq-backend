@@ -7,6 +7,9 @@ import { Term } from '../terms/schemas/term.schema';
 import { CreateSubjectOfferingDto } from './dto/create-subject-offering.dto';
 import { UpdateSubjectOfferingDto } from './dto/update-subject-offering.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
+import { ImportPlanDto } from './dto/import-plan.dto';
+import { Subject } from '../subjects/schemas/subject.schema';
+import { matchByName, parseCount, parseRows } from '../common/arabic-name.util';
 
 @Injectable()
 export class SubjectOfferingsService {
@@ -15,6 +18,8 @@ export class SubjectOfferingsService {
     private readonly subjectOfferingModel: Model<SubjectOffering>,
     @InjectModel(Term.name)
     private readonly termModel: Model<Term>,
+    @InjectModel(Subject.name)
+    private readonly subjectModel: Model<Subject>,
   ) {}
 
   async create(dto: CreateSubjectOfferingDto) {
@@ -95,6 +100,137 @@ export class SubjectOfferingsService {
       message: `${dto.entries.length} subject offerings updated`,
       matched: result.matchedCount,
       modified: result.modifiedCount,
+    };
+  }
+
+  /**
+   * Reads a teaching plan pasted out of a spreadsheet.
+   *
+   * Schools already have this table in Excel. Retyping it one subject at a
+   * time is the same drudgery the whole timetable feature exists to remove, so
+   * an import that only accepts one exact format would be no better.
+   *
+   * Nothing is written unless `dryRun` is explicitly false: the report says
+   * what each line matched, and a plan silently attached to the wrong subject
+   * is very hard to notice afterwards.
+   */
+  async importPlan(dto: ImportPlanDto) {
+    const dryRun = dto.dryRun !== false;
+    const createMissing = dto.createMissingOfferings !== false;
+
+    const term = await this.termModel.findById(dto.termId).lean().exec();
+    if (!term) {
+      throw new NotFoundException(`Term ${dto.termId} not found`);
+    }
+
+    const subjects: any[] = await this.subjectModel.find().lean().exec();
+    const offerings: any[] = await this.subjectOfferingModel
+      .find({
+        termId: new mongoose.Types.ObjectId(dto.termId),
+        gradeLevelId: new mongoose.Types.ObjectId(dto.gradeLevelId),
+      })
+      .lean()
+      .exec();
+
+    const offeringBySubject = new Map(
+      offerings.map((o) => [String(o.subjectId), o]),
+    );
+
+    const rows = parseRows(dto.text);
+    const results: any[] = [];
+    const writes: { offeringId?: any; subjectId?: any; periodsPerWeek: number }[] = [];
+
+    for (const row of rows) {
+      const [rawSubject, rawPeriods] = row.cells;
+
+      if (!rawSubject || rawPeriods === undefined) {
+        results.push({
+          line: row.line, raw: row.raw, status: 'error',
+          reason: 'Expected a subject name and a period count.',
+        });
+        continue;
+      }
+
+      const periodsPerWeek = parseCount(rawPeriods);
+      if (periodsPerWeek === null || periodsPerWeek < 0 || periodsPerWeek > 20) {
+        results.push({
+          line: row.line, raw: row.raw, status: 'error',
+          reason: `"${rawPeriods}" is not a period count between 0 and 20.`,
+        });
+        continue;
+      }
+
+      const { match, ambiguous } = matchByName(rawSubject, subjects, (s: any) => s.subjectName);
+
+      if (!match) {
+        results.push({
+          line: row.line, raw: row.raw, status: 'error',
+          reason: ambiguous.length > 0
+            ? `"${rawSubject}" matches ${ambiguous.length} subjects: ${ambiguous.map((a: any) => a.subjectName).join(', ')}. Use the full name.`
+            : `No subject named "${rawSubject}".`,
+        });
+        continue;
+      }
+
+      const existing = offeringBySubject.get(String(match._id));
+
+      if (existing) {
+        results.push({
+          line: row.line, raw: row.raw, status: 'updated',
+          subjectId: String(match._id), subjectName: match.subjectName,
+          subjectOfferingId: String(existing._id),
+          from: existing.periodsPerWeek ?? 0, periodsPerWeek,
+        });
+        writes.push({ offeringId: existing._id, periodsPerWeek });
+      } else if (createMissing) {
+        results.push({
+          line: row.line, raw: row.raw, status: 'created',
+          subjectId: String(match._id), subjectName: match.subjectName,
+          periodsPerWeek,
+        });
+        writes.push({ subjectId: match._id, periodsPerWeek });
+      } else {
+        results.push({
+          line: row.line, raw: row.raw, status: 'error',
+          reason: `"${match.subjectName}" has no offering in this term and grade.`,
+        });
+      }
+    }
+
+    if (!dryRun) {
+      for (const write of writes) {
+        if (write.offeringId) {
+          await this.subjectOfferingModel.updateOne(
+            { _id: write.offeringId },
+            { $set: { periodsPerWeek: write.periodsPerWeek } },
+          );
+        } else {
+          await new this.subjectOfferingModel({
+            subjectId: write.subjectId,
+            gradeLevelId: new mongoose.Types.ObjectId(dto.gradeLevelId),
+            termId: new mongoose.Types.ObjectId(dto.termId),
+            periodsPerWeek: write.periodsPerWeek,
+          }).save();
+        }
+      }
+    }
+
+    const counts = results.reduce(
+      (acc: any, r) => ({ ...acc, [r.status]: (acc[r.status] ?? 0) + 1 }),
+      {},
+    );
+
+    return {
+      dryRun,
+      written: dryRun ? 0 : writes.length,
+      totalLines: rows.length,
+      updated: counts.updated ?? 0,
+      created: counts.created ?? 0,
+      errors: counts.error ?? 0,
+      totalPeriods: results
+        .filter((r) => r.status !== 'error')
+        .reduce((sum, r) => sum + r.periodsPerWeek, 0),
+      results,
     };
   }
 
