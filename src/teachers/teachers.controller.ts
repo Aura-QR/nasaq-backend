@@ -20,6 +20,8 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { AbilitiesGuard } from 'src/casl/guards/abilities.guard';
 import { CheckAbilities } from 'src/casl/decorators/check-abilities.decorator';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @Controller('teachers')
 @ApiTags('Teachers')
@@ -30,6 +32,7 @@ export class TeachersController {
   @ApiResponse({ status: 201, description: 'Teacher created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 409, description: 'Teacher already exists' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createTeacherDto: CreateTeacherDto) {
@@ -131,6 +134,7 @@ export class TeachersController {
   @ApiResponse({ status: 200, description: 'Teacher updated successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
@@ -144,6 +148,7 @@ export class TeachersController {
   @ApiResponse({ status: 200, description: 'Teacher active status toggled successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id/toggle-active')
   @HttpCode(HttpStatus.OK)
   async toggleActive(@Param('id') id: string) {
@@ -180,6 +185,7 @@ export class TeachersController {
   @ApiResponse({ status: 200, description: 'Teacher deleted successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {

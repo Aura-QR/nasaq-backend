@@ -16,6 +16,8 @@ import { TenantGuard } from 'src/tenancy/guards/tenant.guard';
 import { CurrentSchool } from 'src/tenancy/decorators/current-school.decorator';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { EntityPermission } from './default-permissions';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 /**
  * OWNER and SUPERVISOR are absent on purpose: both authenticate with ['*'],
@@ -30,6 +32,7 @@ const EDITABLE_ROLES = ['MANAGER', 'TEACHER', 'STUDENT'];
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @Get()
   @ApiOperation({ summary: 'Get all permissions defaults for the school' })
   async findAll(@CurrentUser() user: any, @CurrentSchool() schoolId: string) {
@@ -51,6 +54,7 @@ export class PermissionsController {
     };
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @Patch(':role')
   @ApiOperation({ summary: 'Replace one role\'s permissions for this school (Owner/Supervisor only)' })
   async updateRole(
@@ -77,6 +81,7 @@ export class PermissionsController {
     return this.permissionsService.updateRolePermissions(normalized, body.permissions, schoolId);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @Post('sync-financial')
   @ApiOperation({ summary: 'Sync financial permissions for all roles (Owner/Supervisor only)' })
   syncFinancialPermissions(@CurrentUser() user: any, @CurrentSchool() schoolId: string) {

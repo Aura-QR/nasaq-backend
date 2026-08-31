@@ -15,6 +15,8 @@ import { CreateLibraryDto } from './dto/create-library.dto';
 import { UpdateLibraryDto } from './dto/update-library.dto';
 import { ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @Controller('library')
 @ApiTags('Library')
@@ -25,6 +27,7 @@ export class LibraryController {
   @ApiResponse({ status: 201, description: 'Library item created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Subject not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createLibraryDto: CreateLibraryDto) {
@@ -82,6 +85,7 @@ export class LibraryController {
   @ApiResponse({ status: 200, description: 'Library item updated successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Library item not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
@@ -95,6 +99,7 @@ export class LibraryController {
   @ApiResponse({ status: 200, description: 'Library item deleted successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Library item not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {

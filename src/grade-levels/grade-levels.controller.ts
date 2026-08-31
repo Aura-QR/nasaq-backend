@@ -14,12 +14,15 @@ import { GradeLevelsService } from './grade-levels.service';
 import { CreateGradeLevelDto } from './dto/create-grade-level.dto';
 import { UpdateGradeLevelDto } from './dto/update-grade-level.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @ApiTags('grade-levels')
 @Controller('grade-levels')
 export class GradeLevelsController {
   constructor(private readonly gradeLevelsService: GradeLevelsService) {}
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new grade level' })
@@ -56,6 +59,7 @@ export class GradeLevelsController {
     return await this.gradeLevelsService.findOne(id);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update grade level' })
@@ -68,6 +72,7 @@ export class GradeLevelsController {
     return await this.gradeLevelsService.update(id, updateGradeLevelDto);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete grade level' })

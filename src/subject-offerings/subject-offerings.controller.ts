@@ -15,12 +15,15 @@ import { CreateSubjectOfferingDto } from './dto/create-subject-offering.dto';
 import { UpdateSubjectOfferingDto } from './dto/update-subject-offering.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @ApiTags('subject-offerings')
 @Controller('subject-offerings')
 export class SubjectOfferingsController {
   constructor(private readonly subjectOfferingsService: SubjectOfferingsService) {}
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new subject offering' })
@@ -54,6 +57,7 @@ export class SubjectOfferingsController {
     return await this.subjectOfferingsService.findByTerm(termId, gradeLevelId);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post('copy-from/:targetYearId/:sourceYearId')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Copy subject offerings from a previous year (Wizard Step 6)' })
@@ -64,6 +68,7 @@ export class SubjectOfferingsController {
     return await this.subjectOfferingsService.copyFromYear(targetYearId, sourceYearId);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch('plan')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -86,6 +91,7 @@ export class SubjectOfferingsController {
     return await this.subjectOfferingsService.findOne(id);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update a subject offering (periods per week)' })
@@ -97,6 +103,7 @@ export class SubjectOfferingsController {
     return await this.subjectOfferingsService.update(id, dto);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete subject offering' })

@@ -15,12 +15,15 @@ import { CreateTermDto } from './dto/create-term.dto';
 import { UpdateTermDto } from './dto/update-term.dto';
 import { CreateTermsBulkDto } from './dto/create-terms-bulk.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @ApiTags('terms')
 @Controller('terms')
 export class TermsController {
   constructor(private readonly termsService: TermsService) {}
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new term' })
@@ -30,6 +33,7 @@ export class TermsController {
     return await this.termsService.create(createTermDto);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post(['bulk', 'bulk/:academicYearId'])
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create multiple terms for an academic year (accepts academicYearId in URL or body)' })
@@ -58,6 +62,7 @@ export class TermsController {
     return await this.termsService.findByAcademicYear(academicYearId);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post('copy-from/:targetYearId/:sourceYearId')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Copy terms from a previous academic year' })
@@ -85,6 +90,7 @@ export class TermsController {
     return await this.termsService.findOne(id);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update term' })
@@ -94,6 +100,7 @@ export class TermsController {
     return await this.termsService.update(id, updateTermDto);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete term' })

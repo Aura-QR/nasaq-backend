@@ -17,6 +17,8 @@ import { UpdateClassDto } from './dto/update-class.dto';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @ApiTags('classes')
 @Controller('classes')
@@ -26,6 +28,7 @@ export class ClassesController {
   @ApiOperation({ summary: 'Create a new class' })
   @ApiResponse({ status: 201, description: 'Class created successfully' })
   @ApiResponse({ status: 409, description: 'Class name already exists in academic year' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createClassDto: CreateClassDto) {
@@ -58,6 +61,7 @@ export class ClassesController {
   @ApiResponse({ status: 201, description: 'Classes copied successfully' })
   @ApiResponse({ status: 404, description: 'Source year has no classes' })
   @ApiResponse({ status: 409, description: 'Target year already has classes' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post('copy-from/:targetYearId/:sourceYearId')
   @HttpCode(HttpStatus.CREATED)
   async copyFromYear(
@@ -102,6 +106,7 @@ export class ClassesController {
   @ApiOperation({ summary: 'Update class' })
   @ApiResponse({ status: 200, description: 'Class updated successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
@@ -114,6 +119,7 @@ export class ClassesController {
   @ApiOperation({ summary: 'Toggle active status of class' })
   @ApiResponse({ status: 200, description: 'Active status toggled successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id/toggle-active')
   @HttpCode(HttpStatus.OK)
   async toggleActive(@Param('id') id: string) {
@@ -123,6 +129,7 @@ export class ClassesController {
   @ApiOperation({ summary: 'Delete class' })
   @ApiResponse({ status: 200, description: 'Class deleted successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {

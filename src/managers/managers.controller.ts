@@ -4,6 +4,8 @@ import { TenantGuard } from 'src/tenancy/guards/tenant.guard';
 import { CurrentSchool } from 'src/tenancy/decorators/current-school.decorator';
 import { ManagersService } from './managers.service';
 import { CreateManagerDto, UpdateManagerPermissionsDto } from './dto/managers.dto';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @UseGuards(JwtAuthGuard, TenantGuard)
 @Controller('managers')
@@ -16,6 +18,7 @@ export class ManagersController {
     }
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @Post()
   async create(@Req() req: any, @CurrentSchool() schoolId: string, @Body() dto: CreateManagerDto) {
     this.checkOwnerOrSupervisor(req);
@@ -25,6 +28,7 @@ export class ManagersController {
     return this.managersService.createManagerAdmin(schoolId, dto);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @Patch('promote/:teacherId')
   async promote(
     @Req() req: any,
@@ -35,6 +39,7 @@ export class ManagersController {
     return this.managersService.promoteTeacher(teacherId, dto.permissions);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @Patch('demote/:teacherId')
   async demote(@Req() req: any, @Param('teacherId') teacherId: string) {
     this.checkOwnerOrSupervisor(req);
@@ -50,6 +55,7 @@ export class ManagersController {
    * failure mode this refactor exists to remove. It fails loudly and names its
    * replacement instead.
    */
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @Patch(':id/permissions')
   async updatePermissions(@Req() req: any) {
     this.checkOwnerOrSupervisor(req);
@@ -65,6 +71,7 @@ export class ManagersController {
     return this.managersService.findAllManagers();
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @Delete(':id')
   async remove(
     @Req() req: any,

@@ -40,6 +40,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { TenantGuard } from './tenancy/guards/tenant.guard';
 import { CaslModule } from './casl/casl.module';
 import { AbilitiesGuard } from './casl/guards/abilities.guard';
+import { RolesGuard } from './auth/guards/roles.guard';
 
 
 
@@ -114,6 +115,13 @@ import { AbilitiesGuard } from './casl/guards/abilities.guard';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
     { provide: APP_GUARD, useClass: AbilitiesGuard },
+    // RolesGuard is global for the same reason AbilitiesGuard is: it returns
+    // true for any handler that declares no @Roles, so nothing existing
+    // changes — but a route that DOES declare roles can no longer be left
+    // unenforced because its controller forgot @UseGuards(RolesGuard).
+    // Attaching it to fifteen controllers by hand is exactly the kind of
+    // omission that leaves a decorator sitting there looking protective.
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AppModule {}

@@ -19,6 +19,8 @@ import { UpdateLectureDto } from './dto/update-lecture.dto';
 import { ApiOperation, ApiResponse, ApiTags, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @ApiTags('Lectures')
 @Controller('lectures')
@@ -45,6 +47,7 @@ export class LecturesController {
     required: false,
     description: 'Comma-separated. Defaults to every active class in the term.',
   })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Get('feasibility')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -78,6 +81,7 @@ export class LecturesController {
   @ApiResponse({ status: 200, description: 'Timetable generated' })
   @ApiResponse({ status: 400, description: 'No working days, or no active classes' })
   @ApiResponse({ status: 404, description: 'Term not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post('generate')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -92,6 +96,7 @@ export class LecturesController {
   @ApiOperation({ summary: 'Create a new lecture' })
   @ApiResponse({ status: 201, description: 'Lecture created successfully' })
   @ApiResponse({ status: 409, description: 'Scheduling conflict detected' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createLectureDto: CreateLectureDto) {
@@ -159,6 +164,7 @@ export class LecturesController {
   @ApiOperation({ summary: 'Copy schedule from a previous term/year (Wizard Step 7)' })
   @ApiResponse({ status: 201, description: 'Copy schedule preview and execution results' })
   @ApiResponse({ status: 400, description: 'Missing subject offerings or invalid request' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post('copy-from/:targetYearId/:targetTermId/:sourceTermId')
   @HttpCode(HttpStatus.CREATED)
   async copySchedule(
@@ -181,6 +187,7 @@ export class LecturesController {
   @ApiOperation({ summary: 'Update lecture' })
   @ApiResponse({ status: 200, description: 'Lecture updated successfully' })
   @ApiResponse({ status: 404, description: 'Lecture not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
@@ -193,6 +200,7 @@ export class LecturesController {
   @ApiOperation({ summary: 'Delete lecture' })
   @ApiResponse({ status: 200, description: 'Lecture deleted successfully' })
   @ApiResponse({ status: 404, description: 'Lecture not found' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {

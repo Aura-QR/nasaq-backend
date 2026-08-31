@@ -12,12 +12,15 @@ import {
 import { TeacherAssignmentsService } from './teacher-assignments.service';
 import { CreateTeacherAssignmentDto } from './dto/create-teacher-assignment.dto';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @ApiTags('teacher-assignments')
 @Controller('teacher-assignments')
 export class TeacherAssignmentsController {
   constructor(private readonly teacherAssignmentsService: TeacherAssignmentsService) {}
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Assign a teacher to a subject offering' })
@@ -69,6 +72,7 @@ export class TeacherAssignmentsController {
     return await this.teacherAssignmentsService.findByTeacher(teacherId);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Remove teacher assignment' })

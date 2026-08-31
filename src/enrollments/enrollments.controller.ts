@@ -13,12 +13,15 @@ import { EnrollmentsService } from './enrollments.service';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 import { BulkPromoteDto } from './dto/bulk-promote.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @ApiTags('enrollments')
 @Controller('enrollments')
 export class EnrollmentsController {
   constructor(private readonly enrollmentsService: EnrollmentsService) {}
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Enroll a student in a class for an academic year' })
@@ -43,6 +46,7 @@ export class EnrollmentsController {
     return await this.enrollmentsService.findByYearAndClass(academicYearId, classId, status);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Get('promotion-preview/:targetAcademicYearId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get promotion preview data for Wizard Step 5' })
@@ -57,6 +61,7 @@ export class EnrollmentsController {
     );
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post('bulk-promote/:targetAcademicYearId')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Execute bulk promotion for Wizard Step 5' })
@@ -75,6 +80,7 @@ export class EnrollmentsController {
     return await this.enrollmentsService.findByStudent(studentId);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Unenroll student (soft withdraw)' })
