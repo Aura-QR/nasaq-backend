@@ -73,11 +73,19 @@ LectureSchema.index(
   { unique: true },
 );
 
-// Partial unique slot per teacher per term (skips null teacherId for "needs teacher" state)
+// Partial unique slot per teacher per term, skipping the "needs a teacher"
+// state so those never collide with each other.
+//
+// The filter must be `$type`, not `$ne: null`. Mongo does not accept `$ne` in
+// a partialFilterExpression — it rejects the whole index with
+// "Expression not supported in partial index: $not", which meant this index
+// was never actually created and a teacher could be booked into two classes
+// at the same time. Only the application-level check in create() stood in the
+// way, so insertMany and copy-from bypassed it entirely.
 LectureSchema.index(
   { schoolId: 1, teacherId: 1, dayOfWeek: 1, slot: 1, termId: 1 },
   {
     unique: true,
-    partialFilterExpression: { teacherId: { $ne: null } },
+    partialFilterExpression: { teacherId: { $type: 'objectId' } },
   },
 );

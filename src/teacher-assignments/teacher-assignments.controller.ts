@@ -35,13 +35,24 @@ export class TeacherAssignmentsController {
   @ApiQuery({ name: 'teacherId', required: false })
   @ApiQuery({ name: 'subjectOfferingId', required: false })
   @ApiQuery({ name: 'termId', required: false })
+  @ApiQuery({
+    name: 'classId',
+    required: false,
+    description: 'Only assignments pinned to this class',
+  })
   @ApiResponse({ status: 200, description: 'Assignments fetched successfully' })
   async findAll(
     @Query('teacherId') teacherId?: string,
     @Query('subjectOfferingId') subjectOfferingId?: string,
     @Query('termId') termId?: string,
+    @Query('classId') classId?: string,
   ) {
-    return await this.teacherAssignmentsService.findAll({ teacherId, subjectOfferingId, termId });
+    return await this.teacherAssignmentsService.findAll({
+      teacherId,
+      subjectOfferingId,
+      termId,
+      classId,
+    });
   }
 
   @Get('by-offering/:subjectOfferingId')

@@ -52,6 +52,13 @@ export class UpdateSchoolSettingsDto {
   @IsOptional()
   termsPerYear?: number;
 
+  /** Teaching periods in a school day. Decides a week's timetable capacity. */
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  @IsOptional()
+  periodsPerDay?: number;
+
   @IsInt()
   @Min(0)
   @Max(100)

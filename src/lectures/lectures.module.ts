@@ -9,6 +9,8 @@ import { Student, StudentSchema } from 'src/students/schemas/student.schema';
 import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
 import { TeacherAssignment, TeacherAssignmentSchema } from '../teacher-assignments/schemas/teacher-assignment.schema';
 import { Term, TermSchema } from '../terms/schemas/term.schema';
+import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
+import { TimetableService } from './timetable.service';
 
 @Module({
   imports: [
@@ -20,10 +22,11 @@ import { Term, TermSchema } from '../terms/schemas/term.schema';
       { name: SubjectOffering.name, schema: SubjectOfferingSchema },
       { name: TeacherAssignment.name, schema: TeacherAssignmentSchema },
       { name: Term.name, schema: TermSchema },
+      { name: School.name, schema: SchoolSchema },
     ]),
   ],
   controllers: [LecturesController],
-  providers: [LecturesService],
-  exports: [LecturesService, MongooseModule],
+  providers: [LecturesService, TimetableService],
+  exports: [LecturesService, TimetableService, MongooseModule],
 })
 export class LecturesModule {}

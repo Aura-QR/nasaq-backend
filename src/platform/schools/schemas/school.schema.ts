@@ -76,6 +76,16 @@ export class SchoolSettings {
    */
   @Prop({ type: [WorkDaySchema], default: [] })
   workSchedule: WorkDay[];
+
+  /**
+   * Teaching periods in a school day.
+   *
+   * `Lecture.slot` accepts 1–10, but nothing recorded how many the school
+   * actually runs — so there was no way to know a week's capacity, which is
+   * what decides whether a timetable can exist at all.
+   */
+  @Prop({ default: 7, min: 1, max: 10 })
+  periodsPerDay: number;
 }
 
 const SchoolSettingsSchema = SchemaFactory.createForClass(SchoolSettings);

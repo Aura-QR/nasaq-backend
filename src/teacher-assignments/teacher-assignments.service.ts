@@ -13,18 +13,28 @@ export class TeacherAssignmentsService {
   ) {}
 
   async create(dto: CreateTeacherAssignmentDto) {
+    const classId = dto.classId
+      ? new mongoose.Types.ObjectId(dto.classId)
+      : null;
+
     const existing = await this.teacherAssignmentModel.findOne({
       teacherId: new mongoose.Types.ObjectId(dto.teacherId),
       subjectOfferingId: new mongoose.Types.ObjectId(dto.subjectOfferingId),
+      classId,
     }).exec();
 
     if (existing) {
-      throw new ConflictException('Teacher is already assigned to this subject offering');
+      throw new ConflictException(
+        classId
+          ? 'Teacher is already assigned to this subject offering for this class'
+          : 'Teacher is already assigned to this subject offering',
+      );
     }
 
     const assignment = new this.teacherAssignmentModel({
       teacherId: new mongoose.Types.ObjectId(dto.teacherId),
       subjectOfferingId: new mongoose.Types.ObjectId(dto.subjectOfferingId),
+      classId,
     });
 
     return assignment.save();
@@ -37,7 +47,14 @@ export class TeacherAssignmentsService {
    * screen had no way to render the list before choosing something — it had to
    * fetch every teacher and fan out one request each.
    */
-  async findAll(filters: { teacherId?: string; subjectOfferingId?: string; termId?: string } = {}) {
+  async findAll(
+    filters: {
+      teacherId?: string;
+      subjectOfferingId?: string;
+      termId?: string;
+      classId?: string;
+    } = {},
+  ) {
     const query: any = {};
     if (filters.teacherId) {
       query.teacherId = new mongoose.Types.ObjectId(filters.teacherId);
@@ -45,9 +62,13 @@ export class TeacherAssignmentsService {
     if (filters.subjectOfferingId) {
       query.subjectOfferingId = new mongoose.Types.ObjectId(filters.subjectOfferingId);
     }
+    if (filters.classId) {
+      query.classId = new mongoose.Types.ObjectId(filters.classId);
+    }
 
     const rows = await this.teacherAssignmentModel
       .find(query)
+      .populate('classId', 'name roomNumber')
       .populate('teacherId', 'name email phoneNumber specialization')
       .populate({
         path: 'subjectOfferingId',
@@ -71,6 +92,7 @@ export class TeacherAssignmentsService {
   async findByOffering(subjectOfferingId: string) {
     return this.teacherAssignmentModel
       .find({ subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId) })
+      .populate('classId', 'name roomNumber')
       .populate('teacherId', 'name email phoneNumber')
       .populate('subjectOfferingId')
       .exec();
@@ -79,6 +101,7 @@ export class TeacherAssignmentsService {
   async findByTeacher(teacherId: string) {
     return this.teacherAssignmentModel
       .find({ teacherId: new mongoose.Types.ObjectId(teacherId) })
+      .populate('classId', 'name roomNumber')
       .populate({
         path: 'subjectOfferingId',
         populate: [

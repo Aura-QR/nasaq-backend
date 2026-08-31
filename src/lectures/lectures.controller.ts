@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { LecturesService } from './lectures.service';
+import { TimetableService } from './timetable.service';
 import { CreateLectureDto } from './dto/create-lecture.dto';
 import { UpdateLectureDto } from './dto/update-lecture.dto';
 import { ApiOperation, ApiResponse, ApiTags, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
@@ -21,7 +22,43 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @ApiTags('Lectures')
 @Controller('lectures')
 export class LecturesController {
-  constructor(private readonly lecturesService: LecturesService) {}
+  constructor(
+    private readonly lecturesService: LecturesService,
+    private readonly timetableService: TimetableService,
+  ) {}
+
+  @ApiOperation({
+    summary: 'Can a timetable exist for this term?',
+    description:
+      'Arithmetic only — nothing is generated and nothing is written. ' +
+      'Compares each class\'s planned periods and each teacher\'s assigned ' +
+      'load against the capacity of the school week, and names whatever does ' +
+      'not fit. Run this before generating: an overloaded teacher is a ' +
+      'subtraction, not a search failure.',
+  })
+  @ApiResponse({ status: 200, description: 'Feasibility report' })
+  @ApiResponse({ status: 404, description: 'Term not found' })
+  @ApiQuery({ name: 'termId', required: true })
+  @ApiQuery({
+    name: 'classIds',
+    required: false,
+    description: 'Comma-separated. Defaults to every active class in the term.',
+  })
+  @Get('feasibility')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async feasibility(
+    @CurrentUser() user: any,
+    @Query('termId') termId: string,
+    @Query('classIds') classIds?: string,
+  ) {
+    return await this.timetableService.getFeasibility(
+      termId,
+      user.schoolId,
+      classIds ? classIds.split(',').map((id) => id.trim()).filter(Boolean) : undefined,
+    );
+  }
 
   @ApiOperation({ summary: 'Create a new lecture' })
   @ApiResponse({ status: 201, description: 'Lecture created successfully' })
