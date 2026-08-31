@@ -38,7 +38,9 @@ export type ProblemType =
   | 'assignment_shared'
   | 'no_slot_left'
   | 'search_exhausted'
-  | 'assignment_wrong_term';
+  | 'assignment_wrong_term'
+  | 'assignment_pinned_elsewhere'
+  | 'assignment_pin_conflict';
 
 /** One period placed on the grid. */
 interface Placement {
@@ -198,6 +200,7 @@ export class TimetableService {
 
     // Assignments for one offering, split into class-pinned and grade-wide.
     const byOffering = new Map<string, { pinned: Map<string, string>; open: string[] }>();
+    const conflictingPins: any[] = [];
     for (const assignment of assignments) {
       const key = String(assignment.subjectOfferingId);
       if (!byOffering.has(key)) {
@@ -205,7 +208,18 @@ export class TimetableService {
       }
       const entry = byOffering.get(key);
       if (assignment.classId) {
-        entry.pinned.set(String(assignment.classId), String(assignment.teacherId));
+        const pinnedClass = String(assignment.classId);
+        if (entry.pinned.has(pinnedClass)) {
+          // Two teachers pinned to the same class: the second used to
+          // overwrite the first with no trace, which reads as the first
+          // teacher's assignment having vanished.
+          conflictingPins.push({
+            subjectOfferingId: key,
+            classId: pinnedClass,
+            teacherIds: [entry.pinned.get(pinnedClass), String(assignment.teacherId)],
+          });
+        }
+        entry.pinned.set(pinnedClass, String(assignment.teacherId));
       } else {
         entry.open.push(String(assignment.teacherId));
       }
@@ -223,6 +237,7 @@ export class TimetableService {
 
     const requirements: Requirement[] = [];
     const sharedOfferings: any[] = [];
+    const strayPins: any[] = [];
 
     for (const offering of offerings) {
       const gradeClasses = classes.filter(
@@ -232,6 +247,20 @@ export class TimetableService {
 
       if (entry && entry.open.length > 1) {
         sharedOfferings.push({ offering, teacherIds: entry.open });
+      }
+
+      if (entry) {
+        const gradeClassIds = new Set(gradeClasses.map((c: any) => String(c._id)));
+        for (const pinnedClassId of entry.pinned.keys()) {
+          if (!gradeClassIds.has(pinnedClassId)) {
+            strayPins.push({
+              subjectOfferingId: String(offering._id),
+              subjectName: offering.subjectId?.subjectName ?? null,
+              classId: pinnedClassId,
+              teacherId: entry.pinned.get(pinnedClassId),
+            });
+          }
+        }
       }
 
       gradeClasses.forEach((cls, index) => {
@@ -269,7 +298,128 @@ export class TimetableService {
       });
     }
 
-    return { term, classes, offerings, requirements, sharedOfferings, teacherById };
+    return {
+      term,
+      classes,
+      offerings,
+      requirements,
+      sharedOfferings,
+      teacherById,
+      byOffering,
+      conflictingPins,
+      strayPins,
+    };
+  }
+
+
+  /**
+   * Shows exactly what the teacher resolver sees, for one class.
+   *
+   * When a section comes back unstaffed and the data looks right on screen,
+   * the answer is always in the difference between what the screen shows and
+   * what the resolver reads: which offering an assignment actually points at,
+   * whether its classId is null or set, and which grade a class really
+   * belongs to. Guessing at that from the outside is what turned one field
+   * report into a long exchange.
+   */
+  async traceAssignments(termId: string, classId: string, schoolId: any) {
+    // Deliberately unfiltered: the whole point is to show whether a pin aims
+    // at a class in this grade, which cannot be seen from inside a one-class
+    // slice.
+    const built = await this.buildRequirements(termId);
+    const cls: any = built.classes.find((c: any) => String(c._id) === String(classId));
+
+    if (!cls) {
+      throw new NotFoundException(
+        `Class ${classId} is not an active class in this term's academic year.`,
+      );
+    }
+
+    const allAssignments: any[] = await this.teacherAssignmentModel
+      .find({ teacherId: { $exists: true } })
+      .populate('teacherId', 'name')
+      .populate({
+        path: 'subjectOfferingId',
+        populate: [
+          { path: 'subjectId', select: 'subjectName' },
+          { path: 'gradeLevelId', select: 'name' },
+          { path: 'termId', select: 'name order' },
+        ],
+      })
+      .lean()
+      .exec();
+
+    const subjects = built.requirements
+      .filter((r) => r.classId === String(classId))
+      .map((requirement) => {
+        const entry = (built.byOffering as any).get(requirement.subjectOfferingId);
+
+        return {
+          subjectName: requirement.subjectName,
+          subjectOfferingId: requirement.subjectOfferingId,
+          periodsPerWeek: requirement.periodsPerWeek,
+          resolvedTeacherId: requirement.teacherId,
+          resolvedTeacherName: requirement.teacherName,
+          resolvedBy: requirement.teacherId
+            ? entry?.pinned?.has(String(classId))
+              ? 'pinned to this class'
+              : entry?.open?.length === 1
+                ? 'grade-wide assignment'
+                : 'grade-wide, shared round-robin'
+            : 'nothing matched',
+          assignmentsOnThisOffering: {
+            pinnedToAClass: [...(entry?.pinned?.entries() ?? [])].map(
+              ([pinnedClassId, teacherId]) => ({
+                classId: pinnedClassId,
+                isThisClass: String(pinnedClassId) === String(classId),
+                teacherId,
+                teacherName: (built.teacherById as any).get(teacherId)?.name ?? null,
+              }),
+            ),
+            gradeWide: (entry?.open ?? []).map((teacherId: string) => ({
+              teacherId,
+              teacherName: (built.teacherById as any).get(teacherId)?.name ?? null,
+            })),
+          },
+        };
+      });
+
+    // Every assignment in the school, so a row pointing at the wrong term or
+    // the wrong grade is visible rather than inferred.
+    const allRows = allAssignments.map((a: any) => ({
+      assignmentId: String(a._id),
+      teacherName: a.teacherId?.name ?? null,
+      subjectName: a.subjectOfferingId?.subjectId?.subjectName ?? null,
+      gradeName: a.subjectOfferingId?.gradeLevelId?.name ?? null,
+      gradeLevelId: String(a.subjectOfferingId?.gradeLevelId?._id ?? ''),
+      termName: a.subjectOfferingId?.termId?.name ?? null,
+      termId: String(a.subjectOfferingId?.termId?._id ?? ''),
+      subjectOfferingId: String(a.subjectOfferingId?._id ?? a.subjectOfferingId),
+      classId: a.classId ? String(a.classId) : null,
+      classIdPresent: Object.prototype.hasOwnProperty.call(a, 'classId'),
+      matchesThisTerm: String(a.subjectOfferingId?.termId?._id ?? '') === String(termId),
+      matchesThisGrade:
+        String(a.subjectOfferingId?.gradeLevelId?._id ?? '') === String(cls.gradeLevelId),
+    }));
+
+    return {
+      class: {
+        classId: String(cls._id),
+        name: cls.name,
+        gradeLevelId: String(cls.gradeLevelId),
+      },
+      termId,
+      classesInThisGrade: built.classes
+        .filter((c: any) => String(c.gradeLevelId) === String(cls.gradeLevelId))
+        .map((c: any) => ({ classId: String(c._id), name: c.name })),
+      subjects,
+      allAssignmentsInSchool: allRows,
+      hint:
+        'For a subject resolving to nothing: find its rows in ' +
+        'allAssignmentsInSchool and check matchesThisTerm and matchesThisGrade. ' +
+        'A row with classId set to a class not listed in classesInThisGrade is ' +
+        'pinned somewhere it cannot apply.',
+    };
   }
 
   /**
@@ -285,10 +435,8 @@ export class TimetableService {
     classIds?: string[],
   ) {
     const capacity = await this.getCapacity(schoolId);
-    const { classes, requirements, sharedOfferings } = await this.buildRequirements(
-      termId,
-      classIds,
-    );
+    const { classes, requirements, sharedOfferings, conflictingPins, strayPins } =
+      await this.buildRequirements(termId, classIds);
 
     const problems: Problem[] = [];
 
@@ -412,6 +560,26 @@ export class TimetableService {
         message: `${unassigned.length} class-subject pairs have no teacher. They will be scheduled with an empty teacher.`,
         blocking: false,
         count: unassigned.length,
+      });
+    }
+
+    if (strayPins.length > 0) {
+      problems.push({
+        type: 'assignment_pinned_elsewhere',
+        message: `${strayPins.length} assignments are pinned to a class that is not in the subject's grade, so they can never apply. The teacher looks assigned on screen and covers nothing.`,
+        blocking: false,
+        count: strayPins.length,
+        details: strayPins.slice(0, 20),
+      });
+    }
+
+    if (conflictingPins.length > 0) {
+      problems.push({
+        type: 'assignment_pin_conflict',
+        message: `${conflictingPins.length} classes have two teachers pinned to the same subject. Only the last one counts — remove one.`,
+        blocking: false,
+        count: conflictingPins.length,
+        details: conflictingPins.slice(0, 20),
       });
     }
 

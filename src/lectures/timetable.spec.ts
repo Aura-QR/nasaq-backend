@@ -16,6 +16,7 @@ import { Term, TermSchema } from '../terms/schemas/term.schema';
 import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
 import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
 import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
+import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-level.schema';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 
 const URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/nasaq-test';
@@ -56,6 +57,9 @@ describe('TimetableService', () => {
           { name: Teacher.name, schema: TeacherSchema },
           { name: Subject.name, schema: SubjectSchema },
           { name: School.name, schema: SchoolSchema },
+          // traceAssignments populates the grade level. The real app has every
+          // model registered on the connection; an isolated test module does not.
+          { name: GradeLevel.name, schema: GradeLevelSchema },
         ]),
       ],
       providers: [TimetableService],
@@ -64,7 +68,7 @@ describe('TimetableService', () => {
     service = moduleRef.get(TimetableService);
     for (const name of [
       Lecture.name, Class.name, SubjectOffering.name, TeacherAssignment.name,
-      Term.name, Teacher.name, Subject.name, School.name,
+      Term.name, Teacher.name, Subject.name, School.name, GradeLevel.name,
     ]) {
       models[name] = moduleRef.get(getModelToken(name));
     }
@@ -340,6 +344,83 @@ describe('TimetableService', () => {
         expect(
           report.unassignedSubjects.every((u: any) => u.assignedInOtherTerm === null),
         ).toBe(true);
+      });
+
+      it('flags an assignment pinned to a class outside the subject\'s grade', async () => {
+        // Produces exactly the reported symptom: one section resolves, the
+        // other is null, and both assignments look right on screen. The pin
+        // can never apply, so nothing covers the rest of the grade.
+        await assign(teachers.fatima, maths, classes.c);   // ٥/١ — a grade-5 class
+        await assign(teachers.jihan, maths, classes.b);    // ٤/٢
+
+        const { requirements } = await asTenant(() =>
+          service.buildRequirements(String(termId)),
+        );
+        expect(mathsFor(requirements, '٤/٢').teacherName).toBe('أ. جيهان');
+        expect(mathsFor(requirements, '٤/١').teacherId).toBeNull();
+
+        const report: any = await asTenant(() =>
+          service.getFeasibility(String(termId), schoolId),
+        );
+        const problem = report.problems.find(
+          (p: any) => p.type === 'assignment_pinned_elsewhere',
+        );
+        expect(problem).toBeDefined();
+        expect(problem.count).toBe(1);
+      });
+
+      it('flags two teachers pinned to the same class', async () => {
+        // The second silently overwrote the first, which reads as the first
+        // teacher's assignment having disappeared.
+        await assign(teachers.fatima, maths, classes.a);
+        await assign(teachers.jihan, maths, classes.a);
+
+        const report: any = await asTenant(() =>
+          service.getFeasibility(String(termId), schoolId),
+        );
+        const problem = report.problems.find(
+          (p: any) => p.type === 'assignment_pin_conflict',
+        );
+        expect(problem).toBeDefined();
+        expect(problem.details[0].teacherIds).toHaveLength(2);
+      });
+
+      it('traces how each subject resolved, and every assignment in the school', async () => {
+        await assign(teachers.fatima, maths, classes.c);   // stray pin
+        await assign(teachers.jihan, maths, classes.b);
+
+        const trace: any = await asTenant(() =>
+          service.traceAssignments(String(termId), String(classes.a), schoolId),
+        );
+
+        expect(trace.class.name).toBe('٤/١');
+        expect(trace.classesInThisGrade.map((c: any) => c.name).sort()).toEqual(['٤/١', '٤/٢']);
+
+        const maths_ = trace.subjects.find((s: any) => s.subjectName === 'رياضيات');
+        expect(maths_.resolvedTeacherId).toBeNull();
+        expect(maths_.resolvedBy).toBe('nothing matched');
+        expect(maths_.assignmentsOnThisOffering.gradeWide).toHaveLength(0);
+        expect(maths_.assignmentsOnThisOffering.pinnedToAClass).toHaveLength(2);
+        expect(
+          maths_.assignmentsOnThisOffering.pinnedToAClass.every((p: any) => !p.isThisClass),
+        ).toBe(true);
+
+        // Every row in the school, so a wrong term or grade is visible.
+        expect(trace.allAssignmentsInSchool).toHaveLength(2);
+        expect(trace.allAssignmentsInSchool[0]).toHaveProperty('matchesThisTerm');
+        expect(trace.allAssignmentsInSchool[0]).toHaveProperty('matchesThisGrade');
+      });
+
+      it('says plainly when a grade-wide assignment did the work', async () => {
+        await assign(teachers.fatima, maths);
+
+        const trace: any = await asTenant(() =>
+          service.traceAssignments(String(termId), String(classes.a), schoolId),
+        );
+
+        const maths_ = trace.subjects.find((s: any) => s.subjectName === 'رياضيات');
+        expect(maths_.resolvedBy).toBe('grade-wide assignment');
+        expect(maths_.resolvedTeacherName).toBe('أ. فاطمة');
       });
     });
 

@@ -81,6 +81,32 @@ export class LecturesController {
   @ApiResponse({ status: 200, description: 'Timetable generated' })
   @ApiResponse({ status: 400, description: 'No working days, or no active classes' })
   @ApiResponse({ status: 404, description: 'Term not found' })
+  @ApiOperation({
+    summary: 'Why did this class resolve to that teacher?',
+    description:
+      'Shows what the resolver actually reads for one class: which offering ' +
+      'each assignment points at, whether its classId is null or set, which ' +
+      'term and grade it belongs to, and how each subject was resolved. Read ' +
+      'only, writes nothing. Use it when a section comes back unstaffed and ' +
+      'the data looks correct on screen.',
+  })
+  @ApiResponse({ status: 200, description: 'Resolution trace' })
+  @ApiResponse({ status: 404, description: 'Class not active in this term' })
+  @ApiQuery({ name: 'termId', required: true })
+  @ApiQuery({ name: 'classId', required: true })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @Get('assignment-trace')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async assignmentTrace(
+    @CurrentUser() user: any,
+    @Query('termId') termId: string,
+    @Query('classId') classId: string,
+  ) {
+    return await this.timetableService.traceAssignments(termId, classId, user.schoolId);
+  }
+
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post('generate')
   @UseGuards(JwtAuthGuard)
