@@ -156,6 +156,8 @@ describe('DutyService', () => {
   };
 
   const coverage = () => asTenant(() => service.getCoverage(DATE, OWNER));
+  const coverageOn = (date: string) =>
+    asTenant(() => service.getCoverage(date, OWNER));
 
   describe('leave requests', () => {
     const file = (overrides: any = {}) =>
@@ -540,6 +542,80 @@ describe('DutyService', () => {
       );
       expect(mine).toHaveLength(1);
       expect(mine[0].substituteTeacherName).toBe('أ. سارة');
+    });
+  });
+
+  describe('edge cases a real school hits', () => {
+    it('does not mix terms when no term is marked active', async () => {
+      // Without an active term the lecture query has no term filter, so a
+      // second term's Sunday lectures would be pulled into today's board.
+      await models[Term.name].collection.updateMany({}, { $set: { status: 'closed' } });
+      await checkInAllExcept(arabicTeacher);
+
+      const board: any = await coverage();
+
+      expect(board.termId).toBeNull();
+      // Still only أروى's two Sunday lectures, not every term's.
+      expect(board.stats.needCover).toBe(2);
+    });
+
+    it('survives a school with no lectures at all', async () => {
+      await models[Lecture.name].collection.deleteMany({});
+      await checkInAllExcept(arabicTeacher);
+
+      const board: any = await coverage();
+
+      expect(board.stats.needCover).toBe(0);
+      expect(board.uncovered).toEqual([]);
+      expect(board.absentTeachers).toHaveLength(1);
+    });
+
+    it('survives a school with no teachers', async () => {
+      await models[Teacher.name].collection.deleteMany({});
+
+      const board: any = await coverage();
+      expect(board.stats.needCover).toBe(0);
+    });
+
+    it('returns an empty roster rather than failing when none is set', async () => {
+      const rows: any = await asTenant(() => service.getSupervisors({ date: DATE }));
+      expect(rows).toEqual([]);
+    });
+
+    it('rejects a malformed date instead of querying on Invalid Date', async () => {
+      await expect(coverageOn('not-a-date')).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('handles an unassigned lecture without crashing on its null teacher', async () => {
+      await models[Lecture.name].collection.updateOne(
+        { _id: L1 },
+        { $set: { teacherId: null } },
+      );
+      await checkInAllExcept(arabicTeacher);
+
+      const board: any = await coverage();
+
+      // The unstaffed slot has no absent owner, so it is not cover work.
+      expect(board.uncovered.map((u: any) => u.slot)).toEqual([2]);
+    });
+
+    it('reads a day where a teacher is both absent and on leave', async () => {
+      const filed: any = await asTenant(() =>
+        service.createLeaveRequest(
+          { date: DATE, leaveAt: '10:00' },
+          { userId: String(arabicTeacher), role: 'TEACHER' },
+        ),
+      );
+      await asTenant(() =>
+        service.reviewLeaveRequest(String(filed.data._id), { status: 'approved' }, OWNER),
+      );
+      await checkInAllExcept(arabicTeacher);
+
+      const board: any = await coverage();
+
+      // Counted once, not twice.
+      expect(board.stats.needCover).toBe(2);
+      expect(board.uncovered).toHaveLength(2);
     });
   });
 
