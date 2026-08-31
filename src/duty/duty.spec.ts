@@ -809,6 +809,172 @@ describe('DutyService', () => {
     });
   });
 
+  describe('the cover report', () => {
+    const report = (from = DATE, to = DATE) =>
+      asTenant(() => service.getCoverReport(from, to));
+
+    const assign = (lectureId: any, substituteId: any) =>
+      asTenant(() =>
+        service.createSubstitution(
+          {
+            date: DATE,
+            lectureId: String(lectureId),
+            substituteTeacherId: String(substituteId),
+          },
+          OWNER,
+        ),
+      );
+
+    it('counts what each teacher covered, and what needed covering for them', async () => {
+      await assign(L1, freeTeacher);   // أروى's lesson, taken by سارة
+      await assign(L2, arabicSpecialist);
+
+      const result: any = await report();
+
+      const sara = result.teachers.find((t: any) => t.name === 'أ. سارة');
+      const arwa = result.teachers.find((t: any) => t.name === 'أ. أروى');
+
+      expect(sara.covered).toBe(1);
+      expect(sara.neededCover).toBe(0);
+      expect(arwa.covered).toBe(0);
+      expect(arwa.neededCover).toBe(2);
+      expect(result.totals.coverAssigned).toBe(2);
+      expect(result.totals.teachersWhoCovered).toBe(2);
+    });
+
+    it('sorts by cover taken, heaviest first', async () => {
+      await assign(L1, freeTeacher);
+      await assign(L2, freeTeacher);
+      await assign(L3, arabicSpecialist);
+
+      const result: any = await report();
+
+      expect(result.teachers[0].name).toBe('أ. سارة');
+      expect(result.teachers[0].covered).toBe(2);
+    });
+
+    it('flags a teacher carrying twice what everyone else is', async () => {
+      // سارة takes three, منى takes one. Averaging across both gives two and
+      // hides it — سارة's own load drags the baseline up to meet her. Measured
+      // against the others she is at three times theirs.
+      const L4 = await mk(models[Lecture.name], {
+        classId: classB,
+        subjectOfferingId: (await models[SubjectOffering.name].collection.findOne({}))._id,
+        termId, teacherId: mathsTeacher, dayOfWeek: 'sunday', slot: 4,
+        preparation: [], schoolId,
+      });
+      const L5 = await mk(models[Lecture.name], {
+        classId: classA,
+        subjectOfferingId: (await models[SubjectOffering.name].collection.findOne({}))._id,
+        termId, teacherId: mathsTeacher, dayOfWeek: 'sunday', slot: 5,
+        preparation: [], schoolId,
+      });
+
+      await assign(L1, freeTeacher);
+      await assign(L2, freeTeacher);
+      await assign(L4, freeTeacher);
+      await assign(L5, arabicSpecialist);
+
+      const result: any = await report();
+
+      expect(result.totals.averagePerCarrier).toBe(2);
+      expect(result.overloaded.map((o: any) => o.name)).toEqual(['أ. سارة']);
+    });
+
+    it('flags nobody when the load is even', async () => {
+      await assign(L1, freeTeacher);
+      await assign(L3, arabicSpecialist);
+
+      const result: any = await report();
+      expect(result.overloaded).toEqual([]);
+    });
+
+    it('does not fire on a week that is not yet a pattern', async () => {
+      // Two against one is lopsided arithmetically and meaningless in a
+      // school; flagging it would train people to ignore the flag.
+      await assign(L1, freeTeacher);
+      await assign(L2, freeTeacher);
+      await assign(L3, arabicSpecialist);
+
+      const result: any = await report();
+      expect(result.overloaded).toEqual([]);
+    });
+
+    it('counts approved leaves but not pending ones', async () => {
+      const filed: any = await asTenant(() =>
+        service.createLeaveRequest(
+          { date: DATE, leaveAt: '11:00' },
+          { userId: String(arabicTeacher), role: 'TEACHER' },
+        ),
+      );
+
+      const before: any = await report();
+      expect(before.totals.approvedLeaves).toBe(0);
+
+      await asTenant(() =>
+        service.reviewLeaveRequest(String(filed.data._id), { status: 'approved' }, OWNER),
+      );
+
+      const after: any = await report();
+      expect(after.totals.approvedLeaves).toBe(1);
+      expect(
+        after.teachers.find((t: any) => t.name === 'أ. أروى').approvedLeaves,
+      ).toBe(1);
+    });
+
+    it('leaves out teachers with nothing to report', async () => {
+      await assign(L1, freeTeacher);
+
+      const result: any = await report();
+
+      // هيا neither covered nor needed covering; a fairness report listing her
+      // as a row of zeroes is noise.
+      expect(result.teachers.map((t: any) => t.name)).not.toContain('أ. هيا');
+    });
+
+    it('counts distinct days present, not attendance rows', async () => {
+      await checkInAllExcept();
+      await assign(L1, freeTeacher);
+
+      const result: any = await report();
+      expect(
+        result.teachers.find((t: any) => t.name === 'أ. سارة').daysPresent,
+      ).toBe(1);
+    });
+
+    it('breaks the range down by day', async () => {
+      await assign(L1, freeTeacher);
+      await assign(L2, arabicSpecialist);
+
+      const result: any = await report(DATE, '2026-11-21');
+
+      expect(result.byDay).toEqual([{ date: DATE, count: 2 }]);
+      expect(result.from).toBe(DATE);
+      expect(result.to).toBe('2026-11-21');
+    });
+
+    it('excludes cover outside the range', async () => {
+      await assign(L1, freeTeacher);
+
+      const result: any = await report('2026-11-16', '2026-11-21');
+      expect(result.totals.coverAssigned).toBe(0);
+    });
+
+    it('rejects a range that runs backwards', async () => {
+      await expect(report('2026-11-21', DATE)).rejects.toMatchObject({
+        status: 400,
+      });
+    });
+
+    it('returns an empty report rather than failing on a quiet week', async () => {
+      const result: any = await report('2026-12-01', '2026-12-07');
+
+      expect(result.totals.coverAssigned).toBe(0);
+      expect(result.teachers).toEqual([]);
+      expect(result.byDay).toEqual([]);
+    });
+  });
+
   describe('tenant isolation', () => {
     it('keeps another school out of the cover board', async () => {
       const otherSchool = new Types.ObjectId();

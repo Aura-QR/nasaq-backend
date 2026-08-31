@@ -616,6 +616,141 @@ export class DutyService {
     };
   }
 
+  /**
+   * Who has been carrying the cover, over a period.
+   *
+   * This is the fairness question, and it is the first one asked once cover
+   * exists: the same two obliging teachers end up taking everything, nobody
+   * notices until they complain, and by then it is a grievance rather than a
+   * rota problem. The numbers make it visible while it is still the latter.
+   *
+   * Counted from substitutions rather than recomputed from timetables, so the
+   * report says what actually happened on each day — not what today's
+   * timetable would imply about a term that has already been taught.
+   */
+  async getCoverReport(from: string, to: string) {
+    const start = dayStart(from);
+    const end = dayStart(to);
+
+    if (end < start) {
+      throw new BadRequestException('تاريخ النهاية قبل تاريخ البداية');
+    }
+
+    const range = { $gte: start, $lte: end };
+
+    const [substitutions, leaves, attendance, teachers]: any[] =
+      await Promise.all([
+        this.substitutionModel.find({ date: range }).lean().exec(),
+        this.leaveModel.find({ date: range, status: 'approved' }).lean().exec(),
+        this.attendanceModel.find({ date: range }).select('teacherId date').lean().exec(),
+        this.teacherModel
+          .find({ isActive: { $ne: false } })
+          .select('name specialization')
+          .lean()
+          .exec(),
+      ]);
+
+    const row = (teacher: any) => ({
+      teacherId: String(teacher._id),
+      name: teacher.name,
+      specialization: teacher.specialization ?? null,
+      covered: 0,
+      neededCover: 0,
+      approvedLeaves: 0,
+      daysPresent: 0,
+    });
+
+    const rows = new Map<string, any>(
+      teachers.map((t: any) => [String(t._id), row(t)]),
+    );
+
+    for (const substitution of substitutions) {
+      const cover = rows.get(String(substitution.substituteTeacherId));
+      if (cover) cover.covered += 1;
+
+      if (substitution.absentTeacherId) {
+        const owner = rows.get(String(substitution.absentTeacherId));
+        if (owner) owner.neededCover += 1;
+      }
+    }
+
+    for (const leave of leaves) {
+      const teacher = rows.get(String(leave.teacherId));
+      if (teacher) teacher.approvedLeaves += 1;
+    }
+
+    // Distinct days, not records: one teacher has at most one attendance row
+    // per day, but counting rows would still be the wrong thing to say.
+    const presentDays = new Map<string, Set<string>>();
+    for (const record of attendance) {
+      const id = String(record.teacherId);
+      if (!presentDays.has(id)) presentDays.set(id, new Set());
+      presentDays.get(id).add(toDateOnly(record.date) ?? '');
+    }
+    for (const [id, days] of presentDays) {
+      const teacher = rows.get(id);
+      if (teacher) teacher.daysPresent = days.size;
+    }
+
+    const teacherRows = [...rows.values()]
+      // Everybody who neither covered nor needed covering is noise on a
+      // fairness report.
+      .filter((r) => r.covered > 0 || r.neededCover > 0 || r.approvedLeaves > 0)
+      .sort((a, b) => b.covered - a.covered || a.name.localeCompare(b.name, 'ar'));
+
+    const totalCovered = substitutions.length;
+    const carriers = teacherRows.filter((r) => r.covered > 0);
+    const average =
+      carriers.length === 0 ? 0 : totalCovered / carriers.length;
+
+    /*
+     * Flagged against what everybody ELSE is carrying, not against an average
+     * that includes them.
+     *
+     * A teacher taking most of the cover drags the average up towards their
+     * own figure and hides behind it: with two carriers on three and one, the
+     * average is two and nobody clears twice it, even though one of them is
+     * doing three quarters of the work. Comparing against the others makes the
+     * lopsidedness visible, which is the entire point of the report.
+     *
+     * The floor of three keeps it from firing on the one-versus-two weeks that
+     * are not yet a pattern.
+     */
+    const overloaded = carriers
+      .filter((r) => {
+        if (r.covered < 3) return false;
+        const others = carriers.filter((c) => c.teacherId !== r.teacherId);
+        const othersAverage =
+          others.length === 0
+            ? 0
+            : others.reduce((sum, c) => sum + c.covered, 0) / others.length;
+        return r.covered >= othersAverage * 2;
+      })
+      .map((r) => ({ teacherId: r.teacherId, name: r.name, covered: r.covered }));
+
+    const byDay = new Map<string, number>();
+    for (const substitution of substitutions) {
+      const key = toDateOnly(substitution.date) ?? '';
+      byDay.set(key, (byDay.get(key) ?? 0) + 1);
+    }
+
+    return {
+      from: toDateOnly(start),
+      to: toDateOnly(end),
+      totals: {
+        coverAssigned: totalCovered,
+        teachersWhoCovered: carriers.length,
+        approvedLeaves: leaves.length,
+        averagePerCarrier: Math.round(average * 10) / 10,
+      },
+      overloaded,
+      byDay: [...byDay.entries()]
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      teachers: teacherRows,
+    };
+  }
+
   // ───────────────────────────────────────────────── the cover board
 
   /**

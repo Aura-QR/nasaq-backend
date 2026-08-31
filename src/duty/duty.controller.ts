@@ -81,6 +81,24 @@ export class DutyController {
     return await this.dutyService.getMyDay(user.userId, date);
   }
 
+  @ApiOperation({
+    summary: 'Who has been carrying the cover',
+    description:
+      'Per teacher over a date range: periods covered for others, periods of ' +
+      'their own that needed covering, approved leaves and days present. ' +
+      'Sorted by cover taken, heaviest first, and flags anyone at twice the ' +
+      'average — the same two obliging teachers taking everything is the ' +
+      'first thing that goes wrong once cover exists. Read only.',
+  })
+  @ApiQuery({ name: 'from', required: true, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'to', required: true, description: 'YYYY-MM-DD' })
+  @Roles(...STAFF)
+  @Get('cover-report')
+  @HttpCode(HttpStatus.OK)
+  async coverReport(@Query('from') from: string, @Query('to') to: string) {
+    return await this.dutyService.getCoverReport(from, to);
+  }
+
   // ────────────────────────────────────────────────── substitutions
 
   @ApiOperation({ summary: 'Assign a teacher to cover one lecture for one day' })
