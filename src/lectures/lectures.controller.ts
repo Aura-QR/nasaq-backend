@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { LecturesService } from './lectures.service';
 import { TimetableService } from './timetable.service';
+import { GenerateTimetableDto } from './dto/generate-timetable.dto';
 import { CreateLectureDto } from './dto/create-lecture.dto';
 import { UpdateLectureDto } from './dto/update-lecture.dto';
 import { ApiOperation, ApiResponse, ApiTags, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
@@ -58,6 +59,34 @@ export class LecturesController {
       user.schoolId,
       classIds ? classIds.split(',').map((id) => id.trim()).filter(Boolean) : undefined,
     );
+  }
+
+  @ApiOperation({
+    summary: 'Build a timetable for the term',
+    description:
+      'Schedules every planned subject for every class, respecting the two ' +
+      'things that cannot bend — a class cannot sit two lessons at once and a ' +
+      'teacher cannot be in two rooms at once — and preferring not to stack a ' +
+      "subject into one day or leave gaps in a teacher's day.\n\n" +
+      'mode "preview" (the default) writes nothing and returns the proposed ' +
+      'grid. onExisting "skip" (the default) leaves any class that already has ' +
+      'a timetable exactly as it is.\n\n' +
+      'Anything that could not be placed comes back in `problems` with the ' +
+      'class, subject and teacher named. Run GET /lectures/feasibility first: ' +
+      'an overloaded teacher is arithmetic, and no search can fix it.',
+  })
+  @ApiResponse({ status: 200, description: 'Timetable generated' })
+  @ApiResponse({ status: 400, description: 'No working days, or no active classes' })
+  @ApiResponse({ status: 404, description: 'Term not found' })
+  @Post('generate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async generate(
+    @CurrentUser() user: any,
+    @Body() dto: GenerateTimetableDto,
+  ) {
+    return await this.timetableService.generate(dto, user.schoolId);
   }
 
   @ApiOperation({ summary: 'Create a new lecture' })

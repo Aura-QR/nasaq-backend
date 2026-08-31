@@ -394,6 +394,365 @@ describe('TimetableService', () => {
     });
   });
 
+  describe('generate', () => {
+    /** A staffed, comfortably-fitting school: 10 + 10 + 6 = 26 periods. */
+    const staffEverything = async () => {
+      await assign(teachers.fatima, maths);
+      await assign(teachers.jihan, science);
+      await assign(teachers.marwa, arabic);
+    };
+
+    const generate = (overrides: any = {}) =>
+      asTenant(() =>
+        service.generate({ termId: String(termId), ...overrides }, schoolId),
+      );
+
+    it('places every planned period', async () => {
+      await staffEverything();
+
+      const result: any = await generate();
+
+      // (6 maths + 4 science) × two grade-4 classes + 6 arabic × one grade-5
+      expect(result.placed).toBe(26);
+      expect(result.unplaced).toBe(0);
+      expect(result.problems.filter((p: any) => p.blocking)).toHaveLength(0);
+    });
+
+    it('writes nothing in preview mode', async () => {
+      await staffEverything();
+
+      const result: any = await generate();
+
+      expect(result.mode).toBe('preview');
+      expect(result.written).toBe(false);
+      expect(await models[Lecture.name].collection.countDocuments({})).toBe(0);
+    });
+
+    it('never books a class into two lessons at once', async () => {
+      await staffEverything();
+
+      const result: any = await generate();
+
+      const seen = new Set<string>();
+      for (const cls of result.classes) {
+        for (const day of cls.days) {
+          for (const slot of day.slots) {
+            if (!slot.subjectOfferingId) continue;
+            const cell = `${cls.classId}|${day.dayOfWeek}|${slot.slot}`;
+            expect(seen.has(cell)).toBe(false);
+            seen.add(cell);
+          }
+        }
+      }
+    });
+
+    it('never books a teacher into two classes at once', async () => {
+      await staffEverything();
+
+      const result: any = await generate();
+
+      const seen = new Set<string>();
+      for (const cls of result.classes) {
+        for (const day of cls.days) {
+          for (const slot of day.slots) {
+            if (!slot.teacherId) continue;
+            const cell = `${slot.teacherId}|${day.dayOfWeek}|${slot.slot}`;
+            expect(seen.has(cell)).toBe(false);
+            seen.add(cell);
+          }
+        }
+      }
+    });
+
+    it('gives each class exactly the periods its plan asks for', async () => {
+      await staffEverything();
+
+      const result: any = await generate();
+
+      const four1 = result.classes.find((c: any) => c.className === '٤/١');
+      expect(four1.periods).toBe(10);
+
+      const counts = new Map<string, number>();
+      for (const day of four1.days) {
+        for (const slot of day.slots) {
+          if (!slot.subjectName) continue;
+          counts.set(slot.subjectName, (counts.get(slot.subjectName) ?? 0) + 1);
+        }
+      }
+      expect(counts.get('رياضيات')).toBe(6);
+      expect(counts.get('علوم')).toBe(4);
+    });
+
+    it('spreads a subject as evenly as the week allows', async () => {
+      await staffEverything();
+
+      const result: any = await generate();
+
+      const four1 = result.classes.find((c: any) => c.className === '٤/١');
+      const perDay = four1.days.map(
+        (day: any) => day.slots.filter((s: any) => s.subjectName === 'رياضيات').length,
+      );
+
+      // Six maths periods over five working days cannot fit one a day — by
+      // pigeonhole some day takes two. The point is that it is two and not
+      // six: an evenly spread week, not a Sunday of nothing but maths.
+      expect(Math.max(...perDay)).toBe(2);
+      expect(perDay.filter((n: number) => n > 0)).toHaveLength(5);
+      expect(perDay.reduce((a: number, b: number) => a + b, 0)).toBe(6);
+    });
+
+    it('honours maxSamePerDay when asked for doubles', async () => {
+      await staffEverything();
+
+      const result: any = await generate({ maxSamePerDay: 2 });
+
+      const four1 = result.classes.find((c: any) => c.className === '٤/١');
+      for (const day of four1.days) {
+        const maths = day.slots.filter((s: any) => s.subjectName === 'رياضيات');
+        expect(maths.length).toBeLessThanOrEqual(2);
+      }
+    });
+
+    it('schedules unstaffed subjects as visible gaps', async () => {
+      await assign(teachers.fatima, maths); // science and arabic have nobody
+
+      const result: any = await generate();
+
+      expect(result.placed).toBe(26);
+      const unstaffed: any[] = [];
+      for (const cls of result.classes) {
+        for (const day of cls.days) {
+          for (const slot of day.slots) {
+            if (slot.subjectOfferingId && !slot.teacherId) unstaffed.push(slot);
+          }
+        }
+      }
+      expect(unstaffed.length).toBe(14); // science 4×2 + arabic 6
+    });
+
+    it('can be told to leave unstaffed subjects out entirely', async () => {
+      await assign(teachers.fatima, maths);
+
+      const result: any = await generate({ includeUnstaffed: false });
+
+      expect(result.placed).toBe(12); // maths only, both grade-4 classes
+    });
+
+    it('is deterministic — two previews match', async () => {
+      await staffEverything();
+
+      const first: any = await generate();
+      const second: any = await generate();
+
+      expect(JSON.stringify(first.classes)).toBe(JSON.stringify(second.classes));
+    });
+
+    it('commits real lectures', async () => {
+      await staffEverything();
+
+      const result: any = await generate({ mode: 'commit' });
+
+      expect(result.mode).toBe('commit');
+      expect(result.written).toBe(26);
+      expect(result.failed).toBe(0);
+      expect(await models[Lecture.name].collection.countDocuments({})).toBe(26);
+
+      const one = await models[Lecture.name].collection.findOne({});
+      expect(one.termId).toBeDefined();
+      expect(one.preparation).toEqual([]);
+    });
+
+    it('leaves a hand-built timetable alone by default', async () => {
+      await staffEverything();
+      await models[Lecture.name].collection.insertOne({
+        classId: classes.a, subjectOfferingId: maths._id, termId,
+        teacherId: teachers.fatima, dayOfWeek: 'sunday', slot: 1,
+        preparation: [], schoolId,
+      });
+
+      const result: any = await generate({ mode: 'commit' });
+
+      // 4/1 is skipped whole; 4/2 and 5/1 are still built.
+      expect(result.skippedClasses).toBe(1);
+      expect(result.classes.map((c: any) => c.className)).not.toContain('٤/١');
+      const fourOne = await models[Lecture.name].collection.countDocuments({
+        classId: classes.a,
+      });
+      expect(fourOne).toBe(1); // untouched
+    });
+
+    it('rebuilds when told to replace', async () => {
+      await staffEverything();
+      await models[Lecture.name].collection.insertOne({
+        classId: classes.a, subjectOfferingId: maths._id, termId,
+        teacherId: teachers.fatima, dayOfWeek: 'sunday', slot: 1,
+        preparation: [], schoolId,
+      });
+
+      const result: any = await generate({ mode: 'commit', onExisting: 'replace' });
+
+      expect(result.deleted).toBe(1);
+      expect(result.written).toBe(26);
+      expect(await models[Lecture.name].collection.countDocuments({})).toBe(26);
+    });
+
+    it('reports what it could not place instead of failing the whole run', async () => {
+      // One teacher for everything: (6 + 4) × 2 + 6 = 26 periods for one
+      // person, which fits, so push maths up until it cannot.
+      await models[SubjectOffering.name].collection.updateOne(
+        { _id: maths._id }, { $set: { periodsPerWeek: 18 } },
+      );
+      await assign(teachers.fatima, maths);
+      await assign(teachers.fatima, science);
+      await assign(teachers.fatima, arabic);
+
+      const result: any = await generate();
+
+      // 18×2 + 4×2 + 6 = 50 periods for a 35-slot week.
+      expect(result.unplaced).toBeGreaterThan(0);
+      expect(result.placed).toBeGreaterThan(0); // the rest still got built
+      const problem = result.problems.find((p: any) => p.type === 'no_slot_left');
+      expect(problem.blocking).toBe(false);
+      expect(problem.className).toBeDefined();
+      expect(problem.subjectName).toBeDefined();
+    });
+
+    it('handles a realistic school — 6 grades, 12 classes, 8 subjects', async () => {
+      // 6 grades × 8 subjects = 48 offerings, 30 periods a week each, across
+      // 12 classes = 360 periods. A real school, not a toy.
+      const plan = [
+        ['لغتي', 6], ['رياضيات', 6], ['دراسات إسلامية', 5], ['علوم', 4],
+        ['إنجليزي', 4], ['تربية بدنية', 2], ['مهارات رقمية', 2], ['تربية فنية', 1],
+      ] as [string, number][];
+
+      const grades = Array.from({ length: 6 }, () => new Types.ObjectId());
+
+      // One teacher per subject per two grades, so nobody is over 35 periods:
+      // 30 periods a grade / 8 subjects, two classes each.
+      for (const [subjectName, periods] of plan) {
+        const subjectId = await mk(models[Subject.name], {
+          subjectName, isRequiredForPromotion: true, schoolId,
+        });
+
+        for (let g = 0; g < grades.length; g++) {
+          const offeringId = await mk(models[SubjectOffering.name], {
+            subjectId, gradeLevelId: grades[g], termId,
+            periodsPerWeek: periods, schoolId,
+          });
+
+          const teacherId = await mk(models[Teacher.name], {
+            name: `${subjectName}-${g}`, email: `${subjectName}${g}@x.com`,
+            specialization: subjectName, schoolId,
+          });
+
+          await mk(models[TeacherAssignment.name], {
+            teacherId, subjectOfferingId: offeringId, classId: null, schoolId,
+          });
+        }
+      }
+
+      for (let g = 0; g < grades.length; g++) {
+        for (const section of [1, 2]) {
+          await mk(models[Class.name], {
+            name: `${g + 1}/${section}`, gradeLevelId: grades[g], academicYearId,
+            gender: 'male', maxCapacity: 30, isActive: true, schoolId,
+          });
+        }
+      }
+
+      const started = Date.now();
+      const result: any = await generate();
+      const elapsed = Date.now() - started;
+
+      // 12 new classes × 30 periods, plus the 26 from the base fixture.
+      expect(result.placed).toBe(386);
+      expect(result.unplaced).toBe(0);
+      expect(elapsed).toBeLessThan(10_000);
+
+      // And nothing conflicts.
+      const classCells = new Set<string>();
+      const teacherCells = new Set<string>();
+      for (const cls of result.classes) {
+        for (const day of cls.days) {
+          for (const slot of day.slots) {
+            if (!slot.subjectOfferingId) continue;
+            const c = `${cls.classId}|${day.dayOfWeek}|${slot.slot}`;
+            expect(classCells.has(c)).toBe(false);
+            classCells.add(c);
+            if (slot.teacherId) {
+              const t = `${slot.teacherId}|${day.dayOfWeek}|${slot.slot}`;
+              expect(teacherCells.has(t)).toBe(false);
+              teacherCells.add(t);
+            }
+          }
+        }
+      }
+    }, 30_000);
+
+    it('refuses a week with no working days', async () => {
+      await setSchoolWeek(7, 0);
+      await staffEverything();
+
+      await expect(generate()).rejects.toMatchObject({ status: 400 });
+    });
+
+    it('says so when there is nothing planned', async () => {
+      await models[SubjectOffering.name].collection.updateMany(
+        {}, { $set: { periodsPerWeek: 0 } },
+      );
+
+      const result: any = await generate();
+
+      expect(result.placed).toBe(0);
+      expect(result.problems[0].type).toBe('nothing_planned');
+      expect(result.problems[0].blocking).toBe(true);
+    });
+
+    it('splits a shared grade between both teachers', async () => {
+      await assign(teachers.fatima, maths);
+      await assign(teachers.jihan, maths);
+
+      const result: any = await generate();
+
+      const mathTeachers = new Set<string>();
+      for (const cls of result.classes) {
+        for (const day of cls.days) {
+          for (const slot of day.slots) {
+            if (slot.subjectName === 'رياضيات' && slot.teacherId) {
+              mathTeachers.add(slot.teacherId);
+            }
+          }
+        }
+      }
+      expect(mathTeachers.size).toBe(2);
+    });
+
+    it('only touches the classes it was asked for', async () => {
+      await staffEverything();
+
+      const result: any = await generate({
+        mode: 'commit',
+        classIds: [String(classes.c)],
+      });
+
+      expect(result.classes).toHaveLength(1);
+      expect(result.classes[0].className).toBe('٥/١');
+      expect(await models[Lecture.name].collection.countDocuments({})).toBe(6);
+    });
+
+    it('produces a timetable the database accepts', async () => {
+      // The unique indexes are the real guarantee. If the search were wrong,
+      // the commit would report failures rather than silently double-booking.
+      await models[Lecture.name].createIndexes();
+      await staffEverything();
+
+      const result: any = await generate({ mode: 'commit' });
+
+      expect(result.failed).toBe(0);
+      expect(result.written).toBe(result.placed);
+    });
+  });
+
   describe('the DB is the safety net', () => {
     it('rejects a second lecture in the same class slot', async () => {
       await models[Lecture.name].createIndexes();

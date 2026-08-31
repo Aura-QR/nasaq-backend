@@ -9,6 +9,7 @@ import { TeacherAssignment } from '../teacher-assignments/schemas/teacher-assign
 import { Term } from '../terms/schemas/term.schema';
 import { Teacher } from '../teachers/schemas/teacher.schema';
 import { School } from '../platform/schools/schemas/school.schema';
+import { GenerateTimetableDto } from './dto/generate-timetable.dto';
 
 /** One class's need for one subject, and who is expected to teach it. */
 export interface Requirement {
@@ -28,7 +29,21 @@ export type ProblemType =
   | 'class_overbooked'
   | 'teacher_overloaded'
   | 'subject_unassigned'
-  | 'assignment_shared';
+  | 'assignment_shared'
+  | 'no_slot_left'
+  | 'search_exhausted';
+
+/** One period placed on the grid. */
+interface Placement {
+  classId: string;
+  className: string;
+  subjectOfferingId: string;
+  subjectName: string;
+  teacherId: string | null;
+  teacherName: string | null;
+  dayOfWeek: string;
+  slot: number;
+}
 
 export interface Problem {
   type: ProblemType;
@@ -359,5 +374,397 @@ export class TimetableService {
       feasible: problems.every((p) => !p.blocking),
       problems,
     };
+  }
+
+  /**
+   * Builds a timetable for the term.
+   *
+   * The search is greedy with bounded backtracking, ordered most-constrained
+   * first: the periods belonging to the busiest teachers go down before the
+   * easy ones, because those are what run out of room if left until last.
+   *
+   * Hard constraints are checked here and enforced again by the unique indexes
+   * on Lecture, so a bug in the search cannot produce a double-booking — the
+   * write is simply rejected.
+   *
+   * `preview` returns the grid and writes nothing.
+   */
+  async generate(dto: GenerateTimetableDto, schoolId: any) {
+    const mode = dto.mode ?? 'preview';
+    const onExisting = dto.onExisting ?? 'skip';
+    const maxSamePerDay = dto.maxSamePerDay ?? 1;
+    const includeUnstaffed = dto.includeUnstaffed ?? true;
+
+    const capacity = await this.getCapacity(schoolId);
+    const { requirements } = await this.buildRequirements(dto.termId, dto.classIds);
+
+    const problems: Problem[] = [];
+
+    if (capacity.workingDays.length === 0) {
+      throw new BadRequestException(
+        'The school week has no working days configured, so there is nowhere to place a lesson.',
+      );
+    }
+
+    // ---- decide which classes we are allowed to touch ----
+    const termObjectId = new mongoose.Types.ObjectId(dto.termId);
+    const existing = await this.lectureModel
+      .find({ termId: termObjectId })
+      .select('classId')
+      .lean()
+      .exec();
+
+    const classesWithLectures = new Set(existing.map((l: any) => String(l.classId)));
+    const skipped: string[] = [];
+
+    let planned = requirements.filter((r) => r.periodsPerWeek > 0);
+    if (!includeUnstaffed) {
+      planned = planned.filter((r) => r.teacherId);
+    }
+
+    if (onExisting === 'skip') {
+      const before = new Set(planned.map((r) => r.classId));
+      planned = planned.filter((r) => !classesWithLectures.has(r.classId));
+      for (const classId of before) {
+        if (classesWithLectures.has(classId)) skipped.push(classId);
+      }
+    }
+
+    if (planned.length === 0) {
+      return {
+        mode,
+        termId: dto.termId,
+        ...capacity,
+        placed: 0,
+        unplaced: 0,
+        skippedClasses: skipped.length,
+        classes: [],
+        problems: [
+          {
+            type: 'nothing_planned' as ProblemType,
+            message:
+              skipped.length > 0
+                ? 'Every class in scope already has a timetable. Use onExisting: "replace" to rebuild them.'
+                : 'Nothing to schedule: no subject in this term has periodsPerWeek set.',
+            blocking: true,
+          },
+        ],
+        written: false,
+      };
+    }
+
+    // ---- expand each requirement into individual periods ----
+    const loadByTeacher = new Map<string, number>();
+    for (const requirement of planned) {
+      if (!requirement.teacherId) continue;
+      loadByTeacher.set(
+        requirement.teacherId,
+        (loadByTeacher.get(requirement.teacherId) ?? 0) + requirement.periodsPerWeek,
+      );
+    }
+
+    // Hardest first. A teacher with 30 of 35 slots taken has almost no room to
+    // move later on, so their periods have to claim space before anyone else's.
+    const ordered = [...planned].sort((a, b) => {
+      const loadA = a.teacherId ? loadByTeacher.get(a.teacherId) ?? 0 : -1;
+      const loadB = b.teacherId ? loadByTeacher.get(b.teacherId) ?? 0 : -1;
+      if (loadB !== loadA) return loadB - loadA;
+      if (b.periodsPerWeek !== a.periodsPerWeek) return b.periodsPerWeek - a.periodsPerWeek;
+      // Deterministic tiebreak: two identical previews must be identical.
+      return a.classId.localeCompare(b.classId) || a.subjectOfferingId.localeCompare(b.subjectOfferingId);
+    });
+
+    const units: Requirement[] = [];
+    for (const requirement of ordered) {
+      for (let i = 0; i < requirement.periodsPerWeek; i++) units.push(requirement);
+    }
+
+    const slots: { day: string; slot: number }[] = [];
+    for (const day of capacity.workingDays) {
+      for (let slot = 1; slot <= capacity.periodsPerDay; slot++) {
+        slots.push({ day, slot });
+      }
+    }
+
+    const state = {
+      classBusy: new Map<string, Set<string>>(),
+      teacherBusy: new Map<string, Set<string>>(),
+      subjectPerDay: new Map<string, number>(),
+    };
+
+    const placements: Placement[] = [];
+    const unplaced: Requirement[] = [];
+
+    // A cap, not a correctness bound: school instances are small, and an
+    // instance that needs more than this is one the report should describe
+    // rather than one the server should keep grinding on.
+    let budget = 200_000;
+
+    const key = (day: string, slot: number) => `${day}:${slot}`;
+    const dayKey = (r: Requirement, day: string) =>
+      `${r.classId}|${r.subjectOfferingId}|${day}`;
+
+    const isFree = (requirement: Requirement, day: string, slot: number) => {
+      const cell = key(day, slot);
+      if (state.classBusy.get(requirement.classId)?.has(cell)) return false;
+      if (requirement.teacherId && state.teacherBusy.get(requirement.teacherId)?.has(cell)) {
+        return false;
+      }
+      return true;
+    };
+
+    const take = (requirement: Requirement, day: string, slot: number) => {
+      const cell = key(day, slot);
+      if (!state.classBusy.has(requirement.classId)) {
+        state.classBusy.set(requirement.classId, new Set());
+      }
+      state.classBusy.get(requirement.classId).add(cell);
+
+      if (requirement.teacherId) {
+        if (!state.teacherBusy.has(requirement.teacherId)) {
+          state.teacherBusy.set(requirement.teacherId, new Set());
+        }
+        state.teacherBusy.get(requirement.teacherId).add(cell);
+      }
+
+      const dk = dayKey(requirement, day);
+      state.subjectPerDay.set(dk, (state.subjectPerDay.get(dk) ?? 0) + 1);
+    };
+
+    const release = (requirement: Requirement, day: string, slot: number) => {
+      const cell = key(day, slot);
+      state.classBusy.get(requirement.classId)?.delete(cell);
+      if (requirement.teacherId) {
+        state.teacherBusy.get(requirement.teacherId)?.delete(cell);
+      }
+      const dk = dayKey(requirement, day);
+      state.subjectPerDay.set(dk, (state.subjectPerDay.get(dk) ?? 1) - 1);
+    };
+
+    /**
+     * Lower is better. These are preferences, not rules — a slot that breaks
+     * every one of them is still returned rather than failing the run.
+     */
+    const penalty = (requirement: Requirement, day: string, slot: number) => {
+      let score = 0;
+
+      // Six maths periods all on Sunday is a technically valid timetable and a
+      // useless one.
+      const sameToday = state.subjectPerDay.get(dayKey(requirement, day)) ?? 0;
+      if (sameToday >= maxSamePerDay) score += 1000 * (sameToday - maxSamePerDay + 1);
+
+      // Keep a teacher's day contiguous: a free period between two lessons is
+      // time they spend waiting at school.
+      if (requirement.teacherId) {
+        const busy = state.teacherBusy.get(requirement.teacherId);
+        if (busy?.size) {
+          const before = busy.has(key(day, slot - 1));
+          const after = busy.has(key(day, slot + 1));
+          if (!before && !after) score += 12;
+        }
+      }
+
+      // Fill from the top of the day down.
+      score += slot;
+      return score;
+    };
+
+    const place = (index: number): boolean => {
+      if (index >= units.length) return true;
+      if (budget-- <= 0) return false;
+
+      const requirement = units[index];
+
+      const candidates = slots
+        .filter((s) => isFree(requirement, s.day, s.slot))
+        .map((s) => ({ ...s, score: penalty(requirement, s.day, s.slot) }))
+        .sort(
+          (a, b) =>
+            a.score - b.score ||
+            capacity.workingDays.indexOf(a.day) - capacity.workingDays.indexOf(b.day) ||
+            a.slot - b.slot,
+        );
+
+      if (candidates.length === 0) {
+        unplaced.push(requirement);
+        // Carry on rather than abandoning the run: one impossible subject
+        // should not cost the school the other 300 periods that do fit.
+        return place(index + 1);
+      }
+
+      // Only the most promising few are worth revisiting; trying all 35 at
+      // every level is what turns this exponential.
+      for (const candidate of candidates.slice(0, 6)) {
+        take(requirement, candidate.day, candidate.slot);
+        placements.push({
+          classId: requirement.classId,
+          className: requirement.className,
+          subjectOfferingId: requirement.subjectOfferingId,
+          subjectName: requirement.subjectName,
+          teacherId: requirement.teacherId,
+          teacherName: requirement.teacherName,
+          dayOfWeek: candidate.day,
+          slot: candidate.slot,
+        });
+
+        if (place(index + 1)) return true;
+
+        placements.pop();
+        release(requirement, candidate.day, candidate.slot);
+      }
+
+      return false;
+    };
+
+    const completed = place(0);
+
+    if (!completed && unplaced.length === 0) {
+      problems.push({
+        type: 'search_exhausted',
+        message:
+          'The search ran out of steps before placing everything. The plan is probably too tight to fit — check /lectures/feasibility.',
+        blocking: false,
+      });
+    }
+
+    for (const requirement of unplaced) {
+      problems.push({
+        type: 'no_slot_left',
+        message: requirement.teacherName
+          ? `${requirement.className} — ${requirement.subjectName}: ${requirement.teacherName} is busy in every slot this class still has free.`
+          : `${requirement.className} — ${requirement.subjectName}: no free slot left in the week.`,
+        blocking: false,
+        classId: requirement.classId,
+        className: requirement.className,
+        subjectName: requirement.subjectName,
+        teacherName: requirement.teacherName,
+      });
+    }
+
+    if (skipped.length > 0) {
+      problems.push({
+        type: 'nothing_planned',
+        message: `${skipped.length} classes already have a timetable and were left alone. Use onExisting: "replace" to rebuild them.`,
+        blocking: false,
+        skippedClasses: skipped.length,
+      });
+    }
+
+    const grid = this.toGrid(placements, capacity);
+
+    if (mode !== 'commit') {
+      return {
+        mode: 'preview',
+        termId: dto.termId,
+        ...capacity,
+        placed: placements.length,
+        unplaced: unplaced.length,
+        skippedClasses: skipped.length,
+        classes: grid,
+        problems,
+        written: false,
+      };
+    }
+
+    // ---------------------------------------------------------------- commit
+    const touchedClasses = [...new Set(placements.map((p) => p.classId))].map(
+      (id) => new mongoose.Types.ObjectId(id),
+    );
+
+    let deleted = 0;
+    if (onExisting === 'replace' && touchedClasses.length > 0) {
+      const result = await this.lectureModel.deleteMany({
+        termId: termObjectId,
+        classId: { $in: touchedClasses },
+      });
+      deleted = result.deletedCount ?? 0;
+    }
+
+    let written = 0;
+    const failures: any[] = [];
+
+    // One at a time, not insertMany: an ordered insertMany stops at the first
+    // rejection and an unordered one hides which rows failed. Here a conflict
+    // costs one period, and the report says which.
+    for (const placement of placements) {
+      try {
+        await this.lectureModel.create({
+          classId: new mongoose.Types.ObjectId(placement.classId),
+          subjectOfferingId: new mongoose.Types.ObjectId(placement.subjectOfferingId),
+          termId: termObjectId,
+          teacherId: placement.teacherId
+            ? new mongoose.Types.ObjectId(placement.teacherId)
+            : null,
+          dayOfWeek: placement.dayOfWeek,
+          slot: placement.slot,
+          preparation: [],
+        });
+        written++;
+      } catch (error: any) {
+        failures.push({
+          className: placement.className,
+          subjectName: placement.subjectName,
+          dayOfWeek: placement.dayOfWeek,
+          slot: placement.slot,
+          reason: error?.code === 11000 ? 'conflict' : (error?.message ?? 'unknown'),
+        });
+      }
+    }
+
+    if (failures.length > 0) {
+      problems.push({
+        type: 'no_slot_left',
+        message: `${failures.length} lectures were rejected by the database as conflicts. This means something else was written for the same slot between the preview and the commit.`,
+        blocking: false,
+        failures: failures.slice(0, 20),
+      });
+    }
+
+    return {
+      mode: 'commit',
+      termId: dto.termId,
+      ...capacity,
+      placed: placements.length,
+      written,
+      failed: failures.length,
+      deleted,
+      unplaced: unplaced.length,
+      skippedClasses: skipped.length,
+      classes: grid,
+      problems,
+    };
+  }
+
+  /** Reshapes a flat placement list into one grid per class, for rendering. */
+  private toGrid(placements: Placement[], capacity: { workingDays: string[]; periodsPerDay: number }) {
+    const byClass = new Map<string, Placement[]>();
+    for (const placement of placements) {
+      if (!byClass.has(placement.classId)) byClass.set(placement.classId, []);
+      byClass.get(placement.classId).push(placement);
+    }
+
+    return [...byClass.entries()]
+      .map(([classId, rows]) => ({
+        classId,
+        className: rows[0].className,
+        periods: rows.length,
+        days: capacity.workingDays.map((day) => ({
+          dayOfWeek: day,
+          slots: Array.from({ length: capacity.periodsPerDay }, (_, i) => {
+            const slot = i + 1;
+            const hit = rows.find((r) => r.dayOfWeek === day && r.slot === slot);
+            return hit
+              ? {
+                  slot,
+                  subjectOfferingId: hit.subjectOfferingId,
+                  subjectName: hit.subjectName,
+                  teacherId: hit.teacherId,
+                  teacherName: hit.teacherName,
+                }
+              : { slot, subjectOfferingId: null, subjectName: null, teacherId: null, teacherName: null };
+          }),
+        })),
+      }))
+      .sort((a, b) => a.className.localeCompare(b.className, 'ar'));
   }
 }
