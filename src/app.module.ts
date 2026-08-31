@@ -24,6 +24,7 @@ import { ProjectsModule } from './projects/projects.module';
 import { AuthModule } from './auth/auth.module';
 import { PreparationModule } from './preparation/preparation.module';
 import { DutyModule } from './duty/duty.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { TasksModule } from './tasks/tasks.module';
 import { FinancialModule } from './financial/financial.module';
 import { ExpensesModule } from './expenses/expenses.module';
@@ -87,6 +88,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     AuthModule,
     PreparationModule,
     DutyModule,
+    NotificationsModule,
     TasksModule,
     FinancialModule,
     ExpensesModule,

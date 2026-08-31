@@ -65,6 +65,22 @@ export class DutyController {
     return await this.dutyService.getCoverage(date, user);
   }
 
+  @ApiOperation({
+    summary: "The caller's own day — their lectures and any cover they were given",
+    description:
+      'One timeline, each period marked own or cover. The cover screen exists, ' +
+      'but a teacher opens their timetable, not a screen they were not ' +
+      'expecting — so a substitution that only lives there is one nobody sees. ' +
+      'Periods the teacher is excused from by an approved leave are flagged ' +
+      'rather than hidden.',
+  })
+  @ApiQuery({ name: 'date', required: false, description: 'Defaults to today' })
+  @Get('my-day')
+  @HttpCode(HttpStatus.OK)
+  async myDay(@CurrentUser() user: any, @Query('date') date?: string) {
+    return await this.dutyService.getMyDay(user.userId, date);
+  }
+
   // ────────────────────────────────────────────────── substitutions
 
   @ApiOperation({ summary: 'Assign a teacher to cover one lecture for one day' })

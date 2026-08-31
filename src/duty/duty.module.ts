@@ -21,6 +21,7 @@ import {
   SubjectOffering,
   SubjectOfferingSchema,
 } from '../subject-offerings/schemas/subject-offering.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import {
       { name: Subject.name, schema: SubjectSchema },
       { name: SubjectOffering.name, schema: SubjectOfferingSchema },
     ]),
+    NotificationsModule,
   ],
   controllers: [DutyController],
   providers: [DutyService],

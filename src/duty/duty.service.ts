@@ -14,12 +14,14 @@ import { Teacher } from '../teachers/schemas/teacher.schema';
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { TeacherAttendance } from '../teacher-attendance/schemas/teacher-attendance.schema';
 import { Term } from '../terms/schemas/term.schema';
+import { Class } from '../classes/schemas/class.schema';
 import {
   CreateLeaveRequestDto,
   ReviewLeaveRequestDto,
 } from './dto/leave-request.dto';
 import { SetDutySupervisorsDto } from './dto/duty-supervisor.dto';
 import { CreateSubstitutionDto } from './dto/substitution.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const WEEKDAY_NAMES = [
   'sunday',
@@ -69,6 +71,8 @@ export class DutyService {
     @InjectModel(TeacherAttendance.name)
     private readonly attendanceModel: Model<TeacherAttendance>,
     @InjectModel(Term.name) private readonly termModel: Model<Term>,
+    @InjectModel(Class.name) private readonly classModel: Model<Class>,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ───────────────────────────────────────────────── leave requests
@@ -169,6 +173,31 @@ export class DutyService {
     request.reviewedByName = user?.name ?? user?.email ?? '';
     request.reviewedAt = new Date();
     await request.save();
+
+    // Otherwise the teacher only finds out by opening a screen they have no
+    // reason to open.
+    if (dto.status === 'approved' || dto.status === 'rejected') {
+      await this.notifications.notify({
+        recipientId: request.teacherId,
+        type: dto.status === 'approved' ? 'leave_approved' : 'leave_rejected',
+        title:
+          dto.status === 'approved'
+            ? 'تمت الموافقة على استئذانك'
+            : 'تم رفض طلب الاستئذان',
+        body: [
+          toDateOnly(request.date),
+          `انصراف ${request.leaveAt}`,
+          request.reviewNote,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        data: {
+          leaveRequestId: String(request._id),
+          date: toDateOnly(request.date),
+          status: dto.status,
+        },
+      });
+    }
 
     return {
       message:
@@ -361,6 +390,33 @@ export class DutyService {
       )
       .exec();
 
+    // The whole feature turns on this. A manager assigns cover at eight in the
+    // morning; without a notice the substitute never learns of it and the
+    // class sits empty.
+    const classInfo: any = lecture.classId
+      ? await this.classModel.findById(lecture.classId).select('name roomNumber').lean().exec()
+      : null;
+
+    await this.notifications.notify({
+      recipientId: dto.substituteTeacherId,
+      type: 'cover_assigned',
+      title: 'عندك حصة احتياطي',
+      body: [
+        toDateOnly(date),
+        `الحصة ${lecture.slot}`,
+        classInfo?.name,
+        absentTeacher?.name ? `بدل ${absentTeacher.name}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      data: {
+        substitutionId: String(saved._id),
+        lectureId: String(lecture._id),
+        date: toDateOnly(date),
+        slot: lecture.slot,
+      },
+    });
+
     return {
       message: `تم تكليف ${substitute.name} بالحصة`,
       data: { ...saved.toObject(), date: toDateOnly(saved.date) },
@@ -416,6 +472,17 @@ export class DutyService {
     if (!removed) {
       throw new NotFoundException(`التكليف ${id} غير موجود`);
     }
+
+    // Being un-assigned matters as much as being assigned: a teacher who was
+    // told to take a class needs telling that they no longer are.
+    await this.notifications.notify({
+      recipientId: (removed as any).substituteTeacherId,
+      type: 'cover_removed',
+      title: 'تم إلغاء حصة احتياطي',
+      body: toDateOnly((removed as any).date) ?? '',
+      data: { date: toDateOnly((removed as any).date) },
+    });
+
     return { message: 'تم إلغاء التكليف', data: removed };
   }
 
@@ -441,6 +508,112 @@ export class DutyService {
       .exec();
 
     return rows.map((row: any) => ({ ...row, date: toDateOnly(row.date) }));
+  }
+
+  /**
+   * A teacher's actual day: their own lectures plus any cover assigned to them,
+   * on one timeline.
+   *
+   * The cover screen exists, but a teacher has no reason to open it — they
+   * open their timetable. A substitution that only lives on its own screen is
+   * a substitution nobody sees, so this merges the two and marks which is
+   * which.
+   */
+  async getMyDay(userId: string, dateStr: string | undefined) {
+    const date = dayStart(dateStr ?? new Date());
+    const weekday = WEEKDAY_NAMES[date.getUTCDay()];
+
+    const term: any = await this.termModel
+      .findOne({ status: 'active' })
+      .lean()
+      .exec();
+
+    const lectureFilter: any = { teacherId: userId, dayOfWeek: weekday };
+    if (term) lectureFilter.termId = term._id;
+
+    const [own, cover]: any[] = await Promise.all([
+      this.lectureModel
+        .find(lectureFilter)
+        .populate('classId', 'name roomNumber')
+        .populate({ path: 'subjectOfferingId', populate: { path: 'subjectId' } })
+        .lean()
+        .exec(),
+      this.substitutionModel
+        .find({ date, substituteTeacherId: userId })
+        .populate({
+          path: 'lectureId',
+          populate: [
+            { path: 'classId', select: 'name roomNumber' },
+            { path: 'subjectOfferingId', populate: { path: 'subjectId' } },
+          ],
+        })
+        .lean()
+        .exec(),
+    ]);
+
+    const leave = await this.leaveModel
+      .findOne({ teacherId: userId, date })
+      .lean()
+      .exec();
+
+    const approvedLeave =
+      leave && (leave as any).status === 'approved' ? (leave as any) : null;
+
+    const ownSlots = own.map((lecture: any) => {
+      // A period the teacher is excused from is still on their timetable;
+      // showing it without saying so is how somebody turns up for a lesson
+      // they were signed off.
+      const excused =
+        approvedLeave != null &&
+        (approvedLeave.fromSlot == null || lecture.slot >= approvedLeave.fromSlot);
+
+      return {
+        kind: 'own' as const,
+        lectureId: String(lecture._id),
+        slot: lecture.slot,
+        className: lecture.classId?.name ?? null,
+        roomNumber: lecture.classId?.roomNumber ?? null,
+        subjectName: lecture.subjectOfferingId?.subjectId?.subjectName ?? null,
+        excusedByLeave: excused,
+      };
+    });
+
+    const coverSlots = cover
+      .filter((row: any) => row.lectureId)
+      .map((row: any) => ({
+        kind: 'cover' as const,
+        substitutionId: String(row._id),
+        lectureId: String(row.lectureId._id),
+        slot: row.lectureId.slot,
+        className: row.lectureId.classId?.name ?? null,
+        roomNumber: row.lectureId.classId?.roomNumber ?? null,
+        subjectName:
+          row.lectureId.subjectOfferingId?.subjectId?.subjectName ?? null,
+        coveringFor: row.absentTeacherName || null,
+        excusedByLeave: false,
+      }));
+
+    const slots = [...ownSlots, ...coverSlots].sort((a, b) => a.slot - b.slot);
+
+    return {
+      date: toDateOnly(date),
+      dayOfWeek: weekday,
+      leave: approvedLeave
+        ? {
+            leaveAt: approvedLeave.leaveAt,
+            fromSlot: approvedLeave.fromSlot,
+            status: approvedLeave.status,
+          }
+        : leave
+          ? { leaveAt: (leave as any).leaveAt, status: (leave as any).status }
+          : null,
+      stats: {
+        own: ownSlots.length,
+        cover: coverSlots.length,
+        excused: ownSlots.filter((s) => s.excusedByLeave).length,
+      },
+      slots,
+    };
   }
 
   // ───────────────────────────────────────────────── the cover board

@@ -39,6 +39,11 @@ const SERVICE_AUTHORIZED = new Set([
   // teachers out of the feature or let one cancel a colleague's.
   'duty/duty.controller.ts::POST /leave-requests',
   'duty/duty.controller.ts::DELETE /leave-requests/:id',
+  // Every user reads and clears their own notices. NotificationsService scopes
+  // every query and update to recipientId === the caller, so a wrong id and
+  // somebody else's id give the same answer: nothing here for you. A role gate
+  // would only decide who is allowed to have notices at all.
+  'notifications/notifications.controller.ts',
   'attendance/attendance.controller.ts',
   'exams/exams.controller.ts',
   'projects/projects.controller.ts',

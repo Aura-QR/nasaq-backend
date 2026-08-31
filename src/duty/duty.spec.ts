@@ -19,6 +19,11 @@ import {
   SubjectOfferingSchema,
 } from '../subject-offerings/schemas/subject-offering.schema';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
+import { NotificationsService } from '../notifications/notifications.service';
+import {
+  Notification,
+  NotificationSchema,
+} from '../notifications/schemas/notification.schema';
 
 const URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/nasaq-test';
 
@@ -68,16 +73,17 @@ describe('DutyService', () => {
           { name: Class.name, schema: ClassSchema },
           { name: Subject.name, schema: SubjectSchema },
           { name: SubjectOffering.name, schema: SubjectOfferingSchema },
+          { name: Notification.name, schema: NotificationSchema },
         ]),
       ],
-      providers: [DutyService],
+      providers: [DutyService, NotificationsService],
     }).compile();
 
     service = moduleRef.get(DutyService);
     for (const name of [
       LeaveRequest.name, DutySupervisor.name, Substitution.name, Teacher.name,
       Lecture.name, TeacherAttendance.name, Term.name, Class.name,
-      Subject.name, SubjectOffering.name,
+      Subject.name, SubjectOffering.name, Notification.name,
     ]) {
       models[name] = moduleRef.get(getModelToken(name));
     }
@@ -616,6 +622,190 @@ describe('DutyService', () => {
       // Counted once, not twice.
       expect(board.stats.needCover).toBe(2);
       expect(board.uncovered).toHaveLength(2);
+    });
+  });
+
+  describe('notifications', () => {
+    const unreadFor = async (teacherId: any) =>
+      models[Notification.name].collection
+        .find({ recipientId: teacherId })
+        .toArray();
+
+    it('tells the substitute they are covering', async () => {
+      await asTenant(() =>
+        service.createSubstitution(
+          { date: DATE, lectureId: String(L1), substituteTeacherId: String(freeTeacher) },
+          OWNER,
+        ),
+      );
+
+      const notices = await unreadFor(freeTeacher);
+      expect(notices).toHaveLength(1);
+      expect(notices[0].type).toBe('cover_assigned');
+      expect(notices[0].read).toBe(false);
+      // The body has to carry enough to act on without opening anything.
+      expect(notices[0].body).toContain('الحصة 1');
+      expect(notices[0].body).toContain('م١/أ');
+      expect(notices[0].body).toContain('أ. أروى');
+    });
+
+    it('tells them when the cover is taken away again', async () => {
+      const created: any = await asTenant(() =>
+        service.createSubstitution(
+          { date: DATE, lectureId: String(L1), substituteTeacherId: String(freeTeacher) },
+          OWNER,
+        ),
+      );
+      await asTenant(() => service.removeSubstitution(String(created.data._id)));
+
+      const notices = await unreadFor(freeTeacher);
+      expect(notices.map((n: any) => n.type)).toEqual([
+        'cover_assigned',
+        'cover_removed',
+      ]);
+    });
+
+    it('tells the teacher their leave was decided, and carries the note', async () => {
+      const filed: any = await asTenant(() =>
+        service.createLeaveRequest(
+          { date: DATE, leaveAt: '11:00' },
+          { userId: String(arabicTeacher), role: 'TEACHER' },
+        ),
+      );
+      await asTenant(() =>
+        service.reviewLeaveRequest(
+          String(filed.data._id),
+          { status: 'approved', reviewNote: 'البديل أ. سارة' },
+          OWNER,
+        ),
+      );
+
+      const notices = await unreadFor(arabicTeacher);
+      expect(notices).toHaveLength(1);
+      expect(notices[0].type).toBe('leave_approved');
+      expect(notices[0].body).toContain('البديل أ. سارة');
+    });
+
+    it('says so when a request is rejected', async () => {
+      const filed: any = await asTenant(() =>
+        service.createLeaveRequest(
+          { date: DATE, leaveAt: '11:00' },
+          { userId: String(arabicTeacher), role: 'TEACHER' },
+        ),
+      );
+      await asTenant(() =>
+        service.reviewLeaveRequest(String(filed.data._id), { status: 'rejected' }, OWNER),
+      );
+
+      const notices = await unreadFor(arabicTeacher);
+      expect(notices[0].type).toBe('leave_rejected');
+    });
+
+    it('writes nothing when a request is only put back to pending', async () => {
+      const filed: any = await asTenant(() =>
+        service.createLeaveRequest(
+          { date: DATE, leaveAt: '11:00' },
+          { userId: String(arabicTeacher), role: 'TEACHER' },
+        ),
+      );
+      await asTenant(() =>
+        service.reviewLeaveRequest(String(filed.data._id), { status: 'pending' }, OWNER),
+      );
+
+      expect(await unreadFor(arabicTeacher)).toHaveLength(0);
+    });
+  });
+
+  describe('the teacher\'s own day', () => {
+    const myDay = (teacherId: any) =>
+      asTenant(() => service.getMyDay(String(teacherId), DATE));
+
+    it('lists their own lectures', async () => {
+      const day: any = await myDay(arabicTeacher);
+
+      expect(day.stats.own).toBe(2);
+      expect(day.stats.cover).toBe(0);
+      expect(day.slots.map((s: any) => s.slot)).toEqual([1, 2]);
+      expect(day.slots.every((s: any) => s.kind === 'own')).toBe(true);
+    });
+
+    it('merges cover into the same timeline, marked as cover', async () => {
+      await asTenant(() =>
+        service.createSubstitution(
+          { date: DATE, lectureId: String(L3), substituteTeacherId: String(freeTeacher) },
+          OWNER,
+        ),
+      );
+
+      const day: any = await myDay(freeTeacher);
+
+      expect(day.stats.own).toBe(0);
+      expect(day.stats.cover).toBe(1);
+      expect(day.slots[0].kind).toBe('cover');
+      expect(day.slots[0].coveringFor).toBe('أ. هيا');
+      expect(day.slots[0].className).toBe('م١/ب');
+    });
+
+    it('sorts own lectures and cover together by period', async () => {
+      // أروى teaches slots 1 and 2; give her cover in a slot she is free in.
+      const L4 = await mk(models[Lecture.name], {
+        classId: classB, subjectOfferingId: (await models[SubjectOffering.name]
+          .collection.findOne({}))._id,
+        termId, teacherId: mathsTeacher, dayOfWeek: 'sunday', slot: 3,
+        preparation: [], schoolId,
+      });
+      await asTenant(() =>
+        service.createSubstitution(
+          { date: DATE, lectureId: String(L4), substituteTeacherId: String(arabicTeacher) },
+          OWNER,
+        ),
+      );
+
+      const day: any = await myDay(arabicTeacher);
+
+      expect(day.slots.map((s: any) => s.slot)).toEqual([1, 2, 3]);
+      expect(day.slots.map((s: any) => s.kind)).toEqual(['own', 'own', 'cover']);
+    });
+
+    it('flags the periods an approved leave excuses, rather than hiding them', async () => {
+      const filed: any = await asTenant(() =>
+        service.createLeaveRequest(
+          { date: DATE, leaveAt: '10:00', fromSlot: 2 },
+          { userId: String(arabicTeacher), role: 'TEACHER' },
+        ),
+      );
+      await asTenant(() =>
+        service.reviewLeaveRequest(String(filed.data._id), { status: 'approved' }, OWNER),
+      );
+
+      const day: any = await myDay(arabicTeacher);
+
+      // Hiding them is how somebody turns up for a lesson they were signed off.
+      expect(day.slots).toHaveLength(2);
+      expect(day.slots[0].excusedByLeave).toBe(false);
+      expect(day.slots[1].excusedByLeave).toBe(true);
+      expect(day.stats.excused).toBe(1);
+      expect(day.leave.leaveAt).toBe('10:00');
+    });
+
+    it('reports a pending request without excusing anything', async () => {
+      await asTenant(() =>
+        service.createLeaveRequest(
+          { date: DATE, leaveAt: '10:00' },
+          { userId: String(arabicTeacher), role: 'TEACHER' },
+        ),
+      );
+
+      const day: any = await myDay(arabicTeacher);
+
+      expect(day.leave.status).toBe('pending');
+      expect(day.stats.excused).toBe(0);
+    });
+
+    it('returns an empty day for a teacher with nothing on', async () => {
+      const day: any = await myDay(arabicSpecialist);
+      expect(day.slots).toEqual([]);
+      expect(day.leave).toBeNull();
     });
   });
 
