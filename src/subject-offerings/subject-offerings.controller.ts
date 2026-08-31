@@ -70,7 +70,6 @@ export class SubjectOfferingsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
-  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Post('import-plan')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -88,6 +87,7 @@ export class SubjectOfferingsController {
     return await this.subjectOfferingsService.importPlan(dto);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch('plan')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
