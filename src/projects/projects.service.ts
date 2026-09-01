@@ -11,7 +11,18 @@ import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.s
 import { CreateProjectDto } from './dto/create-project.dto';
 import * as fs from 'fs';
 import * as path from 'path';
-import archiver from 'archiver';
+/*
+ * `import archiver = require(...)`, not a default import.
+ *
+ * archiver declares `export = archiver`, and this project compiles with
+ * esModuleInterop off. allowSyntheticDefaultImports is on, which silences the
+ * type error but emits no interop helper — so `import archiver from 'archiver'`
+ * compiled to `archiver_1.default(...)`, which is undefined at runtime.
+ * Every download threw "archiver_1.default is not a function" before the
+ * response was even started, so the endpoint answered 500 whether the files
+ * were there or not.
+ */
+import archiver = require('archiver');
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
 import { Response } from 'express';
@@ -430,7 +441,15 @@ export class ProjectsService {
       const student = await this.studentModel.findById(user.userId);
       if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
+      // The block below used to be empty: it looked the student up and then
+      // let anyone through, while the route's own description promised that
+      // "students can only download projects assigned to their class".
+      const studentClass = (student as any).classId;
+      const assignedClasses = (project.classIds ?? []).map((id: any) => String(id));
 
+      if (!studentClass || !assignedClasses.includes(String(studentClass))) {
+        throw new ForbiddenException('هذا المشروع ليس مسنداً لفصلك');
+      }
     }
 
     const projectFolder = path.join('./uploads/projects', projectId);
@@ -445,18 +464,44 @@ export class ProjectsService {
       throw new NotFoundException(`لا توجد ملفات للمشروع ${projectId}`);
     }
 
-    const archive = archiver('zip', { zlib: { level: 9 } });
-
     const sanitizedTitle = project.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     const zipFilename = `project_${sanitizedTitle}_${projectId}.zip`;
 
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
+    await this.streamFolderAsZip(projectFolder, zipFilename, res);
+  }
 
-    archive.pipe(res);
-    archive.directory(projectFolder, false);
-    archive.on('error', (err) => { throw err; });
-    await archive.finalize();
+  /**
+   * Streams a folder to the client as a zip.
+   *
+   * The error handler is attached before piping and rejects the promise
+   * instead of throwing inside a callback. Throwing there was never caught by
+   * anything: the callback runs on the stream's own tick, so Nest's exception
+   * filter never sees it, and the client is left holding a half-written
+   * response that looks like a corrupt download rather than an error.
+   */
+  private streamFolderAsZip(
+    folder: string,
+    filename: string,
+    res: Response,
+  ): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const archive = archiver('zip', { zlib: { level: 9 } });
+
+      archive.on('error', reject);
+      archive.on('end', () => resolve());
+      // If the client hangs up mid-download, stop compressing for nobody.
+      res.on('close', () => archive.destroy());
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${filename}"`,
+      );
+
+      archive.pipe(res);
+      archive.directory(folder, false);
+      archive.finalize().catch(reject);
+    });
   }
 
   async update(
@@ -884,13 +929,10 @@ export class ProjectsService {
     const folder = path.join('./uploads/submissions', projectId, studentId);
     if (!fs.existsSync(folder)) throw new NotFoundException('مجلد التقديم غير موجود');
 
-    const archive = archiver('zip', { zlib: { level: 9 } });
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="submission_${studentId}.zip"`);
-    archive.pipe(res);
-    archive.directory(folder, false);
-    archive.on('error', (err) => { throw err; });
-    await archive.finalize();
+    // Same helper as the project download: the error handler has to be
+    // attached before piping, and reject rather than throw into a callback
+    // nothing is listening on.
+    await this.streamFolderAsZip(folder, `submission_${studentId}.zip`, res);
   }
 
   async gradeSubmission(projectId: string, studentId: string, achievedGrade: number, teacher: any) {
