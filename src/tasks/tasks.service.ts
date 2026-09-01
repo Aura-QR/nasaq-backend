@@ -38,18 +38,35 @@ export class TasksService {
 
       this.logger.log(`Found ${preparations.length} preparations with valid ObjectId lecture (out of ${allPreparations.length} total)`);
 
+      /*
+       * skipTenantScope on every populate, not just on the find above.
+       *
+       * This job runs on a timer, so there is no request and no tenant
+       * context — and tenantScopedPlugin answers an absent context by scoping
+       * the query to `schoolId: null`. Without this option the populate
+       * matched nothing and resolved to null for every single row, and the
+       * snapshot written below was therefore all-null. That is not a
+       * hypothetical: it silently replaced every preparation's lecture
+       * reference with `{ _id: null, classId: null, ... }` every Friday.
+       */
       await this.preparationModel.populate(preparations, [
         {
           path: 'lecture',
+          options: { skipTenantScope: true },
           populate: [
-            { path: 'classId', select: 'name academicYearId roomNumber gender' },
-          ]
+            {
+              path: 'classId',
+              select: 'name academicYearId roomNumber gender',
+              options: { skipTenantScope: true },
+            },
+          ],
         },
-        { path: 'subject' }
+        { path: 'subject', options: { skipTenantScope: true } },
       ]);
 
       let cleanedCount = 0;
       let failedCount = 0;
+      let skippedCount = 0;
 
       const lectureIds = [...new Set(
         preparations
@@ -74,6 +91,23 @@ export class TasksService {
           const lecture = preparation.lecture as any;
           const subject = preparation.subject as any;
           const classData = lecture?.classId;
+
+          /*
+           * If the lecture did not resolve, leave the row alone.
+           *
+           * Archiving is meant to freeze what the lecture WAS. Writing a
+           * snapshot of nothing does the opposite: it throws away the id that
+           * was still there, and with it the only way back to the lecture. A
+           * dangling reference can be investigated and repaired; an all-null
+           * snapshot cannot.
+           */
+          if (!lecture || !lecture._id) {
+            skippedCount++;
+            this.logger.warn(
+              `Preparation ${preparation._id} left as-is: its lecture did not resolve.`,
+            );
+            continue;
+          }
 
           const lectureData = {
             _id: lecture?._id?.toString() || null,
@@ -149,7 +183,8 @@ export class TasksService {
       }
 
       this.logger.log(
-        `Weekly preparation cleanup completed. Success: ${cleanedCount}, Failed: ${failedCount}`
+        `Weekly preparation cleanup completed. Success: ${cleanedCount}, ` +
+          `Skipped (lecture unresolved): ${skippedCount}, Failed: ${failedCount}`
       );
     } catch (error) {
       this.logger.error('Error during weekly preparation cleanup', error.stack);
