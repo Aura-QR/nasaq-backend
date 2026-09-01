@@ -6,6 +6,7 @@ import {
   Notification,
   NotificationType,
 } from './schemas/notification.schema';
+import { PushService } from './push.service';
 
 @Injectable()
 export class NotificationsService {
@@ -14,6 +15,7 @@ export class NotificationsService {
   constructor(
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<Notification>,
+    private readonly push: PushService,
   ) {}
 
   /**
@@ -42,7 +44,19 @@ export class NotificationsService {
       this.logger.error(
         `Failed to write a ${input.type} notification: ${error.message}`,
       );
+      // The row is the record. If it could not be written there is nothing
+      // for a push to be a copy of, so do not send one.
+      return;
     }
+
+    // Every caller of notify() gets a push for free — the sites that announce
+    // cover, leave and duty do not know this happened, and should not have to.
+    // Sends nothing when Firebase is unconfigured or the user has no device.
+    await this.push.sendToUser(input.recipientId, {
+      title: input.title,
+      body: input.body,
+      data: { ...(input.data ?? {}), type: input.type },
+    });
   }
 
   async list(

@@ -14,3 +14,7 @@ build/
 uploads/
 
 verify-hash.ts
+# Firebase service-account keys. These are private keys with full project
+# access — they belong in environment variables, never in the repo.
+*firebase-adminsdk*.json
+*service-account*.json

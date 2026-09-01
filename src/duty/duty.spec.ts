@@ -24,6 +24,11 @@ import {
   Notification,
   NotificationSchema,
 } from '../notifications/schemas/notification.schema';
+import { PushService } from '../notifications/push.service';
+import {
+  DeviceToken,
+  DeviceTokenSchema,
+} from '../notifications/schemas/device-token.schema';
 
 const URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/nasaq-test';
 
@@ -74,9 +79,10 @@ describe('DutyService', () => {
           { name: Subject.name, schema: SubjectSchema },
           { name: SubjectOffering.name, schema: SubjectOfferingSchema },
           { name: Notification.name, schema: NotificationSchema },
+          { name: DeviceToken.name, schema: DeviceTokenSchema },
         ]),
       ],
-      providers: [DutyService, NotificationsService],
+      providers: [DutyService, NotificationsService, PushService],
     }).compile();
 
     service = moduleRef.get(DutyService);
