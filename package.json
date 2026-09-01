@@ -19,7 +19,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:super-admin": "ts-node src/platform/seed-super-admin.ts",
-    "db:reset": "ts-node src/scripts/reset-db.ts"
+    "db:reset": "ts-node src/scripts/reset-db.ts",
+    "migrate:timetable": "ts-node -r tsconfig-paths/register src/scripts/migrate-timetable-indexes.ts",
+    "migrate:timetable:dry": "ts-node -r tsconfig-paths/register src/scripts/migrate-timetable-indexes.ts --dry-run",
+    "migrate:preparation-week": "ts-node -r tsconfig-paths/register src/scripts/backfill-preparation-week.ts",
+    "migrate:preparation-week:dry": "ts-node -r tsconfig-paths/register src/scripts/backfill-preparation-week.ts --dry-run"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",

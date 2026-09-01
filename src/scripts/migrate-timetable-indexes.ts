@@ -42,6 +42,23 @@ const LECTURE_TEACHER_INDEX = 'schoolId_1_teacherId_1_dayOfWeek_1_slot_1_termId_
 const ASSIGNMENT_OLD = 'schoolId_1_teacherId_1_subjectOfferingId_1';
 const ASSIGNMENT_NEW = 'schoolId_1_teacherId_1_subjectOfferingId_1_classId_1';
 
+/**
+ * A collection that has never been written to does not exist yet, and asking
+ * it for its indexes throws NamespaceNotFound rather than returning nothing.
+ * On a fresh environment that turns a dry run into a stack trace and looks
+ * like a broken migration.
+ */
+async function indexNames(collection: any): Promise<string[]> {
+  try {
+    return (await collection.indexes()).map((index: any) => index.name);
+  } catch (error: any) {
+    if (error?.codeName === 'NamespaceNotFound' || error?.code === 26) {
+      return [];
+    }
+    throw error;
+  }
+}
+
 async function main() {
   const uri = process.env.MONGODB_URI || process.env.DATABASE_URL;
   if (!uri) throw new Error('MONGODB_URI is not set');
@@ -52,7 +69,7 @@ async function main() {
   // ---------------------------------------------------------------- lectures
   console.log('── lectures ──');
   const lectures = db.collection('lectures');
-  const lectureIndexes = (await lectures.indexes()).map((i: any) => i.name);
+  const lectureIndexes = await indexNames(lectures);
 
   const duplicates = await lectures
     .aggregate([
@@ -108,7 +125,7 @@ async function main() {
   // --------------------------------------------------- teacher assignments
   console.log('\n── teacherassignments ──');
   const assignments = db.collection('teacherassignments');
-  const assignmentIndexes = (await assignments.indexes()).map((i: any) => i.name);
+  const assignmentIndexes = await indexNames(assignments);
 
   // Create the wider key before dropping the old one: removing the guard
   // first would leave duplicates writable in between.
