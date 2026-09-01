@@ -7,6 +7,8 @@ export const NOTIFICATION_TYPES = [
   'leave_rejected',
   'cover_assigned',
   'cover_removed',
+  'duty_assigned',
+  'duty_removed',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

@@ -714,6 +714,95 @@ describe('DutyService', () => {
 
       expect(await unreadFor(arabicTeacher)).toHaveLength(0);
     });
+
+    it('tells a teacher they are on duty', async () => {
+      await asTenant(() =>
+        service.setSupervisors(
+          { date: DATE, teacherIds: [String(freeTeacher)], notes: 'البوابة الشمالية' },
+          OWNER,
+        ),
+      );
+
+      const notices = await unreadFor(freeTeacher);
+      expect(notices).toHaveLength(1);
+      expect(notices[0].type).toBe('duty_assigned');
+      expect(notices[0].read).toBe(false);
+      expect(notices[0].body).toContain(DATE);
+      expect(notices[0].body).toContain('البوابة الشمالية');
+    });
+
+    it('tells both of them when the day has two supervisors', async () => {
+      await asTenant(() =>
+        service.setSupervisors(
+          { date: DATE, teacherIds: [String(freeTeacher), String(arabicSpecialist)] },
+          OWNER,
+        ),
+      );
+
+      expect(await unreadFor(freeTeacher)).toHaveLength(1);
+      expect(await unreadFor(arabicSpecialist)).toHaveLength(1);
+    });
+
+    it('only tells whoever actually changed', async () => {
+      await asTenant(() =>
+        service.setSupervisors({ date: DATE, teacherIds: [String(freeTeacher)] }, OWNER),
+      );
+      // freeTeacher stays on the roster; arabicSpecialist joins it.
+      await asTenant(() =>
+        service.setSupervisors(
+          { date: DATE, teacherIds: [String(freeTeacher), String(arabicSpecialist)] },
+          OWNER,
+        ),
+      );
+
+      // Not two. Re-saving a roster must not re-announce it.
+      expect(await unreadFor(freeTeacher)).toHaveLength(1);
+      expect(await unreadFor(arabicSpecialist)).toHaveLength(1);
+    });
+
+    it('writes nothing at all when only the notes change', async () => {
+      await asTenant(() =>
+        service.setSupervisors({ date: DATE, teacherIds: [String(freeTeacher)] }, OWNER),
+      );
+      await asTenant(() =>
+        service.setSupervisors(
+          { date: DATE, teacherIds: [String(freeTeacher)], notes: 'الفناء' },
+          OWNER,
+        ),
+      );
+
+      expect(await unreadFor(freeTeacher)).toHaveLength(1);
+    });
+
+    it('tells a teacher when their duty is taken off them', async () => {
+      await asTenant(() =>
+        service.setSupervisors({ date: DATE, teacherIds: [String(freeTeacher)] }, OWNER),
+      );
+      await asTenant(() => service.setSupervisors({ date: DATE, teacherIds: [] }, OWNER));
+
+      const notices = await unreadFor(freeTeacher);
+      expect(notices.map((n: any) => n.type)).toEqual([
+        'duty_assigned',
+        'duty_removed',
+      ]);
+    });
+
+    it('tells the one dropped and the one added when a roster is swapped', async () => {
+      await asTenant(() =>
+        service.setSupervisors({ date: DATE, teacherIds: [String(freeTeacher)] }, OWNER),
+      );
+      await asTenant(() =>
+        service.setSupervisors({ date: DATE, teacherIds: [String(arabicSpecialist)] }, OWNER),
+      );
+
+      expect((await unreadFor(freeTeacher)).map((n: any) => n.type)).toEqual([
+        'duty_assigned',
+        'duty_removed',
+      ]);
+      expect((await unreadFor(arabicSpecialist)).map((n: any) => n.type)).toEqual([
+        'duty_assigned',
+      ]);
+    });
   });
 
   describe('the teacher\'s own day', () => {

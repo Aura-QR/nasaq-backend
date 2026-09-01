@@ -267,6 +267,14 @@ export class DutyService {
     // exactly as it was set.
     const byId = new Map(teachers.map((t: any) => [String(t._id), t.name]));
 
+    // Read the roster we are about to replace, so only the people whose duty
+    // actually changed get told. Editing the notes on an unchanged roster must
+    // not re-notify everyone on it.
+    const previous = await this.supervisorModel.findOne({ date }).lean().exec();
+    const before = new Set<string>(
+      ((previous as any)?.teacherIds ?? []).map((id: any) => String(id)),
+    );
+
     const saved = await this.supervisorModel
       .findOneAndUpdate(
         { date },
@@ -280,6 +288,35 @@ export class DutyService {
         { new: true, upsert: true, setDefaultsOnInsert: true },
       )
       .exec();
+
+    // Same reasoning as cover: a supervisor who is not told is not a
+    // supervisor. The manager sets the roster in the morning and the teacher,
+    // who has no reason to open a screen they were not expecting, never finds
+    // out the school is theirs to watch that day.
+    const dateLabel = toDateOnly(saved.date);
+    const added = ids.filter((id) => !before.has(id));
+    const removed = [...before].filter((id) => !ids.includes(id));
+
+    await Promise.all([
+      ...added.map((id) =>
+        this.notifications.notify({
+          recipientId: id,
+          type: 'duty_assigned',
+          title: 'أنت مناوب اليوم',
+          body: [dateLabel, dto.notes || null].filter(Boolean).join(' · '),
+          data: { supervisorId: String(saved._id), date: dateLabel },
+        }),
+      ),
+      ...removed.map((id) =>
+        this.notifications.notify({
+          recipientId: id,
+          type: 'duty_removed',
+          title: 'تم إلغاء مناوبتك',
+          body: dateLabel,
+          data: { supervisorId: String(saved._id), date: dateLabel },
+        }),
+      ),
+    ]);
 
     return {
       message: ids.length === 0 ? 'تم مسح مناوبة اليوم' : 'تم حفظ مناوبة اليوم',
