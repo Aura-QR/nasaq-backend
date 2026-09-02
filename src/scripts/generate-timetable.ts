@@ -117,3 +117,8 @@ async function main() {
 }
 
 main().catch((e) => { console.error('\n❌', e.message); process.exit(1); });
+
+// Marks this file a module so its top-level names do not collide with the
+// other standalone scripts, which TypeScript would otherwise treat as one
+// shared global scope.
+export {};

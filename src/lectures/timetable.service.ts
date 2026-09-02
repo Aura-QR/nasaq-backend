@@ -785,9 +785,27 @@ export class TimetableService {
       );
     }
 
-    // Hardest first. A teacher with 30 of 35 slots taken has almost no room to
-    // move later on, so their periods have to claim space before anyone else's.
+    // How full each class's week has to be. A class needing 37 of 38 slots has
+    // almost no choice about where anything goes, so it must claim its slots
+    // before a roomier class takes the ones its shared teachers need.
+    const demandByClass = new Map<string, number>();
+    for (const requirement of planned) {
+      demandByClass.set(
+        requirement.classId,
+        (demandByClass.get(requirement.classId) ?? 0) + requirement.periodsPerWeek,
+      );
+    }
+
+    // Hardest first, and the tightest class is harder than the busiest
+    // teacher. Ordering by teacher load alone left a subject taught by a
+    // mid-load teacher to the fullest class in the school until late, by which
+    // point that class's few free periods and the teacher's few free periods
+    // no longer overlapped and it could not be placed at all.
     const ordered = [...planned].sort((a, b) => {
+      const tightA = demandByClass.get(a.classId) ?? 0;
+      const tightB = demandByClass.get(b.classId) ?? 0;
+      if (tightB !== tightA) return tightB - tightA;
+
       const loadA = a.teacherId ? loadByTeacher.get(a.teacherId) ?? 0 : -1;
       const loadB = b.teacherId ? loadByTeacher.get(b.teacherId) ?? 0 : -1;
       if (loadB !== loadA) return loadB - loadA;
