@@ -108,14 +108,19 @@ async function call(method: string, path: string, body?: any) {
     const msg = data?.message ?? res.statusText;
     throw new Error(`${method} ${path} → ${res.status}: ${JSON.stringify(msg)}`);
   }
+  // Every response goes through a global interceptor that wraps the payload
+  // as { status, message, data }. Unwrap once here so no caller has to know.
+  if (data && typeof data === 'object' && typeof data.status === 'boolean' && 'data' in data) {
+    return data.data;
+  }
   return data;
 }
 
 const unwrap = (r: any) =>
   Array.isArray(r) ? r
   : Array.isArray(r?.data) ? r.data
-  : Array.isArray(r?.data?.data) ? r.data.data
   : Array.isArray(r?.items) ? r.items
+  : Array.isArray(r?.docs) ? r.docs
   : [];
 
 const idOf = (x: any) => String(x?._id ?? x?.id ?? '');
@@ -127,7 +132,7 @@ async function ensure(label: string, existing: any[], name: string, create: () =
   if (DRY) { log(`   + ${label} (dry): ${name}`); return `DRY_${name}`; }
   const made = await create();
   log(`   ✔ ${label}: ${name}`);
-  return idOf(made?.data ?? made);
+  return idOf(made);
 }
 
 async function main() {
@@ -143,9 +148,12 @@ async function main() {
 
   const auth = await call('POST', '/auth/login', { identifier: email, password });
   TOKEN = auth.accessToken;
-  log(`دخلنا: ${auth.user?.name} (${auth.user?.role})`);
+  log(`دخلنا: ${auth.user?.name ?? auth.user?.email ?? email} (${auth.user?.role})`);
+  if (!TOKEN) {
+    throw new Error(`مفيش accessToken في الرد: ${JSON.stringify(auth).slice(0, 200)}`);
+  }
   if (!['OWNER', 'SUPERVISOR', 'MANAGER'].includes(auth.user?.role)) {
-    throw new Error(`الدور ${auth.user?.role} مش كفاية — محتاج OWNER`);
+    throw new Error(`الدور "${auth.user?.role}" مش كفاية — محتاج OWNER`);
   }
 
   // ── 0. the week ─────────────────────────────────────────────────────────
@@ -157,8 +165,9 @@ async function main() {
 
   // ── 1. year + term ──────────────────────────────────────────────────────
   const year = await call('GET', '/academic-years/active');
-  const yearId = idOf(year?.data ?? year);
-  log(`\n1. السنة النشطة: ${(year?.data ?? year)?.name}`);
+  const yearId = idOf(year);
+  if (!yearId) throw new Error('مفيش سنة دراسية نشطة — اعملها الأول');
+  log(`\n1. السنة النشطة: ${year?.name}`);
 
   const terms = unwrap(await call('GET', `/terms/by-year/${yearId}`));
   if (terms.length === 0) throw new Error('مفيش ترمات في السنة دي — اعملها الأول');
@@ -205,12 +214,21 @@ async function main() {
   for (const [grade, rows] of Object.entries(PLAN)) {
     const text = rows.map(([n, p]) => `${n}\t${p}`).join('\n');
     const total = rows.reduce((s, r) => s + r[1], 0);
+    const gradeLevelId = gradeIds[grade];
+
+    // On a dry run against a school that has none of these grades yet, the id
+    // is a placeholder — there is nothing real to check the plan against.
+    if (gradeLevelId.startsWith('DRY_')) {
+      log(`   ${grade}: ${total} حصة  (الصف لسه متعملش — مش هينفع نتأكد من الخطة دلوقتي)`);
+      continue;
+    }
+
     const report = await call('POST', '/subject-offerings/import-plan', {
-      termId, gradeLevelId: gradeIds[grade], text, dryRun: DRY,
+      termId, gradeLevelId, text, dryRun: DRY,
     });
-    const unmatched = (report?.rows ?? report?.data?.rows ?? [])
-      .filter((r: any) => !r.matched && !r.subjectId);
-    log(`   ${grade}: ${total} حصة${unmatched.length ? `  ⚠️ ${unmatched.length} سطر مش متطابق` : ''}`);
+    const parsed = report?.rows ?? report?.lines ?? [];
+    const unmatched = parsed.filter((r: any) => !r.subjectId && !r.matched);
+    log(`   ${grade}: ${total} حصة${unmatched.length ? `  ⚠️ ${unmatched.length} سطر مش متطابق: ${unmatched.map((u: any) => u.name ?? u.raw).join('، ')}` : '  ✔'}`);
   }
 
   // ── 6. teachers ─────────────────────────────────────────────────────────
@@ -238,7 +256,7 @@ async function main() {
   }
 
   log(DRY
-    ? '\n🔍 تجربة خلصت — مكتبناش حاجة. شيل --dry-run للتنفيذ.'
+    ? '\n🔍 تجربة خلصت — مكتبناش حاجة.\n   شغّلها من غير --dry-run، وبعدين شغّل الـ dry-run تاني عشان يتأكد من الخطة.'
     : '\n✅ خلص. فاضل الإسناد: POST /teacher-assignments/import');
 }
 
