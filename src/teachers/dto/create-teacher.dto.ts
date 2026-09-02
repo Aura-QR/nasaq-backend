@@ -60,7 +60,21 @@ export class CreateTeacherDto {
    */
   @IsArray()
   @IsOptional()
-  @IsMongoId({ each: true })
+  @IsMongoId({
+    each: true,
+    // The default message names the field and nothing else, so a client
+    // sending one bad entry among twenty gets no way to find it. Name the
+    // values that actually failed.
+    message: ({ value }) => {
+      const bad = (Array.isArray(value) ? value : [value])
+        .filter((v) => !/^[0-9a-fA-F]{24}$/.test(String(v)))
+        .map((v) => JSON.stringify(v));
+      return (
+        'subjectOfferingIds يجب أن تكون معرفات صالحة — ' +
+        `القيم غير الصالحة: ${bad.join(', ')}`
+      );
+    },
+  })
   @ApiProperty({
     description: 'Subject offerings this teacher teaches. Replaces the current set.',
     required: false,
