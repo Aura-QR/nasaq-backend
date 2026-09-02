@@ -975,6 +975,118 @@ describe('TimetableService', () => {
     });
   });
 
+  describe('a week whose days are not all the same length', () => {
+    /** Sun/Mon/Tue 8, Wed/Thu 7, and a short Friday of 6. */
+    const setUnevenWeek = async (byDay: Record<string, number | null>) => {
+      const all = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      await models[School.name].collection.updateOne(
+        { _id: schoolId },
+        {
+          $set: {
+            'settings.periodsPerDay': 8,
+            'settings.workSchedule': all.map((day) => ({
+              day,
+              isWorkingDay: day in byDay,
+              startTime: null,
+              endTime: null,
+              periodsPerDay: byDay[day] ?? null,
+            })),
+          },
+        },
+      );
+    };
+
+    const capacity = () => asTenant(() => service.getCapacity(schoolId));
+
+    it('adds the days up instead of multiplying one number', async () => {
+      await setUnevenWeek({ sunday: 8, monday: 8, tuesday: 8, wednesday: 7, thursday: 7 });
+
+      const cap: any = await capacity();
+
+      // 8+8+8+7+7 — not 5 x 8.
+      expect(cap.slotsPerWeek).toBe(38);
+      expect(cap.uniformWeek).toBe(false);
+      expect(cap.periodsByDay.thursday).toBe(7);
+    });
+
+    it('falls back to the school number for a day that names none', async () => {
+      await setUnevenWeek({ sunday: null, monday: null, tuesday: null, wednesday: 6, thursday: 6 });
+
+      const cap: any = await capacity();
+
+      expect(cap.periodsByDay.sunday).toBe(8);
+      expect(cap.slotsPerWeek).toBe(8 + 8 + 8 + 6 + 6);
+    });
+
+    it('still reports a uniform week as uniform', async () => {
+      await setUnevenWeek({ sunday: 7, monday: 7, tuesday: 7, wednesday: 7, thursday: 7 });
+
+      const cap: any = await capacity();
+
+      expect(cap.uniformWeek).toBe(true);
+      expect(cap.slotsPerWeek).toBe(35);
+    });
+
+    it('never schedules a lesson into a period the short day does not have', async () => {
+      await setUnevenWeek({ sunday: 8, monday: 8, tuesday: 8, wednesday: 7, thursday: 3 });
+      // Enough work to be forced to use every day.
+      await models[SubjectOffering.name].collection.updateOne(
+        { _id: maths._id }, { $set: { periodsPerWeek: 20 } },
+      );
+      await assign(teachers.fatima, maths);
+
+      await asTenant(() =>
+        service.generate(
+          { termId: String(termId), classIds: [String(classes.a)], mode: 'commit' } as any,
+          schoolId,
+        ),
+      );
+
+      const rows = await models[Lecture.name].collection
+        .find({ classId: classes.a }).toArray();
+
+      expect(rows.length).toBeGreaterThan(15);
+      const overflow = rows.filter(
+        (l: any) =>
+          (l.dayOfWeek === 'thursday' && l.slot > 3) ||
+          (l.dayOfWeek === 'wednesday' && l.slot > 7) ||
+          l.slot > 8,
+      );
+      expect(overflow).toEqual([]);
+    });
+
+    it('renders each day at its own length rather than padding', async () => {
+      await setUnevenWeek({ sunday: 8, monday: 8, tuesday: 8, wednesday: 7, thursday: 3 });
+      await assign(teachers.fatima, maths);
+
+      const result: any = await asTenant(() =>
+        service.generate(
+          { termId: String(termId), classIds: [String(classes.a)], mode: 'preview' } as any,
+          schoolId,
+        ),
+      );
+
+      const days = result.classes[0].days;
+      expect(days.find((d: any) => d.dayOfWeek === 'sunday').slots).toHaveLength(8);
+      expect(days.find((d: any) => d.dayOfWeek === 'thursday').slots).toHaveLength(3);
+    });
+
+    it('measures a class against the summed week, not the longest day', async () => {
+      await setUnevenWeek({ sunday: 8, monday: 8, tuesday: 8, wednesday: 7, thursday: 3 });
+      // 34 slots exist; ask for 40.
+      await models[SubjectOffering.name].collection.updateOne(
+        { _id: maths._id }, { $set: { periodsPerWeek: 40 } },
+      );
+      await assign(teachers.fatima, maths);
+
+      const report: any = await feasibility();
+
+      expect(report.slotsPerWeek).toBe(34);
+      const problem = report.problems.find((p: any) => p.type === 'class_overbooked');
+      expect(problem).toBeDefined();
+    });
+  });
+
   describe('teacher constraints', () => {
     const block = (teacherId: any, unavailable: any[]) =>
       mk(models[TeacherConstraint.name], { teacherId, termId, unavailable, schoolId });

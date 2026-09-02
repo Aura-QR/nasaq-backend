@@ -26,6 +26,17 @@ export class WorkDay {
 
   @Prop({ type: String, default: null })
   endTime: string | null;
+
+  /**
+   * Periods on this day, when it differs from the school's usual number.
+   *
+   * Real weeks are rarely uniform — eight periods early in the week and six on
+   * the last day is ordinary. A single school-wide number forced a choice
+   * between under-using the long days and scheduling lessons into periods the
+   * short day does not have. null means "use the school's number".
+   */
+  @Prop({ type: Number, default: null, min: 1, max: 10 })
+  periodsPerDay: number | null;
 }
 
 const WorkDaySchema = SchemaFactory.createForClass(WorkDay);

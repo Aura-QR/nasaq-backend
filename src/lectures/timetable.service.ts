@@ -148,10 +148,28 @@ export class TimetableService {
             .map((d: any) => d.day)
         : ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'];
 
+    // A day may run fewer periods than the rest of the week. Multiplying one
+    // number by the day count would either waste the long days or schedule
+    // lessons into periods the short day does not have.
+    const periodsByDay: Record<string, number> = {};
+    for (const day of workingDays) {
+      const row = schedule.find((d: any) => d?.day === day);
+      periodsByDay[day] = row?.periodsPerDay ?? periodsPerDay;
+    }
+
+    const slotsPerWeek = workingDays.reduce(
+      (sum: number, day: string) => sum + periodsByDay[day],
+      0,
+    );
+
     return {
       workingDays,
       periodsPerDay,
-      slotsPerWeek: workingDays.length * periodsPerDay,
+      periodsByDay,
+      // The longest day — a slot number can never exceed this anywhere.
+      maxPeriodsPerDay: Math.max(periodsPerDay, ...Object.values(periodsByDay)),
+      slotsPerWeek,
+      uniformWeek: new Set(Object.values(periodsByDay)).size <= 1,
       scheduleConfigured: schedule.length > 0,
     };
   }
@@ -562,7 +580,7 @@ export class TimetableService {
       if (teacherBlocks.size === 0) return capacity.slotsPerWeek;
       let free = 0;
       for (const day of capacity.workingDays) {
-        for (let slot = 1; slot <= capacity.periodsPerDay; slot++) {
+        for (let slot = 1; slot <= capacity.periodsByDay[day]; slot++) {
           if (!this.isBlocked(teacherBlocks, teacherId, day, slot)) free++;
         }
       }
@@ -785,12 +803,10 @@ export class TimetableService {
 
     const slots: { day: string; slot: number }[] = [];
     for (const day of capacity.workingDays) {
-      for (let slot = 1; slot <= capacity.periodsPerDay; slot++) {
+      for (let slot = 1; slot <= capacity.periodsByDay[day]; slot++) {
         slots.push({ day, slot });
       }
     }
-
-    const periodsPerDay = capacity.periodsPerDay;
     const teacherBlocks = await this.loadTeacherBlocks(dto.termId);
 
     const state = {
@@ -882,7 +898,9 @@ export class TimetableService {
       // it so art and PE drift toward the end of the day.
       const preference = requirement.slotPreference ?? 'any';
       if (preference === 'early') score += slot * 3;
-      else if (preference === 'late') score += (periodsPerDay - slot) * 3;
+      else if (preference === 'late') {
+        score += ((capacity.periodsByDay[day] ?? capacity.periodsPerDay) - slot) * 3;
+      }
       else score += slot;
 
       return score;
@@ -1055,7 +1073,14 @@ export class TimetableService {
   }
 
   /** Reshapes a flat placement list into one grid per class, for rendering. */
-  private toGrid(placements: Placement[], capacity: { workingDays: string[]; periodsPerDay: number }) {
+  private toGrid(
+    placements: Placement[],
+    capacity: {
+      workingDays: string[];
+      periodsPerDay: number;
+      periodsByDay?: Record<string, number>;
+    },
+  ) {
     const byClass = new Map<string, Placement[]>();
     for (const placement of placements) {
       if (!byClass.has(placement.classId)) byClass.set(placement.classId, []);
@@ -1069,7 +1094,11 @@ export class TimetableService {
         periods: rows.length,
         days: capacity.workingDays.map((day) => ({
           dayOfWeek: day,
-          slots: Array.from({ length: capacity.periodsPerDay }, (_, i) => {
+          // Render this day's real length. Padding a six-period day out to
+          // eight would show two empty periods that do not exist.
+          slots: Array.from(
+            { length: capacity.periodsByDay?.[day] ?? capacity.periodsPerDay },
+            (_, i) => {
             const slot = i + 1;
             const hit = rows.find((r) => r.dayOfWeek === day && r.slot === slot);
             return hit
@@ -1080,8 +1109,9 @@ export class TimetableService {
                   teacherId: hit.teacherId,
                   teacherName: hit.teacherName,
                 }
-              : { slot, subjectOfferingId: null, subjectName: null, teacherId: null, teacherName: null };
-          }),
+                : { slot, subjectOfferingId: null, subjectName: null, teacherId: null, teacherName: null };
+            },
+          ),
         })),
       }))
       .sort((a, b) => a.className.localeCompare(b.className, 'ar'));

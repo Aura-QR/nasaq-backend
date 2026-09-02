@@ -36,6 +36,14 @@ export class WorkDayDto {
   @ValidateIf((_, value) => value !== null)
   @Matches(TIME_PATTERN, { message: 'endTime يجب أن يكون بصيغة HH:mm بنظام 24 ساعة' })
   endTime?: string | null;
+
+  /** Periods on this day. Omit to use the school-wide number. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  periodsPerDay?: number | null;
 }
 
 export class UpdateSchoolSettingsDto {
