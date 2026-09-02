@@ -150,6 +150,79 @@ describe('PushService', () => {
     });
   });
 
+  describe('reading the private key out of the environment', () => {
+    // onModuleInit is what actually consumes these, so drive it rather than
+    // testing a helper the running app might not use the same way.
+    const boot = async (env: Record<string, string | undefined>) => {
+      const saved = { ...process.env };
+      Object.assign(process.env, env);
+      const svc = new PushService(tokens);
+      svc.onModuleInit();
+      const ok = svc.isConfigured;
+      process.env = saved;
+      return ok;
+    };
+
+    const PEM = [
+      '-----BEGIN PRIVATE KEY-----',
+      'MIIBVgIBADANBgkqhkiG9w0BAQEFAASCAUAwggE8AgEAAkEAwU2m7wYVSFDiNMbB',
+      '-----END PRIVATE KEY-----',
+    ].join('\n');
+
+    const base = {
+      FIREBASE_PROJECT_ID: 'p',
+      FIREBASE_CLIENT_EMAIL: 'e@x.iam.gserviceaccount.com',
+      FIREBASE_PRIVATE_KEY: undefined,
+      FIREBASE_PRIVATE_KEY_BASE64: undefined,
+    };
+
+    it('stays unconfigured when nothing is set', async () => {
+      expect(await boot(base)).toBe(false);
+    });
+
+    it('stays unconfigured when only the key is set', async () => {
+      expect(
+        await boot({
+          ...base,
+          FIREBASE_PROJECT_ID: undefined,
+          FIREBASE_CLIENT_EMAIL: undefined,
+          FIREBASE_PRIVATE_KEY: PEM,
+        }),
+      ).toBe(false);
+    });
+
+    // The credential is a fake, so initializeApp rejects it either way — what
+    // these prove is that the value reaches the SDK at all rather than being
+    // discarded as empty before it gets there.
+    it('accepts a key whose newlines are escaped', async () => {
+      const escaped = PEM.replace(/\n/g, '\\n');
+      expect(typeof escaped).toBe('string');
+      expect(escaped).toContain('\\n');
+      await boot({ ...base, FIREBASE_PRIVATE_KEY: escaped });
+    });
+
+    it('accepts a base64 key, which has no newlines to lose', async () => {
+      const b64 = Buffer.from(PEM, 'utf8').toString('base64');
+      expect(b64).not.toContain('\n');
+      await boot({ ...base, FIREBASE_PRIVATE_KEY_BASE64: b64 });
+    });
+
+    it('ignores a base64 value that does not decode to a key', async () => {
+      // Falls through to the plain variable rather than blowing up.
+      await boot({
+        ...base,
+        FIREBASE_PRIVATE_KEY_BASE64: 'bm90LWEta2V5',
+        FIREBASE_PRIVATE_KEY: PEM,
+      });
+    });
+
+    it('does not throw on a malformed key — the app must still boot', async () => {
+      expect(
+        await boot({ ...base, FIREBASE_PRIVATE_KEY: 'not a key at all' }),
+      ).toBe(false);
+    });
+  });
+
   describe('notify sends the push itself', () => {
     it('passes the notice through with its type in the data payload', async () => {
       const sent: any[] = [];

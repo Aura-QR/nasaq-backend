@@ -8,6 +8,41 @@ import { App, cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 import { DeviceToken, DevicePlatform } from './schemas/device-token.schema';
 
+/**
+ * The private key, however the deployment managed to store it.
+ *
+ * A PEM key is multi-line and an env var is not, so it survives the trip only
+ * if the newlines are escaped — and every layer between a paste box and the
+ * process is another chance to mangle them. When that happens the SDK throws
+ * on a key that looks correct to the eye, push silently stops, and nothing
+ * says why.
+ *
+ * FIREBASE_PRIVATE_KEY_BASE64 avoids the question entirely: base64 has no
+ * newlines to lose. It wins when both are set.
+ */
+const readPrivateKey = (): string | undefined => {
+  const b64 = process.env.FIREBASE_PRIVATE_KEY_BASE64?.trim();
+  if (b64) {
+    try {
+      const decoded = Buffer.from(b64, 'base64').toString('utf8').trim();
+      if (decoded.includes('BEGIN PRIVATE KEY')) return decoded;
+    } catch {
+      // fall through to the plain variable
+    }
+  }
+
+  const raw = process.env.FIREBASE_PRIVATE_KEY;
+  if (!raw) return undefined;
+
+  // Strip a wrapping pair of quotes some env editors add, put the newlines
+  // back, and drop trailing whitespace a paste may have left behind.
+  return raw
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/\\n/g, '\n')
+    .trim();
+};
+
 /** FCM rejects a data payload whose values are not all strings. */
 const stringifyData = (data: Record<string, any>): Record<string, string> => {
   const out: Record<string, string> = {};
@@ -50,13 +85,19 @@ export class PushService implements OnModuleInit {
   onModuleInit() {
     const projectId = process.env.FIREBASE_PROJECT_ID;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    // Env vars cannot hold real newlines, so the key is stored with the \n
-    // escaped and has to be put back before the SDK will parse it.
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    const privateKey = readPrivateKey();
 
     if (!projectId || !clientEmail || !privateKey) {
-      this.logger.log(
-        'Firebase is not configured — notifications stay in-app only.',
+      // Say which one is missing. "Not configured" on its own sends whoever
+      // is deploying to read three variables looking for the empty one.
+      const missing = [
+        !projectId && 'FIREBASE_PROJECT_ID',
+        !clientEmail && 'FIREBASE_CLIENT_EMAIL',
+        !privateKey && 'FIREBASE_PRIVATE_KEY',
+      ].filter(Boolean);
+      this.logger.warn(
+        `Firebase is not configured (missing: ${missing.join(', ')}) — ` +
+          'notices are written but never pushed. The in-app bell still works.',
       );
       return;
     }
