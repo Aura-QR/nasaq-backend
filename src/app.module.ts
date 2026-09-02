@@ -16,6 +16,7 @@ import { SubjectsModule } from './subjects/subjects.module';
 import { TeachersModule } from './teachers/teachers.module';
 import { ClassesModule } from './classes/classes.module';
 import { LecturesModule } from './lectures/lectures.module';
+import { TeacherConstraintsModule } from './teacher-constraints/teacher-constraints.module';
 import { LibraryModule } from './library/library.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { GradesCriteriaModule } from './grades-criteria/grades-criteria.module';
@@ -79,6 +80,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     TeachersModule,
     ClassesModule,
     LecturesModule,
+    TeacherConstraintsModule,
     LibraryModule,
     AttendanceModule,
     TeacherAttendanceModule,

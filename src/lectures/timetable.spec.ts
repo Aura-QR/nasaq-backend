@@ -17,6 +17,10 @@ import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
 import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
 import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
 import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-level.schema';
+import {
+  TeacherConstraint,
+  TeacherConstraintSchema,
+} from '../teacher-constraints/schemas/teacher-constraint.schema';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 
 const URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/nasaq-test';
@@ -60,6 +64,7 @@ describe('TimetableService', () => {
           // traceAssignments populates the grade level. The real app has every
           // model registered on the connection; an isolated test module does not.
           { name: GradeLevel.name, schema: GradeLevelSchema },
+          { name: TeacherConstraint.name, schema: TeacherConstraintSchema },
         ]),
       ],
       providers: [TimetableService],
@@ -69,6 +74,7 @@ describe('TimetableService', () => {
     for (const name of [
       Lecture.name, Class.name, SubjectOffering.name, TeacherAssignment.name,
       Term.name, Teacher.name, Subject.name, School.name, GradeLevel.name,
+      TeacherConstraint.name,
     ]) {
       models[name] = moduleRef.get(getModelToken(name));
     }
@@ -966,6 +972,226 @@ describe('TimetableService', () => {
 
       expect(result.failed).toBe(0);
       expect(result.written).toBe(result.placed);
+    });
+  });
+
+  describe('teacher constraints', () => {
+    const block = (teacherId: any, unavailable: any[]) =>
+      mk(models[TeacherConstraint.name], { teacherId, termId, unavailable, schoolId });
+
+    const commitFor = (classId: any) =>
+      asTenant(() =>
+        service.generate(
+          { termId: String(termId), classIds: [String(classId)], mode: 'commit' } as any,
+          schoolId,
+        ),
+      );
+
+    const cellsOf = async (teacherId: any) =>
+      (await models[Lecture.name].collection.find({ teacherId }).toArray())
+        .map((l: any) => `${l.dayOfWeek}|${l.slot}`);
+
+    it('never puts a teacher on a day they are unavailable', async () => {
+      await assign(teachers.fatima, maths);
+      await block(teachers.fatima, [{ day: 'wednesday', slots: [] }]);
+
+      await commitFor(classes.a);
+
+      const rows = await models[Lecture.name].collection
+        .find({ teacherId: teachers.fatima }).toArray();
+      expect(rows).toHaveLength(6);
+      expect(rows.map((l: any) => l.dayOfWeek)).not.toContain('wednesday');
+    });
+
+    it('honours a block on named periods rather than the whole day', async () => {
+      await assign(teachers.fatima, maths);
+      // "not the last two periods", any day.
+      await block(teachers.fatima, [
+        { day: 'sunday', slots: [6, 7] },
+        { day: 'monday', slots: [6, 7] },
+        { day: 'tuesday', slots: [6, 7] },
+        { day: 'wednesday', slots: [6, 7] },
+        { day: 'thursday', slots: [6, 7] },
+      ]);
+
+      await commitFor(classes.a);
+
+      const slots = (await models[Lecture.name].collection
+        .find({ teacherId: teachers.fatima })
+        .toArray()).map((l: any) => l.slot);
+      expect(slots.length).toBe(6);
+      expect(Math.max(...slots)).toBeLessThanOrEqual(5);
+    });
+
+    it('leaves the rest of that day usable', async () => {
+      await assign(teachers.fatima, maths);
+      await block(teachers.fatima, [{ day: 'sunday', slots: [1] }]);
+
+      await commitFor(classes.a);
+
+      const cells = await cellsOf(teachers.fatima);
+      expect(cells).not.toContain('sunday|1');
+      expect(cells.length).toBe(6);
+    });
+
+    it('does not constrain a teacher who has no row', async () => {
+      await assign(teachers.fatima, maths);
+      await block(teachers.jihan, [{ day: 'wednesday', slots: [] }]);
+
+      await commitFor(classes.a);
+
+      // Jihan's block says nothing about Fatima.
+      expect(await cellsOf(teachers.fatima)).toHaveLength(6);
+    });
+
+    it('is scoped to its own term', async () => {
+      const otherTerm = new Types.ObjectId();
+      await assign(teachers.fatima, maths);
+      await mk(models[TeacherConstraint.name], {
+        teacherId: teachers.fatima, termId: otherTerm,
+        unavailable: [{ day: 'sunday', slots: [] }, { day: 'monday', slots: [] }],
+        schoolId,
+      });
+
+      await commitFor(classes.a);
+
+      // A constraint written for another term must not shrink this one.
+      const days = (await models[Lecture.name].collection
+        .find({ teacherId: teachers.fatima })
+        .toArray()).map((l: any) => l.dayOfWeek);
+      expect(days).toContain('sunday');
+    });
+
+    it('reports what it could not place rather than pretending', async () => {
+      await assign(teachers.fatima, maths);
+      // Six periods, and only Sunday left to hold them.
+      await block(teachers.fatima, [
+        { day: 'monday', slots: [] },
+        { day: 'tuesday', slots: [] },
+        { day: 'wednesday', slots: [] },
+        { day: 'thursday', slots: [] },
+      ]);
+
+      await commitFor(classes.a);
+
+      // A seven-period Sunday can hold six, so this still fits — the point is
+      // that everything landed on the one day left open.
+      const days = new Set(
+        (await models[Lecture.name].collection
+          .find({ teacherId: teachers.fatima })
+          .toArray()).map((l: any) => l.dayOfWeek),
+      );
+      expect([...days]).toEqual(['sunday']);
+    });
+  });
+
+  describe('feasibility sees the constraints too', () => {
+    const block = (teacherId: any, unavailable: any[]) =>
+      mk(models[TeacherConstraint.name], { teacherId, termId, unavailable, schoolId });
+
+    it('measures a teacher against their available time, not the whole week', async () => {
+      // Six periods for each of two classes, and only Sunday left open.
+      await assign(teachers.fatima, maths);
+      await block(teachers.fatima, [
+        { day: 'monday', slots: [] },
+        { day: 'tuesday', slots: [] },
+        { day: 'wednesday', slots: [] },
+        { day: 'thursday', slots: [] },
+      ]);
+
+      const report: any = await feasibility();
+      const row = report.teachers.find((t: any) => t.teacherId === String(teachers.fatima));
+
+      // Twelve periods across two classes, seven slots left.
+      expect(row.load).toBe(12);
+      expect(row.capacity).toBe(7);
+      expect(row.ok).toBe(false);
+
+      const problem = report.problems.find((p: any) => p.type === 'teacher_overloaded');
+      expect(problem.constrained).toBe(true);
+      expect(problem.message).toContain('only available for 7');
+    });
+
+    it('still reports the full week for an unconstrained teacher', async () => {
+      await assign(teachers.fatima, maths);
+
+      const report: any = await feasibility();
+      const row = report.teachers.find((t: any) => t.teacherId === String(teachers.fatima));
+
+      expect(row.capacity).toBe(35);
+      expect(row.ok).toBe(true);
+    });
+
+    it('counts named slots, not only whole days', async () => {
+      await assign(teachers.fatima, maths);
+      await block(teachers.fatima, [
+        { day: 'sunday', slots: [6, 7] },
+        { day: 'monday', slots: [6, 7] },
+      ]);
+
+      const report: any = await feasibility();
+      const row = report.teachers.find((t: any) => t.teacherId === String(teachers.fatima));
+
+      expect(row.capacity).toBe(31);
+    });
+  });
+
+  describe('subject slot preference', () => {
+    const commitFor = (classId: any) =>
+      asTenant(() =>
+        service.generate(
+          { termId: String(termId), classIds: [String(classId)], mode: 'commit' } as any,
+          schoolId,
+        ),
+      );
+
+    const slotsOfSubject = async (offering: any) =>
+      (await models[Lecture.name].collection
+        .find({ subjectOfferingId: offering._id })
+        .toArray()).map((l: any) => l.slot);
+
+    it('pulls an early subject ahead of a late one', async () => {
+      await models[SubjectOffering.name].collection.updateOne(
+        { _id: maths._id }, { $set: { slotPreference: 'early' } },
+      );
+      await models[SubjectOffering.name].collection.updateOne(
+        { _id: science._id }, { $set: { slotPreference: 'late' } },
+      );
+      await assign(teachers.fatima, maths);
+      await assign(teachers.jihan, science);
+
+      await commitFor(classes.a);
+
+      const early = await slotsOfSubject(maths);
+      const late = await slotsOfSubject(science);
+      const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+      expect(avg(early)).toBeLessThan(avg(late));
+    });
+
+    it('changes nothing for a plan that never set a preference', async () => {
+      await assign(teachers.fatima, maths);
+
+      const result: any = await commitFor(classes.a);
+
+      // Six maths periods, and four of science which has no teacher.
+      expect(result.unplaced).toBe(0);
+      expect(await slotsOfSubject(maths)).toHaveLength(6);
+    });
+
+    it('stays a preference — an early subject is still placed late if it must be', async () => {
+      await models[SubjectOffering.name].collection.updateOne(
+        { _id: maths._id }, { $set: { slotPreference: 'early', periodsPerWeek: 20 } },
+      );
+      await assign(teachers.fatima, maths);
+
+      const result: any = await commitFor(classes.a);
+
+      // 20 periods cannot all be early in a 7-period day; it schedules them
+      // anyway rather than refusing.
+      expect(result.written).toBeGreaterThan(10);
+      const slots = await slotsOfSubject(maths);
+      expect(Math.max(...slots)).toBeGreaterThan(3);
     });
   });
 

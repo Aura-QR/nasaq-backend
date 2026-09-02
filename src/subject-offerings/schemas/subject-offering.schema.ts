@@ -3,6 +3,9 @@ import { Document } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
+export const SLOT_PREFERENCES = ['early', 'any', 'late'] as const;
+export type SlotPreference = (typeof SLOT_PREFERENCES)[number];
+
 @Schema({ timestamps: true })
 export class SubjectOffering extends Document {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Subject', required: true, index: true })
@@ -25,6 +28,16 @@ export class SubjectOffering extends Document {
    */
   @Prop({ type: Number, default: 0, min: 0, max: 20 })
   periodsPerWeek: number;
+
+  /**
+   * Where in the day this subject would rather sit.
+   *
+   * A preference, not a rule: a core subject that cannot fit early still gets
+   * scheduled late rather than not at all. 'any' is the default so an
+   * untouched plan behaves exactly as it did before this existed.
+   */
+  @Prop({ type: String, enum: SLOT_PREFERENCES, default: 'any' })
+  slotPreference: SlotPreference;
 }
 
 export const SubjectOfferingSchema = SchemaFactory.createForClass(SubjectOffering);

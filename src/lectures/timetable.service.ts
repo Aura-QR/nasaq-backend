@@ -9,6 +9,7 @@ import { TeacherAssignment } from '../teacher-assignments/schemas/teacher-assign
 import { Term } from '../terms/schemas/term.schema';
 import { Teacher } from '../teachers/schemas/teacher.schema';
 import { School } from '../platform/schools/schemas/school.schema';
+import { TeacherConstraint } from '../teacher-constraints/schemas/teacher-constraint.schema';
 import { GenerateTimetableDto } from './dto/generate-timetable.dto';
 
 /** One class's need for one subject, and who is expected to teach it. */
@@ -21,6 +22,8 @@ export interface Requirement {
   teacherId: string | null;
   teacherName: string | null;
   periodsPerWeek: number;
+  /** 'early' | 'any' | 'late' — where in the day this subject would rather sit. */
+  slotPreference?: string;
   /**
    * Set only when this pair has no teacher for the term being generated, but
    * the same subject and grade IS assigned in another term. Turns a silent
@@ -73,7 +76,53 @@ export class TimetableService {
     @InjectModel(Term.name) private readonly termModel: Model<Term>,
     @InjectModel(Teacher.name) private readonly teacherModel: Model<Teacher>,
     @InjectModel(School.name) private readonly schoolModel: Model<School>,
+    @InjectModel(TeacherConstraint.name)
+    private readonly teacherConstraintModel: Model<TeacherConstraint>,
   ) {}
+
+  /**
+   * "teacherId|day|slot" for every cell a teacher may not occupy this term.
+   *
+   * Flattened to one lookup set rather than kept as blocks: this is consulted
+   * once per candidate slot per lesson, which is tens of thousands of times in
+   * a normal run.
+   */
+  async loadTeacherBlocks(termId: string): Promise<Set<string>> {
+    const rows = await this.teacherConstraintModel
+      .find({ termId: new mongoose.Types.ObjectId(String(termId)) })
+      .lean()
+      .exec();
+
+    const blocked = new Set<string>();
+    for (const row of rows as any[]) {
+      for (const block of row.unavailable ?? []) {
+        if (!block?.day) continue;
+        if (!block.slots?.length) {
+          // No slots named means the whole day, however long the day is.
+          blocked.add(`${String(row.teacherId)}|${block.day}|*`);
+          continue;
+        }
+        for (const slot of block.slots) {
+          blocked.add(`${String(row.teacherId)}|${block.day}|${slot}`);
+        }
+      }
+    }
+    return blocked;
+  }
+
+  /** Whether this teacher is barred from this cell. */
+  private isBlocked(
+    blocked: Set<string>,
+    teacherId: string | null,
+    day: string,
+    slot: number,
+  ): boolean {
+    if (!teacherId || blocked.size === 0) return false;
+    return (
+      blocked.has(`${teacherId}|${day}|*`) ||
+      blocked.has(`${teacherId}|${day}|${slot}`)
+    );
+  }
 
   /**
    * How many teaching slots a week holds, per class.
@@ -286,6 +335,7 @@ export class TimetableService {
           teacherId,
           teacherName: teacherId ? (teacherById.get(teacherId)?.name ?? null) : null,
           periodsPerWeek: offering.periodsPerWeek ?? 0,
+          slotPreference: offering.slotPreference ?? 'any',
           assignedInOtherTerm: teacherId
             ? null
             : (strandedBy.get(
@@ -504,26 +554,46 @@ export class TimetableService {
         .map((r) => [r.teacherId, r.teacherName ?? '—']),
     );
 
+    // A teacher's real ceiling is the week minus whatever they blocked out, not
+    // the whole week. Checking against the whole week would pass someone who is
+    // available two days and assigned thirty periods.
+    const teacherBlocks = await this.loadTeacherBlocks(termId);
+    const availableSlotsFor = (teacherId: string) => {
+      if (teacherBlocks.size === 0) return capacity.slotsPerWeek;
+      let free = 0;
+      for (const day of capacity.workingDays) {
+        for (let slot = 1; slot <= capacity.periodsPerDay; slot++) {
+          if (!this.isBlocked(teacherBlocks, teacherId, day, slot)) free++;
+        }
+      }
+      return free;
+    };
+
     const teacherRows = [...loadByTeacher.entries()]
       .map(([teacherId, load]) => {
-        const ok = load <= capacity.slotsPerWeek;
+        const available = availableSlotsFor(teacherId);
+        const ok = load <= available;
         if (!ok) {
+          const constrained = available < capacity.slotsPerWeek;
           problems.push({
             type: 'teacher_overloaded',
-            message: `${nameByTeacher.get(teacherId)} is assigned ${load} periods a week but the week only holds ${capacity.slotsPerWeek}.`,
+            message: constrained
+              ? `${nameByTeacher.get(teacherId)} is assigned ${load} periods a week but is only available for ${available} after their unavailability is taken out.`
+              : `${nameByTeacher.get(teacherId)} is assigned ${load} periods a week but the week only holds ${capacity.slotsPerWeek}.`,
             blocking: true,
             teacherId,
             teacherName: nameByTeacher.get(teacherId),
             required: load,
-            capacity: capacity.slotsPerWeek,
+            capacity: available,
+            constrained,
           });
         }
         return {
           teacherId,
           name: nameByTeacher.get(teacherId) ?? '—',
           load,
-          capacity: capacity.slotsPerWeek,
-          free: capacity.slotsPerWeek - load,
+          capacity: available,
+          free: available - load,
           ok,
         };
       })
@@ -720,6 +790,9 @@ export class TimetableService {
       }
     }
 
+    const periodsPerDay = capacity.periodsPerDay;
+    const teacherBlocks = await this.loadTeacherBlocks(dto.termId);
+
     const state = {
       classBusy: new Map<string, Set<string>>(),
       teacherBusy: new Map<string, Set<string>>(),
@@ -742,6 +815,11 @@ export class TimetableService {
       const cell = key(day, slot);
       if (state.classBusy.get(requirement.classId)?.has(cell)) return false;
       if (requirement.teacherId && state.teacherBusy.get(requirement.teacherId)?.has(cell)) {
+        return false;
+      }
+      // A declared unavailability is a rule, not a preference — a teacher who
+      // is not in the building cannot be given a lesson however well it scores.
+      if (this.isBlocked(teacherBlocks, requirement.teacherId, day, slot)) {
         return false;
       }
       return true;
@@ -798,8 +876,15 @@ export class TimetableService {
         }
       }
 
-      // Fill from the top of the day down.
-      score += slot;
+      // Fill from the top of the day down. A subject marked 'early' feels this
+      // pull three times as hard, which is what puts core subjects ahead of
+      // the rest when they compete for the same morning slot; 'late' inverts
+      // it so art and PE drift toward the end of the day.
+      const preference = requirement.slotPreference ?? 'any';
+      if (preference === 'early') score += slot * 3;
+      else if (preference === 'late') score += (periodsPerDay - slot) * 3;
+      else score += slot;
+
       return score;
     };
 

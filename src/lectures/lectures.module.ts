@@ -3,6 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { LecturesController } from './lectures.controller';
 import { LecturesService } from './lectures.service';
 import { Lecture, LectureSchema } from './schemas/lecture.schema';
+import {
+  TeacherConstraint,
+  TeacherConstraintSchema,
+} from '../teacher-constraints/schemas/teacher-constraint.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
 import { Student, StudentSchema } from 'src/students/schemas/student.schema';
@@ -15,6 +19,8 @@ import { TimetableService } from './timetable.service';
 @Module({
   imports: [
     MongooseModule.forFeature([
+      // Read by the generator: a blocked cell is never offered.
+      { name: TeacherConstraint.name, schema: TeacherConstraintSchema },
       { name: Lecture.name, schema: LectureSchema },
       { name: Class.name, schema: ClassSchema },
       { name: Teacher.name, schema: TeacherSchema },
