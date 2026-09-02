@@ -43,17 +43,18 @@ const STAGES = [
 ];
 
 const CLASSES = [
-  { name: 'أولى/بنات',        grade: 'الصف الأول' },
-  { name: 'أولى/بنين',        grade: 'الصف الأول' },
-  { name: 'ثانية/بنات ١',     grade: 'الصف الثاني' },
-  { name: 'ثانية/بنات ٢',     grade: 'الصف الثاني' },
-  { name: 'ثانية/بنين',       grade: 'الصف الثاني' },
-  { name: 'ثالثة/بنات',       grade: 'الصف الثالث' },
-  { name: 'ثالثة/بنين',       grade: 'الصف الثالث' },
-  { name: 'رابعة/بنات',       grade: 'الصف الرابع' },
-  { name: 'خامسة/بنات',       grade: 'الصف الخامس' },
-  { name: 'سادسة',            grade: 'الصف السادس' },
-  { name: 'أولى متوسط/بنات',  grade: 'الأول متوسط' },
+  { name: 'أولى/بنات',        grade: 'الصف الأول',   gender: 'female' },
+  { name: 'أولى/بنين',        grade: 'الصف الأول',   gender: 'male' },
+  { name: 'ثانية/بنات ١',     grade: 'الصف الثاني',  gender: 'female' },
+  { name: 'ثانية/بنات ٢',     grade: 'الصف الثاني',  gender: 'female' },
+  { name: 'ثانية/بنين',       grade: 'الصف الثاني',  gender: 'male' },
+  { name: 'ثالثة/بنات',       grade: 'الصف الثالث',  gender: 'female' },
+  { name: 'ثالثة/بنين',       grade: 'الصف الثالث',  gender: 'male' },
+  { name: 'رابعة/بنات',       grade: 'الصف الرابع',  gender: 'female' },
+  { name: 'خامسة/بنات',       grade: 'الصف الخامس',  gender: 'female' },
+  // The أنصبة sheet never says which; 'both' keeps it honest until they do.
+  { name: 'سادسة',            grade: 'الصف السادس',  gender: 'both' },
+  { name: 'أولى متوسط/بنات',  grade: 'الأول متوسط',  gender: 'female' },
 ];
 
 /** The teaching plan, straight off the أنصبة sheet. */
@@ -195,7 +196,7 @@ async function main() {
   for (const c of CLASSES) {
     await ensure('فصل', existingClasses, c.name, () =>
       call('POST', '/classes', {
-        name: c.name, gradeLevelId: gradeIds[c.grade],
+        name: c.name, gradeLevelId: gradeIds[c.grade], gender: c.gender,
         academicYearId: yearId, maxCapacity: 30, isActive: true,
       }));
   }
