@@ -89,6 +89,93 @@ const TEACHERS = [
   'فاطمة الدهاسي', 'العنود مدهر', 'بشاير الياسي',
 ];
 
+
+// ── who teaches what ──────────────────────────────────────────────────────
+const T2 = ['ثانية/بنات ١', 'ثانية/بنات ٢', 'ثانية/بنين'];
+const T3 = ['ثالثة/بنات', 'ثالثة/بنين'];
+const UPPER = ['رابعة/بنات', 'خامسة/بنات', 'سادسة', 'أولى متوسط/بنات'];
+const EVERY = [
+  'أولى/بنات', 'أولى/بنين', ...T2, ...T3, ...UPPER,
+];
+
+/**
+ * Straight off the أنصبة sheet, one row per (teacher, subject, classes).
+ *
+ * Always pinned to named classes rather than left grade-wide. Two teachers
+ * split the same subject across a grade all over this sheet — سمر takes the
+ * boys' first grade and زينب the girls' — and a grade-wide assignment would
+ * put both of them in both rooms.
+ */
+const ASSIGNMENTS: [string, string, string[]][] = [
+  ['سمر المالكي', 'الدراسات الإسلامية', ['أولى/بنين']],
+  ['سمر المالكي', 'لغتي', ['أولى/بنين']],
+  ['سمر المالكي', 'الرياضيات', ['أولى/بنين']],
+  ['سمر المالكي', 'العلوم', ['أولى/بنين']],
+  ['سمر المالكي', 'تربية فنية', ['أولى/بنين']],
+  ['سمر المالكي', 'المهارات الحياتية والأسرية', ['أولى/بنين']],
+
+  ['زينب البيشي', 'الدراسات الإسلامية', ['أولى/بنات']],
+  ['زينب البيشي', 'لغتي', ['أولى/بنات']],
+  ['زينب البيشي', 'الرياضيات', ['أولى/بنات']],
+  ['زينب البيشي', 'العلوم', ['أولى/بنات']],
+  ['زينب البيشي', 'تربية فنية', ['أولى/بنات']],
+  ['زينب البيشي', 'المهارات الحياتية والأسرية', ['أولى/بنات']],
+
+  ['عنود القرشي', 'الرياضيات', T2],
+  ['عنود القرشي', 'العلوم', T2],
+
+  ['جوهرة المالكي', 'لغتي', ['ثانية/بنات ١', 'ثانية/بنات ٢']],
+  ['جوهرة المالكي', 'تربية فنية', ['ثانية/بنات ١']],
+
+  ['بسمة عبدالفتاح', 'لغتي', ['خامسة/بنات', 'سادسة', 'أولى متوسط/بنات']],
+  ['بسمة عبدالفتاح', 'الدراسات الإسلامية', ['سادسة', 'أولى متوسط/بنات']],
+
+  ['أميرة العصيمي', 'اجتماعيات', UPPER],
+  ['أميرة العصيمي', 'لغتي', ['رابعة/بنات']],
+  ['أميرة العصيمي', 'الدراسات الإسلامية', ['رابعة/بنات']],
+  ['أميرة العصيمي', 'تربية فنية', ['رابعة/بنات']],
+  ['أميرة العصيمي', 'المهارات الحياتية والأسرية', ['رابعة/بنات']],
+
+  ['مروة العتيبي', 'لغتي', T3],
+  ['مروة العتيبي', 'تدريب نافس', T3],
+  ['مروة العتيبي', 'المهارات الرقمية', UPPER],
+
+  ['ريم العتيبي', 'الرياضيات', UPPER],
+
+  ['جيهان العتيبي', 'العلوم', [...UPPER, ...T3]],
+
+  ['أشواق المضيقي', 'الدراسات الإسلامية', [...T2, 'خامسة/بنات']],
+  ['أشواق المضيقي', 'تربية فنية', ['خامسة/بنات']],
+  ['أشواق المضيقي', 'المهارات الحياتية والأسرية', ['خامسة/بنات']],
+  ['أشواق المضيقي', 'التربية البدنية', ['خامسة/بنات']],
+
+  ['نادية الشريف', 'تربية فنية', ['سادسة', 'أولى متوسط/بنات', ...T3]],
+  ['نادية الشريف', 'المهارات الحياتية والأسرية', ['سادسة', 'أولى متوسط/بنات', ...T3]],
+  ['نادية الشريف', 'التربية البدنية',
+    ['أولى/بنات', 'أولى/بنين', 'رابعة/بنات', 'سادسة', 'أولى متوسط/بنات', 'ثالثة/بنات']],
+
+  ['صوفيا عبدالعزيز', 'اللغة الإنجليزية', UPPER],
+
+  // The sheet gives grade-1 English to both ثريا and ملاك; split one class each.
+  ['ثريا بوخاري', 'اللغة الإنجليزية', ['ثانية/بنين', 'أولى/بنين', ...T3]],
+  // The sheet assigns nobody to the two second-grade girls' classes. ملاك has
+  // the lightest load, so they go to her — confirm with the school.
+  ['ملاك الجهني', 'اللغة الإنجليزية', ['أولى/بنات', 'ثانية/بنات ١', 'ثانية/بنات ٢']],
+  ['ملاك الجهني', 'اللغة الصينية', EVERY],
+
+  ['رشا طاهر', 'الحساب الذهني', EVERY],
+  ['رشا طاهر', 'التربية البدنية', ['ثالثة/بنين']],
+
+  ['فاطمة الدهاسي', 'الرياضيات', T3],
+
+  ['العنود مدهر', 'لغتي', ['ثانية/بنين']],
+  ['العنود مدهر', 'تربية فنية', ['ثانية/بنات ٢', 'ثانية/بنين']],
+  ['العنود مدهر', 'المهارات الحياتية والأسرية', T2],
+  ['العنود مدهر', 'التربية البدنية', T2],
+
+  ['بشاير الياسي', 'الدراسات الإسلامية', T3],
+];
+
 // ── plumbing ──────────────────────────────────────────────────────────────
 let TOKEN = '';
 const log = (...a: any[]) => console.log(...a);
@@ -245,8 +332,78 @@ async function main() {
       }));
   }
 
-  // ── 7. feasibility ──────────────────────────────────────────────────────
-  log('\n7. فحص الجدوى');
+  // ── 7. assignments ──────────────────────────────────────────────────────
+  log('\n7. الإسناد');
+  const classRows = unwrap(await call('GET', '/classes'));
+  const teacherRows = unwrap(await call('GET', '/teachers'));
+  const offeringRows = unwrap(await call('GET', `/subject-offerings/by-term/${termId}`));
+  const existingAssignments = unwrap(await call('GET', '/teacher-assignments'));
+
+  const classByName = new Map(classRows.map((c: any) => [c.name, c]));
+  const teacherByName = new Map(teacherRows.map((t: any) => [t.name, idOf(t)]));
+
+  // Offerings are keyed by grade + subject; a class points at its grade.
+  const offeringFor = (gradeLevelId: string, subjectName: string) =>
+    offeringRows.find(
+      (o: any) =>
+        String(o.gradeLevelId?._id ?? o.gradeLevelId) === String(gradeLevelId) &&
+        (o.subjectId?.subjectName ?? o.subjectName) === subjectName,
+    );
+
+  const already = new Set(
+    existingAssignments.map(
+      (a: any) =>
+        `${String(a.teacherId?._id ?? a.teacherId)}|` +
+        `${String(a.subjectOfferingId?._id ?? a.subjectOfferingId)}|` +
+        `${a.classId ? String(a.classId?._id ?? a.classId) : ''}`,
+    ),
+  );
+
+  let made = 0, skipped = 0;
+  const failures: string[] = [];
+
+  for (const [teacherName, subjectName, classNames] of ASSIGNMENTS) {
+    const teacherId = teacherByName.get(teacherName);
+    if (!teacherId) { failures.push(`معلمة مش موجودة: ${teacherName}`); continue; }
+
+    for (const className of classNames) {
+      const klass: any = classByName.get(className);
+      if (!klass) { failures.push(`فصل مش موجود: ${className}`); continue; }
+
+      const gradeLevelId = String(klass.gradeLevelId?._id ?? klass.gradeLevelId);
+      const offering = offeringFor(gradeLevelId, subjectName);
+      if (!offering) {
+        failures.push(`مفيش عرض لـ "${subjectName}" في صف ${className}`);
+        continue;
+      }
+
+      const key = `${teacherId}|${idOf(offering)}|${idOf(klass)}`;
+      if (already.has(key)) { skipped++; continue; }
+      if (DRY) { made++; continue; }
+
+      try {
+        await call('POST', '/teacher-assignments', {
+          teacherId,
+          subjectOfferingId: idOf(offering),
+          // Always pinned: two teachers share a subject across a grade all
+          // over this sheet, and grade-wide would put both in both rooms.
+          classId: idOf(klass),
+        });
+        made++;
+      } catch (e: any) {
+        failures.push(`${teacherName} · ${subjectName} · ${className}: ${e.message.slice(-90)}`);
+      }
+    }
+  }
+
+  log(`   ✔ ${made} إسناد${skipped ? `   ↺ ${skipped} موجود` : ''}`);
+  if (failures.length) {
+    log(`   ⚠️ ${failures.length} مشكلة:`);
+    for (const f of failures.slice(0, 15)) log(`      · ${f}`);
+  }
+
+  // ── 8. feasibility ──────────────────────────────────────────────────────
+  log('\n8. فحص الجدوى');
   const f = await call('GET', `/lectures/feasibility?termId=${termId}`);
   log(`   خانات الأسبوع: ${f.slotsPerWeek}`);
   const problems = f.problems ?? [];
@@ -257,8 +414,9 @@ async function main() {
   }
 
   log(DRY
-    ? '\n🔍 تجربة خلصت — مكتبناش حاجة.\n   شغّلها من غير --dry-run، وبعدين شغّل الـ dry-run تاني عشان يتأكد من الخطة.'
-    : '\n✅ خلص. فاضل الإسناد: POST /teacher-assignments/import');
+    ? '\n🔍 تجربة خلصت — مكتبناش حاجة.'
+    : '\n✅ خلص. لو فحص الجدوى نضيف، ولّد:\n' +
+      '   POST /lectures/generate  { "termId": "' + termId + '", "mode": "preview" }');
 }
 
 main().catch((e) => { console.error('\n❌', e.message); process.exit(1); });
