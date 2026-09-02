@@ -1087,6 +1087,68 @@ describe('TimetableService', () => {
     });
   });
 
+  describe('teachers already booked in a class we are not rebuilding', () => {
+    it('does not plan on top of them', async () => {
+      // ٥/١ keeps a hand-built timetable; فاطمة teaches there all Sunday.
+      await assign(teachers.fatima, maths);
+      await assign(teachers.fatima, arabic, classes.c);
+      for (let slot = 1; slot <= 6; slot++) {
+        await mk(models[Lecture.name], {
+          classId: classes.c, teacherId: teachers.fatima,
+          subjectOfferingId: arabic._id, termId, dayOfWeek: 'sunday', slot, schoolId,
+        });
+      }
+
+      // Rebuild ٤/١ only. onExisting defaults to skip, so ٥/١ is left alone.
+      const result: any = await asTenant(() =>
+        service.generate(
+          { termId: String(termId), classIds: [String(classes.a)], mode: 'commit' } as any,
+          schoolId,
+        ),
+      );
+
+      // Every write must land: planning against a teacher who is not actually
+      // free is what the database used to have to catch.
+      expect(result.failed).toBe(0);
+      expect(result.written).toBe(result.placed);
+
+      // She may still teach ٤/١ on Sunday — just not in the six periods she is
+      // already standing in ٥/١ for.
+      const clash = await models[Lecture.name].collection
+        .find({
+          teacherId: teachers.fatima, dayOfWeek: 'sunday',
+          classId: classes.a, slot: { $lte: 6 },
+        })
+        .toArray();
+      expect(clash).toEqual([]);
+    });
+
+    it('still uses those slots when the class is being replaced', async () => {
+      await assign(teachers.fatima, maths);
+      for (let slot = 1; slot <= 6; slot++) {
+        await mk(models[Lecture.name], {
+          classId: classes.a, teacherId: teachers.fatima,
+          subjectOfferingId: maths._id, termId, dayOfWeek: 'sunday', slot, schoolId,
+        });
+      }
+
+      const result: any = await asTenant(() =>
+        service.generate(
+          {
+            termId: String(termId), classIds: [String(classes.a)],
+            mode: 'commit', onExisting: 'replace',
+          } as any,
+          schoolId,
+        ),
+      );
+
+      // The old ones go first, so their slots are genuinely free again.
+      expect(result.deleted).toBe(6);
+      expect(result.failed).toBe(0);
+      expect(result.written).toBeGreaterThan(0);
+    });
+  });
+
   describe('teacher constraints', () => {
     const block = (teacherId: any, unavailable: any[]) =>
       mk(models[TeacherConstraint.name], { teacherId, termId, unavailable, schoolId });

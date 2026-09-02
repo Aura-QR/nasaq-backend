@@ -732,7 +732,7 @@ export class TimetableService {
     const termObjectId = new mongoose.Types.ObjectId(dto.termId);
     const existing = await this.lectureModel
       .find({ termId: termObjectId })
-      .select('classId')
+      .select('classId teacherId dayOfWeek slot')
       .lean()
       .exec();
 
@@ -832,6 +832,32 @@ export class TimetableService {
       teacherBusy: new Map<string, Set<string>>(),
       subjectPerDay: new Map<string, number>(),
     };
+
+    /**
+     * A teacher already standing in a classroom we are not rebuilding is not
+     * free, however little we intend to touch that class.
+     *
+     * Existing lectures were read only to decide which classes to skip. Their
+     * teachers were then treated as available, so the solver planned lessons
+     * on top of them and the unique index rejected the writes — six of them on
+     * a real school. Nothing corrupt landed, but six periods were lost and the
+     * preview had promised them.
+     *
+     * Lectures belonging to classes being replaced are deleted before the
+     * write, so those slots really are free and are left out here.
+     */
+    const replacing = onExisting === 'replace'
+      ? new Set(planned.map((r) => r.classId))
+      : new Set<string>();
+
+    for (const lecture of existing as any[]) {
+      if (!lecture.teacherId) continue;
+      if (replacing.has(String(lecture.classId))) continue;
+      const teacherId = String(lecture.teacherId);
+      const cell = `${lecture.dayOfWeek}:${lecture.slot}`;
+      if (!state.teacherBusy.has(teacherId)) state.teacherBusy.set(teacherId, new Set());
+      state.teacherBusy.get(teacherId).add(cell);
+    }
 
     const placements: Placement[] = [];
     const unplaced: Requirement[] = [];
