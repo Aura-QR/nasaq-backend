@@ -25,7 +25,8 @@
     "migrate:preparation-week": "ts-node -r tsconfig-paths/register src/scripts/backfill-preparation-week.ts",
     "migrate:preparation-week:dry": "ts-node -r tsconfig-paths/register src/scripts/backfill-preparation-week.ts --dry-run",
     "repair:preparation-lectures": "ts-node -r tsconfig-paths/register src/scripts/repair-preparation-lectures.ts",
-    "seed:mwahb": "ts-node src/scripts/seed-mwahb.ts"
+    "seed:mwahb": "ts-node src/scripts/seed-mwahb.ts",
+    "cleanup:dup-teachers": "ts-node src/scripts/cleanup-duplicate-teachers.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",

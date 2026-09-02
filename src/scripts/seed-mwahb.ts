@@ -14,6 +14,8 @@
  *
  * Safe to re-run: anything that already exists is matched by name and reused.
  */
+import { normalizeArabicName } from '../common/arabic-name.util';
+
 const API = process.env.NASAQ_API ?? 'https://api.nasaq.185.170.196.120.sslip.io';
 const DRY = process.argv.includes('--dry-run');
 
@@ -213,10 +215,40 @@ const unwrap = (r: any) =>
 
 const idOf = (x: any) => String(x?._id ?? x?.id ?? '');
 
+/** /teachers returns { _id, name }; /teachers/list returns { id, fullName }. */
+const nameOf = (x: any) => String(x?.name ?? x?.fullName ?? x?.subjectName ?? '');
+
+/**
+ * Whether a stored name is the same person as the one we are about to add.
+ *
+ * Exact string equality is not enough: schools enter teachers under their
+ * full names, so "زينب البيشي" and "زينب سالم محمد البيشي" are one person and
+ * a strict match creates a second record for her. Every word of the shorter
+ * name appearing in the longer one is the same test the import endpoints use.
+ */
+const samePerson = (a: string, b: string) => {
+  if (a === b) return true;
+  const short = normalizeArabicName(a).split(/\s+/).filter(Boolean);
+  const long = new Set(normalizeArabicName(b).split(/\s+/).filter(Boolean));
+  return short.length > 0 && short.every((w) => long.has(w));
+};
+
 /** Reuse a row that already exists rather than creating a duplicate. */
-async function ensure(label: string, existing: any[], name: string, create: () => Promise<any>) {
-  const hit = existing.find((e: any) => (e.name ?? e.subjectName) === name);
-  if (hit) { log(`   ↺ ${label} موجود: ${name}`); return idOf(hit); }
+async function ensure(
+  label: string,
+  existing: any[],
+  name: string,
+  create: () => Promise<any>,
+  fuzzy = false,
+) {
+  const hit = fuzzy
+    ? existing.find((e: any) => samePerson(name, nameOf(e)))
+    : existing.find((e: any) => nameOf(e) === name);
+  if (hit) {
+    const stored = nameOf(hit);
+    log(`   ↺ ${label} موجود: ${stored === name ? name : `${name} → ${stored}`}`);
+    return idOf(hit);
+  }
   if (DRY) { log(`   + ${label} (dry): ${name}`); return `DRY_${name}`; }
   const made = await create();
   log(`   ✔ ${label}: ${name}`);
@@ -321,7 +353,9 @@ async function main() {
 
   // ── 6. teachers ─────────────────────────────────────────────────────────
   log('\n6. المعلمات');
-  const existingTeachers = unwrap(await call('GET', '/teachers'));
+  // /teachers is paginated at ten; /teachers/list is not, and matching
+  // against ten of forty-three is how the duplicates happened.
+  const existingTeachers = unwrap(await call('GET', '/teachers/list'));
   for (const name of TEACHERS) {
     await ensure('معلمة', existingTeachers, name, () =>
       call('POST', '/teachers', {
@@ -329,18 +363,21 @@ async function main() {
         email: `${name.replace(/\s+/g, '.')}@mwahb.sa`,
         password: 'Mwahb@1448',
         isActive: true,
-      }));
+      }), true);
   }
 
   // ── 7. assignments ──────────────────────────────────────────────────────
   log('\n7. الإسناد');
   const classRows = unwrap(await call('GET', '/classes'));
-  const teacherRows = unwrap(await call('GET', '/teachers'));
+  const teacherRows = unwrap(await call('GET', '/teachers/list'));
   const offeringRows = unwrap(await call('GET', `/subject-offerings/by-term/${termId}`));
   const existingAssignments = unwrap(await call('GET', '/teacher-assignments'));
 
   const classByName = new Map(classRows.map((c: any) => [c.name, c]));
-  const teacherByName = new Map(teacherRows.map((t: any) => [t.name, idOf(t)]));
+  const findTeacher = (name: string) => {
+    const row = teacherRows.find((t: any) => samePerson(name, nameOf(t)));
+    return row ? idOf(row) : null;
+  };
 
   // Offerings are keyed by grade + subject; a class points at its grade.
   const offeringFor = (gradeLevelId: string, subjectName: string) =>
@@ -363,7 +400,7 @@ async function main() {
   const failures: string[] = [];
 
   for (const [teacherName, subjectName, classNames] of ASSIGNMENTS) {
-    const teacherId = teacherByName.get(teacherName);
+    const teacherId = findTeacher(teacherName);
     if (!teacherId) { failures.push(`معلمة مش موجودة: ${teacherName}`); continue; }
 
     for (const className of classNames) {
