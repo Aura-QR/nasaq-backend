@@ -27,7 +27,8 @@
     "repair:preparation-lectures": "ts-node -r tsconfig-paths/register src/scripts/repair-preparation-lectures.ts",
     "seed:mwahb": "ts-node src/scripts/seed-mwahb.ts",
     "cleanup:dup-teachers": "ts-node src/scripts/cleanup-duplicate-teachers.ts",
-    "cleanup:classes": "ts-node src/scripts/cleanup-stray-classes.ts"
+    "cleanup:classes": "ts-node src/scripts/cleanup-stray-classes.ts",
+    "generate:timetable": "ts-node src/scripts/generate-timetable.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",
