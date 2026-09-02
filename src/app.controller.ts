@@ -11,9 +11,14 @@ export class AppController {
   // Health check endpoint
   @Public()
   @Get(['health-check', 'api/v1/health-check'])
-  @ApiOperation({ summary: 'Check server health status' })
+  @ApiOperation({
+    summary: 'Health, and which build is actually running',
+    description:
+      'startedAt dates the running process, so comparing it against the time ' +
+      'of a push says whether that push is live yet.',
+  })
   @ApiResponse({ status: 200, description: 'Server is healthy' })
-  healthCheck(): string {
+  healthCheck() {
     return this.appService.healthCheck();
   }
 

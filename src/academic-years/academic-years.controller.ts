@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, HttpCode, HttpStatus,
+import { Controller, Get, Post, Body, Patch, Delete, Param, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { AcademicYearsService } from './academic-years.service';
 import { CreateAcademicYearDto } from './dto/create-academic-year.dto';
@@ -66,5 +66,22 @@ export class AcademicYearsController {
   @ApiResponse({ status: 404, description: 'Academic year not found.' })
   updateSetupStep(@Param('id') id: string, @Body('step') step: number) {
     return this.academicYearsService.updateSetupStep(id, step);
+  }
+
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Delete an academic year created by mistake',
+    description:
+      'Refuses while any student is enrolled in the year or in one of its ' +
+      'classes, and refuses to remove the last year. Empty classes, their ' +
+      'lectures and the terms go with it. Deleting the active year promotes ' +
+      'the most recent remaining one so the school is never left without.',
+  })
+  @ApiResponse({ status: 200, description: 'Deleted' })
+  @ApiResponse({ status: 409, description: 'Students are enrolled' })
+  remove(@Param('id') id: string) {
+    return this.academicYearsService.remove(id);
   }
 }
