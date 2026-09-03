@@ -23,6 +23,9 @@ const DRY = process.argv.includes('--dry-run');
 const PAIRS: [string, string][] = [
   ['سمر المالكي', 'سمر سعود محمدالمالكي'],
   ['صوفيا عبدالعزيز', 'صوفيا عبد العزيز جفان'],
+  // The school entered ملاك twice, three days apart, under two addresses.
+  // Confirmed one person; the later record is the one in use.
+  ['ملاك عبدالرحمن سعد الجهني', 'ملاك عبد الرحمن الجهني'],
 ];
 
 let TOKEN = '';
@@ -83,19 +86,31 @@ async function main() {
 
     if (DRY) continue;
 
-    let moved = 0, dropped = 0;
+    let moved = 0, dropped = 0, broken = 0;
     for (const a of mine) {
-      const key = `${ref(a.subjectOfferingId)}|${a.classId ? ref(a.classId) : ''}`;
+      const offeringId = ref(a.subjectOfferingId);
+
+      // Some rows point at an offering that no longer exists. They cannot be
+      // recreated and are not worth keeping — delete and count them, rather
+      // than failing the merge on data that was already broken.
+      if (!offeringId) {
+        await call('DELETE', `/teacher-assignments/${idOf(a)}`);
+        broken++;
+        continue;
+      }
+
+      const key = `${offeringId}|${a.classId ? ref(a.classId) : ''}`;
       await call('DELETE', `/teacher-assignments/${idOf(a)}`);
       if (theirs.has(key)) { dropped++; continue; }  // she already has it
       await call('POST', '/teacher-assignments', {
         teacherId: idOf(keep),
-        subjectOfferingId: ref(a.subjectOfferingId),
+        subjectOfferingId: offeringId,
         ...(a.classId ? { classId: ref(a.classId) } : {}),
       });
       theirs.add(key);
       moved++;
     }
+    if (broken) console.log(`   ⚠️  ${broken} إسناد مكسور (مادة مش موجودة) اتشال`);
     // Her lectures block the delete, and rightly — but they belong to a
     // timetable that is about to be rebuilt from the merged assignments, so
     // they are not work anyone loses.
