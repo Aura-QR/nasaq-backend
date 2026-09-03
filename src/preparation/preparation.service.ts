@@ -181,7 +181,7 @@ export class PreparationService {
           select: 'name academicYearId roomNumber gender',
         },
       })
-      .populate('subject')
+      .populate({ path: 'subject', populate: { path: 'subjectId' } })
       .populate('submittedBy', 'name email')
       .exec();
 
@@ -432,23 +432,51 @@ export class PreparationService {
     }
 
   
-    if (prepObj.lecture && prepObj.lecture.classId && typeof prepObj.lecture.classId === 'object' && prepObj.lecture.classId._id) {
-      const classData = prepObj.lecture.classId;
-      prepObj.academicYear = classData.academicYear;
+    /*
+     * The class can arrive by either road: through the lecture (live rows and
+     * archived snapshots both nest it), or through the row's own denormalised
+     * classId. Take whichever resolved.
+     */
+    const lectureClass =
+      prepObj.lecture &&
+      typeof prepObj.lecture.classId === 'object' &&
+      prepObj.lecture.classId?._id
+        ? prepObj.lecture.classId
+        : null;
+
+    const ownClass =
+      typeof prepObj.classId === 'object' && prepObj.classId?._id
+        ? prepObj.classId
+        : null;
+
+    const classData = lectureClass ?? ownClass;
+
+    if (classData) {
+      // `name` was selected by every populate above and then dropped here, so
+      // the class the client got had no way to identify itself. `academicYear`
+      // is not a field on Class — it is `academicYearId` — so it was always
+      // undefined; passing it on made the label look empty rather than wrong.
       prepObj.roomNumber = classData.roomNumber;
       prepObj.gender = classData.gender;
       prepObj.class = {
         _id: classData._id,
-        academicYear: classData.academicYear,
+        name: classData.name ?? null,
+        academicYearId: classData.academicYearId ?? null,
         gender: classData.gender,
         roomNumber: classData.roomNumber,
       };
 
-   
-      prepObj.lecture = {
-        ...prepObj.lecture,
-        classId: classData._id.toString(),
-      };
+      if (lectureClass) {
+        prepObj.lecture = {
+          ...prepObj.lecture,
+          classId: classData._id.toString(),
+        };
+      }
+
+      prepObj.classId =
+        typeof prepObj.classId === 'object' && prepObj.classId?._id
+          ? prepObj.classId._id.toString()
+          : prepObj.classId;
     }
 
     // The teacher picks a week; the day comes from the lecture. Surfacing the
@@ -549,7 +577,10 @@ export class PreparationService {
 
     let preparationsQuery = this.preparationModel
       .find(query).sort({ createdAt: -1 })
-      .populate('submittedBy', 'name email');
+      .populate('submittedBy', 'name email')
+      // The row stores classId precisely so the class survives the archiving
+      // cron. Not resolving it here threw that away and left the column blank.
+      .populate('classId', 'name roomNumber gender academicYearId');
 
     if (isPaginationRequested) {
       preparationsQuery = preparationsQuery
@@ -566,14 +597,16 @@ export class PreparationService {
     if (toPopulate.length > 0) {
       await this.preparationModel.populate(toPopulate, [
         { path: 'lecture', populate: { path: 'classId', select: 'name academicYearId roomNumber gender' } },
-        { path: 'subject' },
+        { path: 'subject', populate: { path: 'subjectId' } },
       ]);
     }
     const toPopulateSubject = preparations.filter(
       (p) => !toPopulate.includes(p) && Types.ObjectId.isValid(p.subject as any) && String(p.subject).length === 24,
     );
     if (toPopulateSubject.length > 0) {
-      await this.preparationModel.populate(toPopulateSubject, [{ path: 'subject' }]);
+      await this.preparationModel.populate(toPopulateSubject, [
+        { path: 'subject', populate: { path: 'subjectId' } },
+      ]);
     }
     const totalDocs = paginationMate.total;
     const totalPages = paginationMate.totalPages;
@@ -937,7 +970,7 @@ export class PreparationService {
           select: 'name academicYearId roomNumber gender',
         },
       })
-      .populate('subject')
+      .populate({ path: 'subject', populate: { path: 'subjectId' } })
       .populate('submittedBy', 'name email')
       .exec();
 
@@ -994,7 +1027,9 @@ export class PreparationService {
       ]);
     }
     if (Types.ObjectId.isValid(preparation.subject as any) && String(preparation.subject).length === 24) {
-      await this.preparationModel.populate(preparation, [{ path: 'subject' }]);
+      await this.preparationModel.populate(preparation, [
+        { path: 'subject', populate: { path: 'subjectId' } },
+      ]);
     }
 
     const baseUrl =
@@ -1058,7 +1093,7 @@ export class PreparationService {
           select: 'name academicYearId roomNumber gender',
         },
       })
-      .populate('subject')
+      .populate({ path: 'subject', populate: { path: 'subjectId' } })
       .populate('submittedBy', 'name email')
       .exec();
 
@@ -1112,7 +1147,7 @@ export class PreparationService {
           select: 'name academicYearId roomNumber gender',
         },
       })
-      .populate('subject')
+      .populate({ path: 'subject', populate: { path: 'subjectId' } })
       .populate('submittedBy', 'name email')
       .exec();
 

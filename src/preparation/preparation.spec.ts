@@ -249,6 +249,60 @@ describe('PreparationService', () => {
     });
   });
 
+  /**
+   * Every one of these columns was blank on the screen no matter what the
+   * database held, so each test here fails against the previous code.
+   */
+  describe('what the list has to name', () => {
+    it('resolves the subject, whose name is a level below the offering', async () => {
+      await createByManager();
+
+      const rows: any = await asTenant(() => service.filtering({}, {}, OWNER, req));
+      const subject = rows[0].subject;
+
+      // `subject` is a SubjectOffering. It carries no name of its own — that
+      // is on subjectId — so populating only the offering could never label
+      // the column, whatever the data said.
+      expect(subject?.subjectId?.subjectName).toBe('رياضيات');
+    });
+
+    it('names the teacher on the row itself, not only by reference', async () => {
+      await createByManager();
+
+      const rows: any = await asTenant(() => service.filtering({}, {}, OWNER, req));
+
+      expect(rows[0].name).toBe('أ. محمد');
+      expect(String(rows[0].submittedBy?._id ?? rows[0].submittedBy)).toBe(String(teacherA));
+    });
+
+    it('resolves the class it denormalised, and keeps the class name', async () => {
+      await createByManager();
+
+      const rows: any = await asTenant(() => service.filtering({}, {}, OWNER, req));
+
+      // The row stores classId so the class survives the archiving cron.
+      // Leaving it an unresolved id, and dropping `name` on the way out, left
+      // the client holding a class that could not say which one it was.
+      expect(rows[0].class?.name).toBe('أول/١');
+      expect(rows[0].class?.gender).toBe('male');
+    });
+
+    it('resolves the class from the row alone once the lecture is archived', async () => {
+      await createByManager();
+
+      // What the Friday cron leaves behind: a snapshot, and no ref to follow.
+      await prepModel.collection.updateMany(
+        {},
+        { $set: { lecture: { _id: null, dayOfWeek: null, slot: null } } },
+      );
+
+      const rows: any = await asTenant(() => service.filtering({}, {}, OWNER, req));
+
+      expect(rows[0].class?.name).toBe('أول/١');
+      expect(rows[0].name).toBe('أ. محمد');
+    });
+  });
+
   describe('filtering', () => {
     it('rejects an unknown filter by name rather than returning an empty list', async () => {
       // The old code assigned every unrecognised key straight into the query,
