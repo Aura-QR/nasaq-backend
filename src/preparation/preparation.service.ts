@@ -993,18 +993,39 @@ export class PreparationService {
 
     this.assertCanMutate(preparation, user, 'حذف');
 
+    /*
+     * Detach from the lecture only when there is still a lecture to detach
+     * from. An archived row holds a snapshot object here, and handing that to
+     * findByIdAndUpdate raises a CastError — which reached the client as
+     * "صيغة المعرف غير صحيحة" and made exactly the rows a manager most wants
+     * to clear away the ones that could not be deleted, by API or by the
+     * trash button.
+     */
+    const lectureRef = preparation.lecture as any;
+    const hasLectureRef =
+      Types.ObjectId.isValid(lectureRef) && String(lectureRef).length === 24;
+
+    if (hasLectureRef) {
+      await this.lectureModel.findByIdAndUpdate(
+        lectureRef,
+        { $pull: { preparation: id } },
+        { new: true },
+      );
+    }
+
+    await this.preparationModel.findByIdAndDelete(id);
+
+    /*
+     * Files last. This used to run first, so a failure anywhere below it —
+     * the CastError above, most of all — destroyed the uploads and left the
+     * row behind pointing at them. Deleting the row is the step that must
+     * succeed; the folder is cleanup.
+     */
     const preparationFolder = path.join('./uploads/preparation', id);
     if (fs.existsSync(preparationFolder)) {
       fs.rmSync(preparationFolder, { recursive: true, force: true });
     }
 
-    await this.lectureModel.findByIdAndUpdate(
-      preparation.lecture,
-      { $pull: { preparation: id } },
-      { new: true }
-    );
-
-    await this.preparationModel.findByIdAndDelete(id);
     return {
       message: `تم حذف التحضير ذو المعرف ${id} بنجاح`,
       data: preparation,

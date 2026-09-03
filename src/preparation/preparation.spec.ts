@@ -253,6 +253,39 @@ describe('PreparationService', () => {
    * Every one of these columns was blank on the screen no matter what the
    * database held, so each test here fails against the previous code.
    */
+  describe('delete', () => {
+    it('deletes an archived row, whose lecture is a snapshot and not an id', async () => {
+      const created: any = await createByManager();
+      const id = String(created.data?._id ?? created._id);
+
+      // What the Friday cron leaves behind.
+      await prepModel.collection.updateOne(
+        { _id: new Types.ObjectId(id) },
+        { $set: { lecture: { _id: null, dayOfWeek: null, slot: null } } },
+      );
+
+      // This threw a CastError, surfacing as 400 "صيغة المعرف غير صحيحة",
+      // so the rows most in need of clearing were the ones that would not go.
+      await asTenant(() => service.delete(id, OWNER));
+
+      expect(await prepModel.collection.findOne({ _id: new Types.ObjectId(id) })).toBeNull();
+    });
+
+    it('still detaches a live row from its lecture', async () => {
+      const created: any = await createByManager();
+      const id = String(created.data?._id ?? created._id);
+
+      const before = await lectureModel.collection.findOne({ _id: new Types.ObjectId(String(L1)) });
+      expect((before?.preparation ?? []).map(String)).toContain(id);
+
+      await asTenant(() => service.delete(id, OWNER));
+
+      const after = await lectureModel.collection.findOne({ _id: new Types.ObjectId(String(L1)) });
+      expect((after?.preparation ?? []).map(String)).not.toContain(id);
+      expect(await prepModel.collection.findOne({ _id: new Types.ObjectId(id) })).toBeNull();
+    });
+  });
+
   describe('what the list has to name', () => {
     it('resolves the subject, whose name is a level below the offering', async () => {
       await createByManager();
