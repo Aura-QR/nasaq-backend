@@ -5,6 +5,7 @@ import { School } from 'src/platform/schools/schemas/school.schema';
 import { Student } from 'src/students/schemas/student.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { Class } from 'src/classes/schemas/class.schema';
+import { AcademicYear } from 'src/academic-years/schemas/academic-year.schema';
 import { Attendance } from 'src/attendance/schemas/attendance.schema';
 import { Expense } from 'src/expenses/schemas/expense.schema';
 import { StudentFinancialRecord } from 'src/financial/schemas/student-financial-record.schema';
@@ -16,14 +17,40 @@ export class DashboardsService {
     @InjectModel(Student.name) private studentModel: Model<Student>,
     @InjectModel(Teacher.name) private teacherModel: Model<Teacher>,
     @InjectModel(Class.name) private classModel: Model<Class>,
+    @InjectModel(AcademicYear.name)
+    private academicYearModel: Model<AcademicYear>,
     @InjectModel(Attendance.name) private attendanceModel: Model<Attendance>,
     @InjectModel(Expense.name) private expenseModel: Model<Expense>,
     @InjectModel(StudentFinancialRecord.name)
     private financialRecordModel: Model<StudentFinancialRecord>,
   ) {}
 
+  /**
+   * A class belongs to one academic year, so counting every class ever created
+   * answers a question nobody asked. A school in its second year saw twenty-two
+   * classes on a dashboard that shows eleven on the timetable — the old ones had
+   * not gone anywhere, they had just stopped being this year's.
+   *
+   * Activating a year archives the rest (academic-years.service), so at most one
+   * row comes back. A school with no active year has no current classes either,
+   * which is what a null here means downstream.
+   */
+  private async getActiveYear(): Promise<{
+    _id: Types.ObjectId;
+    name: string;
+  } | null> {
+    const year = await this.academicYearModel
+      .findOne({ status: 'active' })
+      .select('_id name')
+      .lean()
+      .exec();
+
+    return year ? { _id: year._id as Types.ObjectId, name: year.name } : null;
+  }
+
   async getOwnerDashboard(schoolId: string) {
     const sId = new Types.ObjectId(schoolId);
+    const activeYear = await this.getActiveYear();
 
     const [
       totalStudents,
@@ -38,7 +65,9 @@ export class DashboardsService {
       this.studentModel.countDocuments(),
       this.studentModel.countDocuments({ isActive: true }),
       this.teacherModel.countDocuments(),
-      this.classModel.countDocuments(),
+      activeYear
+        ? this.classModel.countDocuments({ academicYearId: activeYear._id })
+        : Promise.resolve(0),
       this.schoolModel.findById(schoolId).setOptions({ skipTenantScope: true }).lean(),
       this.expenseModel.aggregate([
         { $group: { _id: null, totalAmount: { $sum: '$amount' } } },
@@ -58,6 +87,9 @@ export class DashboardsService {
     const netIncome = totalTuitionCollected - totalExpenses;
 
     return {
+      academicYear: activeYear
+        ? { id: activeYear._id, name: activeYear.name }
+        : null,
       school: {
         id: school?._id,
         name: (school as any)?.name,
@@ -69,6 +101,7 @@ export class DashboardsService {
         students: totalStudents,
         activeStudents,
         teachers: totalTeachers,
+        // This year's classes, not every class the school has ever had.
         classes: totalClasses,
       },
       financialSummary: {
@@ -101,7 +134,10 @@ export class DashboardsService {
     }
 
     if (isOwnerOrAll || userPermissions.includes('school.classes.manage')) {
-      const totalClasses = await this.classModel.countDocuments();
+      const activeYear = await this.getActiveYear();
+      const totalClasses = activeYear
+        ? await this.classModel.countDocuments({ academicYearId: activeYear._id })
+        : 0;
       result.metrics.classes = { totalClasses };
     }
 
