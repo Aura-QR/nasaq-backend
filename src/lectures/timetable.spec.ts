@@ -169,6 +169,22 @@ describe('TimetableService', () => {
   const feasibility = () =>
     asTenant(() => service.getFeasibility(String(termId), schoolId));
 
+  /** Add an unstaffed filler offering so grade 4 fills the 35-slot week without duplicate key error. */
+  const fillGradeFour = async (periods = 25) => {
+    const fillerSubjectId = await mk(models[Subject.name], {
+      subjectName: `إضافي-${Date.now()}-${Math.random()}`,
+      isRequiredForPromotion: false,
+      schoolId,
+    });
+    return mk(models[SubjectOffering.name], {
+      subjectId: fillerSubjectId,
+      gradeLevelId: gradeFour,
+      termId,
+      periodsPerWeek: periods,
+      schoolId,
+    });
+  };
+
   describe('capacity', () => {
     it('multiplies working days by periods per day', async () => {
       const capacity = await asTenant(() => service.getCapacity(schoolId));
@@ -483,17 +499,47 @@ describe('TimetableService', () => {
   });
 
   describe('feasibility', () => {
-    it('passes a plan that fits', async () => {
+    it('blocks a plan that fits mathematically but leaves empty periods', async () => {
       await assign(teachers.fatima, maths);
       await assign(teachers.jihan, science);
       await assign(teachers.marwa, arabic);
 
       const report = await feasibility();
 
-      expect(report.feasible).toBe(true);
+      expect(report.feasible).toBe(false);
       expect(report.slotsPerWeek).toBe(35);
       // (6 + 4) × two grade-4 classes + 6 × one grade-5 class
       expect(report.totalPeriodsNeeded).toBe(26);
+      const problem = report.problems.find(
+        (p) => p.type === 'class_underfilled' && p.className === '٤/١',
+      );
+      expect(problem).toMatchObject({
+        blocking: true,
+        required: 10,
+        capacity: 35,
+        missing: 25,
+      });
+    });
+
+    it('passes only when every planned class exactly fills its week', async () => {
+      // Scope this check to grade 4 and give it a ten-slot week: 6 maths + 4
+      // science is now exactly complete for both sections.
+      await setSchoolWeek(2, 5);
+      await assign(teachers.fatima, maths, classes.a);
+      await assign(teachers.jihan, maths, classes.b);
+      await assign(teachers.jihan, science, classes.a);
+      await assign(teachers.fatima, science, classes.b);
+
+      const report = await asTenant(() =>
+        service.getFeasibility(String(termId), schoolId, [
+          String(classes.a),
+          String(classes.b),
+        ]),
+      );
+
+      expect(report.feasible).toBe(true);
+      expect(report.slotsPerWeek).toBe(10);
+      expect(report.classes.every((row) => row.ok)).toBe(true);
       expect(report.problems.filter((p) => p.blocking)).toHaveLength(0);
     });
 
@@ -556,7 +602,9 @@ describe('TimetableService', () => {
 
       const problem = report.problems.find((p) => p.type === 'subject_unassigned');
       expect(problem.blocking).toBe(false);
-      expect(report.feasible).toBe(true);
+      // The missing-teacher warning itself is not blocking; this particular
+      // fixture is blocked separately because its teaching plan is incomplete.
+      expect(report.feasible).toBe(false);
       // science × 2 classes + arabic × 1
       expect(report.unassignedSubjects).toHaveLength(3);
     });
@@ -599,7 +647,8 @@ describe('TimetableService', () => {
       const four1 = report.classes.find((c) => c.name === '٤/١');
       expect(four1.demand).toBe(10);   // maths 6 + science 4
       expect(four1.free).toBe(25);
-      expect(four1.ok).toBe(true);
+      expect(four1.missing).toBe(25);
+      expect(four1.ok).toBe(false);
     });
 
     it('ignores another school entirely', async () => {
@@ -617,10 +666,39 @@ describe('TimetableService', () => {
   });
 
   describe('generate', () => {
-    /** A staffed, comfortably-fitting school: 10 + 10 + 6 = 26 periods. */
+    /**
+     * Shrink the week so that each grade's plan *exactly* fills it.
+     * Grade 4: maths(6) + science(4) = 10 → 2 periods × 5 days.
+     * Grade 5: arabic needs bumping from 6 to 10.
+     * Call this before any commit test that touches all three classes.
+     */
+    const fillWeekForCommit = async () => {
+      await setSchoolWeek(2, 5); // 10 slots
+      await models[SubjectOffering.name].collection.updateOne(
+        { _id: arabic._id }, { $set: { periodsPerWeek: 10 } },
+      );
+    };
+
+    /**
+     * Shrink the week so grade 4's plan exactly fills it.
+     * Grade 4: maths(6) + science(4) = 10 → 2 periods × 5 days.
+     * Call this before any commit test that only touches grade-4 classes.
+     */
+    const fillWeekForGradeFour = () => setSchoolWeek(2, 5);
+
+    /** A staffed school: after fillWeekForCommit → 10 + 10 + 10 = 30 periods. */
     const staffEverything = async () => {
       await assign(teachers.fatima, maths);
       await assign(teachers.jihan, science);
+      await assign(teachers.marwa, arabic);
+    };
+
+    /** A staffed school with balanced teacher loads for a 10-slot week: 10 + 10 + 10 = 30 periods. */
+    const staffEverythingEvenly = async () => {
+      await assign(teachers.fatima, maths, classes.a);
+      await assign(teachers.jihan, maths, classes.b);
+      await assign(teachers.jihan, science, classes.a);
+      await assign(teachers.fatima, science, classes.b);
       await assign(teachers.marwa, arabic);
     };
 
@@ -637,7 +715,11 @@ describe('TimetableService', () => {
       // (6 maths + 4 science) × two grade-4 classes + 6 arabic × one grade-5
       expect(result.placed).toBe(26);
       expect(result.unplaced).toBe(0);
-      expect(result.problems.filter((p: any) => p.blocking)).toHaveLength(0);
+      // class_underfilled is expected here (the plan leaves empty slots); what
+      // matters is that nothing else — like no_slot_left — blocked placement.
+      expect(
+        result.problems.filter((p: any) => p.blocking && p.type !== 'class_underfilled'),
+      ).toHaveLength(0);
     });
 
     it('writes nothing in preview mode', async () => {
@@ -769,15 +851,38 @@ describe('TimetableService', () => {
       expect(JSON.stringify(first.classes)).toBe(JSON.stringify(second.classes));
     });
 
-    it('commits real lectures', async () => {
+    it('does not commit a timetable whose subject plan leaves empty periods', async () => {
       await staffEverything();
 
       const result: any = await generate({ mode: 'commit' });
 
+      expect(result.written).toBe(0);
+      expect(result.classes).toEqual([]);
+      expect(result.problems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: 'class_underfilled',
+            blocking: true,
+            className: '٤/١',
+            required: 10,
+            capacity: 35,
+            missing: 25,
+          }),
+        ]),
+      );
+      expect(await models[Lecture.name].collection.countDocuments({})).toBe(0);
+    });
+
+    it('commits real lectures', async () => {
+      await fillWeekForCommit();
+      await staffEverythingEvenly();
+
+      const result: any = await generate({ mode: 'commit' });
+
       expect(result.mode).toBe('commit');
-      expect(result.written).toBe(26);
+      expect(result.written).toBe(30);
       expect(result.failed).toBe(0);
-      expect(await models[Lecture.name].collection.countDocuments({})).toBe(26);
+      expect(await models[Lecture.name].collection.countDocuments({})).toBe(30);
 
       const one = await models[Lecture.name].collection.findOne({});
       expect(one.termId).toBeDefined();
@@ -785,7 +890,8 @@ describe('TimetableService', () => {
     });
 
     it('leaves a hand-built timetable alone by default', async () => {
-      await staffEverything();
+      await fillWeekForCommit();
+      await staffEverythingEvenly();
       await models[Lecture.name].collection.insertOne({
         classId: classes.a, subjectOfferingId: maths._id, termId,
         teacherId: teachers.fatima, dayOfWeek: 'sunday', slot: 1,
@@ -804,7 +910,8 @@ describe('TimetableService', () => {
     });
 
     it('rebuilds when told to replace', async () => {
-      await staffEverything();
+      await fillWeekForCommit();
+      await staffEverythingEvenly();
       await models[Lecture.name].collection.insertOne({
         classId: classes.a, subjectOfferingId: maths._id, termId,
         teacherId: teachers.fatima, dayOfWeek: 'sunday', slot: 1,
@@ -814,8 +921,8 @@ describe('TimetableService', () => {
       const result: any = await generate({ mode: 'commit', onExisting: 'replace' });
 
       expect(result.deleted).toBe(1);
-      expect(result.written).toBe(26);
-      expect(await models[Lecture.name].collection.countDocuments({})).toBe(26);
+      expect(result.written).toBe(30);
+      expect(await models[Lecture.name].collection.countDocuments({})).toBe(30);
     });
 
     it('reports what it could not place instead of failing the whole run', async () => {
@@ -950,6 +1057,7 @@ describe('TimetableService', () => {
     });
 
     it('only touches the classes it was asked for', async () => {
+      await setSchoolWeek(3, 2); // 6 slots = arabic 6
       await staffEverything();
 
       const result: any = await generate({
@@ -966,7 +1074,8 @@ describe('TimetableService', () => {
       // The unique indexes are the real guarantee. If the search were wrong,
       // the commit would report failures rather than silently double-booking.
       await models[Lecture.name].createIndexes();
-      await staffEverything();
+      await fillWeekForCommit();
+      await staffEverythingEvenly();
 
       const result: any = await generate({ mode: 'commit' });
 
@@ -1029,11 +1138,15 @@ describe('TimetableService', () => {
 
     it('never schedules a lesson into a period the short day does not have', async () => {
       await setUnevenWeek({ sunday: 8, monday: 8, tuesday: 8, wednesday: 7, thursday: 3 });
-      // Enough work to be forced to use every day.
+      // Enough work to be forced to use every day. Total must equal capacity (34).
       await models[SubjectOffering.name].collection.updateOne(
         { _id: maths._id }, { $set: { periodsPerWeek: 20 } },
       );
+      await models[SubjectOffering.name].collection.updateOne(
+        { _id: science._id }, { $set: { periodsPerWeek: 14 } },
+      );
       await assign(teachers.fatima, maths);
+      await assign(teachers.jihan, science);
 
       await asTenant(() =>
         service.generate(
@@ -1090,6 +1203,7 @@ describe('TimetableService', () => {
   describe('teachers already booked in a class we are not rebuilding', () => {
     it('does not plan on top of them', async () => {
       // ٥/١ keeps a hand-built timetable; فاطمة teaches there all Sunday.
+      await fillGradeFour();
       await assign(teachers.fatima, maths);
       await assign(teachers.fatima, arabic, classes.c);
       for (let slot = 1; slot <= 6; slot++) {
@@ -1124,6 +1238,7 @@ describe('TimetableService', () => {
     });
 
     it('still uses those slots when the class is being replaced', async () => {
+      await fillGradeFour();
       await assign(teachers.fatima, maths);
       for (let slot = 1; slot <= 6; slot++) {
         await mk(models[Lecture.name], {
@@ -1166,6 +1281,7 @@ describe('TimetableService', () => {
         .map((l: any) => `${l.dayOfWeek}|${l.slot}`);
 
     it('never puts a teacher on a day they are unavailable', async () => {
+      await fillGradeFour();
       await assign(teachers.fatima, maths);
       await block(teachers.fatima, [{ day: 'wednesday', slots: [] }]);
 
@@ -1178,6 +1294,7 @@ describe('TimetableService', () => {
     });
 
     it('honours a block on named periods rather than the whole day', async () => {
+      await fillGradeFour();
       await assign(teachers.fatima, maths);
       // "not the last two periods", any day.
       await block(teachers.fatima, [
@@ -1198,6 +1315,7 @@ describe('TimetableService', () => {
     });
 
     it('leaves the rest of that day usable', async () => {
+      await fillGradeFour();
       await assign(teachers.fatima, maths);
       await block(teachers.fatima, [{ day: 'sunday', slots: [1] }]);
 
@@ -1209,6 +1327,7 @@ describe('TimetableService', () => {
     });
 
     it('does not constrain a teacher who has no row', async () => {
+      await fillGradeFour();
       await assign(teachers.fatima, maths);
       await block(teachers.jihan, [{ day: 'wednesday', slots: [] }]);
 
@@ -1220,6 +1339,7 @@ describe('TimetableService', () => {
 
     it('is scoped to its own term', async () => {
       const otherTerm = new Types.ObjectId();
+      await fillGradeFour();
       await assign(teachers.fatima, maths);
       await mk(models[TeacherConstraint.name], {
         teacherId: teachers.fatima, termId: otherTerm,
@@ -1237,6 +1357,7 @@ describe('TimetableService', () => {
     });
 
     it('reports what it could not place rather than pretending', async () => {
+      await fillGradeFour();
       await assign(teachers.fatima, maths);
       // Six periods, and only Sunday left to hold them.
       await block(teachers.fatima, [
@@ -1325,6 +1446,7 @@ describe('TimetableService', () => {
         .toArray()).map((l: any) => l.slot);
 
     it('pulls an early subject ahead of a late one', async () => {
+      await fillGradeFour();
       await models[SubjectOffering.name].collection.updateOne(
         { _id: maths._id }, { $set: { slotPreference: 'early' } },
       );
@@ -1344,6 +1466,7 @@ describe('TimetableService', () => {
     });
 
     it('changes nothing for a plan that never set a preference', async () => {
+      await fillGradeFour();
       await assign(teachers.fatima, maths);
 
       const result: any = await commitFor(classes.a);
@@ -1357,6 +1480,8 @@ describe('TimetableService', () => {
       await models[SubjectOffering.name].collection.updateOne(
         { _id: maths._id }, { $set: { slotPreference: 'early', periodsPerWeek: 20 } },
       );
+      // maths(20) + science(4) = 24; fill the remaining 11 to match 35.
+      await fillGradeFour(11);
       await assign(teachers.fatima, maths);
 
       const result: any = await commitFor(classes.a);

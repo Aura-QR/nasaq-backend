@@ -35,6 +35,7 @@ export interface Requirement {
 export type ProblemType =
   | 'no_working_days'
   | 'nothing_planned'
+  | 'class_underfilled'
   | 'class_overbooked'
   | 'teacher_overloaded'
   | 'subject_unassigned'
@@ -172,6 +173,76 @@ export class TimetableService {
       uniformWeek: new Set(Object.values(periodsByDay)).size <= 1,
       scheduleConfigured: schedule.length > 0,
     };
+  }
+
+  /**
+   * Compare every class's teaching plan with the real number of slots in its
+   * week. Subject offerings are configured per grade, then expanded to every
+   * class in that grade by buildRequirements(), so checking the expanded rows
+   * also tells the caller exactly which classes an incomplete grade plan would
+   * leave with holes.
+   *
+   * A timetable is complete only on equality. The old <= check correctly
+   * rejected an overloaded week, but treated 35 planned lessons in a 40-slot
+   * week as feasible and the generator consequently left five empty cells.
+   */
+  private evaluateClassPlans(
+    classes: any[],
+    requirements: Requirement[],
+    slotsPerWeek: number,
+    reportEmptyPlans = true,
+  ) {
+    const problems: Problem[] = [];
+
+    const rows = classes.map((cls: any) => {
+      const demand = requirements
+        .filter((r) => r.classId === String(cls._id))
+        .reduce((sum, r) => sum + Math.max(0, r.periodsPerWeek ?? 0), 0);
+
+      const missing = Math.max(0, slotsPerWeek - demand);
+      const excess = Math.max(0, demand - slotsPerWeek);
+      const ok = demand === slotsPerWeek;
+
+      if (demand > slotsPerWeek) {
+        problems.push({
+          type: 'class_overbooked',
+          message: `${cls.name} needs ${demand} periods a week but only has ${slotsPerWeek} slots.`,
+          blocking: true,
+          classId: String(cls._id),
+          className: cls.name,
+          gradeLevelId: String(cls.gradeLevelId),
+          required: demand,
+          capacity: slotsPerWeek,
+          excess,
+        });
+      } else if (demand < slotsPerWeek && (reportEmptyPlans || demand > 0)) {
+        problems.push({
+          type: 'class_underfilled',
+          message: `${cls.name} has ${demand} planned periods but its week has ${slotsPerWeek} slots. Add ${missing} periods to the grade's teaching plan.`,
+          blocking: true,
+          classId: String(cls._id),
+          className: cls.name,
+          gradeLevelId: String(cls.gradeLevelId),
+          required: demand,
+          capacity: slotsPerWeek,
+          missing,
+        });
+      }
+
+      return {
+        classId: String(cls._id),
+        name: cls.name,
+        gradeLevelId: String(cls.gradeLevelId),
+        demand,
+        capacity: slotsPerWeek,
+        free: slotsPerWeek - demand,
+        missing,
+        excess,
+        ok,
+      };
+    });
+
+    return { rows, problems };
   }
 
   /**
@@ -528,33 +599,17 @@ export class TimetableService {
     }
 
     // ---- per class ----
-    const classRows = classes.map((cls: any) => {
-      const demand = planned
-        .filter((r) => r.classId === String(cls._id))
-        .reduce((sum, r) => sum + r.periodsPerWeek, 0);
-
-      const ok = demand <= capacity.slotsPerWeek;
-      if (!ok) {
-        problems.push({
-          type: 'class_overbooked',
-          message: `${cls.name} needs ${demand} periods a week but only has ${capacity.slotsPerWeek} slots.`,
-          blocking: true,
-          classId: String(cls._id),
-          className: cls.name,
-          required: demand,
-          capacity: capacity.slotsPerWeek,
-        });
-      }
-
-      return {
-        classId: String(cls._id),
-        name: cls.name,
-        demand,
-        capacity: capacity.slotsPerWeek,
-        free: capacity.slotsPerWeek - demand,
-        ok,
-      };
-    });
+    // A completely empty term already has the more useful nothing_planned
+    // error above. Once any plan exists, a grade left at zero must still be
+    // reported as underfilled rather than silently ignored.
+    const classPlan = this.evaluateClassPlans(
+      classes,
+      requirements,
+      capacity.slotsPerWeek,
+      planned.length > 0,
+    );
+    const classRows = classPlan.rows;
+    problems.push(...classPlan.problems);
 
     // ---- per teacher ----
     const loadByTeacher = new Map<string, number>();
@@ -718,7 +773,7 @@ export class TimetableService {
     const includeUnstaffed = dto.includeUnstaffed ?? true;
 
     const capacity = await this.getCapacity(schoolId);
-    const { requirements } = await this.buildRequirements(dto.termId, dto.classIds);
+    const { classes, requirements } = await this.buildRequirements(dto.termId, dto.classIds);
 
     const problems: Problem[] = [];
 
@@ -752,6 +807,17 @@ export class TimetableService {
       }
     }
 
+    const classesBeingGenerated = classes.filter(
+      (cls: any) => onExisting === 'replace' || !classesWithLectures.has(String(cls._id)),
+    );
+    const classPlan = this.evaluateClassPlans(
+      classesBeingGenerated,
+      requirements,
+      capacity.slotsPerWeek,
+      true,
+    );
+    problems.push(...classPlan.problems);
+
     if (planned.length === 0) {
       return {
         mode,
@@ -772,6 +838,28 @@ export class TimetableService {
           },
         ],
         written: false,
+      };
+    }
+
+
+    // Preview remains useful while the manager is editing: it shows the grid
+    // and the exact missing/excess count. Commit is the point at which the
+    // draft becomes the school's timetable, so an incomplete plan must never
+    // write a partial week.
+    if (mode === 'commit' && classPlan.problems.length > 0) {
+      return {
+        mode: 'commit',
+        termId: dto.termId,
+        ...capacity,
+        placed: 0,
+        written: 0,
+        failed: 0,
+        deleted: 0,
+        unplaced: 0,
+        skippedClasses: skipped.length,
+        classes: [],
+        classPlans: classPlan.rows,
+        problems,
       };
     }
 
@@ -1042,6 +1130,7 @@ export class TimetableService {
         unplaced: unplaced.length,
         skippedClasses: skipped.length,
         classes: grid,
+        classPlans: classPlan.rows,
         problems,
         written: false,
       };
@@ -1112,6 +1201,7 @@ export class TimetableService {
       unplaced: unplaced.length,
       skippedClasses: skipped.length,
       classes: grid,
+      classPlans: classPlan.rows,
       problems,
     };
   }
