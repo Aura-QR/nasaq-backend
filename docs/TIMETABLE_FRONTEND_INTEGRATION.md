@@ -167,6 +167,7 @@ export type TimetableProblemType =
   | 'nothing_planned'             // لم يتم إدخال أي حصص لأي مادة
   | 'class_underfilled'           // [جديد] خطة الفصل ناقصة عن سعة الأسبوع
   | 'class_overbooked'            // خطة الفصل تتجاوز سعة الأسبوع
+  | 'unstaffed_excluded'          // استبعاد مواد بلا معلم سيترك حصصاً فارغة عند الاعتماد
   | 'teacher_overloaded'          // المعلم تم إسناد حصص له أكثر من طاقته أو أوقات تفرغه
   | 'subject_unassigned'          // مادة في الخطة بدون معلم مسند (تحذيري)
   | 'assignment_wrong_term'       // إسناد يخص ترم آخر
@@ -185,6 +186,7 @@ export interface TimetableProblem {
   capacity?: number;
   missing?: number;               // عدد الحصص المتبقية لاكتمال الأسبوع
   excess?: number;                // عدد الحصص الزائدة عن الأسبوع
+  omitted?: number;               // حصص مخططة حُذفت بسبب includeUnstaffed: false
   teacherId?: string;
   teacherName?: string;
 }
@@ -312,6 +314,10 @@ export interface GenerateTimetableDto {
 | $\text{Demand} == \text{Capacity}$ | لا توجد مشكلة فصل | ❌ لا | ❌ **لا (مسموح)** | علامة صح خضراء وجاهزية تامة للاعتماد |
 | معلم نصابه أكبر من السعة | `teacher_overloaded` | ❌ لا | ✅ **نعم (حاجب)** | تنبيه باسم المعلم والحصص الزائدة عن طاقته |
 | مادة بدون معلم | `subject_unassigned` | ❌ لا | ❌ **لا (تحذيري)** | علامة تنبيه صفراء، وتُجدول الحصص بدون معلم مؤقتاً |
+| `includeUnstaffed: false` سيحذف حصص مادة بلا معلم | `unstaffed_excluded` | ❌ لا | ✅ **نعم (حاجب)** | إسناد معلم للمادة أو الاعتماد مع `includeUnstaffed: true` |
+
+> الاعتماد كذلك عملية كاملة أو لا تتم: إذا عجز المولّد عن وضع أي حصة بسبب
+> قيود المعلمين أو تعارض الخانات، تكون `written: 0` ولا يُحفظ جدول جزئي.
 
 ---
 

@@ -842,6 +842,30 @@ describe('TimetableService', () => {
       expect(result.placed).toBe(12); // maths only, both grade-4 classes
     });
 
+    it('does not commit holes created by excluding unstaffed subjects', async () => {
+      await fillWeekForGradeFour();
+      await assign(teachers.fatima, maths); // science is planned but unstaffed
+
+      const result: any = await generate({
+        mode: 'commit',
+        includeUnstaffed: false,
+        classIds: [String(classes.a)],
+      });
+
+      expect(result.written).toBe(0);
+      expect(result.problems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: 'unstaffed_excluded',
+            blocking: true,
+            className: '٤/١',
+            omitted: 4,
+          }),
+        ]),
+      );
+      expect(await models[Lecture.name].collection.countDocuments({})).toBe(0);
+    });
+
     it('is deterministic — two previews match', async () => {
       await staffEverything();
 
@@ -868,6 +892,39 @@ describe('TimetableService', () => {
             capacity: 35,
             missing: 25,
           }),
+        ]),
+      );
+      expect(await models[Lecture.name].collection.countDocuments({})).toBe(0);
+    });
+
+    it('does not partially commit when teacher constraints leave planned periods unplaced', async () => {
+      await fillWeekForGradeFour();
+      await assign(teachers.fatima, maths);
+      await assign(teachers.jihan, science);
+      await mk(models[TeacherConstraint.name], {
+        teacherId: teachers.fatima,
+        termId,
+        unavailable: [
+          { day: 'sunday', slots: [] },
+          { day: 'monday', slots: [] },
+          { day: 'tuesday', slots: [] },
+          { day: 'wednesday', slots: [] },
+          { day: 'thursday', slots: [] },
+        ],
+        schoolId,
+      });
+
+      const result: any = await generate({
+        mode: 'commit',
+        classIds: [String(classes.a)],
+      });
+
+      expect(result.placed).toBeGreaterThan(0);
+      expect(result.unplaced).toBeGreaterThan(0);
+      expect(result.written).toBe(0);
+      expect(result.problems).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'no_slot_left', blocking: true }),
         ]),
       );
       expect(await models[Lecture.name].collection.countDocuments({})).toBe(0);

@@ -37,6 +37,7 @@ export type ProblemType =
   | 'nothing_planned'
   | 'class_underfilled'
   | 'class_overbooked'
+  | 'unstaffed_excluded'
   | 'teacher_overloaded'
   | 'subject_unassigned'
   | 'assignment_shared'
@@ -814,9 +815,54 @@ export class TimetableService {
       classesBeingGenerated,
       requirements,
       capacity.slotsPerWeek,
-      true,
+      requirements.some((requirement) => requirement.periodsPerWeek > 0),
     );
     problems.push(...classPlan.problems);
+
+    // Excluding an unstaffed subject removes real periods from the generated
+    // grid even when the teaching plan itself adds up perfectly. That option
+    // is useful for a draft preview, but committing it would recreate the very
+    // holes the equality rule exists to prevent.
+    if (!includeUnstaffed) {
+      const generatedClassIds = new Set(
+        classesBeingGenerated.map((cls: any) => String(cls._id)),
+      );
+      const omittedByClass = new Map<string, {
+        className: string;
+        gradeLevelId: string;
+        periods: number;
+      }>();
+
+      for (const requirement of requirements) {
+        if (
+          requirement.teacherId ||
+          requirement.periodsPerWeek <= 0 ||
+          !generatedClassIds.has(requirement.classId)
+        ) {
+          continue;
+        }
+
+        const current = omittedByClass.get(requirement.classId) ?? {
+          className: requirement.className,
+          gradeLevelId: requirement.gradeLevelId,
+          periods: 0,
+        };
+        current.periods += requirement.periodsPerWeek;
+        omittedByClass.set(requirement.classId, current);
+      }
+
+      for (const [classId, omitted] of omittedByClass) {
+        problems.push({
+          type: 'unstaffed_excluded',
+          message: `${omitted.className} would omit ${omitted.periods} planned periods because includeUnstaffed is false. Assign teachers or include unstaffed subjects before committing.`,
+          blocking: true,
+          classId,
+          className: omitted.className,
+          gradeLevelId: omitted.gradeLevelId,
+          omitted: omitted.periods,
+        });
+      }
+    }
 
     if (planned.length === 0) {
       return {
@@ -827,7 +873,9 @@ export class TimetableService {
         unplaced: 0,
         skippedClasses: skipped.length,
         classes: [],
+        classPlans: classPlan.rows,
         problems: [
+          ...problems,
           {
             type: 'nothing_planned' as ProblemType,
             message:
@@ -846,7 +894,7 @@ export class TimetableService {
     // and the exact missing/excess count. Commit is the point at which the
     // draft becomes the school's timetable, so an incomplete plan must never
     // write a partial week.
-    if (mode === 'commit' && classPlan.problems.length > 0) {
+    if (mode === 'commit' && problems.some((problem) => problem.blocking)) {
       return {
         mode: 'commit',
         termId: dto.termId,
@@ -1092,7 +1140,7 @@ export class TimetableService {
         type: 'search_exhausted',
         message:
           'The search ran out of steps before placing everything. The plan is probably too tight to fit — check /lectures/feasibility.',
-        blocking: false,
+        blocking: mode === 'commit',
       });
     }
 
@@ -1102,7 +1150,7 @@ export class TimetableService {
         message: requirement.teacherName
           ? `${requirement.className} — ${requirement.subjectName}: ${requirement.teacherName} is busy in every slot this class still has free.`
           : `${requirement.className} — ${requirement.subjectName}: no free slot left in the week.`,
-        blocking: false,
+        blocking: mode === 'commit',
         classId: requirement.classId,
         className: requirement.className,
         subjectName: requirement.subjectName,
@@ -1133,6 +1181,27 @@ export class TimetableService {
         classPlans: classPlan.rows,
         problems,
         written: false,
+      };
+    }
+
+    // A commit is all-or-nothing at the planning level. Even an exactly sized
+    // curriculum can become impossible after teacher availability and existing
+    // timetables are considered; writing only the placements that happened to
+    // fit would still leave an official timetable with empty periods.
+    if (!completed || unplaced.length > 0) {
+      return {
+        mode: 'commit',
+        termId: dto.termId,
+        ...capacity,
+        placed: placements.length,
+        written: 0,
+        failed: 0,
+        deleted: 0,
+        unplaced: unplaced.length,
+        skippedClasses: skipped.length,
+        classes: grid,
+        classPlans: classPlan.rows,
+        problems,
       };
     }
 
