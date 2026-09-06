@@ -1,4 +1,4 @@
-import { Controller, UseGuards, Post, Body, Param, Patch, Delete, Get, ForbiddenException, BadRequestException, Req, Query } from '@nestjs/common';
+import { Controller, UseGuards, Post, Body, Param, Patch, Delete, Get, ForbiddenException, BadRequestException, Req, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { TenantGuard } from 'src/tenancy/guards/tenant.guard';
 import { CurrentSchool } from 'src/tenancy/decorators/current-school.decorator';
@@ -6,6 +6,9 @@ import { ManagersService } from './managers.service';
 import { CreateManagerDto, UpdateManagerPermissionsDto } from './dto/managers.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { AdminSetPasswordDto } from '../auth/dto/admin-set-password.dto';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+
 
 @UseGuards(JwtAuthGuard, TenantGuard)
 @Controller('managers')
@@ -69,6 +72,29 @@ export class ManagersController {
   async findAll(@Req() req: any) {
     this.checkOwnerOrSupervisor(req);
     return this.managersService.findAllManagers();
+  }
+
+  @ApiOperation({
+    summary: 'تعيين أو إعادة تعيين كلمة مرور مدير / مشرف / مالك',
+    description:
+      'OWNER يمكنه تغيير كلمة مرور MANAGER أو SUPERVISOR. ' +
+      'SUPERVISOR يمكنه تغيير كلمة مرور MANAGER فقط. ' +
+      'SUPER_ADMIN يمكنه تغيير كلمة مرور أي مسؤول. ' +
+      'إذا لم يُرسَل password يُولَّد تلقائياً ويُعاد في الاستجابة.',
+  })
+  @ApiResponse({ status: 200, description: 'تم تعيين كلمة المرور' })
+  @ApiResponse({ status: 403, description: 'لا تملك صلاحية تغيير كلمة مرور هذا المسؤول' })
+  @ApiResponse({ status: 404, description: 'المسؤول غير موجود' })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @Patch(':id/password')
+  @HttpCode(HttpStatus.OK)
+  async setAdminPassword(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: AdminSetPasswordDto,
+  ) {
+    this.checkOwnerOrSupervisor(req);
+    return this.managersService.setAdminPassword(id, req.user?.role, body.password);
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)

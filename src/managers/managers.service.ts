@@ -6,6 +6,11 @@ import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CreateManagerDto } from './dto/managers.dto';
 import { PasswordUtil } from 'src/auth/utils/password.util';
 
+/** Roles that live on the Admin collection (not Teacher) */
+const ADMIN_ROLES = ['OWNER', 'MANAGER', 'SUPERVISOR'] as const;
+type AdminRole = (typeof ADMIN_ROLES)[number];
+
+
 @Injectable()
 export class ManagersService {
   constructor(
@@ -152,6 +157,74 @@ export class ManagersService {
     }));
 
     return [...formattedAdmins, ...formattedTeachers];
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // SET / RESET PASSWORD FOR AN ADMIN (OWNER / MANAGER / SUPERVISOR)
+  //
+  // requesterRole rules:
+  //   SUPER_ADMIN → can reset anyone
+  //   OWNER       → can reset MANAGER and SUPERVISOR
+  //   SUPERVISOR  → can reset MANAGER only
+  //   (MANAGER has no access to this endpoint — guarded at controller level)
+  // ─────────────────────────────────────────────────────────────────────────
+  async setAdminPassword(
+    id: string,
+    requesterRole: string,
+    password?: string,
+  ): Promise<{ message: string; data: Record<string, unknown> }> {
+    const admin = await this.adminModel
+      .findById(id)
+      .select('username email role')
+      .setOptions({ skipTenantScope: true })
+      .exec();
+
+    if (!admin) {
+      throw new NotFoundException(`المسؤول بمعرف ${id} غير موجود`);
+    }
+
+    const targetRole = admin.role as AdminRole;
+
+    // Role-hierarchy enforcement
+    if (requesterRole === 'SUPERVISOR') {
+      if (targetRole === 'SUPERVISOR' || targetRole === 'OWNER') {
+        throw new ForbiddenException(
+          'لا يمكن للمشرف تغيير كلمة مرور مشرف آخر أو مالك المدرسة',
+        );
+      }
+    } else if (requesterRole === 'OWNER') {
+      // OWNER can reset MANAGER and SUPERVISOR but not another OWNER
+      if (targetRole === 'OWNER') {
+        throw new ForbiddenException(
+          'لا يمكن لمالك المدرسة تغيير كلمة مرور مالك آخر',
+        );
+      }
+    }
+    // SUPER_ADMIN has no restrictions
+
+    const plaintext = password ?? PasswordUtil.generate();
+    const hashedPassword = await PasswordUtil.hash(plaintext);
+
+    await this.adminModel
+      .findByIdAndUpdate(
+        id,
+        {
+          $set: { password: hashedPassword },
+          $unset: { otp: '', otpExpiry: '' },
+        },
+        { skipTenantScope: true },
+      )
+      .exec();
+
+    return {
+      message: 'تم تعيين كلمة المرور',
+      data: {
+        id: admin._id,
+        username: admin.username,
+        role: admin.role,
+        ...(password == null ? { password: plaintext } : {}),
+      },
+    };
   }
 
   async removeManager(id: string, type: 'admin' | 'teacher', requesterRole?: string) {
