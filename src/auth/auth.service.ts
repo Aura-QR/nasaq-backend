@@ -303,7 +303,7 @@ export class AuthService {
                     { $set: { otp, otpExpiry } },
                     { skipTenantScope: true },
                 );
-                await this.emailService.sendPasswordResetOtp(student.email, otp);
+                await this.emailService.sendPasswordResetOtp(cleanEmail, otp);
 
             } else if (
                 role === 'OWNER' ||

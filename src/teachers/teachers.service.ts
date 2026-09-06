@@ -269,6 +269,39 @@ export class TeachersService {
     };
   }
 
+  async setAdminPassword(id: string, password?: string) {
+    const teacher = await this.teacherModel.findById(id).select('name').exec();
+    if (!teacher) {
+      throw new NotFoundException(`المعلم بمعرف ${id} غير موجود`);
+    }
+
+    const plaintext = password ?? PasswordUtil.generate();
+    const hashedPassword = await PasswordUtil.hash(plaintext);
+    const updatedTeacher = await this.teacherModel
+      .findByIdAndUpdate(
+        id,
+        {
+          $set: { password: hashedPassword },
+          $unset: { otp: '', otpExpiry: '' },
+        },
+        { new: true },
+      )
+      .select('name')
+      .exec();
+    if (!updatedTeacher) {
+      throw new NotFoundException(`المعلم بمعرف ${id} غير موجود`);
+    }
+
+    return {
+      message: 'تم تعيين كلمة المرور',
+      data: {
+        id: updatedTeacher._id,
+        name: updatedTeacher.name,
+        ...(password == null ? { password: plaintext } : {}),
+      },
+    };
+  }
+
   async remove(id: string) {
     const teacher = await this.teacherModel.findById(id);
     if (!teacher) {

@@ -24,6 +24,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { AdminSetPasswordDto } from '../auth/dto/admin-set-password.dto';
 
 @Controller('students')
 @ApiTags('Students')
@@ -98,6 +99,19 @@ export class StudentsController {
     @Body() updateStudentDto: UpdateStudentDto,
   ) {
     return await this.studentsService.update(id, updateStudentDto);
+  }
+
+  @ApiOperation({ summary: 'Set or generate a student password' })
+  @ApiResponse({ status: 200, description: 'تم تعيين كلمة المرور' })
+  @ApiResponse({ status: 404, description: 'Student not found' })
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPER_ADMIN)
+  @Patch(':id/password')
+  @HttpCode(HttpStatus.OK)
+  async setAdminPassword(
+    @Param('id') id: string,
+    @Body() body: AdminSetPasswordDto,
+  ) {
+    return await this.studentsService.setAdminPassword(id, body.password);
   }
 
   @ApiOperation({ summary: 'Toggle active status of a student' })

@@ -22,6 +22,7 @@ import { CheckAbilities } from 'src/casl/decorators/check-abilities.decorator';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { AdminSetPasswordDto } from '../auth/dto/admin-set-password.dto';
 
 @Controller('teachers')
 @ApiTags('Teachers')
@@ -142,6 +143,19 @@ export class TeachersController {
     @Body() updateTeacherDto: UpdateTeacherDto,
   ) {
     return await this.teachersService.update(id, updateTeacherDto);
+  }
+
+  @ApiOperation({ summary: 'Set or generate a teacher password' })
+  @ApiResponse({ status: 200, description: 'تم تعيين كلمة المرور' })
+  @ApiResponse({ status: 404, description: 'Teacher not found' })
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPER_ADMIN)
+  @Patch(':id/password')
+  @HttpCode(HttpStatus.OK)
+  async setAdminPassword(
+    @Param('id') id: string,
+    @Body() body: AdminSetPasswordDto,
+  ) {
+    return await this.teachersService.setAdminPassword(id, body.password);
   }
 
   @ApiOperation({ summary: 'Toggle active status' })

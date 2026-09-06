@@ -381,6 +381,39 @@ export class StudentsService {
     }));
   }
 
+  async setAdminPassword(id: string, password?: string) {
+    const student = await this.studentModel.findById(id).select('name').exec();
+    if (!student) {
+      throw new NotFoundException(`الطالب بمعرف ${id} غير موجود`);
+    }
+
+    const plaintext = password ?? PasswordUtil.generate();
+    const hashedPassword = await PasswordUtil.hash(plaintext);
+    const updatedStudent = await this.studentModel
+      .findByIdAndUpdate(
+        id,
+        {
+          $set: { password: hashedPassword, hasPassword: true },
+          $unset: { otp: '', otpExpiry: '' },
+        },
+        { new: true },
+      )
+      .select('name')
+      .exec();
+    if (!updatedStudent) {
+      throw new NotFoundException(`الطالب بمعرف ${id} غير موجود`);
+    }
+
+    return {
+      message: 'تم تعيين كلمة المرور',
+      data: {
+        id: updatedStudent._id,
+        name: updatedStudent.name,
+        ...(password == null ? { password: plaintext } : {}),
+      },
+    };
+  }
+
   async requestPasswordSetup(email: string) {
     const cleanEmail = email.toLowerCase().trim();
     const student = await this.studentModel
