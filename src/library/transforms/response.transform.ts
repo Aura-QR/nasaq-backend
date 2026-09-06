@@ -11,6 +11,8 @@ export const transformLibraryResponse = (libraryDoc: any) => {
 
   return {
     ...libraryObj,
+    kind: libraryObj.kind ?? 'link',
+    file: libraryObj.file ?? null,
     subjectId,
     academicYearId,
     subjectOffering: libraryObj.subjectOfferingId,

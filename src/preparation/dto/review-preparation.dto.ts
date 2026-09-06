@@ -1,6 +1,7 @@
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { REVIEW_STATUSES, ReviewStatus } from '../schemas/preparation.schema';
+import { ReviewStatus } from '../schemas/preparation.schema';
+const REVIEW_STATUSES = ['pending', 'approved', 'needs_revision'];
 
 export class ReviewPreparationDto {
   @ApiProperty({

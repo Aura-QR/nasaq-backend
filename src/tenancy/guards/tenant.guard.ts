@@ -34,6 +34,10 @@ export class TenantGuard implements CanActivate {
       throw new ForbiddenException('Authentication required');
     }
 
+    // Only explicitly marked read-only catalogue routes accept platform context.
+    const catalogRead = this.reflector.get<boolean>('catalogPlatformRead', context.getHandler());
+    if (catalogRead && request.method === 'GET' && user.role === 'SUPER_ADMIN' && !user.schoolId) return true;
+
     if (isPlatformOnly) {
       if (user.schoolId !== null && user.schoolId !== undefined) {
         throw new ForbiddenException('School context cannot access platform routes');

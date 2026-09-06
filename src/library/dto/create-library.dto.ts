@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsMongoId,
   IsUrl,
+  IsIn,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -15,11 +16,16 @@ export class CreateLibraryDto {
   @ApiProperty({ description: 'The title of the library item' })
   title: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @IsUrl()
+  @IsUrl({ protocols: ['http', 'https'], require_protocol: true })
   @ApiProperty({ description: 'The link/URL of the library item' })
-  link: string;
+  link?: string;
+
+  @IsOptional()
+  @IsIn(['link', 'file'])
+  @ApiProperty({ enum: ['link', 'file'], default: 'link', required: false })
+  kind?: string;
 
   @IsOptional()
   @IsMongoId()

@@ -1,10 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Schema as MongooseSchema } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 export type PreparationDocument = Preparation & Document;
 
 export const REVIEW_STATUSES = [
+  'draft',
   'pending',
   'approved',
   'needs_revision',
@@ -13,6 +14,23 @@ export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 
 @Schema({ timestamps: true })
 export class Preparation {
+  // Null for records created before the curriculum tree was introduced.
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'CurriculumLesson', default: null })
+  lessonId: Types.ObjectId;
+
+  @Prop({ type: Number, default: 0 })
+  contentRevision: number;
+
+  @Prop({ default: '' }) warmUp: string;
+  @Prop({ default: '' }) vocabulary: string;
+  @Prop({ type: [String], default: [] }) objectives: string[];
+  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Library' }], default: [] }) digitalContentIds: Types.ObjectId[];
+  @Prop({ type: [String], default: [] }) teachingStrategies: string[];
+  @Prop({ default: '' }) strategiesOther: string;
+  @Prop({ type: [String], default: [] }) teachingAids: string[];
+  @Prop({ default: '' }) thinkingSkills: string;
+  @Prop({ default: '' }) closure: string;
+  @Prop({ default: '' }) teacherInstructions: string;
   @Prop({
     type: MongooseSchema.Types.Mixed,
     ref: 'Lecture',
@@ -65,9 +83,8 @@ export class Preparation {
   name: string;
 
   /**
-   * The lesson title the teacher types in. There is no curriculum in the
-   * system, so this is free text — it is what the teacher wrote at the top of
-   * the sheet they printed from Madrasati.
+   * The lesson name captured when selecting curriculum content. Legacy rows
+   * retain their free-text title, even without a curriculum reference.
    *
    * Note this is NOT `name`: `name` holds the *teacher's* name (set from
    * `teacherName` on create), which is why searching `?name=` searches
@@ -124,7 +141,7 @@ export class Preparation {
   @Prop({
     type: String,
     enum: REVIEW_STATUSES,
-    default: 'pending',
+    default: 'draft',
     index: true,
   })
   reviewStatus: ReviewStatus;
@@ -155,3 +172,4 @@ PreparationSchema.index({ schoolId: 1, lecture: 1 });
 PreparationSchema.index({ schoolId: 1, weekOf: 1, submittedBy: 1 });
 PreparationSchema.index({ schoolId: 1, weekOf: 1, classId: 1 });
 PreparationSchema.index({ schoolId: 1, reviewStatus: 1 });
+PreparationSchema.index({ schoolId: 1, lessonId: 1 });

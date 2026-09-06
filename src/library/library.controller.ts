@@ -9,6 +9,8 @@ import {
   HttpCode,
   HttpStatus,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { LibraryService } from './library.service';
 import { CreateLibraryDto } from './dto/create-library.dto';
@@ -17,6 +19,10 @@ import { ApiOperation, ApiResponse, ApiTags, ApiQuery } from '@nestjs/swagger';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { libraryMulterConfig } from './config/multer.config';
+import { ApiConsumes } from '@nestjs/swagger';
+import { unlink } from 'fs/promises';
 
 @Controller('library')
 @ApiTags('Library')
@@ -27,11 +33,14 @@ export class LibraryController {
   @ApiResponse({ status: 201, description: 'Library item created successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Subject not found' })
-  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN, Role.TEACHER)
   @Post()
+  @UseInterceptors(FileInterceptor('file', libraryMulterConfig))
+  @ApiConsumes('application/json', 'multipart/form-data')
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() createLibraryDto: CreateLibraryDto) {
-    return await this.libraryService.create(createLibraryDto);
+  async create(@Body() createLibraryDto: CreateLibraryDto, @UploadedFile() file?: Express.Multer.File) {
+    try { return await this.libraryService.create(createLibraryDto, file); }
+    catch (error) { if (file) await unlink(file.path).catch(() => undefined); throw error; }
   }
 
   @ApiOperation({ summary: 'Get all library items or filter with query params' })
@@ -87,12 +96,16 @@ export class LibraryController {
   @ApiResponse({ status: 404, description: 'Library item not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @Patch(':id')
+  @UseInterceptors(FileInterceptor('file', libraryMulterConfig))
+  @ApiConsumes('application/json', 'multipart/form-data')
   @HttpCode(HttpStatus.OK)
   async update(
     @Param('id') id: string,
     @Body() updateLibraryDto: UpdateLibraryDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return await this.libraryService.update(id, updateLibraryDto);
+    try { return await this.libraryService.update(id, updateLibraryDto, file); }
+    catch (error) { if (file) await unlink(file.path).catch(() => undefined); throw error; }
   }
 
   @ApiOperation({ summary: 'Delete a library item' })

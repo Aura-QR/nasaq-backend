@@ -44,6 +44,8 @@ import { TenantGuard } from './tenancy/guards/tenant.guard';
 import { CaslModule } from './casl/casl.module';
 import { AbilitiesGuard } from './casl/guards/abilities.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { CatalogModule } from './catalog/catalog.module';
+import { CurriculumModule } from './curriculum/curriculum.module';
 
 
 
@@ -89,6 +91,8 @@ import { RolesGuard } from './auth/guards/roles.guard';
     ProjectsModule,
     AuthModule,
     PreparationModule,
+    CatalogModule,
+    CurriculumModule,
     DutyModule,
     NotificationsModule,
     TasksModule,

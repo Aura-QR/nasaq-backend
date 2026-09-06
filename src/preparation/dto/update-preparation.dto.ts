@@ -1,7 +1,8 @@
 import { IsOptional, IsMongoId, IsString, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { StructuredPreparationDto } from './structured-preparation.dto';
 
-export class UpdatePreparationDto {
+export class UpdatePreparationDto extends StructuredPreparationDto {
   @ApiPropertyOptional({
     description: 'Lecture ID',
     example: '507f1f77bcf86cd799439011',

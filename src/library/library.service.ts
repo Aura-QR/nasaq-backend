@@ -14,6 +14,7 @@ import { Term } from '../terms/schemas/term.schema';
 import { transformLibraryResponse } from './transforms/response.transform';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
+import { isURL } from 'class-validator';
 
 @Injectable()
 export class LibraryService {
@@ -100,6 +101,7 @@ export class LibraryService {
   }
 
   private async checkForDuplicate(title: string, link: string, excludeId?: string): Promise<void> {
+    if (!link) return;
     const query: any = { title, link };
     if (excludeId) query._id = { $ne: excludeId };
     const existing = await this.libraryModel.findOne(query);
@@ -110,7 +112,19 @@ export class LibraryService {
     }
   }
 
-  async create(createLibraryDto: CreateLibraryDto) {
+  private validateContent(item: any) {
+    const kind = item.kind ?? 'link';
+    if (!['link', 'file'].includes(kind)) throw new BadRequestException('نوع المحتوى غير صحيح');
+    if (kind === 'link' && (!item.link || !isURL(item.link, { protocols: ['http', 'https'], require_protocol: true }))) throw new BadRequestException('رابط المحتوى مطلوب ويجب أن يكون HTTP أو HTTPS');
+    if (kind === 'file' && !item.file) throw new BadRequestException('يجب رفع ملف للمحتوى الرقمي');
+    return { kind, link: kind === 'link' ? item.link : null, file: kind === 'file' ? item.file : null };
+  }
+
+  private fileRef(file?: Express.Multer.File) {
+    return file ? { filename: file.filename, originalName: file.originalname, path: `/uploads/library/${file.filename}`, size: file.size } : null;
+  }
+
+  async create(createLibraryDto: CreateLibraryDto, file?: Express.Multer.File) {
     const { subjectOfferingId, subjectId, academicYearId, ...libraryFields } = createLibraryDto as any;
 
     const resolvedOfferingId = await this.resolveSubjectOfferingId(
@@ -119,9 +133,11 @@ export class LibraryService {
       academicYearId,
     );
 
-    await this.checkForDuplicate(createLibraryDto.title, createLibraryDto.link);
+    const content = this.validateContent({ ...libraryFields, file: this.fileRef(file) });
+    if (file && content.kind !== 'file') throw new BadRequestException('اختر نوع ملف عند رفع ملف');
+    await this.checkForDuplicate(createLibraryDto.title, content.link);
 
-    const libraryData: any = { ...libraryFields };
+    const libraryData: any = { ...libraryFields, ...content };
     if (resolvedOfferingId) {
       libraryData.subjectOfferingId = new mongoose.Types.ObjectId(resolvedOfferingId);
     }
@@ -180,19 +196,16 @@ export class LibraryService {
     return libraries.map((library) => transformLibraryResponse(library));
   }
 
-  async update(id: string, updateLibraryDto: UpdateLibraryDto) {
+  async update(id: string, updateLibraryDto: UpdateLibraryDto, file?: Express.Multer.File) {
     const currentLibrary = await this.libraryModel.findById(id);
 
     if (!currentLibrary) {
       throw new NotFoundException(`Library item with ID ${id} not found`);
     }
 
-    if (updateLibraryDto.title || updateLibraryDto.link) {
-      const title = updateLibraryDto.title || currentLibrary.title;
-      const link = updateLibraryDto.link || currentLibrary.link;
-
-      await this.checkForDuplicate(title, link, id);
-    }
+    const content = this.validateContent({ ...currentLibrary.toObject(), ...updateLibraryDto, file: file ? this.fileRef(file) : currentLibrary.file });
+    if (file && content.kind !== 'file') throw new BadRequestException('اختر نوع ملف عند رفع ملف');
+    await this.checkForDuplicate(updateLibraryDto.title ?? currentLibrary.title, content.link, id);
 
     const { subjectOfferingId, subjectId, academicYearId, ...otherFields } = updateLibraryDto as any;
 
@@ -206,13 +219,13 @@ export class LibraryService {
       );
     }
 
-    const updatePayload: any = { ...otherFields };
+    const updatePayload: any = { ...otherFields, ...content };
     if (resolvedOfferingId !== undefined) {
       updatePayload.subjectOfferingId = new mongoose.Types.ObjectId(resolvedOfferingId);
     }
 
     const library = await this.libraryModel
-      .findByIdAndUpdate(id, updatePayload, { new: true })
+      .findByIdAndUpdate(id, updatePayload, { new: true, runValidators: true })
       .populate(LibraryService.SUBJECT_OFFERING_POPULATE)
       .exec();
 

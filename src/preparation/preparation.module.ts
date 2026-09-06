@@ -6,9 +6,11 @@ import { Preparation, PreparationSchema } from './schemas/preparation.schema';
 import { LecturesModule } from '../lectures/lectures.module';
 import { CaslModule } from '../casl/casl.module';
 import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
+import { PreparationContentModule } from './preparation-content.module';
 
 @Module({
   imports: [
+    PreparationContentModule,
     MongooseModule.forFeature([
       { name: Preparation.name, schema: PreparationSchema },
       { name: Teacher.name, schema: TeacherSchema },

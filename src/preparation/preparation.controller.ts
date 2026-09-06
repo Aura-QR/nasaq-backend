@@ -35,13 +35,18 @@ import { AbilitiesGuard } from '../casl/guards/abilities.guard';
 import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { multerConfig } from './config/multer.config';
+import { PreparationContentService } from './preparation-content.service';
+import { CreatePreparationResourceDto } from './dto/create-preparation-resource.dto';
+import { MongoIdPipe } from '../common/pipes/mongo-id.pipe';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 
 @Controller('preparation')
 @ApiTags('Preparation')
 @UseGuards(JwtAuthGuard, AbilitiesGuard)
 @ApiBearerAuth()
 export class PreparationController {
-  constructor(private readonly preparationService: PreparationService) {}
+  constructor(private readonly preparationService: PreparationService, private readonly content: PreparationContentService) {}
 
   @ApiOperation({ summary: 'Create a new preparation' })
   @ApiResponse({ status: 201, description: 'Preparation created successfully' })
@@ -51,39 +56,8 @@ export class PreparationController {
   @CheckAbilities({ action: 'create', subject: 'Preparation' })
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FilesInterceptor('files', 10, multerConfig))
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        lecture: {
-          type: 'string',
-          description: 'Lecture ID',
-          example: '507f1f77bcf86cd799439011',
-        },
-        lessonTitle: {
-          type: 'string',
-          description: 'Lesson title, free text',
-          example: 'حل المعادلات من الدرجة الأولى',
-        },
-        weekOf: {
-          type: 'string',
-          description:
-            'Any date inside the target week (YYYY-MM-DD). Defaults to the current week.',
-          example: '2026-08-22',
-        },
-        files: {
-          type: 'array',
-          items: {
-            type: 'string',
-            format: 'binary',
-          },
-          description: 'Preparation files (max 10 files, 20MB each)',
-        },
-      },
-      required: ['lecture'],
-    },
-  })
+  @ApiConsumes('application/json', 'multipart/form-data')
+  @ApiBody({ type: CreatePreparationDto })
   async create(
     @Body() createPreparationDto: CreatePreparationDto,
     @CurrentUser() user: any,
@@ -115,7 +89,7 @@ export class PreparationController {
   @CheckAbilities({ action: 'create', subject: 'Preparation' })
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FilesInterceptor('files', 10, multerConfig))
-  @ApiConsumes('multipart/form-data')
+  @ApiConsumes('application/json', 'multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
@@ -205,7 +179,7 @@ export class PreparationController {
   @ApiQuery({
     name: 'reviewStatus',
     required: false,
-    enum: ['pending', 'approved', 'needs_revision'],
+    enum: ['draft', 'pending', 'approved', 'needs_revision'],
   })
   @ApiQuery({
     name: 'name',
@@ -266,13 +240,41 @@ export class PreparationController {
     );
   }
 
+  @Get('reference-lists')
+  @CheckAbilities({ action: 'read', subject: 'Preparation' })
+  referenceLists() { return this.content.referenceLists(); }
+
+  @Get(':id/student-view')
+  @Roles(Role.STUDENT, Role.TEACHER, Role.OWNER, Role.MANAGER, Role.SUPERVISOR)
+  studentView(@Param('id', MongoIdPipe) id: string, @CurrentUser() user: any) {
+    return this.content.studentView(id, user);
+  }
+
+  @Post(':id/submit')
+  @CheckAbilities({ action: 'update', subject: 'Preparation' })
+  submit(@Param('id', MongoIdPipe) id: string, @CurrentUser() user: any) {
+    return this.content.submit(id, user);
+  }
+
+  @Post(':id/resources')
+  @CheckAbilities({ action: 'update', subject: 'Preparation' })
+  createResource(@Param('id', MongoIdPipe) id: string, @Body() dto: CreatePreparationResourceDto, @CurrentUser() user: any) {
+    return this.content.createResource(id, dto, user);
+  }
+
+  @Delete(':id/resources/:rid')
+  @CheckAbilities({ action: 'update', subject: 'Preparation' })
+  deleteResource(@Param('id', MongoIdPipe) id: string, @Param('rid', MongoIdPipe) rid: string, @CurrentUser() user: any) {
+    return this.content.deleteResource(id, rid, user);
+  }
+
   @ApiOperation({ summary: 'Get a single preparation by ID' })
   @ApiResponse({ status: 200, description: 'Preparation fetched successfully' })
   @ApiResponse({ status: 404, description: 'Preparation not found' })
   @Get(':id')
   @CheckAbilities({ action: 'read', subject: 'Preparation' })
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string, @Req() req: any) {
+  async findOne(@Param('id', MongoIdPipe) id: string, @Req() req: any) {
     return await this.preparationService.findOne(id, req);
   }
 
@@ -287,41 +289,10 @@ export class PreparationController {
   @CheckAbilities({ action: 'update', subject: 'Preparation' })
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FilesInterceptor('files', 10, multerConfig))
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        lecture: {
-          type: 'string',
-          description: 'Lecture ID',
-          example: '507f1f77bcf86cd799439011',
-        },
-        lessonTitle: {
-          type: 'string',
-          description: 'Lesson title, free text',
-          example: 'حل المعادلات من الدرجة الأولى',
-        },
-        weekOf: {
-          type: 'string',
-          description:
-            'Any date inside the target week (YYYY-MM-DD). Defaults to the current week.',
-          example: '2026-08-22',
-        },
-        files: {
-          type: 'array',
-          items: {
-            type: 'string',
-            format: 'binary',
-          },
-          description: 'Preparation files (max 10 files, 20MB each)',
-        },
-      },
-      required: [],
-    },
-  })
+  @ApiConsumes('application/json', 'multipart/form-data')
+  @ApiBody({ type: UpdatePreparationDto })
   async update(
-    @Param('id') id: string,
+    @Param('id', MongoIdPipe) id: string,
     @Body() updatePreparationDto: UpdatePreparationDto,
     @CurrentUser() user: any,
     @Req() req: any,
@@ -344,7 +315,7 @@ export class PreparationController {
   @CheckAbilities({ action: 'update', subject: 'Preparation' })
   @HttpCode(HttpStatus.OK)
   async review(
-    @Param('id') id: string,
+    @Param('id', MongoIdPipe) id: string,
     @Body() dto: ReviewPreparationDto,
     @CurrentUser() user: any,
     @Req() req: any,
@@ -362,7 +333,7 @@ export class PreparationController {
   @Delete(':id')
   @CheckAbilities({ action: 'delete', subject: 'Preparation' })
   @HttpCode(HttpStatus.OK)
-  async delete(@Param('id') id: string, @CurrentUser() user: any) {
+  async delete(@Param('id', MongoIdPipe) id: string, @CurrentUser() user: any) {
     return await this.preparationService.delete(id, user);
   }
 
@@ -395,7 +366,7 @@ export class PreparationController {
     },
   })
   async addFiles(
-    @Param('id') id: string,
+    @Param('id', MongoIdPipe) id: string,
     @CurrentUser() user: any,
     @Req() req: any,
     @UploadedFiles() files?: Express.Multer.File[],
@@ -414,7 +385,7 @@ export class PreparationController {
   @CheckAbilities({ action: 'update', subject: 'Preparation' })
   @HttpCode(HttpStatus.OK)
   async removeFile(
-    @Param('id') id: string,
+    @Param('id', MongoIdPipe) id: string,
     @Param('filename') filename: string,
     @CurrentUser() user: any,
     @Req() req: any,

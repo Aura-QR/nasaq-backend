@@ -7,8 +7,9 @@ import {
   MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { StructuredPreparationDto } from './structured-preparation.dto';
 
-export class CreatePreparationDto {
+export class CreatePreparationDto extends StructuredPreparationDto {
   @ApiProperty({
     description: 'Lecture ID',
     example: '507f1f77bcf86cd799439011',
@@ -19,8 +20,7 @@ export class CreatePreparationDto {
 
   @ApiPropertyOptional({
     description:
-      'Lesson title, free text — whatever the teacher wrote on the sheet. ' +
-      'There is no curriculum in the system to pick from.',
+      'Legacy free-text title. Selecting a curriculum lesson captures its name.',
     example: 'حل المعادلات من الدرجة الأولى',
   })
   @IsOptional()

@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -16,6 +17,8 @@ import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
 import * as fs from 'fs';
 import * as path from 'path';
+import { PreparationContentService } from './preparation-content.service';
+import { STRUCTURED_FIELDS } from './constants/preparation-constants';
 import {
   currentWeekOf,
   lessonDateFor,
@@ -64,6 +67,7 @@ export class PreparationService {
     private readonly lectureModel: Model<Lecture>,
     @InjectModel(Teacher.name)
     private readonly teacherModel: Model<Teacher>,
+    private readonly content: PreparationContentService,
   ) {}
 
   async create(
@@ -116,8 +120,15 @@ export class PreparationService {
     const { weekOf: requestedWeek, ...preparationFields } =
       createPreparationDto as any;
 
+    const lesson = await this.content.validateReferences(preparationFields, lecture.subjectOfferingId);
+    if (lesson) {
+      preparationFields.lessonTitle = lesson.name;
+      if (preparationFields.objectives === undefined) preparationFields.objectives = lesson.objectives;
+    }
+
     const savedPreparation = await new this.preparationModel({
       ...preparationFields,
+      reviewStatus: 'draft',
       subject: lecture.subjectOfferingId,
       submittedBy: teacherId,
       name: teacherName,
@@ -154,7 +165,7 @@ export class PreparationService {
       for (const file of files) {
         const newPath = path.join(preparationFolder, file.filename);
 
-        fs.renameSync(file.path, newPath);
+        this.moveFile(file.path, newPath);
 
         const relativePath = `/uploads/preparation/${savedPreparation._id}/${file.filename}`;
         const fullUrl = baseUrl ? `${baseUrl}${relativePath}` : relativePath;
@@ -209,14 +220,11 @@ export class PreparationService {
    *
    * Without this, a teacher could upload, get approved, then swap the PDF —
    * and the row would still read "approved" while pointing at a file nobody
-   * ever looked at. Any content change sends it back to the queue.
+   * ever looked at. Any content change returns it to draft for explicit resubmission.
    */
-  private reviewResetFor(preparation: any) {
-    if (!preparation?.reviewStatus || preparation.reviewStatus === 'pending') {
-      return {};
-    }
+  private reviewResetFor() {
     return {
-      reviewStatus: 'pending',
+      reviewStatus: 'draft',
       reviewedBy: null,
       reviewedByName: '',
       reviewedAt: null,
@@ -225,6 +233,7 @@ export class PreparationService {
   }
 
   private assertCanMutate(preparation: any, user: any, action: string) {
+    if (user?.role === 'STUDENT') throw new ForbiddenException();
     if (user?.role !== 'TEACHER') return;
 
     const owner = preparation?.submittedBy;
@@ -399,6 +408,15 @@ export class PreparationService {
     });
   }
 
+  private moveFile(source: string, destination: string) {
+    try { fs.renameSync(source, destination); }
+    catch (error) {
+      if (error.code !== 'EXDEV') throw error;
+      fs.copyFileSync(source, destination);
+      fs.unlinkSync(source);
+    }
+  }
+
   /**
    * The single-create path renames the upload out of temp; the bulk path
    * copies it, so the original has to be swept up afterwards or temp grows
@@ -564,6 +582,17 @@ export class PreparationService {
   ) {
     const query = this.buildFilterQuery(filters, user);
 
+    if (user?.role === 'STUDENT') {
+      const scoped = { $and: [query, await this.content.studentFilter(user)] };
+      const totalDocs = await this.preparationModel.countDocuments(scoped);
+      const page = getPagination(pagination.page, pagination.limit, totalDocs);
+      let rowsQuery = this.preparationModel.find(scoped).sort({ createdAt: -1 });
+      const paginated = pagination.page !== undefined || pagination.limit !== undefined;
+      if (paginated) rowsQuery = rowsQuery.skip(page.skip).limit(page.limit);
+      const data = (await rowsQuery).map(row => this.content.studentProjection(row));
+      return paginated ? { data, totalDocs, totalPages: page.totalPages } : data;
+    }
+
     const total = await this.preparationModel.countDocuments(query).exec();
 
     const paginationMate = getPagination(
@@ -644,6 +673,7 @@ export class PreparationService {
     user: any,
     req?: any,
   ) {
+    if (user?.role === 'STUDENT') throw new ForbiddenException();
     // A teacher asking about "the week" can only mean their own.
     const teacherId =
       user?.role === 'TEACHER' ? user.userId : params.teacherId || null;
@@ -724,9 +754,10 @@ export class PreparationService {
     }).filter((d) => d.slots.length > 0);
 
     const total = lectures.length;
-    const submitted = lectures.filter((l: any) =>
-      byLecture.has(String(l._id)),
-    ).length;
+    const submitted = lectures.filter((l: any) => {
+      const prep = byLecture.get(String(l._id));
+      return prep && prep.reviewStatus !== 'draft';
+    }).length;
 
     const teacherDoc: any = lectures.find(
       (l: any) => l.teacherId && String(l.teacherId._id) === String(teacherId),
@@ -741,6 +772,7 @@ export class PreparationService {
         total,
         submitted,
         missing: total - submitted,
+        draft: preparations.filter((p: any) => p.reviewStatus === 'draft').length,
         pending: preparations.filter((p: any) => p.reviewStatus === 'pending')
           .length,
         needsRevision: preparations.filter(
@@ -787,7 +819,8 @@ export class PreparationService {
 
       const row = rows.get(id);
       row.total += 1;
-      if (byLecture.has(String(lecture._id))) row.submitted += 1;
+      const prep = byLecture.get(String(lecture._id));
+      if (prep && prep.reviewStatus !== 'draft') row.submitted += 1;
     }
 
     const teachers = [...rows.values()].map((row) => ({
@@ -826,13 +859,15 @@ export class PreparationService {
       throw new NotFoundException(`التحضير ذو المعرف ${id} غير موجود`);
     }
 
-    if (user?.role === 'TEACHER') {
+    if (user?.role === 'TEACHER' || user?.role === 'STUDENT') {
       throw new ForbiddenException('المدرس لا يراجع تحاضيره بنفسه');
     }
+    if (preparation.reviewStatus === 'draft') throw new BadRequestException('يجب إرسال التحضير قبل مراجعته');
+    if (!['pending', 'approved', 'needs_revision'].includes(dto.reviewStatus)) throw new BadRequestException('نتيجة المراجعة غير صحيحة');
 
     const updated = await this.preparationModel
-      .findByIdAndUpdate(
-        id,
+      .findOneAndUpdate(
+        { _id: id, reviewStatus: { $ne: 'draft' }, $or: [{ contentRevision: preparation.contentRevision ?? 0 }, ...(preparation.contentRevision ? [] : [{ contentRevision: { $exists: false } }])] },
         {
           reviewStatus: dto.reviewStatus,
           reviewNote: dto.reviewNote ?? '',
@@ -844,6 +879,8 @@ export class PreparationService {
       )
       .populate('submittedBy', 'name email')
       .exec();
+
+    if (!updated) throw new ConflictException('تم تعديل التحضير أثناء المراجعة، أعد تحميله');
 
     const baseUrl =
       req?.protocol && req?.host ? `${req.protocol}://${req.host}` : '';
@@ -867,6 +904,19 @@ export class PreparationService {
     }
 
     this.assertCanMutate(preparation, user, 'تحديث');
+
+    let targetSubject: any = preparation.subject;
+    if (updatePreparationDto.lecture) {
+      const target = await this.lectureModel.findById(updatePreparationDto.lecture);
+      if (!target) throw new NotFoundException('المحاضرة غير موجودة');
+      targetSubject = target.subjectOfferingId;
+    }
+    const merged = { ...preparation.toObject(), ...updatePreparationDto };
+    const lesson = await this.content.validateReferences(merged, targetSubject);
+    if (lesson && updatePreparationDto.lessonId !== undefined) {
+      updatePreparationDto.lessonTitle = lesson.name;
+      if (updatePreparationDto.objectives === undefined && String(preparation.lessonId) !== String(lesson._id)) updatePreparationDto.objectives = lesson.objectives;
+    }
 
     if (updatePreparationDto.lecture) {
       const newLecture = await this.lectureModel.findById(
@@ -936,7 +986,7 @@ export class PreparationService {
       for (const file of files) {
         const newPath = path.join(preparationFolder, file.filename);
 
-        fs.renameSync(file.path, newPath);
+        this.moveFile(file.path, newPath);
 
         newFiles.push({
           filename: file.filename,
@@ -950,6 +1000,8 @@ export class PreparationService {
     }
 
     const touchesContent =
+      STRUCTURED_FIELDS.some(key => updatePreparationDto[key] !== undefined) ||
+      updatePreparationDto.weekOf !== undefined ||
       updatePreparationDto['files'] !== undefined ||
       updatePreparationDto.lecture !== undefined ||
       updatePreparationDto.lessonTitle !== undefined;
@@ -959,7 +1011,8 @@ export class PreparationService {
         id,
         {
           ...updatePreparationDto,
-          ...(touchesContent ? this.reviewResetFor(preparation) : {}),
+          ...(touchesContent ? this.reviewResetFor() : {}),
+          ...(touchesContent ? { $inc: { contentRevision: 1 } } : {}),
         },
         { new: true },
       )
@@ -1014,6 +1067,7 @@ export class PreparationService {
     }
 
     await this.preparationModel.findByIdAndDelete(id);
+    await this.content.deleteResources(id);
 
     /*
      * Files last. This used to run first, so a failure anywhere below it —
@@ -1033,13 +1087,18 @@ export class PreparationService {
   }
 
   async findOne(id: string, req?: any) {
+    if (req?.user?.role === 'STUDENT') return this.content.studentView(id, req.user);
     const preparation = await this.preparationModel
       .findById(id)
       .populate('submittedBy', 'name email')
+      .populate('lessonId')
+      .populate('digitalContentIds')
       .exec();
     if (!preparation) {
       throw new NotFoundException(`التحضير ذو المعرف ${id} غير موجود`);
     }
+
+    if (req?.user?.role === 'TEACHER' && String((preparation.submittedBy as any)?._id ?? preparation.submittedBy) !== String(req.user.userId)) throw new ForbiddenException();
 
     //only populate lecture/subject if they are still ObjectId refs
     if (Types.ObjectId.isValid(preparation.lecture as any) && String(preparation.lecture).length === 24) {
@@ -1057,7 +1116,7 @@ export class PreparationService {
       req?.protocol && req?.host ? `${req.protocol}://${req.host}` : '';
     const preparationWithUrls = this.addUrlsToFiles(preparation, baseUrl);
 
-    return preparationWithUrls;
+    return { ...preparationWithUrls, ...await this.content.details(id) };
   }
 
   async addFiles(
@@ -1091,7 +1150,7 @@ export class PreparationService {
     for (const file of files) {
       const newPath = path.join(preparationFolder, file.filename);
 
-      fs.renameSync(file.path, newPath);
+      this.moveFile(file.path, newPath);
 
       existingFiles.push({
         filename: file.filename,
@@ -1102,7 +1161,8 @@ export class PreparationService {
     }
 
     preparation.files = existingFiles;
-    Object.assign(preparation, this.reviewResetFor(preparation));
+    Object.assign(preparation, this.reviewResetFor());
+    preparation.contentRevision = (preparation.contentRevision ?? 0) + 1;
     await preparation.save();
 
     const updatedPreparation = await this.preparationModel
@@ -1153,7 +1213,8 @@ export class PreparationService {
     }
 
     preparation.files.splice(fileIndex, 1);
-    Object.assign(preparation, this.reviewResetFor(preparation));
+    Object.assign(preparation, this.reviewResetFor());
+    preparation.contentRevision = (preparation.contentRevision ?? 0) + 1;
     await preparation.save();
 
     const baseUrl =

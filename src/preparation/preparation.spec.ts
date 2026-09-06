@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MongooseModule, getModelToken } from '@nestjs/mongoose';
 import { Types } from 'mongoose';
 import { PreparationService } from './preparation.service';
+import { PreparationContentModule } from './preparation-content.module';
 import { Preparation, PreparationSchema } from './schemas/preparation.schema';
 import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
 import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
@@ -74,6 +75,7 @@ describe('PreparationService', () => {
     moduleRef = await Test.createTestingModule({
       imports: [
         MongooseModule.forRoot(URI),
+        PreparationContentModule,
         MongooseModule.forFeature([
           { name: Preparation.name, schema: PreparationSchema },
           { name: Lecture.name, schema: LectureSchema },
@@ -219,7 +221,7 @@ describe('PreparationService', () => {
       expect(raw.lessonTitle).toBe('حل المعادلات');
       expect(String(raw.classId)).toBe(String(classA));
       expect(String(raw.termId)).toBe(String(termId));
-      expect(raw.reviewStatus).toBe('pending');
+      expect(raw.reviewStatus).toBe('draft');
     });
 
     it('defaults to the current week and does not flag it as a guess', async () => {
@@ -507,8 +509,9 @@ describe('PreparationService', () => {
       expect(week.weekOf).toBe(SAT);
       // Counted from the timetable, not from what was uploaded.
       expect(week.stats.total).toBe(3);
-      expect(week.stats.submitted).toBe(1);
-      expect(week.stats.missing).toBe(2);
+      expect(week.stats.submitted).toBe(0);
+      expect(week.stats.draft).toBe(1);
+      expect(week.stats.missing).toBe(3);
     });
 
     it('hangs each preparation off its slot and leaves the rest null', async () => {
@@ -543,7 +546,7 @@ describe('PreparationService', () => {
       );
 
       const rowA = summary.teachers.find((t: any) => t.teacher.name === 'أ. محمد');
-      expect(rowA.percentage).toBe(33); // 1 of 3
+      expect(rowA.percentage).toBe(0); // A draft does not count as submitted.
       const rowB = summary.teachers.find((t: any) => t.teacher.name === 'أ. سارة');
       expect(rowB.submitted).toBe(0);
     });
@@ -556,10 +559,15 @@ describe('PreparationService', () => {
     });
   });
 
+  const markLegacySubmitted = (id: string) => prepModel.collection.updateOne(
+    { _id: new Types.ObjectId(id) }, { $set: { reviewStatus: 'pending' } },
+  );
+
   describe('review', () => {
     it('records the outcome, the reason and the reviewer', async () => {
       const prep = await createByManager();
 
+      await markLegacySubmitted(prep.data._id);
       const reviewed: any = await asTenant(() =>
         service.review(
           String(prep.data._id),
@@ -589,6 +597,7 @@ describe('PreparationService', () => {
     it('is filterable afterwards', async () => {
       const prep = await createByManager();
       await createInTestWeek();
+      await markLegacySubmitted(prep.data._id);
       await asTenant(() =>
         service.review(String(prep.data._id), { reviewStatus: 'needs_revision' }, MANAGER, req),
       );
@@ -601,7 +610,7 @@ describe('PreparationService', () => {
       const pending: any = await asTenant(() =>
         service.filtering({ reviewStatus: 'pending' }, {}, OWNER, req),
       );
-      expect(pending).toHaveLength(1);
+      expect(pending).toHaveLength(0);
     });
   });
 
@@ -634,7 +643,8 @@ describe('PreparationService', () => {
       const week: any = await asTenant(() =>
         service.getWeekly({ weekOf: SAT, teacherId: String(teacherA) }, OWNER, req),
       );
-      expect(week.stats.submitted).toBe(1);
+      expect(week.stats.submitted).toBe(0);
+      expect(week.stats.draft).toBe(1);
     });
 
     it('still filters by class — the whole reason it is denormalised', async () => {
@@ -804,8 +814,9 @@ describe('PreparationService', () => {
       const week: any = await asTenant(() =>
         service.getWeekly({ weekOf: WED, teacherId: String(teacherA) }, OWNER, req),
       );
-      expect(week.stats.submitted).toBe(3);
-      expect(week.stats.missing).toBe(0);
+      expect(week.stats.submitted).toBe(0);
+      expect(week.stats.draft).toBe(3);
+      expect(week.stats.missing).toBe(3);
     });
   });
 
@@ -854,10 +865,12 @@ describe('PreparationService', () => {
   });
 
   describe('a review does not outlive what it reviewed', () => {
-    const approve = (id: string) =>
-      asTenant(() =>
+    const approve = async (id: string) => {
+      await markLegacySubmitted(id);
+      return asTenant(() =>
         service.review(id, { reviewStatus: 'approved', reviewNote: 'ممتاز' }, MANAGER, req),
       );
+    };
 
     it('sends an approved preparation back to the queue when its title changes', async () => {
       const prep = await createByManager();
@@ -867,7 +880,7 @@ describe('PreparationService', () => {
         service.update(String(prep.data._id), { lessonTitle: 'درس تاني' } as any, req, [], TEACHER_A),
       );
 
-      expect(updated.data.reviewStatus).toBe('pending');
+      expect(updated.data.reviewStatus).toBe('draft');
       expect(updated.data.reviewedByName).toBe('');
       expect(updated.data.reviewedAt).toBeNull();
       expect(updated.data.reviewNote).toBe('');
@@ -887,7 +900,7 @@ describe('PreparationService', () => {
         ], OWNER),
       );
 
-      expect(result.data.reviewStatus).toBe('pending');
+      expect(result.data.reviewStatus).toBe('draft');
 
       fs.rmSync(path.join('./uploads/preparation', String(prep.data._id)), {
         recursive: true,

@@ -125,7 +125,7 @@ describe('authorization coverage', () => {
     const unguarded: string[] = [];
 
     for (const file of files) {
-      const rel = path.relative(SRC, file);
+      const rel = path.relative(SRC, file).split(path.sep).join('/');
       if (PUBLIC_FILES.includes(rel)) continue;
       if (SERVICE_AUTHORIZED.has(rel)) continue;
 

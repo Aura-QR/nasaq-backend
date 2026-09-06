@@ -29,7 +29,8 @@
     "cleanup:dup-teachers": "ts-node src/scripts/cleanup-duplicate-teachers.ts",
     "cleanup:classes": "ts-node src/scripts/cleanup-stray-classes.ts",
     "generate:timetable": "ts-node src/scripts/generate-timetable.ts",
-    "merge:dup-teachers": "ts-node src/scripts/merge-duplicate-teachers.ts"
+    "merge:dup-teachers": "ts-node src/scripts/merge-duplicate-teachers.ts",
+    "seed:catalog": "ts-node src/scripts/seed-catalog.ts"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",
