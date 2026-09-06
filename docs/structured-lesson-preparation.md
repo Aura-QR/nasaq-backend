@@ -1,5 +1,7 @@
 # Structured lesson preparation
 
+Frontend handoff: [Frontend integration guide](./frontend-structured-preparation-integration.md).
+
 The backend now creates drafts through both single and bulk preparation creation. A draft needs a lecture to establish its teacher, class and subject; all lesson content can be saved later. Existing preparations retain their fields and review statuses. No existing-row status migration is required.
 
 ## Review of the implementation plan
