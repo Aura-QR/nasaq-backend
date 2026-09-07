@@ -1,5 +1,7 @@
 import {
+  ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsInt,
   IsMongoId,
   IsNotEmpty,
@@ -40,6 +42,17 @@ export class CreateCurriculumLessonDto {
   @IsString({ each: true })
   @MaxLength(2000, { each: true })
   objectives?: string[];
+}
+export class CreateCurriculumLessonsBulkDto {
+  @IsArray()
+  @ArrayMaxSize(200)
+  @IsString({ each: true })
+  @MaxLength(300, { each: true })
+  names: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  dryRun?: boolean;
 }
 export class UpdateCurriculumLessonDto extends PartialType(
   CreateCurriculumLessonDto,

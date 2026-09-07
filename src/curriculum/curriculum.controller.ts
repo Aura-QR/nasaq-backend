@@ -17,6 +17,7 @@ import {
   ImportCurriculumDto,
   CreateCurriculumUnitDto,
   CreateCurriculumLessonDto,
+  CreateCurriculumLessonsBulkDto,
   UpdateCurriculumLessonDto,
   UpdateCurriculumUnitDto,
   CurriculumQueryDto,
@@ -65,6 +66,14 @@ export class CurriculumController {
     @Body() dto: CreateCurriculumLessonDto,
   ) {
     return this.service.createLesson(id, dto);
+  }
+  @Roles(Role.OWNER, Role.MANAGER)
+  @Post('units/:id/lessons-bulk')
+  createLessonsBulk(
+    @Param('id', MongoIdPipe) id: string,
+    @Body() dto: CreateCurriculumLessonsBulkDto,
+  ) {
+    return this.service.createLessonsBulk(id, dto);
   }
   @Roles(Role.OWNER, Role.MANAGER)
   @Patch('lessons/:id')

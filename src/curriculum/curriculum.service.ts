@@ -14,6 +14,7 @@ import { CatalogService } from '../catalog/catalog.service';
 import {
   CreateCurriculumUnitDto,
   CreateCurriculumLessonDto,
+  CreateCurriculumLessonsBulkDto,
   UpdateCurriculumLessonDto,
   UpdateCurriculumUnitDto,
   ImportCurriculumDto,
@@ -127,6 +128,79 @@ export class CurriculumService {
   async createLesson(unitId: string, dto: CreateCurriculumLessonDto) {
     await this.getUnit(unitId);
     return this.lessons.create({ ...dto, unitId });
+  }
+  async createLessonsBulk(unitId: string, dto: CreateCurriculumLessonsBulkDto) {
+    // listLessons follows the same tenant-scoped unit lookup as createLesson.
+    // Besides rejecting a unit from another school, it gives us one snapshot
+    // for both duplicate detection and the next order number.
+    const existingLessons = await this.listLessons(unitId);
+    const existingNames = new Set(existingLessons.map((lesson) => lesson.name));
+    const cleanedNames = dto.names
+      .map((name) => this.cleanLessonName(name))
+      .filter(Boolean);
+
+    let skipped = 0;
+    const namesToCreate: string[] = [];
+    for (const name of cleanedNames) {
+      if (existingNames.has(name)) {
+        skipped++;
+        continue;
+      }
+      existingNames.add(name);
+      namesToCreate.push(name);
+    }
+
+    const currentMaxOrder = existingLessons.reduce(
+      (maximum, lesson) => Math.max(maximum, lesson.order),
+      -1,
+    );
+
+    if (dto.dryRun === true) {
+      return {
+        message: `تم إنشاء ${namesToCreate.length} دروس`,
+        data: {
+          created: namesToCreate.length,
+          skipped,
+          names: cleanedNames,
+          lessons: namesToCreate.map((name, index) => ({
+            name,
+            order: currentMaxOrder + index + 1,
+          })),
+        },
+      };
+    }
+
+    const createdLessons = [];
+    for (const [index, name] of namesToCreate.entries()) {
+      createdLessons.push(
+        await this.createLesson(unitId, {
+          name,
+          order: currentMaxOrder + index + 1,
+        }),
+      );
+    }
+
+    return {
+      message: `تم إنشاء ${createdLessons.length} دروس`,
+      data: {
+        created: createdLessons.length,
+        skipped,
+        lessons: createdLessons,
+      },
+    };
+  }
+  private cleanLessonName(name: string) {
+    return name
+      .replace(
+        /^\s*(?:(?:[0-9\u0660-\u0669]+\s*[.)\-\u2013\u2014:]\s*)|(?:[\-\u2013\u2014\u2022\u25cf\u25aa\u25e6]\s*))/u,
+        '',
+      )
+      .replace(
+        /\s*(?:(?:[.\u2024\u2025\u2026\u00b7]\s*){2,})[0-9\u0660-\u0669]+\s*\.?\s*$/u,
+        '',
+      )
+      .trim()
+      .replace(/\s+/gu, ' ');
   }
   async updateLesson(id: string, dto: UpdateCurriculumLessonDto) {
     const lesson = await this.lessons.findByIdAndUpdate(
