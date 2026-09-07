@@ -24,6 +24,12 @@ import { generateOtp, otpExpiry as otpExpiryDate } from '../common/utils/otp.uti
 
 @Injectable()
 export class StudentsService {
+  private static readonly CLASS_POPULATE = {
+    path: 'classId',
+    select: 'roomNumber gender academicYearId',
+    populate: { path: 'academicYearId', select: 'name' },
+  };
+
   constructor(
     @InjectModel(Student.name)
     private readonly studentModel: Model<Student>,
@@ -169,7 +175,7 @@ export class StudentsService {
   async findAll() {
     const students = await this.studentModel
       .find()
-      .populate('classId', 'roomNumber gender academicYear')
+      .populate(StudentsService.CLASS_POPULATE)
       .exec();
 
     return students.map(student => transformStudentResponse(student));
@@ -178,7 +184,7 @@ export class StudentsService {
   async findOne(id: string) {
     const student = await this.studentModel
       .findById(id)
-      .populate('classId', 'roomNumber gender academicYear')
+      .populate(StudentsService.CLASS_POPULATE)
       .exec();
 
     if (!student) {
@@ -194,6 +200,7 @@ export class StudentsService {
 
   async filtering(filters: any, pagination: PaginationDto = {}) {
     const query: any = {};
+    let everEnrolledStudentIds: Set<string> | null = null;
 
     const academicYearParam = filters.academicYearId || filters.academicYear;
     const cleanFilters = { ...filters };
@@ -201,16 +208,24 @@ export class StudentsService {
     delete cleanFilters.academicYear;
 
     if (academicYearParam && mongoose.Types.ObjectId.isValid(String(academicYearParam))) {
-      const enrollments = await this.enrollmentModel
-        .find({
-          academicYearId: new mongoose.Types.ObjectId(String(academicYearParam)),
-          status: 'active',
-        })
-        .select('studentId')
-        .exec();
+      const [enrollments, everEnrolled] = await Promise.all([
+        this.enrollmentModel
+          .find({
+            academicYearId: new mongoose.Types.ObjectId(String(academicYearParam)),
+            status: 'active',
+          })
+          .select('studentId')
+          .exec(),
+        this.enrollmentModel.distinct('studentId').exec(),
+      ]);
 
-      const studentIds = enrollments.map((e) => e.studentId);
-      query._id = { $in: studentIds };
+      const studentIds = enrollments.map((enrollment) => enrollment.studentId);
+      everEnrolledStudentIds = new Set(everEnrolled.map((id) => String(id)));
+
+      query.$or = [
+        { _id: { $in: studentIds } },
+        { _id: { $nin: everEnrolled } },
+      ];
     }
 
     const textSearchFields = ['name', 'firstName', 'familyName', 'fatherName', 'nationality', 'address', 'previousSchool', 'notes','schoolEmail'];
@@ -253,7 +268,7 @@ export class StudentsService {
 
     let studentsQuery = this.studentModel
       .find(query).sort({ createdAt: -1 })
-      .populate('classId', 'roomNumber gender academicYear');
+      .populate(StudentsService.CLASS_POPULATE);
 
     if (isPaginationRequested) {
       studentsQuery = studentsQuery.skip(paginationMate.skip).limit(paginationMate.limit);
@@ -265,13 +280,27 @@ export class StudentsService {
 
     if (isPaginationRequested) {
       return {
-        data: students.map(student => transformStudentResponse(student)),
+        data: students.map((student) =>
+          transformStudentResponse(
+            student,
+            everEnrolledStudentIds
+              ? !everEnrolledStudentIds.has(String(student._id))
+              : undefined,
+          ),
+        ),
         totalDocs,
         totalPages
       };
     }
 
-    return students.map(student => transformStudentResponse(student));
+    return students.map((student) =>
+      transformStudentResponse(
+        student,
+        everEnrolledStudentIds
+          ? !everEnrolledStudentIds.has(String(student._id))
+          : undefined,
+      ),
+    );
   }
 
   async update(id: string, updateStudentDto: UpdateStudentDto) {
@@ -480,7 +509,7 @@ export class StudentsService {
   async toggleActive(id: string) {
     const student = await this.studentModel
       .findById(id)
-      .populate('classId', 'roomNumber gender academicYear');
+      .populate(StudentsService.CLASS_POPULATE);
 
     if (!student) {
       throw new NotFoundException(`الطالب بمعرف ${id} غير موجود`);
@@ -489,7 +518,7 @@ export class StudentsService {
     student.isActive = !student.isActive;
     await student.save();
 
-    await student.populate('classId', 'roomNumber gender academicYear');
+    await student.populate(StudentsService.CLASS_POPULATE);
 
     return {
       message: `تم ${student.isActive ? 'تفعيل' : 'إلغاء تفعيل'} الطالب بنجاح`,

@@ -8,6 +8,7 @@ import { AcademicYearSchema } from 'src/academic-years/schemas/academic-year.sch
 import { AttendanceSchema } from 'src/attendance/schemas/attendance.schema';
 import { ExpenseSchema } from 'src/expenses/schemas/expense.schema';
 import { StudentFinancialRecordSchema } from 'src/financial/schemas/student-financial-record.schema';
+import { EnrollmentSchema } from 'src/enrollments/schemas/enrollment.schema';
 import { TenantContextService } from 'src/tenancy/tenant-context.service';
 import * as dotenv from 'dotenv';
 
@@ -26,6 +27,7 @@ describe('Dashboards Service Integration', () => {
   let attendanceModel: any;
   let expenseModel: any;
   let financialRecordModel: any;
+  let enrollmentModel: any;
   let service: DashboardsService;
 
   beforeAll(async () => {
@@ -40,6 +42,7 @@ describe('Dashboards Service Integration', () => {
     try { attendanceModel = mongoose.model('TestAttendanceDash', AttendanceSchema); } catch { attendanceModel = mongoose.model('TestAttendanceDash'); }
     try { expenseModel = mongoose.model('TestExpenseDash', ExpenseSchema); } catch { expenseModel = mongoose.model('TestExpenseDash'); }
     try { financialRecordModel = mongoose.model('TestFinancialRecordDash', StudentFinancialRecordSchema); } catch { financialRecordModel = mongoose.model('TestFinancialRecordDash'); }
+    try { enrollmentModel = mongoose.model('TestEnrollmentDash', EnrollmentSchema); } catch { enrollmentModel = mongoose.model('TestEnrollmentDash'); }
 
     service = new DashboardsService(
       schoolModel,
@@ -50,6 +53,7 @@ describe('Dashboards Service Integration', () => {
       attendanceModel,
       expenseModel,
       financialRecordModel,
+      enrollmentModel,
     );
   });
 
@@ -63,12 +67,20 @@ describe('Dashboards Service Integration', () => {
       await attendanceModel.deleteMany({}).setOptions({ skipTenantScope: true });
       await expenseModel.deleteMany({}).setOptions({ skipTenantScope: true });
       await financialRecordModel.deleteMany({}).setOptions({ skipTenantScope: true });
+      await enrollmentModel.deleteMany({}).setOptions({ skipTenantScope: true });
     } catch {}
     await mongoose.disconnect();
   });
 
   it('should return isolated Owner dashboard metrics for School A', async () => {
     await contextService.runWithTenant(schoolIdA, false, async () => {
+      await academicYearModel.create({
+        name: '2026/2027',
+        startDate: new Date('2026-08-01'),
+        endDate: new Date('2027-06-01'),
+        status: 'active',
+      });
+
       await studentModel.create({
         firstName: 'Ali',
         fatherName: 'Ahmed',
@@ -170,6 +182,85 @@ describe('Dashboards Service Integration', () => {
 
     await classModel.deleteMany({ name: 'stranded' }).setOptions({ skipTenantScope: true });
     await academicYearModel.deleteMany({ name: 'archived-only' }).setOptions({ skipTenantScope: true });
+  });
+
+  it('counts the same active-year and unplaced students shown by the student list', async () => {
+    const schoolIdD = new mongoose.Types.ObjectId().toString();
+
+    await contextService.runWithTenant(schoolIdD, false, async () => {
+      const previousYear = await academicYearModel.create({
+        name: '2025/2026',
+        startDate: new Date('2025-08-01'),
+        endDate: new Date('2026-06-01'),
+        status: 'archived',
+      });
+      const activeYear = await academicYearModel.create({
+        name: '2026/2027',
+        startDate: new Date('2026-08-01'),
+        endDate: new Date('2027-06-01'),
+        status: 'active',
+      });
+      const gradeLevelId = new mongoose.Types.ObjectId();
+      const previousClass = await classModel.create({
+        name: 'previous-student-class',
+        gradeLevelId,
+        academicYearId: previousYear._id,
+        gender: 'male',
+        maxCapacity: 30,
+      });
+      const currentClass = await classModel.create({
+        name: 'current-student-class',
+        gradeLevelId,
+        academicYearId: activeYear._id,
+        gender: 'male',
+        maxCapacity: 30,
+      });
+
+      const makeStudent = (firstName: string, isActive = true) =>
+        studentModel.create({
+          firstName,
+          fatherName: 'Dashboard',
+          familyName: 'Test',
+          birthDate: new Date('2015-01-01'),
+          gender: 'male',
+          phoneNumber: `050-${firstName}`,
+          email: `${firstName.toLowerCase()}@dashboard.test`,
+          address: 'Riyadh',
+          isActive,
+        });
+
+      const current = await makeStudent('Current');
+      const previous = await makeStudent('Previous');
+      const withdrawn = await makeStudent('Withdrawn');
+      await makeStudent('Unplaced', false);
+
+      await enrollmentModel.create([
+        {
+          studentId: current._id,
+          classId: currentClass._id,
+          academicYearId: activeYear._id,
+          status: 'active',
+        },
+        {
+          studentId: previous._id,
+          classId: previousClass._id,
+          academicYearId: previousYear._id,
+          status: 'active',
+        },
+        {
+          studentId: withdrawn._id,
+          classId: currentClass._id,
+          academicYearId: activeYear._id,
+          status: 'withdrawn',
+        },
+      ]);
+
+      const dash = await service.getOwnerDashboard(schoolIdD);
+
+      expect(dash.counts.students).toEqual(2);
+      expect(dash.counts.activeStudents).toEqual(1);
+      expect(dash.academicYear?.name).toEqual('2026/2027');
+    });
   });
 
   it('should return Super Admin cross-tenant aggregate platform stats', async () => {

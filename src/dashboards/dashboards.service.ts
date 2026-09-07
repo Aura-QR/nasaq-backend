@@ -9,6 +9,7 @@ import { AcademicYear } from 'src/academic-years/schemas/academic-year.schema';
 import { Attendance } from 'src/attendance/schemas/attendance.schema';
 import { Expense } from 'src/expenses/schemas/expense.schema';
 import { StudentFinancialRecord } from 'src/financial/schemas/student-financial-record.schema';
+import { Enrollment } from 'src/enrollments/schemas/enrollment.schema';
 
 @Injectable()
 export class DashboardsService {
@@ -23,6 +24,8 @@ export class DashboardsService {
     @InjectModel(Expense.name) private expenseModel: Model<Expense>,
     @InjectModel(StudentFinancialRecord.name)
     private financialRecordModel: Model<StudentFinancialRecord>,
+    @InjectModel(Enrollment.name)
+    private enrollmentModel: Model<Enrollment>,
   ) {}
 
   /**
@@ -48,9 +51,31 @@ export class DashboardsService {
     return year ? { _id: year._id as Types.ObjectId, name: year.name } : null;
   }
 
+  private async getStudentsForYearFilter(
+    academicYearId: Types.ObjectId,
+  ): Promise<Record<string, unknown>> {
+    const [activeStudentIds, everEnrolledStudentIds] = await Promise.all([
+      this.enrollmentModel.distinct('studentId', {
+        academicYearId,
+        status: 'active',
+      }),
+      this.enrollmentModel.distinct('studentId'),
+    ]);
+
+    return {
+      $or: [
+        { _id: { $in: activeStudentIds } },
+        { _id: { $nin: everEnrolledStudentIds } },
+      ],
+    };
+  }
+
   async getOwnerDashboard(schoolId: string) {
     const sId = new Types.ObjectId(schoolId);
     const activeYear = await this.getActiveYear();
+    const studentYearFilter = activeYear
+      ? await this.getStudentsForYearFilter(activeYear._id)
+      : null;
 
     const [
       totalStudents,
@@ -62,8 +87,15 @@ export class DashboardsService {
       financialRecords,
       todayAttendanceCount,
     ] = await Promise.all([
-      this.studentModel.countDocuments(),
-      this.studentModel.countDocuments({ isActive: true }),
+      studentYearFilter
+        ? this.studentModel.countDocuments(studentYearFilter)
+        : Promise.resolve(0),
+      studentYearFilter
+        ? this.studentModel.countDocuments({
+            ...studentYearFilter,
+            isActive: true,
+          })
+        : Promise.resolve(0),
       this.teacherModel.countDocuments(),
       activeYear
         ? this.classModel.countDocuments({ academicYearId: activeYear._id })
@@ -115,15 +147,29 @@ export class DashboardsService {
 
   async getManagerDashboard(userPermissions: string[]) {
     const isOwnerOrAll = userPermissions.includes('*');
+    const activeYear = await this.getActiveYear();
     const result: any = {
       permissions: userPermissions,
+      academicYear: activeYear
+        ? { id: activeYear._id, name: activeYear.name }
+        : null,
       metrics: {},
     };
 
     if (isOwnerOrAll || userPermissions.includes('school.students.read')) {
+      const studentYearFilter = activeYear
+        ? await this.getStudentsForYearFilter(activeYear._id)
+        : null;
       const [totalStudents, activeStudents] = await Promise.all([
-        this.studentModel.countDocuments(),
-        this.studentModel.countDocuments({ isActive: true }),
+        studentYearFilter
+          ? this.studentModel.countDocuments(studentYearFilter)
+          : Promise.resolve(0),
+        studentYearFilter
+          ? this.studentModel.countDocuments({
+              ...studentYearFilter,
+              isActive: true,
+            })
+          : Promise.resolve(0),
       ]);
       result.metrics.students = { totalStudents, activeStudents };
     }
@@ -134,7 +180,6 @@ export class DashboardsService {
     }
 
     if (isOwnerOrAll || userPermissions.includes('school.classes.manage')) {
-      const activeYear = await this.getActiveYear();
       const totalClasses = activeYear
         ? await this.classModel.countDocuments({ academicYearId: activeYear._id })
         : 0;

@@ -14,6 +14,7 @@ import {
   StudentFinancialRecord,
   StudentFinancialRecordSchema,
 } from 'src/financial/schemas/student-financial-record.schema';
+import { Enrollment, EnrollmentSchema } from 'src/enrollments/schemas/enrollment.schema';
 import { DashboardsService } from './dashboards.service';
 import { DashboardsController } from './dashboards.controller';
 
@@ -28,6 +29,7 @@ import { DashboardsController } from './dashboards.controller';
       { name: Attendance.name, schema: AttendanceSchema },
       { name: Expense.name, schema: ExpenseSchema },
       { name: StudentFinancialRecord.name, schema: StudentFinancialRecordSchema },
+      { name: Enrollment.name, schema: EnrollmentSchema },
     ]),
   ],
   controllers: [DashboardsController],
