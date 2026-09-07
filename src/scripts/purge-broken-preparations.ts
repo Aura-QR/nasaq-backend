@@ -1,3 +1,4 @@
+export {};
 /**
  * Deletes preparations whose lecture is an all-null snapshot.
  *

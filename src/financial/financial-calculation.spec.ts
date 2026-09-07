@@ -138,6 +138,7 @@ describe('Financial Calculation Invariants & Expatriate Surcharge', () => {
     const recordService = new FinancialRecordService(
       {} as any, {} as any, {} as any, {} as any,
       {} as any, {} as any, {} as any, {} as any,
+      {} as any, {} as any,
     );
     const plan = {
       numberOfInstallments: 3,

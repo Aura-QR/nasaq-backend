@@ -10,6 +10,10 @@ import { AdditionalFeeController } from './additional-fee.controller';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-level.schema';
+import {
+  AcademicYear,
+  AcademicYearSchema,
+} from '../academic-years/schemas/academic-year.schema';
 import { CaslModule } from '../casl/casl.module';
 import { FeeConfigService } from './fee-config.service';
 import { FeeConfigController } from './fee-config.controller';
@@ -43,6 +47,7 @@ import { School, SchoolSchema } from '../platform/schools/schemas/school.schema'
       { name: Student.name, schema: StudentSchema },
       { name: Class.name, schema: ClassSchema },
       { name: GradeLevel.name, schema: GradeLevelSchema },
+      { name: AcademicYear.name, schema: AcademicYearSchema },
       { name: FinancialTrip.name, schema: FinancialTripSchema },
       { name: BusPlan.name, schema: BusPlanSchema },
       { name: School.name, schema: SchoolSchema },

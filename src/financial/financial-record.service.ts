@@ -8,6 +8,8 @@ import { InstallmentPlan } from './schemas/installment-plan.schema';
 import { Discount } from './schemas/discount.schema';
 import { Student } from '../students/schemas/student.schema';
 import { Class } from '../classes/schemas/class.schema';
+import { GradeLevel } from '../grade-levels/schemas/grade-level.schema';
+import { AcademicYear } from '../academic-years/schemas/academic-year.schema';
 import { FinancialTrip } from './schemas/financial-trip.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { RecordPaymentDto } from './dto/record-payment.dto';
@@ -24,9 +26,46 @@ export class FinancialRecordService {
     @InjectModel(Discount.name) private discountModel: Model<Discount>,
     @InjectModel(Student.name) private studentModel: Model<Student>,
     @InjectModel(Class.name) private classModel: Model<Class>,
+    @InjectModel(GradeLevel.name) private gradeLevelModel: Model<GradeLevel>,
+    @InjectModel(AcademicYear.name) private academicYearModel: Model<AcademicYear>,
     @InjectModel(FinancialTrip.name) private tripTemplateModel: Model<FinancialTrip>,
     @InjectModel(School.name) private schoolModel: Model<School>,
   ) {}
+
+  /**
+   * Name the year and grade the missing config belongs to.
+   *
+   * The message used to say only "no fee criteria for the selected year and
+   * grade", which is true and useless: a school with eighteen grade levels —
+   * and this one has duplicates of most of them — has no way to tell which of
+   * the eighteen it is being asked to create. A deputy head created the config
+   * for "الصف السادس إبتدائى" while her classes sat on "الصف السادس", and could
+   * not add a single student until someone read the database.
+   */
+  private async describeMissingFeeConfig(cls: any): Promise<string> {
+    const [grade, year] = await Promise.all([
+      this.gradeLevelModel
+        .findById(cls.gradeLevelId)
+        .select('name')
+        .setOptions({ skipTenantScope: true })
+        .lean()
+        .exec(),
+      this.academicYearModel
+        .findById(cls.academicYearId)
+        .select('name')
+        .setOptions({ skipTenantScope: true })
+        .lean()
+        .exec(),
+    ]);
+
+    const gradeName = (grade as any)?.name ?? 'غير معروف';
+    const yearName = (year as any)?.name ?? 'غير معروفة';
+
+    return (
+      `لا توجد معايير رسوم لـ "${gradeName}" في السنة الدراسية "${yearName}". ` +
+      `أنشئها من: المالية والحسابات ← معايير الرسوم، ثم أعد المحاولة.`
+    );
+  }
 
   private validateObjectId(id: string, name = 'المعرف'): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -132,9 +171,7 @@ export class FinancialRecordService {
       .setOptions({ skipTenantScope: true })
       .exec();
     if (!feeConfig) {
-      throw new BadRequestException(
-        `لا توجد معايير رسوم للعام الدراسي والمرحلة الدراسية المحددة. يرجى إنشاؤها أولاً قبل إضافة الطالب للفصل.`,
-      );
+      throw new BadRequestException(await this.describeMissingFeeConfig(cls));
     }
 
     const student = await this.studentModel
@@ -265,9 +302,7 @@ export class FinancialRecordService {
       .setOptions({ skipTenantScope: true })
       .exec();
     if (!feeConfig) {
-      throw new BadRequestException(
-        `لا توجد معايير رسوم للعام الدراسي والمرحلة الدراسية المحددة. يرجى إنشاؤها أولاً قبل إضافة الطالب للفصل.`,
-      );
+      throw new BadRequestException(await this.describeMissingFeeConfig(cls));
     }
 
     let plan: InstallmentPlan | null = null;
