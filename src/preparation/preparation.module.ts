@@ -1,4 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
+import {
+  GradeLevel,
+  GradeLevelSchema,
+} from '../grade-levels/schemas/grade-level.schema';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PreparationController } from './preparation.controller';
 import { PreparationService } from './preparation.service';
@@ -14,6 +18,10 @@ import { PreparationContentModule } from './preparation-content.module';
     MongooseModule.forFeature([
       { name: Preparation.name, schema: PreparationSchema },
       { name: Teacher.name, schema: TeacherSchema },
+      // The weekly view populates a lecture's offering down to its grade, so
+      // the model has to exist on the connection. It does today only because
+      // other modules happen to register it; registering it here says so.
+      { name: GradeLevel.name, schema: GradeLevelSchema },
     ]),
     forwardRef(() => LecturesModule),
     CaslModule,

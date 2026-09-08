@@ -12,6 +12,10 @@ import {
   SubjectOfferingSchema,
 } from '../subject-offerings/schemas/subject-offering.schema';
 import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
+import {
+  GradeLevel,
+  GradeLevelSchema,
+} from '../grade-levels/schemas/grade-level.schema';
 import { startOfWeek, lessonDateFor, toDateOnlyString } from './utils/week.util';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 import * as fs from 'fs';
@@ -37,6 +41,7 @@ describe('PreparationService', () => {
   let teacherModel: any;
   let classModel: any;
   let offeringModel: any;
+  let gradeLevelModel: any;
   let subjectModel: any;
 
   const schoolId = new Types.ObjectId();
@@ -83,6 +88,7 @@ describe('PreparationService', () => {
           { name: Class.name, schema: ClassSchema },
           { name: SubjectOffering.name, schema: SubjectOfferingSchema },
           { name: Subject.name, schema: SubjectSchema },
+          { name: GradeLevel.name, schema: GradeLevelSchema },
         ]),
       ],
       providers: [PreparationService],
@@ -94,6 +100,7 @@ describe('PreparationService', () => {
     teacherModel = moduleRef.get(getModelToken(Teacher.name));
     classModel = moduleRef.get(getModelToken(Class.name));
     offeringModel = moduleRef.get(getModelToken(SubjectOffering.name));
+    gradeLevelModel = moduleRef.get(getModelToken(GradeLevel.name));
     subjectModel = moduleRef.get(getModelToken(Subject.name));
   });
 
@@ -118,6 +125,16 @@ describe('PreparationService', () => {
       isRequiredForPromotion: true,
       schoolId,
     });
+    // A real row, not just an id: the weekly view populates the offering down
+    // to its grade so a client can look up the curriculum for that pair.
+    // Upsert: this fixture runs before each test and the grade is not among
+    // the collections the suite clears.
+    await gradeLevelModel.collection.replaceOne(
+      { _id: gradeLevelId },
+      { _id: gradeLevelId, schoolId, name: 'الأول الابتدائي', order: 1 },
+      { upsert: true },
+    );
+
     offeringId = await mk(offeringModel, {
       subjectId,
       gradeLevelId,
@@ -531,6 +548,30 @@ describe('PreparationService', () => {
       expect(slot1.subject.name).toBe('رياضيات');
 
       expect(week.days.every((d: any) => d.slots.length > 0)).toBe(true);
+    });
+
+    it('names the subject and grade a lesson lookup needs', async () => {
+      /*
+       * A week without these can show a teacher her slots but cannot offer
+       * her the lessons in them: GET /curriculum/units takes subjectId and
+       * gradeLevelId together, and the slot used to carry only the offering
+       * id and a subject name.
+       */
+      const week: any = await asTenant(() =>
+        service.getWeekly({ weekOf: WED, teacherId: String(teacherA) }, OWNER, req),
+      );
+
+      const slot = week.days
+        .find((d: any) => d.dayOfWeek === 'sunday')
+        .slots.find((s: any) => s.slot === 1);
+
+      expect(slot.subject.subjectId).toBeTruthy();
+      expect(slot.subject.gradeLevel).toEqual({
+        _id: String(gradeLevelId),
+        name: 'الأول الابتدائي',
+      });
+      // The offering id stays where it was; clients filter by it.
+      expect(slot.subject._id).toBe(String(offeringId));
     });
 
     it('summarises per teacher, worst coverage first, when no teacher is named', async () => {

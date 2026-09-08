@@ -743,7 +743,16 @@ export class PreparationService {
     const lectures = await this.lectureModel
       .find(lectureFilter)
       .populate('classId', 'name roomNumber gender academicYearId')
-      .populate({ path: 'subjectOfferingId', populate: { path: 'subjectId' } })
+      .populate({
+        path: 'subjectOfferingId',
+        // gradeLevelId as well as the subject: a curriculum lookup needs the
+        // pair, and populating one level too shallow is how a field comes
+        // back as a bare id and reads on screen as an empty column.
+        populate: [
+          { path: 'subjectId' },
+          { path: 'gradeLevelId', select: 'name order' },
+        ],
+      })
       .populate('teacherId', 'name email')
       .lean()
       .exec();
@@ -787,12 +796,34 @@ export class PreparationService {
                   gender: l.classId.gender,
                 }
               : null,
+            /*
+             * `_id` is the OFFERING, kept as it was because clients filter by
+             * it. `subjectId` and `gradeLevel` are the pair a curriculum
+             * lookup needs — GET /curriculum/units takes both — and without
+             * them this endpoint can show a teacher her week but cannot offer
+             * her the lessons in it, which is the one thing the week is for.
+             */
             subject: l.subjectOfferingId
               ? {
                   _id: String(l.subjectOfferingId._id),
                   name:
                     (l.subjectOfferingId as any)?.subjectId?.subjectName ??
                     null,
+                  subjectId:
+                    (l.subjectOfferingId as any)?.subjectId?._id
+                      ? String((l.subjectOfferingId as any).subjectId._id)
+                      : null,
+                  gradeLevel: (l.subjectOfferingId as any)?.gradeLevelId
+                    ? {
+                        _id: String(
+                          (l.subjectOfferingId as any).gradeLevelId._id ??
+                            (l.subjectOfferingId as any).gradeLevelId,
+                        ),
+                        name:
+                          (l.subjectOfferingId as any).gradeLevelId?.name ??
+                          null,
+                      }
+                    : null,
                 }
               : null,
             preparation: prep
