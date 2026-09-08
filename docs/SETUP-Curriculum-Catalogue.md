@@ -36,14 +36,23 @@ safe to run before the screens exist.
 ```bash
 npm run catalog:convert -- \
   --source /Users/abdelati88/development/moeen/Moeen-Extension/madrasati_courses_clean.json \
-  --map    subjects-to-map.csv \
-  --out    catalog-source.json
+  --map       subjects-to-map.csv \
+  --recovered catalog-mapping.recovered.json \
+  --out       catalog-source.json
 ```
+
+`--recovered` is where the subject and the grade actually come from — see
+`docs/Curriculum-Mapping-Review.md`. It settles 139 of the 162 courses by
+matching lesson ids against a local curriculum source. The CSV is the
+fallback for the other 23; it was hand-assigned from each course's first unit
+name and is wrong for 90 of the 162, so it is not the thing to trust.
 
 Prints what it found and writes `catalog-source.json`. Expect:
 
 ```
+ربط مستعاد : 139 مقرر
 مقررات : 162 / 162
+بصف    : 139
 وحدات  : 1377
 دروس   : 8331
 ```
@@ -111,17 +120,17 @@ reads `وحدة تعزيز المهارات`, and 44 of the 75 distinct labels r
 `variant`, which is what a picker shows beside the subject — without it the
 list offers `العلوم` thirty-five times with nothing to choose between them.
 
-### 51 courses look identical in the picker
+### Courses that used to look identical
 
-23 groups of them, and in three of the four sampled the lessons are the same
-byte for byte: **the ministry publishes one course under two ids.**
+23 groups of them (51 rows) were indistinguishable, and in most the lessons
+were byte-for-byte the same: **the ministry publishes one course under two
+ids.**
 
-A deputy head will see two rows she cannot tell apart. Both import to the same
-result, so picking the wrong one is harmless — but it looks like a bug.
-
-**The fix is the grade column.** `subjects-to-map.csv` has `الصف — املأه` and
-it is empty on all 162 rows. Fill it, re-convert, re-seed, and `gradeName`
-separates them in the list.
+The recovered mapping resolves nearly all of it — each maths course now
+carries its grade, so الصف الثاني المتوسط and الصف الخامس الابتدائي no longer
+read as one repeated row. The 23 the recovery could not settle still show
+without a grade; `docs/Curriculum-Mapping-Review.md` lists them with the
+evidence for each.
 
 The grade is *only* a label. What an import actually lands on is the school's
 own grade, chosen at import — and it must be, because schools name grades

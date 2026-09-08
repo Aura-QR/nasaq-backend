@@ -27,8 +27,21 @@ import { readFileSync, writeFileSync } from 'fs';
  * school chooses its own subject and grade when it imports (see
  * `CurriculumService.import`), and it must, because grades are named per
  * school — مواهب carries both "الصف السادس" and "الصف السادس إبتدائى".
- * The CSV's grade column feeds `gradeName`, which is a hint for the picker
- * and nothing more. It is blank today.
+ * `gradeName` is a hint for the picker and nothing more.
+ *
+ * ## Where the good mapping comes from
+ *
+ * `catalog-mapping.recovered.json` (see docs/Curriculum-Mapping-Review.md)
+ * recovers both the subject and the grade by matching each course's lesson
+ * ids against a local curriculum source, requiring 60% of a course's lessons
+ * and at least three, with no rival candidate above 20%. It resolves 139 of
+ * the 162 courses.
+ *
+ * Prefer it. The CSV was hand-assigned from the first unit's name and is
+ * wrong for 90 of the 162 — course 273 is اللغة العربية and the sheet calls
+ * it التربية الصحية والبدنية. The CSV remains the fallback for the 23 the
+ * recovery could not settle; those rows carry an empty subject, and an empty
+ * name is never allowed to overwrite a usable one.
  *
  * ## Usage
  *
@@ -39,6 +52,15 @@ import { readFileSync, writeFileSync } from 'fs';
  *
  * Then feed `catalog-source.json` to `seed-catalog.ts`.
  */
+
+/** One row of catalog-mapping.recovered.json. */
+interface RecoveredSubject {
+  subjectId: string | number;
+  subjectName?: string;
+  gradeName?: string;
+  stageName?: string;
+  status?: string;
+}
 
 export interface CatalogSourceSubject {
   subjectId: string;
@@ -148,9 +170,37 @@ export function splitLessonName(raw: string): { unit: string; lesson: string } {
   };
 }
 
+/**
+ * subjectId -> the recovered subject and grade, for rows that were settled.
+ *
+ * A `needs-review` row is skipped entirely rather than merged in: it carries
+ * an empty subject, and letting an empty value win would blank a name the CSV
+ * had right.
+ */
+export function readRecovered(
+  json: unknown,
+): Map<string, { subject: string; grade: string }> {
+  const rows: RecoveredSubject[] = Array.isArray(json)
+    ? (json as RecoveredSubject[])
+    : ((json as any)?.subjects ?? []);
+
+  const map = new Map<string, { subject: string; grade: string }>();
+  for (const row of rows) {
+    const id = String(row?.subjectId ?? '').trim();
+    const subject = String(row?.subjectName ?? '').trim();
+    const grade = String(row?.gradeName ?? '').trim();
+    if (!/^\d+$/.test(id)) continue;
+    if (row?.status === 'needs-review') continue;
+    if (!subject) continue;
+    map.set(id, { subject, grade: grade === 'needs-review' ? '' : grade });
+  }
+  return map;
+}
+
 export function convert(
   courses: any[],
   mapping: Map<string, { subject: string; variant: string; grade: string }>,
+  recovered: Map<string, { subject: string; grade: string }> = new Map(),
 ): { subjects: CatalogSourceSubject[]; skipped: string[] } {
   const subjects: CatalogSourceSubject[] = [];
   const skipped: string[] = [];
@@ -186,17 +236,20 @@ export function convert(
     }
 
     const mapped = mapping.get(subjectId);
-    if (!mapped?.subject) {
-      skipped.push(`${subjectId}: no subject in the mapping CSV`);
+    const found = recovered.get(subjectId);
+
+    const subjectName = found?.subject || mapped?.subject || '';
+    if (!subjectName) {
+      skipped.push(`${subjectId}: no subject in the recovered mapping or the CSV`);
       continue;
     }
 
     subjects.push({
       subjectId,
-      subjectName: mapped.subject,
+      subjectName,
       // Fall back to the first unit — it is what the CSV's own column holds.
-      subjectVariant: mapped.variant || lessons[0].unit,
-      gradeName: mapped.grade,
+      subjectVariant: mapped?.variant || lessons[0].unit,
+      gradeName: found?.grade || mapped?.grade || '',
       lessons,
     });
   }
@@ -213,6 +266,7 @@ async function main() {
   const source = arg('source');
   const map = arg('map') ?? 'subjects-to-map.csv';
   const out = arg('out') ?? 'catalog-source.json';
+  const recoveredPath = arg('recovered') ?? 'catalog-mapping.recovered.json';
   if (!source) {
     throw new Error(
       'Provide --source <madrasati_courses_clean.json> [--map subjects-to-map.csv] [--out catalog-source.json]',
@@ -221,7 +275,16 @@ async function main() {
 
   const courses = JSON.parse(readFileSync(source, 'utf8').replace(/^﻿/, ''));
   const mapping = readMapping(readFileSync(map, 'utf8'));
-  const { subjects, skipped } = convert(courses, mapping);
+
+  let recovered = new Map<string, { subject: string; grade: string }>();
+  try {
+    recovered = readRecovered(JSON.parse(readFileSync(recoveredPath, 'utf8')));
+    console.log(`ربط مستعاد : ${recovered.size} مقرر (${recoveredPath})`);
+  } catch {
+    console.log(`ربط مستعاد : غير موجود (${recoveredPath}) — سيُستخدم CSV وحده`);
+  }
+
+  const { subjects, skipped } = convert(courses, mapping, recovered);
 
   const units = new Set<string>();
   let lessons = 0;
@@ -234,7 +297,9 @@ async function main() {
   for (const s of subjects)
     bySubject.set(s.subjectName, (bySubject.get(s.subjectName) ?? 0) + 1);
 
+  const withGrade = subjects.filter((row) => row.gradeName).length;
   console.log(`مقررات : ${subjects.length} / ${courses.length}`);
+  console.log(`بصف    : ${withGrade}`);
   console.log(`وحدات  : ${units.size}`);
   console.log(`دروس   : ${lessons}`);
   console.log('\nالمواد:');

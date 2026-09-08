@@ -1,6 +1,7 @@
 import {
   parseCsv,
   readMapping,
+  readRecovered,
   splitLessonName,
   convert,
 } from './convert-madrasati-catalog';
@@ -96,6 +97,44 @@ describe('Madrasati → catalogue conversion', () => {
     });
   });
 
+  describe('readRecovered', () => {
+    const file = {
+      subjects: [
+        { subjectId: '86', subjectName: 'اللغة العربية', gradeName: 'الصف الأول المتوسط', status: 'matched-local-lesson-ids' },
+        { subjectId: '208', subjectName: '', gradeName: '', status: 'needs-review' },
+        { subjectId: '90', subjectName: 'الرياضيات', gradeName: 'needs-review', status: 'matched-local-lesson-ids' },
+      ],
+    };
+
+    it('reads a settled row', () => {
+      expect(readRecovered(file).get('86')).toEqual({
+        subject: 'اللغة العربية',
+        grade: 'الصف الأول المتوسط',
+      });
+    });
+
+    it('drops a needs-review row instead of merging its empty subject', () => {
+      // Letting it through would blank a name the CSV had right.
+      expect(readRecovered(file).has('208')).toBe(false);
+    });
+
+    it("treats 'needs-review' in the grade as no grade, not as a grade name", () => {
+      expect(readRecovered(file).get('90')).toEqual({
+        subject: 'الرياضيات',
+        grade: '',
+      });
+    });
+
+    it('accepts a bare array as well as the wrapped file', () => {
+      expect(readRecovered(file.subjects).size).toBe(2);
+    });
+
+    it('is empty for junk rather than throwing', () => {
+      expect(readRecovered(null).size).toBe(0);
+      expect(readRecovered({}).size).toBe(0);
+    });
+  });
+
   describe('convert', () => {
     const mapping = new Map([
       ['86', { subject: 'اللغة العربية', variant: 'القيم الإسلامية', grade: '' }],
@@ -169,6 +208,44 @@ describe('Madrasati → catalogue conversion', () => {
       );
       expect(subjects).toHaveLength(0);
       expect(skipped[0]).toContain('no usable lessons');
+    });
+
+    describe('with the recovered mapping', () => {
+      const recovered = new Map([
+        ['86', { subject: 'اللغة العربية', grade: 'الصف الأول المتوسط' }],
+      ]);
+
+      it('prefers the recovered subject over the sheet', () => {
+        // The sheet was hand-assigned from the first unit's name and is wrong
+        // for 90 of the 162 courses.
+        const wrongSheet = new Map([
+          ['86', { subject: 'التربية الصحية والبدنية', variant: 'القيم الإسلامية', grade: '' }],
+        ]);
+        const { subjects } = convert([course()], wrongSheet, recovered);
+        expect(subjects[0].subjectName).toBe('اللغة العربية');
+      });
+
+      it('carries the recovered grade, which is what separates two look-alike courses', () => {
+        const { subjects } = convert([course()], mapping, recovered);
+        expect(subjects[0].gradeName).toBe('الصف الأول المتوسط');
+      });
+
+      it('keeps the sheet variant — the recovery has no equivalent', () => {
+        const { subjects } = convert([course()], mapping, recovered);
+        expect(subjects[0].subjectVariant).toBe('القيم الإسلامية');
+      });
+
+      it('falls back to the sheet for a course the recovery did not settle', () => {
+        const { subjects } = convert([course()], mapping, new Map());
+        expect(subjects[0].subjectName).toBe('اللغة العربية');
+      });
+
+      it('takes a course the sheet has no subject for when the recovery does', () => {
+        const { subjects } = convert([course()], new Map(), recovered);
+        expect(subjects[0].subjectName).toBe('اللغة العربية');
+        // No sheet row, so the variant comes from the first unit.
+        expect(subjects[0].subjectVariant).toBe('القيم الإسلامية');
+      });
     });
 
     it('falls back to the first unit when the sheet has no variant', () => {

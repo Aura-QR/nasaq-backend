@@ -3,7 +3,7 @@
     "subjectId": "86",
     "subjectName": "اللغة العربية",
     "subjectVariant": "الحياة الاجتماعية",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "86,87,273",
@@ -451,7 +451,7 @@
     "subjectId": "90",
     "subjectName": "الرياضيات",
     "subjectVariant": "تطبيقات النسبة المئوية",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "90,91,44052",
@@ -884,7 +884,7 @@
     "subjectId": "95",
     "subjectName": "العلوم",
     "subjectVariant": "العلم وتفاعلات الأجسام",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "95,96,97,307",
@@ -1032,7 +1032,7 @@
     "subjectId": "105",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم1",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "105,106,321",
@@ -1123,9 +1123,9 @@
   },
   {
     "subjectId": "110",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "التوعية الصحية1",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "110,111,332",
@@ -1283,7 +1283,7 @@
     "subjectId": "156",
     "subjectName": "اللغة العربية",
     "subjectVariant": "حب الوطن",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "156,157,438",
@@ -1776,7 +1776,7 @@
     "subjectId": "160",
     "subjectName": "الرياضيات",
     "subjectVariant": "الإحصاء",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "160,33657,33658,162346",
@@ -2349,7 +2349,7 @@
     "subjectId": "166",
     "subjectName": "العلوم",
     "subjectVariant": "دراسة المادة",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "166,167,168,476",
@@ -2722,7 +2722,7 @@
     "subjectId": "176",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم والتلوين",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "176,177,489",
@@ -2828,9 +2828,9 @@
   },
   {
     "subjectId": "182",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "التوعية الصحية1",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "182,183,501",
@@ -3041,7 +3041,7 @@
     "subjectId": "231",
     "subjectName": "اللغة العربية",
     "subjectVariant": "قضايا العمل",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "231,232,618",
@@ -3534,7 +3534,7 @@
     "subjectId": "235",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم1",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "235,236,621",
@@ -3605,9 +3605,9 @@
   },
   {
     "subjectId": "241",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "التوعية الصحية1",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "241,242,161260",
@@ -3768,9 +3768,9 @@
   },
   {
     "subjectId": "273",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "اللغة العربية",
     "subjectVariant": "صحتي وسلامتي",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "273,274,69049",
@@ -4028,7 +4028,7 @@
     "subjectId": "277",
     "subjectName": "الرياضيات",
     "subjectVariant": "الطرح",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "277,278,44021",
@@ -4521,7 +4521,7 @@
     "subjectId": "284",
     "subjectName": "العلوم",
     "subjectVariant": "النباتات من حولنا",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "284,285,286,753",
@@ -4639,7 +4639,7 @@
     "subjectId": "297",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم1",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "297,298,779",
@@ -4760,9 +4760,9 @@
   },
   {
     "subjectId": "301",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي وسلامتي1",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "301,302,792",
@@ -4838,9 +4838,9 @@
   },
   {
     "subjectId": "309",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "اللغة العربية",
     "subjectVariant": "آداب وسلوك",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "309,310,69058",
@@ -4968,7 +4968,7 @@
     "subjectId": "314",
     "subjectName": "الرياضيات",
     "subjectVariant": "القياس: النقود والزمن",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "314,315,44032",
@@ -5561,7 +5561,7 @@
     "subjectId": "323",
     "subjectName": "العلوم",
     "subjectVariant": "النباتات والحيوانات",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "323,324,325,874",
@@ -5689,7 +5689,7 @@
     "subjectId": "333",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم والتلوين",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "333,334,68872",
@@ -5800,9 +5800,9 @@
   },
   {
     "subjectId": "338",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي وسلامتي1",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "338,339,896",
@@ -5873,9 +5873,9 @@
   },
   {
     "subjectId": "354",
-    "subjectName": "العلوم",
+    "subjectName": "اللغة العربية",
     "subjectVariant": "مكارم الأخلاق",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "354,355,69062",
@@ -6003,7 +6003,7 @@
     "subjectId": "359",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم1",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "359,360,943",
@@ -6099,9 +6099,9 @@
   },
   {
     "subjectId": "364",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي وسلامتي1",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "364,365,951",
@@ -6179,7 +6179,7 @@
     "subjectId": "383",
     "subjectName": "الرياضيات",
     "subjectVariant": "القسمة على عدد من رقم واحد",
-    "gradeName": "",
+    "gradeName": "الصف الرابع الابتدائي",
     "lessons": [
       {
         "id": "383,384,43996",
@@ -6742,7 +6742,7 @@
     "subjectId": "390",
     "subjectName": "العلوم",
     "subjectVariant": "المخلوقات الحية",
-    "gradeName": "",
+    "gradeName": "الصف الرابع الابتدائي",
     "lessons": [
       {
         "id": "390,391,392,1041",
@@ -6925,7 +6925,7 @@
     "subjectId": "398",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم1",
-    "gradeName": "",
+    "gradeName": "الصف الرابع الابتدائي",
     "lessons": [
       {
         "id": "398,399,1053",
@@ -7026,9 +7026,9 @@
   },
   {
     "subjectId": "408",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي وسلامتي1",
-    "gradeName": "",
+    "gradeName": "الصف الرابع الابتدائي",
     "lessons": [
       {
         "id": "408,409,1079",
@@ -7136,7 +7136,7 @@
     "subjectId": "418",
     "subjectName": "اللغة العربية",
     "subjectVariant": "الوطن: ولاء وعطاء",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "418,419,1103",
@@ -7369,7 +7369,7 @@
     "subjectId": "423",
     "subjectName": "الرياضيات",
     "subjectVariant": "القسمة (1)",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "423,424,44027",
@@ -7872,7 +7872,7 @@
     "subjectId": "429",
     "subjectName": "العلوم",
     "subjectVariant": "المخلوقات الحية",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "429,430,431,1164",
@@ -8005,7 +8005,7 @@
     "subjectId": "459",
     "subjectName": "الرياضيات",
     "subjectVariant": "الإحصاء والاحتمال",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "459,460,44001",
@@ -8578,7 +8578,7 @@
     "subjectId": "466",
     "subjectName": "العلوم",
     "subjectVariant": "تنوع الحياة",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "466,467,468,1256",
@@ -8706,7 +8706,7 @@
     "subjectId": "476",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم1",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "476,477,1270",
@@ -8812,9 +8812,9 @@
   },
   {
     "subjectId": "485",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي وسلامتي1",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "485,486,1294",
@@ -8902,7 +8902,7 @@
     "subjectId": "509",
     "subjectName": "اللغة العربية",
     "subjectVariant": "الوعي الصحي والاجتماعي",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "509,510,1370",
@@ -9130,7 +9130,7 @@
     "subjectId": "528",
     "subjectName": "الرياضيات",
     "subjectVariant": "العمليات على الكسور الاعتيادية",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "528,529,43991",
@@ -9608,7 +9608,7 @@
     "subjectId": "534",
     "subjectName": "العلوم",
     "subjectVariant": "تنوع الحياة",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "534,535,536,1435",
@@ -9736,7 +9736,7 @@
     "subjectId": "544",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم1",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "544,545,69677",
@@ -9822,9 +9822,9 @@
   },
   {
     "subjectId": "555",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي وسلامتي1",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "555,556,1470",
@@ -10063,9 +10063,9 @@
   },
   {
     "subjectId": "610",
-    "subjectName": "اللغة العربية",
+    "subjectName": "الكفايات اللغوية 1",
     "subjectVariant": "متممات الجملة العربية",
-    "gradeName": "",
+    "gradeName": "السنة الأولى المشتركة",
     "lessons": [
       {
         "id": "610,27867,1756",
@@ -10301,9 +10301,9 @@
   },
   {
     "subjectId": "616",
-    "subjectName": "اللغة العربية",
+    "subjectName": "الكفايات اللغوية 1",
     "subjectVariant": "متممات الجملة العربية",
-    "gradeName": "",
+    "gradeName": "السنة الأولى المشتركة",
     "lessons": [
       {
         "id": "616,27867,1756",
@@ -10657,9 +10657,9 @@
   },
   {
     "subjectId": "628",
-    "subjectName": "اللغة العربية",
+    "subjectName": "الكفايات اللغوية 2",
     "subjectVariant": "التوابع والأساليب النحوية",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "628,33540,1761",
@@ -11626,7 +11626,7 @@
     "subjectId": "1120",
     "subjectName": "الرياضيات",
     "subjectVariant": "كثيرات الحدود",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "1120,33666,33667,162390",
@@ -12124,7 +12124,7 @@
     "subjectId": "1121",
     "subjectName": "العلوم",
     "subjectVariant": "طبيعة العلم و تغيرات الأرض",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "1121,1127,1128,3153",
@@ -12270,9 +12270,9 @@
   },
   {
     "subjectId": "1141",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "الدراسات الأدبية",
     "subjectVariant": "الأدب القديم",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "1141,1142,3180",
@@ -12463,9 +12463,9 @@
   },
   {
     "subjectId": "1144",
-    "subjectName": "اللغة العربية",
+    "subjectName": "الدراسات البلاغية والنقدية",
     "subjectVariant": "دراسات نقدية",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "1144,1146,41191",
@@ -12636,9 +12636,9 @@
   },
   {
     "subjectId": "1147",
-    "subjectName": "اللغة العربية",
+    "subjectName": "الدراسات اللغوية",
     "subjectVariant": "دراسات في اللغة الإنسانية",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "1147,48483,3195",
@@ -12857,9 +12857,9 @@
   },
   {
     "subjectId": "1158",
-    "subjectName": "الاجتماعيات",
+    "subjectName": "مبادئ الاقتصاد",
     "subjectVariant": "مدخل علم الاقتصاد",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "1158,34448,3211",
@@ -12985,9 +12985,9 @@
   },
   {
     "subjectId": "1205",
-    "subjectName": "الرياضيات",
+    "subjectName": "الرياضيات 1",
     "subjectVariant": "التشابه",
-    "gradeName": "",
+    "gradeName": "السنة الأولى المشتركة",
     "lessons": [
       {
         "id": "1205,27586,44039",
@@ -13358,9 +13358,9 @@
   },
   {
     "subjectId": "1210",
-    "subjectName": "الرياضيات",
+    "subjectName": "الرياضيات 1",
     "subjectVariant": "التشابه",
-    "gradeName": "",
+    "gradeName": "السنة الأولى المشتركة",
     "lessons": [
       {
         "id": "1210,27586,44039",
@@ -13731,9 +13731,9 @@
   },
   {
     "subjectId": "1215",
-    "subjectName": "الرياضيات",
+    "subjectName": "الرياضيات 2",
     "subjectVariant": "الدوال و المتباينات",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "1215,33503,44013",
@@ -14109,9 +14109,9 @@
   },
   {
     "subjectId": "1220",
-    "subjectName": "الرياضيات",
+    "subjectName": "الرياضيات 2",
     "subjectVariant": "الدوال و المتباينات",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "1220,33503,44013",
@@ -14487,9 +14487,9 @@
   },
   {
     "subjectId": "1266",
-    "subjectName": "اللغة الإنجليزية",
+    "subjectName": "اللغة الإنجليزية 1",
     "subjectVariant": "Did You Hurt Yourself?",
-    "gradeName": "",
+    "gradeName": "السنة الأولى المشتركة",
     "lessons": [
       {
         "id": "1266,27604,42972",
@@ -14915,9 +14915,9 @@
   },
   {
     "subjectId": "1269",
-    "subjectName": "اللغة الإنجليزية",
+    "subjectName": "اللغة الإنجليزية 2",
     "subjectVariant": "Connected by Technology",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "1269,34026,40365",
@@ -15343,9 +15343,9 @@
   },
   {
     "subjectId": "1273",
-    "subjectName": "اللغة الإنجليزية",
+    "subjectName": "اللغة الإنجليزية 3",
     "subjectVariant": "Two Is Better Than One",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "1273,41536,41615",
@@ -15771,9 +15771,9 @@
   },
   {
     "subjectId": "1283",
-    "subjectName": "المهارات الحياتية",
+    "subjectName": "الدراسات النفسية والاجتماعية",
     "subjectVariant": "النمو الإنساني",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "1283,1285,39765",
@@ -16265,9 +16265,9 @@
   },
   {
     "subjectId": "1301",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "التفسير2",
     "subjectVariant": "الوحدة الأولى",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "1301,1302,3528",
@@ -16493,9 +16493,9 @@
   },
   {
     "subjectId": "1312",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "التوحيد 2",
     "subjectVariant": "الإيمان",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "1312,34053,3590",
@@ -16621,9 +16621,9 @@
   },
   {
     "subjectId": "1328",
-    "subjectName": "العلوم",
+    "subjectName": "الأحياء 1",
     "subjectVariant": "البكتيريا والفيروسات",
-    "gradeName": "",
+    "gradeName": "السنة الأولى المشتركة",
     "lessons": [
       {
         "id": "1328,29693,2212",
@@ -17060,9 +17060,9 @@
   },
   {
     "subjectId": "1408",
-    "subjectName": "العلوم",
+    "subjectName": "الكيمياء 1",
     "subjectVariant": "مقدمة في الكيمياء",
-    "gradeName": "",
+    "gradeName": "السنة الأولى المشتركة",
     "lessons": [
       {
         "id": "1408,1409,2844",
@@ -17251,9 +17251,9 @@
   },
   {
     "subjectId": "1422",
-    "subjectName": "العلوم",
+    "subjectName": "الأحياء 2",
     "subjectVariant": "شوكيات الجلد واللافقاريات الحبلية",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "1422,33552,162034",
@@ -17494,9 +17494,9 @@
   },
   {
     "subjectId": "1423",
-    "subjectName": "العلوم",
+    "subjectName": "الكيمياء 2",
     "subjectVariant": "الحاسبات الكيميائية",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "1423,33520,27666",
@@ -17762,9 +17762,9 @@
   },
   {
     "subjectId": "1424",
-    "subjectName": "العلوم",
+    "subjectName": "علوم الأرض والفضاء",
     "subjectVariant": "المجموعة الشمسية",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "1424,43244,166690",
@@ -17950,9 +17950,9 @@
   },
   {
     "subjectId": "1425",
-    "subjectName": "العلوم",
+    "subjectName": "الفيزياء 3",
     "subjectVariant": "الحث الكهرومغناطيسي",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "1425,39670,39832",
@@ -18890,9 +18890,9 @@
   },
   {
     "subjectId": "3000",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "القرآن الكريم والدراسات الإسلامية",
     "subjectVariant": "دراسات إسلامية - توحيد",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "3000,34340,34345,802",
@@ -19343,9 +19343,9 @@
   },
   {
     "subjectId": "3001",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "القرآن الكريم والدراسات الإسلامية",
     "subjectVariant": "دراسات إسلامية - توحيد",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "3001,34348,34350,912",
@@ -19776,9 +19776,9 @@
   },
   {
     "subjectId": "3002",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "القرآن الكريم والدراسات الإسلامية",
     "subjectVariant": "دراسات إسلامية - توحيد",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "3002,34356,34358,966",
@@ -20234,9 +20234,9 @@
   },
   {
     "subjectId": "3003",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "القرآن الكريم والدراسات الإسلامية",
     "subjectVariant": "دراسات إسلامية - توحيد",
-    "gradeName": "",
+    "gradeName": "الصف الرابع الابتدائي",
     "lessons": [
       {
         "id": "3003,34364,34367,1095",
@@ -20747,9 +20747,9 @@
   },
   {
     "subjectId": "3004",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "القرآن الكريم والدراسات الإسلامية",
     "subjectVariant": "دراسات إسلامية - توحيد",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "3004,34373,34376,1357",
@@ -21780,9 +21780,9 @@
   },
   {
     "subjectId": "3005",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "القرآن الكريم والدراسات الإسلامية",
     "subjectVariant": "دراسات إسلامية - توحيد",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "3005,34389,34392,1528",
@@ -22713,9 +22713,9 @@
   },
   {
     "subjectId": "3006",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "القرآن الكريم والدراسات الإسلامية",
     "subjectVariant": "دراسات إسلامية - فقه",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "3006,69,73,248",
@@ -23366,9 +23366,9 @@
   },
   {
     "subjectId": "3007",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "القرآن الكريم والدراسات الإسلامية",
     "subjectVariant": "دراسات إسلامية - فقه",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "3007,143,144,418",
@@ -23969,9 +23969,9 @@
   },
   {
     "subjectId": "3008",
-    "subjectName": "العلوم",
+    "subjectName": "القرآن الكريم والدراسات الإسلامية",
     "subjectVariant": "دراسات إسلامية - فقه",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "3008,221,222,599",
@@ -24790,7 +24790,7 @@
     "subjectId": "3734",
     "subjectName": "اللغة الإنجليزية",
     "subjectVariant": "Things we do",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "3734,27426,38626",
@@ -25003,7 +25003,7 @@
     "subjectId": "3747",
     "subjectName": "اللغة الإنجليزية",
     "subjectVariant": "Things we do",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "3747,27426,38626",
@@ -25216,7 +25216,7 @@
     "subjectId": "3749",
     "subjectName": "اللغة الإنجليزية",
     "subjectVariant": "It's Nice to Meet You!",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "3749,41717,38640",
@@ -25464,7 +25464,7 @@
     "subjectId": "3750",
     "subjectName": "اللغة الإنجليزية",
     "subjectVariant": "WHAT DO YOU DO",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "3750,8116,39956",
@@ -25952,7 +25952,7 @@
     "subjectId": "3751",
     "subjectName": "اللغة الإنجليزية",
     "subjectVariant": "LET’S GO OUT",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "3751,8200,40407",
@@ -26440,7 +26440,7 @@
     "subjectId": "3752",
     "subjectName": "اللغة الإنجليزية",
     "subjectVariant": "IT’S A GOOD DEAL , ISN’T IT?",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "3752,8226,40543",
@@ -26806,9 +26806,9 @@
   },
   {
     "subjectId": "3792",
-    "subjectName": "العلوم",
+    "subjectName": "الفيزياء 3",
     "subjectVariant": "الحث الكهرومغناطيسي",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "3792,39670,39832",
@@ -27019,9 +27019,9 @@
   },
   {
     "subjectId": "3801",
-    "subjectName": "العلوم",
+    "subjectName": "الكيمياء 2",
     "subjectVariant": "الحاسبات الكيميائية",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "3801,33520,27666",
@@ -27287,9 +27287,9 @@
   },
   {
     "subjectId": "3822",
-    "subjectName": "الرياضيات",
+    "subjectName": "الرياضيات 3",
     "subjectVariant": "الإحداثيات القطبية والأعداد المركبة",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "3822,39464,44061",
@@ -27580,9 +27580,9 @@
   },
   {
     "subjectId": "3827",
-    "subjectName": "الرياضيات",
+    "subjectName": "الرياضيات 3",
     "subjectVariant": "الإحداثيات القطبية والأعداد المركبة",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "3827,39464,44061",
@@ -27873,9 +27873,9 @@
   },
   {
     "subjectId": "3832",
-    "subjectName": "العلوم",
+    "subjectName": "الفيزياء 3",
     "subjectVariant": "الحث الكهرومغناطيسي",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "3832,39670,39832",
@@ -28086,9 +28086,9 @@
   },
   {
     "subjectId": "3888",
-    "subjectName": "العلوم",
+    "subjectName": "الكيمياء 2",
     "subjectVariant": "الحاسبات الكيميائية",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "3888,33520,27666",
@@ -28354,9 +28354,9 @@
   },
   {
     "subjectId": "3898",
-    "subjectName": "العلوم",
+    "subjectName": "الأحياء 2",
     "subjectVariant": "شوكيات الجلد واللافقاريات الحبلية",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "3898,33552,162034",
@@ -28597,9 +28597,9 @@
   },
   {
     "subjectId": "3909",
-    "subjectName": "العلوم",
+    "subjectName": "علم البيئة",
     "subjectVariant": "مبادئ علم البيئة",
-    "gradeName": "",
+    "gradeName": "السنة الأولى المشتركة",
     "lessons": [
       {
         "id": "3909,27887,44236",
@@ -28670,9 +28670,9 @@
   },
   {
     "subjectId": "3927",
-    "subjectName": "اللغة الإنجليزية",
+    "subjectName": "اللغة الإنجليزية 1",
     "subjectVariant": "Did You Hurt Yourself?",
-    "gradeName": "",
+    "gradeName": "السنة الأولى المشتركة",
     "lessons": [
       {
         "id": "3927,27604,42972",
@@ -29098,9 +29098,9 @@
   },
   {
     "subjectId": "3938",
-    "subjectName": "اللغة الإنجليزية",
+    "subjectName": "اللغة الإنجليزية 3",
     "subjectVariant": "Two Is Better Than One",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "3938,41536,41615",
@@ -29526,9 +29526,9 @@
   },
   {
     "subjectId": "3942",
-    "subjectName": "اللغة الإنجليزية",
+    "subjectName": "اللغة الإنجليزية 3",
     "subjectVariant": "Two Is Better Than One",
-    "gradeName": "",
+    "gradeName": "السنة الثالثة",
     "lessons": [
       {
         "id": "3942,41536,41615",
@@ -29954,9 +29954,9 @@
   },
   {
     "subjectId": "3971",
-    "subjectName": "اللغة الإنجليزية",
+    "subjectName": "اللغة الإنجليزية 2",
     "subjectVariant": "Connected by Technology",
-    "gradeName": "",
+    "gradeName": "السنة الثانية",
     "lessons": [
       {
         "id": "3971,34026,40365",
@@ -30442,7 +30442,7 @@
     "subjectId": "3993",
     "subjectName": "اللغة العربية",
     "subjectVariant": "حقوق وواجبات",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "3993,232,618",
@@ -30935,7 +30935,7 @@
     "subjectId": "3997",
     "subjectName": "الرياضيات",
     "subjectVariant": "وحدة تعزيز المهارات",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "3997,33666,33667,162390",
@@ -31433,7 +31433,7 @@
     "subjectId": "4003",
     "subjectName": "العلوم",
     "subjectVariant": "طبيعة العلم و تغيرات الأرض",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "4003,1127,1128,3153",
@@ -31581,7 +31581,7 @@
     "subjectId": "4013",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "4013,236,621",
@@ -31652,9 +31652,9 @@
   },
   {
     "subjectId": "4020",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "المهارات الحياتية",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "4020,242,161260",
@@ -31817,7 +31817,7 @@
     "subjectId": "4049",
     "subjectName": "الرياضيات",
     "subjectVariant": "القيمة المنزلية",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "4049,460,44001",
@@ -32390,7 +32390,7 @@
     "subjectId": "4056",
     "subjectName": "العلوم",
     "subjectVariant": "تنوع الحياة",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "4056,467,468,1256",
@@ -32516,9 +32516,9 @@
   },
   {
     "subjectId": "4066",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي وسلامتي",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "4066,486,1294",
@@ -32606,7 +32606,7 @@
     "subjectId": "4069",
     "subjectName": "اللغة العربية",
     "subjectVariant": "اخلاق وفضائل",
-    "gradeName": "",
+    "gradeName": "الصف الخامس الابتدائي",
     "lessons": [
       {
         "id": "4069,419,1103",
@@ -32947,7 +32947,7 @@
     "subjectId": "4124",
     "subjectName": "العلوم",
     "subjectVariant": "دراسة المادة",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "4124,167,168,476",
@@ -33320,7 +33320,7 @@
     "subjectId": "4141",
     "subjectName": "الرياضيات",
     "subjectVariant": "الجبر: الأنماط العددية والدوال",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "4141,529,43991",
@@ -33798,7 +33798,7 @@
     "subjectId": "4147",
     "subjectName": "العلوم",
     "subjectVariant": "تنوع الحياة",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "4147,535,536,1435",
@@ -33924,9 +33924,9 @@
   },
   {
     "subjectId": "4157",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي و سلامتي",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "4157,556,1470",
@@ -34014,7 +34014,7 @@
     "subjectId": "4170",
     "subjectName": "اللغة العربية",
     "subjectVariant": "قدوات و مثل عليا",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "4170,510,1370",
@@ -34242,7 +34242,7 @@
     "subjectId": "4172",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم",
-    "gradeName": "",
+    "gradeName": "الصف السادس الابتدائي",
     "lessons": [
       {
         "id": "4172,545,69677",
@@ -34330,7 +34330,7 @@
     "subjectId": "4219",
     "subjectName": "اللغة العربية",
     "subjectVariant": "القيم الإسلامية",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "4219,87,273",
@@ -34778,7 +34778,7 @@
     "subjectId": "4223",
     "subjectName": "الرياضيات",
     "subjectVariant": "الجبر و الدوال",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "4223,91,44052",
@@ -35211,7 +35211,7 @@
     "subjectId": "4228",
     "subjectName": "العلوم",
     "subjectVariant": "العلم وتفاعلات الأجسام",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "4228,96,97,307",
@@ -35359,7 +35359,7 @@
     "subjectId": "4239",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "4239,106,321",
@@ -35450,9 +35450,9 @@
   },
   {
     "subjectId": "4244",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "المهارات الحياتية",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "4244,111,332",
@@ -35610,7 +35610,7 @@
     "subjectId": "4284",
     "subjectName": "اللغة العربية",
     "subjectVariant": "تقنيات",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "4284,157,438",
@@ -36103,7 +36103,7 @@
     "subjectId": "4295",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "4295,177,489",
@@ -36209,9 +36209,9 @@
   },
   {
     "subjectId": "4301",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "المهارات الحياتية1",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "4301,183,501",
@@ -36379,7 +36379,7 @@
     "subjectId": "4391",
     "subjectName": "الرياضيات",
     "subjectVariant": "وحدة تعزيز المهارات",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "4391,33657,33658,162346",
@@ -36952,7 +36952,7 @@
     "subjectId": "4393",
     "subjectName": "الرياضيات",
     "subjectVariant": "القيمة المنزلية حتى 100 والأنماط",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "4393,315,44032",
@@ -37545,7 +37545,7 @@
     "subjectId": "4394",
     "subjectName": "العلوم",
     "subjectVariant": "النباتات والحيوانات",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "4394,324,325,874",
@@ -37673,7 +37673,7 @@
     "subjectId": "4395",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "4395,334,68872",
@@ -37784,9 +37784,9 @@
   },
   {
     "subjectId": "4396",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي و سلامتي",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "4396,339,896",
@@ -37859,7 +37859,7 @@
     "subjectId": "4399",
     "subjectName": "الرياضيات",
     "subjectVariant": "القيمة المنزلية",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "4399,424,44027",
@@ -38362,7 +38362,7 @@
     "subjectId": "4400",
     "subjectName": "العلوم",
     "subjectVariant": "المخلوقات الحية",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "4400,430,431,1164",
@@ -38591,9 +38591,9 @@
   },
   {
     "subjectId": "4402",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي وسلامتي",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "4402,365,951",
@@ -38669,9 +38669,9 @@
   },
   {
     "subjectId": "4441",
-    "subjectName": "الدراسات الإسلامية",
+    "subjectName": "اللغة العربية",
     "subjectVariant": "أقاربي",
-    "gradeName": "",
+    "gradeName": "الصف الثاني الابتدائي",
     "lessons": [
       {
         "id": "4441,310,69058",
@@ -38797,9 +38797,9 @@
   },
   {
     "subjectId": "4442",
-    "subjectName": "العلوم",
+    "subjectName": "اللغة العربية",
     "subjectVariant": "التعامل مع الآخرين",
-    "gradeName": "",
+    "gradeName": "الصف الثالث الابتدائي",
     "lessons": [
       {
         "id": "4442,355,69062",
@@ -39103,9 +39103,9 @@
   },
   {
     "subjectId": "4624",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "المهارات الحياتية والأسرية",
     "subjectVariant": "صحتي وسلامتي",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "4624,302,792",
@@ -39181,9 +39181,9 @@
   },
   {
     "subjectId": "4635",
-    "subjectName": "التربية الصحية والبدنية",
+    "subjectName": "اللغة العربية",
     "subjectVariant": "أسرتي",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "4635,274,69049",
@@ -39441,7 +39441,7 @@
     "subjectId": "4637",
     "subjectName": "التربية الفنية",
     "subjectVariant": "مجال الرسم",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "4637,298,779",
@@ -39564,7 +39564,7 @@
     "subjectId": "4641",
     "subjectName": "اللغة العربية",
     "subjectVariant": "صحتي وبيئتي",
-    "gradeName": "",
+    "gradeName": "الصف الرابع الابتدائي",
     "lessons": [
       {
         "id": "4641,4965,27889",
@@ -39960,7 +39960,7 @@
     "subjectId": "4688",
     "subjectName": "الرياضيات",
     "subjectVariant": "المقارنة والتصنيف",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "4688,278,44021",
@@ -40453,7 +40453,7 @@
     "subjectId": "4690",
     "subjectName": "الرياضيات",
     "subjectVariant": "القيمة المنزلية",
-    "gradeName": "",
+    "gradeName": "الصف الرابع الابتدائي",
     "lessons": [
       {
         "id": "4690,384,43996",
@@ -41016,7 +41016,7 @@
     "subjectId": "4692",
     "subjectName": "العلوم",
     "subjectVariant": "المخلوقات الحية",
-    "gradeName": "",
+    "gradeName": "الصف الرابع الابتدائي",
     "lessons": [
       {
         "id": "4692,391,392,1041",
@@ -41199,7 +41199,7 @@
     "subjectId": "4695",
     "subjectName": "العلوم",
     "subjectVariant": "النباتات من حولنا",
-    "gradeName": "",
+    "gradeName": "الصف الأول الابتدائي",
     "lessons": [
       {
         "id": "4695,285,286,753",
@@ -41317,7 +41317,7 @@
     "subjectId": "4959",
     "subjectName": "اللغة العربية",
     "subjectVariant": "آداب وواجبات",
-    "gradeName": "",
+    "gradeName": "الصف الرابع الابتدائي",
     "lessons": [
       {
         "id": "4959,4965,27889",
@@ -41610,7 +41610,7 @@
     "subjectId": "4992",
     "subjectName": "اللغة الإنجليزية",
     "subjectVariant": "Lifestyles",
-    "gradeName": "",
+    "gradeName": "الصف الثالث المتوسط",
     "lessons": [
       {
         "id": "4992,8226,40543",
@@ -41978,7 +41978,7 @@
     "subjectId": "4996",
     "subjectName": "اللغة الإنجليزية",
     "subjectVariant": "?Are You Here On Vacation",
-    "gradeName": "",
+    "gradeName": "الصف الثاني المتوسط",
     "lessons": [
       {
         "id": "4996,8200,40407",
@@ -42466,7 +42466,7 @@
     "subjectId": "4998",
     "subjectName": "اللغة الإنجليزية",
     "subjectVariant": "Good Morning",
-    "gradeName": "",
+    "gradeName": "الصف الأول المتوسط",
     "lessons": [
       {
         "id": "4998,8116,39956",
