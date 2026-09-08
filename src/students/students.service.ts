@@ -21,6 +21,7 @@ import { FinancialRecordService } from 'src/financial/financial-record.service';
 import { BusService } from 'src/financial/bus.service';
 import { StudentFinancialRecord } from '../financial/schemas/student-financial-record.schema';
 import { generateOtp, otpExpiry as otpExpiryDate } from '../common/utils/otp.util';
+import { CredentialsDeliveryService } from 'src/messaging/credentials-delivery.service';
 
 @Injectable()
 export class StudentsService {
@@ -44,6 +45,7 @@ export class StudentsService {
     private readonly emailService: EmailService,
     private readonly financialRecordService: FinancialRecordService,
     private readonly busService: BusService,
+    private readonly credentialsDelivery: CredentialsDeliveryService,
   ) { }
 
 
@@ -94,10 +96,22 @@ export class StudentsService {
       studentFields.isActive = status === 'active' || status === 'true';
     }
 
-    if (createStudentDto.password) {
-      studentFields.password = await PasswordUtil.hash(createStudentDto.password);
-      studentFields.hasPassword = true;
-    }
+    /*
+     * Every student gets an account at creation.
+     *
+     * `password` is optional on the DTO and the web form leaves it empty, so
+     * students used to be created with `hasPassword: false` — a row that looks
+     * like an account and cannot log in ('لم يتم تعيين كلمة مرور لهذا الحساب
+     * بعد'), until somebody remembered to open the profile and set one. Nobody
+     * remembered.
+     *
+     * Generating one here is what makes the WhatsApp message below possible:
+     * there is always something to send. Held in memory only — what is stored
+     * is the bcrypt hash.
+     */
+    const issuedPassword: string = createStudentDto.password || PasswordUtil.generate();
+    studentFields.password = await PasswordUtil.hash(issuedPassword);
+    studentFields.hasPassword = true;
 
     const student = new this.studentModel(studentFields);
     await student.save();
@@ -155,6 +169,23 @@ export class StudentsService {
     } else if (createStudentDto.busPlanId) {
       busEnrollmentWarning = 'لم يتم تسجيل الطالب في خدمة الباص لعدم تحديد الفصل الدراسي';
     }
+
+    /*
+     * Send the login details to the guardian's WhatsApp.
+     *
+     * Never throws, and its result is not awaited: a WhatsApp outage must not
+     * fail an enrolment. Whatever this misses is retried by the outbox cron.
+     */
+    await this.credentialsDelivery.enqueue({
+      schoolId: (student as any).schoolId,
+      recipientRole: 'STUDENT',
+      recipientId: student._id as any,
+      recipientName: (student as any).name ?? '',
+      phone: (student as any).phoneNumber,
+      loginEmail: (student as any).schoolEmail || (student as any).email,
+      password: issuedPassword,
+      reason: 'created',
+    });
 
     // `select: false` hides the hash from QUERIES, but this document was just
     // built in memory, so it still carries it. Strip it explicitly or the create
@@ -411,7 +442,10 @@ export class StudentsService {
   }
 
   async setAdminPassword(id: string, password?: string) {
-    const student = await this.studentModel.findById(id).select('name').exec();
+    const student = await this.studentModel
+      .findById(id)
+      .select('name phoneNumber email schoolEmail schoolId')
+      .exec();
     if (!student) {
       throw new NotFoundException(`الطالب بمعرف ${id} غير موجود`);
     }
@@ -432,6 +466,19 @@ export class StudentsService {
     if (!updatedStudent) {
       throw new NotFoundException(`الطالب بمعرف ${id} غير موجود`);
     }
+
+    // Whether the admin typed the password or let us generate it, the person
+    // on the other end still has to be told what it is.
+    await this.credentialsDelivery.enqueue({
+      schoolId: (student as any).schoolId,
+      recipientRole: 'STUDENT',
+      recipientId: id,
+      recipientName: (student as any).name ?? '',
+      phone: (student as any).phoneNumber,
+      loginEmail: (student as any).schoolEmail || (student as any).email,
+      password: plaintext,
+      reason: 'password_reset',
+    });
 
     return {
       message: 'تم تعيين كلمة المرور',

@@ -48,6 +48,7 @@ describe('StudentsService academic-year filtering', () => {
       {} as any,
       {} as any,
       {} as any,
+      { enqueue: async () => null } as any,
     );
 
     await contextService.runWithTenant(schoolId, false, async () => {

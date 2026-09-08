@@ -34,6 +34,7 @@ import { TeacherAssignment } from '../teacher-assignments/schemas/teacher-assign
 import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
 import { TeachersController } from '../teachers/teachers.controller';
 import { TeachersService } from '../teachers/teachers.service';
+import { CredentialsDeliveryService } from '../messaging/credentials-delivery.service';
 import { TenantGuard } from '../tenancy/guards/tenant.guard';
 import { TenantContextInterceptor } from '../tenancy/tenant-context.interceptor';
 import { AuthController } from './auth.controller';
@@ -64,6 +65,9 @@ describe('Admin-set student and teacher passwords (integration)', () => {
   const emailService = {
     sendPasswordResetOtp: jest.fn().mockResolvedValue(undefined),
   };
+  const credentialsDelivery = {
+    enqueue: jest.fn().mockResolvedValue(null),
+  };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -91,6 +95,9 @@ describe('Admin-set student and teacher passwords (integration)', () => {
         // These collaborators belong to unrelated student/teacher operations.
         { provide: FinancialRecordService, useValue: {} },
         { provide: BusService, useValue: {} },
+        // Setting a password now also sends it over WhatsApp; the queue itself
+        // is covered in messaging/credentials-delivery.spec.ts.
+        { provide: CredentialsDeliveryService, useValue: credentialsDelivery },
         ...[
           Class,
           Counter,

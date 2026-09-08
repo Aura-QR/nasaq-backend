@@ -15,6 +15,7 @@ import { Lecture } from '../lectures/schemas/lecture.schema';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
 import { PasswordUtil } from 'src/auth/utils/password.util';
+import { CredentialsDeliveryService } from 'src/messaging/credentials-delivery.service';
 
 @Injectable()
 export class TeachersService {
@@ -24,6 +25,7 @@ export class TeachersService {
     @InjectModel(TeacherAssignment.name)
     private readonly teacherAssignmentModel: Model<TeacherAssignment>,
     @InjectModel(Lecture.name) private readonly lectureModel: Model<Lecture>,
+    private readonly credentialsDelivery: CredentialsDeliveryService,
   ) {}
 
   async create(createTeacherDto: CreateTeacherDto) {
@@ -47,7 +49,16 @@ export class TeachersService {
 
     const { status, subjects, subjectIds, subjectOfferingIds, password, ...teacherFields } =
       createTeacherDto as any;
-    const hashedPassword = await PasswordUtil.hash(password || 'Teacher@123');
+
+    /*
+     * A teacher created without a password used to get the literal
+     * 'Teacher@123' — the same password for every teacher in every school,
+     * which anyone who has ever seen one teacher's welcome message can then
+     * use on the rest. Now an unspecified password is generated per teacher,
+     * and the WhatsApp message below is what tells them what it is.
+     */
+    const issuedPassword: string = password || PasswordUtil.generate();
+    const hashedPassword = await PasswordUtil.hash(issuedPassword);
 
     const teacher = new this.teacherModel({
       ...teacherFields,
@@ -58,6 +69,17 @@ export class TeachersService {
     if (Array.isArray(subjectOfferingIds) && subjectOfferingIds.length > 0) {
       await this.syncAssignments(teacher._id.toString(), subjectOfferingIds);
     }
+
+    await this.credentialsDelivery.enqueue({
+      schoolId: (teacher as any).schoolId,
+      recipientRole: 'TEACHER',
+      recipientId: teacher._id as any,
+      recipientName: teacher.name,
+      phone: (teacher as any).phoneNumber,
+      loginEmail: teacher.email,
+      password: issuedPassword,
+      reason: 'created',
+    });
 
     const teacherWithSubjects = await this.withSubjects(teacher);
     const { password: _hash, otp: _otp, ...safeTeacher } = teacherWithSubjects;
@@ -270,7 +292,10 @@ export class TeachersService {
   }
 
   async setAdminPassword(id: string, password?: string) {
-    const teacher = await this.teacherModel.findById(id).select('name').exec();
+    const teacher = await this.teacherModel
+      .findById(id)
+      .select('name email phoneNumber schoolId')
+      .exec();
     if (!teacher) {
       throw new NotFoundException(`المعلم بمعرف ${id} غير موجود`);
     }
@@ -291,6 +316,17 @@ export class TeachersService {
     if (!updatedTeacher) {
       throw new NotFoundException(`المعلم بمعرف ${id} غير موجود`);
     }
+
+    await this.credentialsDelivery.enqueue({
+      schoolId: (teacher as any).schoolId,
+      recipientRole: 'TEACHER',
+      recipientId: id,
+      recipientName: teacher.name,
+      phone: (teacher as any).phoneNumber,
+      loginEmail: (teacher as any).email,
+      password: plaintext,
+      reason: 'password_reset',
+    });
 
     return {
       message: 'تم تعيين كلمة المرور',

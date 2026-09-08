@@ -46,6 +46,7 @@ import { AbilitiesGuard } from './casl/guards/abilities.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { CatalogModule } from './catalog/catalog.module';
 import { CurriculumModule } from './curriculum/curriculum.module';
+import { MessagingModule } from './messaging/messaging.module';
 
 
 
@@ -95,6 +96,7 @@ import { CurriculumModule } from './curriculum/curriculum.module';
     CurriculumModule,
     DutyModule,
     NotificationsModule,
+    MessagingModule,
     TasksModule,
     FinancialModule,
     ExpensesModule,
