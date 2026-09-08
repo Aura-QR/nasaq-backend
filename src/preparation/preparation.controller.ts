@@ -98,7 +98,25 @@ export class PreparationController {
           type: 'array',
           items: { type: 'string' },
           description:
-            'Lecture IDs. Repeated field, lectureIds[], or comma-separated.',
+            'Lecture IDs, all getting the same lessonTitle. Repeated field, ' +
+            'lectureIds[], or comma-separated. Use `items` instead when the ' +
+            'lessons differ.',
+        },
+        items: {
+          type: 'array',
+          description:
+            'One lecture and its own lesson: [{ lectureId, lessonId }]. A ' +
+            'week of maths is six different lessons, not the same one six ' +
+            'times. Each lessonId is checked against its own lecture, so a ' +
+            'batch may span subjects. Sent as a JSON string over ' +
+            'multipart/form-data.',
+          items: {
+            type: 'object',
+            properties: {
+              lectureId: { type: 'string' },
+              lessonId: { type: 'string' },
+            },
+          },
         },
         lessonTitle: {
           type: 'string',

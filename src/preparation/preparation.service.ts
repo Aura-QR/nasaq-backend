@@ -261,8 +261,32 @@ export class PreparationService {
     req?: any,
     files?: Express.Multer.File[],
   ) {
+    /*
+     * Two shapes, one list.
+     *
+     * `lectureIds` + one `lessonTitle` covers "the same lesson to all my
+     * sixth-grade sections". `items` covers the week a teacher actually
+     * teaches, where six maths periods are six different lessons — which the
+     * single-title form could not express at all, so a teacher preparing a
+     * week had to file one at a time.
+     */
+    const requested: { lectureId: string; lessonId?: string }[] = dto.items?.length
+      ? dto.items.map((item) => ({
+          lectureId: String(item.lectureId),
+          lessonId: item.lessonId ? String(item.lessonId) : undefined,
+        }))
+      : (dto.lectureIds ?? []).map((id) => ({ lectureId: String(id) }));
+
+    if (!requested.length) {
+      throw new BadRequestException('لازم تبعت حصة واحدة على الأقل');
+    }
+
     // Same lecture twice in one payload is a client slip, not two lessons.
-    const lectureIds = [...new Set(dto.lectureIds.map(String))];
+    const byLectureId = new Map<string, { lectureId: string; lessonId?: string }>();
+    for (const entry of requested) {
+      if (!byLectureId.has(entry.lectureId)) byLectureId.set(entry.lectureId, entry);
+    }
+    const lectureIds = [...byLectureId.keys()];
     const weekOf = dto.weekOf ? startOfWeek(dto.weekOf) : currentWeekOf();
 
     const lectures = await this.lectureModel
@@ -310,6 +334,26 @@ export class PreparationService {
       );
     }
 
+    /*
+     * Resolve every lesson before writing anything.
+     *
+     * validateReferences refuses a lesson that belongs to another subject or
+     * grade, and each item is checked against its OWN lecture — a batch
+     * spanning two subjects is normal and each half must match. Doing it up
+     * front means a wrong lesson at position 30 fails the request instead of
+     * leaving 29 preparations behind.
+     */
+    const lessonByLecture = new Map<string, any>();
+    for (const [lectureId, entry] of byLectureId) {
+      if (!entry.lessonId) continue;
+      const lecture: any = byId.get(lectureId);
+      const lesson = await this.content.validateReferences(
+        { lessonId: entry.lessonId },
+        lecture.subjectOfferingId,
+      );
+      if (lesson) lessonByLecture.set(lectureId, lesson);
+    }
+
     // One preparation per lecture per week; a second upload is almost always a
     // double-tap, so report it instead of quietly creating a duplicate.
     const existing = await this.preparationModel
@@ -341,13 +385,23 @@ export class PreparationService {
       }
 
       const teacher: any = teacherById.get(String(lecture.teacherId));
+      const lesson = lessonByLecture.get(lectureId);
 
       const saved = await new this.preparationModel({
         lecture: lectureId,
         subject: lecture.subjectOfferingId,
         submittedBy: teacher._id,
         name: teacher.name,
-        lessonTitle: dto.lessonTitle ?? '',
+        // A curriculum lesson names itself, and brings the objectives the
+        // school already wrote for it — which is the whole reason a teacher
+        // picks one instead of typing a title.
+        ...(lesson
+          ? {
+              lessonId: lesson._id,
+              lessonTitle: lesson.name,
+              objectives: lesson.objectives ?? [],
+            }
+          : { lessonTitle: dto.lessonTitle ?? '' }),
         classId: lecture.classId ?? null,
         termId: lecture.termId ?? null,
         weekOf,
@@ -370,6 +424,7 @@ export class PreparationService {
         lectureId,
         status: 'created',
         preparationId: String(saved._id),
+        lessonTitle: saved.lessonTitle || null,
       });
     }
 
