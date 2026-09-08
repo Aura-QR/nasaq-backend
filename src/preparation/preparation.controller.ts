@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { PreparationService } from './preparation.service';
+import { LessonContentService } from './lesson-content.service';
 import { CreatePreparationDto } from './dto/create-preparation.dto';
 import { UpdatePreparationDto } from './dto/update-preparation.dto';
 import { ReviewPreparationDto } from './dto/review-preparation.dto';
@@ -46,7 +47,11 @@ import { Role } from '../auth/enums/role.enum';
 @UseGuards(JwtAuthGuard, AbilitiesGuard)
 @ApiBearerAuth()
 export class PreparationController {
-  constructor(private readonly preparationService: PreparationService, private readonly content: PreparationContentService) {}
+  constructor(
+    private readonly preparationService: PreparationService,
+    private readonly content: PreparationContentService,
+    private readonly lessonContent: LessonContentService,
+  ) {}
 
   @ApiOperation({ summary: 'Create a new preparation' })
   @ApiResponse({ status: 201, description: 'Preparation created successfully' })
@@ -266,6 +271,24 @@ export class PreparationController {
   @Roles(Role.STUDENT, Role.TEACHER, Role.OWNER, Role.MANAGER, Role.SUPERVISOR)
   studentView(@Param('id', MongoIdPipe) id: string, @CurrentUser() user: any) {
     return this.content.studentView(id, user);
+  }
+
+  @ApiOperation({
+    summary: "Fill this preparation's empty content fields from the school workflow",
+    description:
+      'Writes the warm-up, closure, vocabulary, thinking skills and note — but ' +
+      'only into fields that are still empty. Anything the teacher already ' +
+      'wrote is left exactly as it is, so this is safe to run twice. Requires ' +
+      'a lesson to have been chosen.',
+  })
+  @ApiResponse({ status: 200, description: 'تم توليد المحتوى' })
+  @ApiResponse({ status: 400, description: 'No lesson chosen, or the service is off' })
+  @ApiResponse({ status: 403, description: "Not this teacher's preparation" })
+  @Post(':id/generate')
+  @CheckAbilities({ action: 'update', subject: 'Preparation' })
+  @HttpCode(HttpStatus.OK)
+  async generateContent(@Param('id') id: string, @CurrentUser() user: any) {
+    return await this.lessonContent.generate(id, user);
   }
 
   @Post(':id/submit')

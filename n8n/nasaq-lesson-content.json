@@ -1,0 +1,134 @@
+{
+  "name": "Nasaq — Lesson Content",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nasaq-prep",
+        "responseMode": "responseNode",
+        "options": { "rawBody": true }
+      },
+      "id": "b1000000-0000-4000-8000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [-660, 0],
+      "webhookId": "b1000000-0000-4000-8000-000000000001",
+      "notes": "Nasaq posts one lesson here and waits for the written content. Raw Body is ON because the signature covers the exact bytes."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify the HMAC Nasaq signed the body with, then parse it.\n//\n// Same scheme as the WhatsApp workflow: the digest covers the exact bytes\n// that were sent, so it is checked against the raw body — re-serialising the\n// parsed JSON changes key order and whitespace and the digest with it.\n\nconst secret = $env.NASAQ_WEBHOOK_SECRET;\nif (!secret) {\n  throw new Error('NASAQ_WEBHOOK_SECRET is not set on this n8n instance.');\n}\n\nconst item = $input.first();\n\nconst raw = item.binary && item.binary.data\n  ? Buffer.from(item.binary.data.data, 'base64').toString('utf8')\n  : JSON.stringify(item.json.body || item.json);\n\nconst given = (item.json.headers || {})['x-nasaq-signature'] || '';\n\nconst encoder = new TextEncoder();\nconst key = await crypto.subtle.importKey(\n  'raw',\n  encoder.encode(secret),\n  { name: 'HMAC', hash: 'SHA-256' },\n  false,\n  ['sign'],\n);\nconst signed = await crypto.subtle.sign('HMAC', key, encoder.encode(raw));\nconst expected =\n  'sha256=' +\n  Array.from(new Uint8Array(signed))\n    .map((b) => b.toString(16).padStart(2, '0'))\n    .join('');\n\nlet valid = given.length === expected.length;\nif (valid) {\n  let diff = 0;\n  for (let i = 0; i < given.length; i++) {\n    diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);\n  }\n  valid = diff === 0;\n}\n\nreturn [{ json: { valid, payload: JSON.parse(raw) } }];"
+      },
+      "id": "b1000000-0000-4000-8000-000000000002",
+      "name": "Verify signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-440, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-000000000003",
+      "name": "Signature valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the request to Claude.\n//\n// This node is where the wording of the prompt lives — edit it here, not in\n// Nasaq. What comes back has to be exactly the fields Nasaq stores, so the\n// response is constrained by a JSON schema rather than asked for politely:\n// output_config.format guarantees the first content block is valid JSON of\n// that shape, which removes the whole class of \"the model wrote a preamble\n// before the JSON\" failures.\n\nconst p = $json.payload || $json;\n\nconst objectives = Array.isArray(p.objectives) ? p.objectives.filter(Boolean) : [];\n\nconst facts = [\n  `المادة: ${p.subject || 'غير محددة'}`,\n  `الصف: ${p.grade || 'غير محدد'}`,\n  p.unit ? `الوحدة: ${p.unit}` : null,\n  `الدرس: ${p.lessonTitle}`,\n  objectives.length ? `أهداف المدرسة لهذا الدرس:\\n- ${objectives.join('\\n- ')}` : null,\n].filter(Boolean).join('\\n');\n\nconst system =\n  'أنت معلم سعودي خبير تكتب خطة درس لمعلم زميل، وفق مناهج وزارة التعليم السعودية.\\n' +\n  'اكتب بالعربية الفصحى، بجُمل قصيرة قابلة للتنفيذ داخل الحصة، وبلا حشو أو عبارات عامة.\\n' +\n  'اربط كل ما تكتبه بالدرس المذكور تحديدًا — لا بالمادة عمومًا.' +\n  (objectives.length\n    ? '\\nأهداف المدرسة معطاة: اجعل المحتوى خادمًا لها، ولا تعد كتابتها في حقل الأهداف إلا إن طُلب.'\n    : '');\n\nconst instruction =\n  `${facts}\\n\\n` +\n  'اكتب:\\n' +\n  '- warmUp: تمهيد لا يزيد عن ٣ جمل يربط الدرس بخبرة سابقة للطالب أو بموقف من حياته.\\n' +\n  '- closure: إغلاق يلخّص أهم نقطتين أو ثلاث في الدرس.\\n' +\n  '- vocabulary: المصطلحات الأساسية في الدرس مفصولة بفواصل، بلا تعريفات.\\n' +\n  '- thinkingSkills: مهارات التفكير التي يمارسها الطالب فعلًا في هذا الدرس، مفصولة بفواصل.\\n' +\n  '- teacherInstructions: ملاحظة عملية واحدة للمعلم — خطأ شائع يتوقعه أو نقطة يركّز عليها.\\n' +\n  '- objectives: من هدفين إلى أربعة أهداف سلوكية تبدأ بفعل قابل للقياس.\\n' +\n  '- teachingStrategies: من استراتيجيتين إلى أربع مناسبة لهذا الدرس.\\n' +\n  '- teachingAids: من وسيلتين إلى أربع متاحة في فصل عادي.';\n\nconst text = { type: 'string' };\nconst list = { type: 'array', items: { type: 'string' } };\n\nreturn [\n  {\n    json: {\n      model: $env.NASAQ_AI_MODEL || 'claude-opus-5',\n      max_tokens: 4000,\n      // Routine writing, not a hard problem: low effort keeps the cost and\n      // the latency down. Raise it in the env var if the output is thin.\n      output_config: {\n        effort: $env.NASAQ_AI_EFFORT || 'low',\n        format: {\n          type: 'json_schema',\n          schema: {\n            type: 'object',\n            properties: {\n              warmUp: text,\n              closure: text,\n              vocabulary: text,\n              thinkingSkills: text,\n              teacherInstructions: text,\n              objectives: list,\n              teachingStrategies: list,\n              teachingAids: list,\n            },\n            required: [\n              'warmUp',\n              'closure',\n              'vocabulary',\n              'thinkingSkills',\n              'teacherInstructions',\n              'objectives',\n              'teachingStrategies',\n              'teachingAids',\n            ],\n            additionalProperties: false,\n          },\n        },\n      },\n      system,\n      messages: [{ role: 'user', content: instruction }],\n    },\n  },\n];"
+      },
+      "id": "b1000000-0000-4000-8000-000000000004",
+      "name": "Build prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [20, -110]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key", "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 80000 }
+      },
+      "id": "b1000000-0000-4000-8000-000000000005",
+      "name": "Claude — messages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [240, -110],
+      "notes": "Do not switch on 'Continue on Fail' — a failure here must reach Nasaq as a failure, or a preparation is reported as generated when nothing was written."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pull the JSON out of the response and hand Nasaq exactly its own fields.\n//\n// output_config.format guarantees the first text block is valid JSON of the\n// requested shape, so this is a parse rather than an extraction — but the\n// refusal check comes first: a decline arrives as HTTP 200 with\n// stop_reason 'refusal' and no usable content, and reading content blindly\n// would surface it as a confusing parse error.\n\nconst r = $json;\n\nif (r.stop_reason === 'refusal') {\n  throw new Error('رفض النموذج توليد المحتوى لهذا الدرس.');\n}\n\nconst block = (r.content || []).find((b) => b.type === 'text');\nif (!block || !block.text) {\n  throw new Error('لم يرجع النموذج أي نص.');\n}\n\nlet data;\ntry {\n  data = JSON.parse(block.text);\n} catch (error) {\n  throw new Error('رد النموذج ليس JSON صالحًا: ' + String(block.text).slice(0, 120));\n}\n\nconst str = (v) => (typeof v === 'string' ? v.trim() : '');\nconst arr = (v) => (Array.isArray(v) ? v.map(str).filter(Boolean) : []);\n\nreturn [\n  {\n    json: {\n      warmUp: str(data.warmUp),\n      closure: str(data.closure),\n      vocabulary: str(data.vocabulary),\n      thinkingSkills: str(data.thinkingSkills),\n      teacherInstructions: str(data.teacherInstructions),\n      objectives: arr(data.objectives),\n      teachingStrategies: arr(data.teachingStrategies),\n      teachingAids: arr(data.teachingAids),\n    },\n  },\n];"
+      },
+      "id": "b1000000-0000-4000-8000-000000000006",
+      "name": "Shape for Nasaq",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, -110]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "b1000000-0000-4000-8000-000000000007",
+      "name": "200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [680, -110]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: 'invalid signature' }) }}",
+        "options": { "responseCode": 401 }
+      },
+      "id": "b1000000-0000-4000-8000-000000000008",
+      "name": "401 Bad signature",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [20, 120]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Verify signature", "type": "main", "index": 0 }]] },
+    "Verify signature": { "main": [[{ "node": "Signature valid?", "type": "main", "index": 0 }]] },
+    "Signature valid?": {
+      "main": [
+        [{ "node": "Build prompt", "type": "main", "index": 0 }],
+        [{ "node": "401 Bad signature", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build prompt": { "main": [[{ "node": "Claude — messages", "type": "main", "index": 0 }]] },
+    "Claude — messages": { "main": [[{ "node": "Shape for Nasaq", "type": "main", "index": 0 }]] },
+    "Shape for Nasaq": { "main": [[{ "node": "200 OK", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

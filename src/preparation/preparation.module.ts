@@ -6,6 +6,7 @@ import {
 import { MongooseModule } from '@nestjs/mongoose';
 import { PreparationController } from './preparation.controller';
 import { PreparationService } from './preparation.service';
+import { LessonContentService } from './lesson-content.service';
 import { Preparation, PreparationSchema } from './schemas/preparation.schema';
 import { LecturesModule } from '../lectures/lectures.module';
 import { CaslModule } from '../casl/casl.module';
@@ -27,7 +28,7 @@ import { PreparationContentModule } from './preparation-content.module';
     CaslModule,
   ],
   controllers: [PreparationController],
-  providers: [PreparationService],
-  exports: [PreparationService, MongooseModule],
+  providers: [PreparationService, LessonContentService],
+  exports: [PreparationService, LessonContentService, MongooseModule],
 })
 export class PreparationModule {}

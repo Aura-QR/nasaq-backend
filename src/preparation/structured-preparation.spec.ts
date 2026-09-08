@@ -7,6 +7,7 @@ import * as request from 'supertest';
 import { PreparationContentModule } from './preparation-content.module';
 import { PreparationContentService } from './preparation-content.service';
 import { PreparationService } from './preparation.service';
+import { LessonContentService } from './lesson-content.service';
 import { PreparationController } from './preparation.controller';
 import { CurriculumModule } from '../curriculum/curriculum.module';
 import { CurriculumService } from '../curriculum/curriculum.service';
@@ -130,6 +131,9 @@ describe('Structured preparation integration', () => {
       controllers: [PreparationController],
       providers: [
         PreparationService,
+        // The controller gained POST /:id/generate. Nothing here exercises it
+        // — the service has its own suite — but Nest resolves the constructor.
+        LessonContentService,
         { provide: APP_GUARD, useValue: fakeAuth },
         { provide: APP_GUARD, useClass: TenantGuard },
         { provide: APP_GUARD, useClass: RolesGuard },
