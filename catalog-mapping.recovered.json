@@ -1,0 +1,6517 @@
+{
+  "schemaVersion": 1,
+  "provenance": "Recovered from local Hader Tahdiri curriculum and its track migration. Not a direct official Madrasati export.",
+  "academicYearVerified": null,
+  "matchingRule": "Exact leaf ID and normalized leaf title; >=60% of course lessons, at least 3; competing grade/subject must cover <20%, unless a local book record explicitly associates this course ID with the candidate. Tracks are retained separately.",
+  "sources": [
+    {
+      "file": "D:/Work/Aura/nasaq-backend/catalog-source.json",
+      "sha256": "e027d300f87d38b0b675fd324a8ba502751a13620c51e76da5bc9d66016cadfc"
+    },
+    {
+      "file": "D:/Work/Aura/Hader-backend/files/stages.json",
+      "sha256": "ec2638529e506d9b0d34acec291c2a04e95f06c1f442c153441d8a859f26b80a"
+    },
+    {
+      "file": "D:/Work/Aura/Hader-backend/files/grades.json",
+      "sha256": "a4a7822adf58739b5672fd3da7d214ebb0d0c040283f48b94cb934c739061315"
+    },
+    {
+      "file": "D:/Work/Aura/Hader-backend/files/subjects.json",
+      "sha256": "66ba09eb5b8d8a85b2dd5a348f926dc75003fb568fdfa96b1c120375e1072da5"
+    },
+    {
+      "file": "D:/Work/Aura/Hader-backend/files/units.json",
+      "sha256": "7d74baaa37e1f01684112a7e32493ef3d5e9c29263bb35dfb0f0950b89d43fa6"
+    },
+    {
+      "file": "D:/Work/Aura/Hader-backend/files/chapters.json",
+      "sha256": "adb492a53da735897aafd03eb1ace3d413b8c1e927512d091bba5846339c5b2a"
+    },
+    {
+      "file": "D:/Work/Aura/Hader-backend/files/lessons.json",
+      "sha256": "386571a5cc2d48478907672eb8bbb934e037026e03695c0a372ed13e98e2cb10"
+    },
+    {
+      "file": "D:/Work/Aura/Hader-backend/migration.sql",
+      "sha256": "83b716313b110a4fa3dee9b76c51b265e8f7b5d8227fead97cc0e1b01b335a02"
+    },
+    {
+      "file": "D:/Work/Aura/Hader-backend/scraper/tahdiri/books.json",
+      "sha256": "e30a54c8b66415afe98e6ecf59b07478a2920792a987a045327c3865f23658e5"
+    }
+  ],
+  "sourceCounts": {
+    "stages": 5,
+    "grades": 28,
+    "subjects": 351,
+    "units": 1954,
+    "chapters": 2724,
+    "lessons": 12873
+  },
+  "summary": {
+    "courses": 162,
+    "mapped": 139,
+    "needsReview": 23,
+    "correctedSubjects": 67
+  },
+  "subjects": [
+    {
+      "subjectId": "86",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 88,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          3
+        ],
+        "matchedLessons": 88,
+        "parentAndLessonMatches": 88,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "86,87,273",
+          "86,87,38499",
+          "86,87,38500",
+          "86,87,38501",
+          "86,87,38502"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر لغتي الخالدة / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K07-SM1-ilng-part1.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الأول المتوسط-مقررات العام الدراسي-اللغة العربية"
+        },
+        {
+          "title": "مقرر لغتي الخالدة/ كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K07-SM1-ilng-part2.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الأول المتوسط-مقررات العام الدراسي-اللغة العربية"
+        }
+      ]
+    },
+    {
+      "subjectId": "90",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 85,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          1
+        ],
+        "matchedLessons": 85,
+        "parentAndLessonMatches": 85,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "90,91,44052",
+          "90,91,276",
+          "90,91,277",
+          "90,91,278",
+          "90,91,279"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر الرياضيات /كتاب الطالب الجزء الأول ",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K07-SM1-math-part1.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الأول المتوسط-مقررات العام الدراسي-الرياضيات"
+        },
+        {
+          "title": "مقرر الرياضيات /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K07-SM1-math-part2.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الأول المتوسط-مقررات العام الدراسي-الرياضيات"
+        }
+      ]
+    },
+    {
+      "subjectId": "95",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 28,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          206
+        ],
+        "matchedLessons": 28,
+        "parentAndLessonMatches": 28,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "95,96,97,307",
+          "95,96,97,308",
+          "95,96,97,309",
+          "95,96,98,310",
+          "95,96,98,311"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K07-SM1-scin.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الأول المتوسط-مقررات العام الدراسي-العلوم"
+        },
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K07-SM1-scin-part2.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الأول المتوسط-مقررات العام الدراسي-العلوم"
+        }
+      ]
+    },
+    {
+      "subjectId": "105",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 17,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          7
+        ],
+        "matchedLessons": 17,
+        "parentAndLessonMatches": 17,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "105,106,321",
+          "105,106,322",
+          "105,106,323",
+          "105,107,324",
+          "105,107,325"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر  التربية الفنية /كتاب الطالب ",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K07-SM1-tart.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الأول المتوسط-مقررات العام الدراسي-التربية الفنية"
+        }
+      ]
+    },
+    {
+      "subjectId": "110",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 30,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          8
+        ],
+        "matchedLessons": 30,
+        "parentAndLessonMatches": 30,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "110,111,332",
+          "110,111,333",
+          "110,111,155852",
+          "110,111,24854",
+          "110,112,155853"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر المهارات الحياتية والأسرية /كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K07-SM1-tfml.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الأول المتوسط-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        }
+      ]
+    },
+    {
+      "subjectId": "156",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 97,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          15
+        ],
+        "matchedLessons": 97,
+        "parentAndLessonMatches": 97,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "156,157,438",
+          "156,157,38545",
+          "156,157,38546",
+          "156,157,38547",
+          "156,157,38548"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر لغتي الخالدة / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K08-SM1-ILNG.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الثاني المتوسط-مقررات العام الدراسي-اللغة العربية"
+        },
+        {
+          "title": "مقرر لغتي الخالدة / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K08-SM1-ilng-part2.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الثاني المتوسط-مقررات العام الدراسي-اللغة العربية"
+        }
+      ]
+    },
+    {
+      "subjectId": "160",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 113,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          16
+        ],
+        "matchedLessons": 113,
+        "parentAndLessonMatches": 113,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "160,33657,33658,162346",
+          "160,33657,33658,162347",
+          "160,33657,33658,162348",
+          "160,33657,33658,162349",
+          "160,33657,33658,162350"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر الرياضيات /كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K08-SM1-math-part1.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الثاني المتوسط-مقررات العام الدراسي-الرياضيات"
+        },
+        {
+          "title": "مقرر الرياضيات /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K08-SM1-math-part2.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الثاني المتوسط-مقررات العام الدراسي-الرياضيات"
+        }
+      ]
+    },
+    {
+      "subjectId": "166",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 73,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          208
+        ],
+        "matchedLessons": 73,
+        "parentAndLessonMatches": 73,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "166,167,168,476",
+          "166,167,168,477",
+          "166,167,169,478",
+          "166,167,169,479",
+          "166,170,171,480"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K08-SM1-scin.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الثاني المتوسط-مقررات العام الدراسي-العلوم"
+        },
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K08-SM1-scin-part2.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الثاني المتوسط-مقررات العام الدراسي-العلوم"
+        }
+      ]
+    },
+    {
+      "subjectId": "176",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 20,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          17
+        ],
+        "matchedLessons": 20,
+        "parentAndLessonMatches": 20,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "176,177,489",
+          "176,177,490",
+          "176,177,491",
+          "176,178,492",
+          "176,178,493"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر التربية الفنية / كتاب الطالب ",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K08-SM1-tart.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الثاني المتوسط-مقررات العام الدراسي-التربية الفنية"
+        }
+      ]
+    },
+    {
+      "subjectId": "182",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 32,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          20
+        ],
+        "matchedLessons": 32,
+        "parentAndLessonMatches": 32,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "182,183,501",
+          "182,183,502",
+          "182,183,503",
+          "182,183,504",
+          "182,183,24747"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "  مقرر المهارات الحياتية والأسرية / كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K08-SM1-tfml.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الثاني المتوسط-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        }
+      ]
+    },
+    {
+      "subjectId": "208",
+      "originalSubjectName": "العلوم",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 7,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "231",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 97,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          30
+        ],
+        "matchedLessons": 97,
+        "parentAndLessonMatches": 97,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "231,232,618",
+          "231,232,38671",
+          "231,232,38685",
+          "231,232,38686",
+          "231,232,38687"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر لغتي الخالدة /كتاب الطالب الجزء الأول ",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K09-SM1-ilng-part1.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف  الثالث المتوسط-مقررات العام الدراسي-اللغة العربية"
+        },
+        {
+          "title": "مقرر لغتي الخالدة / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K09-SM1-ilng-part2.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف  الثالث المتوسط-مقررات العام الدراسي-اللغة العربية"
+        }
+      ]
+    },
+    {
+      "subjectId": "235",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 13,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          29
+        ],
+        "matchedLessons": 13,
+        "parentAndLessonMatches": 13,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "235,236,621",
+          "235,237,622",
+          "235,238,623",
+          "235,4014,25652",
+          "235,4015,25653"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر  التربية الفنية /كتاب الطالب ",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K09-SM1-tart.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف  الثالث المتوسط-مقررات العام الدراسي-التربية الفنية"
+        }
+      ]
+    },
+    {
+      "subjectId": "241",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 31,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          27
+        ],
+        "matchedLessons": 31,
+        "parentAndLessonMatches": 31,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "241,242,161260",
+          "241,242,161261",
+          "241,242,161262",
+          "241,243,630",
+          "241,243,631"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "  مقرر المهارات الحياتية والأسرية / كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K09-SM1-tfml.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف  الثالث المتوسط-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        }
+      ]
+    },
+    {
+      "subjectId": "273",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 50,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          36
+        ],
+        "matchedLessons": 50,
+        "parentAndLessonMatches": 50,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "273,274,69049",
+          "273,274,69050",
+          "273,274,69051",
+          "273,274,69052",
+          "273,274,69053"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر لغتي /كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-lang-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        },
+        {
+          "title": "مقرر لغتي / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-lang.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        }
+      ]
+    },
+    {
+      "subjectId": "277",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 97,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          38
+        ],
+        "matchedLessons": 97,
+        "parentAndLessonMatches": 97,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "277,278,44021",
+          "277,278,712",
+          "277,278,713",
+          "277,278,714",
+          "277,278,715"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر الرياضيات /كتاب الطالب الجزء الأول ",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-math-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-الرياضيات"
+        },
+        {
+          "title": "مقرر الرياضيات /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-math.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-الرياضيات"
+        }
+      ]
+    },
+    {
+      "subjectId": "284",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 22,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          212
+        ],
+        "matchedLessons": 22,
+        "parentAndLessonMatches": 22,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "284,285,286,753",
+          "284,285,286,754",
+          "284,285,287,755",
+          "284,285,287,756",
+          "284,288,289,757"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر العلوم /كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-scin-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-العلوم"
+        },
+        {
+          "title": "مقرر العلوم/ كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-scin.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-العلوم"
+        }
+      ]
+    },
+    {
+      "subjectId": "297",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 23,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          45
+        ],
+        "matchedLessons": 23,
+        "parentAndLessonMatches": 23,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "297,298,779",
+          "297,298,780",
+          "297,298,776",
+          "297,298,775",
+          "297,299,777"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر التربية الفنية / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-tart-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-التربية الفنية"
+        },
+        {
+          "title": "مقرر التربية الفنية / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-tart.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-التربية الفنية"
+        }
+      ]
+    },
+    {
+      "subjectId": "301",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 14,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          46
+        ],
+        "matchedLessons": 14,
+        "parentAndLessonMatches": 14,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "301,302,792",
+          "301,302,791",
+          "301,302,159961",
+          "301,303,797",
+          "301,303,159963"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر المهارات الحياتية والأسرية / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-tfml-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        },
+        {
+          "title": "مقرر المهارات الحياتية والاسرية /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K01-SM1-tfml.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الأول الابتدائي-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        }
+      ]
+    },
+    {
+      "subjectId": "309",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          52
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "309,310,69058",
+          "309,310,69059",
+          "309,310,69060",
+          "309,311,69137",
+          "309,311,69134"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر لغتي / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-lang.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        },
+        {
+          "title": "مقرر لغتي / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-lang-part2.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        }
+      ]
+    },
+    {
+      "subjectId": "314",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 117,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          57
+        ],
+        "matchedLessons": 117,
+        "parentAndLessonMatches": 117,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "314,315,44032",
+          "314,315,825",
+          "314,315,826",
+          "314,315,827",
+          "314,315,828"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر الرياضيات / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-math.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-الرياضيات"
+        },
+        {
+          "title": "مقرر الرياضيات / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-math-part2.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-الرياضيات"
+        }
+      ]
+    },
+    {
+      "subjectId": "323",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          214
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "323,324,325,874",
+          "323,324,325,875",
+          "323,324,326,876",
+          "323,324,326,877",
+          "323,327,328,878"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقررالعلوم / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-SCIN.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-العلوم"
+        },
+        {
+          "title": "مقرر العلوم /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-scin-part2.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-العلوم"
+        }
+      ]
+    },
+    {
+      "subjectId": "333",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 21,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          55
+        ],
+        "matchedLessons": 21,
+        "parentAndLessonMatches": 21,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "333,334,68872",
+          "333,334,886",
+          "333,334,887",
+          "333,335,888",
+          "333,335,889"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقررالتربية الفنية / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-tart.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-التربية الفنية"
+        },
+        {
+          "title": "مقرر الفنية /كتاب الطالب الجزء الثاني ",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-tart-part2.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-التربية الفنية"
+        }
+      ]
+    },
+    {
+      "subjectId": "338",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 13,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          56
+        ],
+        "matchedLessons": 13,
+        "parentAndLessonMatches": 13,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "338,339,896",
+          "338,339,897",
+          "338,339,159965",
+          "338,340,910",
+          "338,340,908"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر المهارات الحياتية والأسرية / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-tfml-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        },
+        {
+          "title": "مقرر المهارات الحياتية والاسرية /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K02-SM1-tfml.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الثاني الابتدائي-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        }
+      ]
+    },
+    {
+      "subjectId": "354",
+      "originalSubjectName": "العلوم",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          58
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "354,355,69062",
+          "354,355,69065",
+          "354,355,69063",
+          "354,356,69158",
+          "354,356,69155"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر لغتي /كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-lang-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        },
+        {
+          "title": "مقرر لغتي /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-lang-part2.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        }
+      ]
+    },
+    {
+      "subjectId": "359",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 18,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          59
+        ],
+        "matchedLessons": 18,
+        "parentAndLessonMatches": 18,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "359,360,943",
+          "359,360,944",
+          "359,361,945",
+          "359,361,946",
+          "359,362,947"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر التربية الفنية / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-tart-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-التربية الفنية"
+        },
+        {
+          "title": "مقرر الرتبية الفنية /كتاب الطالب الجزء الثاني ",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-tart-PART2.PDF",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-التربية الفنية"
+        }
+      ]
+    },
+    {
+      "subjectId": "364",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 14,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          60
+        ],
+        "matchedLessons": 14,
+        "parentAndLessonMatches": 14,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "364,365,951",
+          "364,365,952",
+          "364,365,1469",
+          "364,365,159958",
+          "364,366,907"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر المهارات الحياتية والاسرية /كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-tfml-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        },
+        {
+          "title": "مقرر المهارات الحياتية والاسرية /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-tfml.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        }
+      ]
+    },
+    {
+      "subjectId": "383",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الرابع الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 111,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الرابع الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          67
+        ],
+        "matchedLessons": 111,
+        "parentAndLessonMatches": 111,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "383,384,43996",
+          "383,384,1005",
+          "383,384,69300",
+          "383,384,1006",
+          "383,384,1007"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر الرياضيات / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K04-SM1-math.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الرابع الابتدائي-مقررات العام الدراسي-الرياضيات"
+        },
+        {
+          "title": "مقرر الرياضيات / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K04-SM1-math.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الرابع الابتدائي-مقررات العام الدراسي-الرياضيات"
+        }
+      ]
+    },
+    {
+      "subjectId": "390",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الرابع الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 35,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الرابع الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          217
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 0.6857,
+        "sampleLessonIds": [
+          "390,391,392,1041",
+          "390,391,392,1042",
+          "390,391,393,1043",
+          "390,391,393,1044",
+          "390,391,393,1045"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر العلوم /كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K04-SM1-scin-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الرابع الابتدائي-مقررات العام الدراسي-العلوم"
+        },
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K04-SM1-scin.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الرابع الابتدائي-مقررات العام الدراسي-العلوم"
+        }
+      ]
+    },
+    {
+      "subjectId": "398",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الرابع الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 19,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الرابع الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          62
+        ],
+        "matchedLessons": 19,
+        "parentAndLessonMatches": 19,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "398,399,1053",
+          "398,399,1052",
+          "398,399,1051",
+          "398,400,1054",
+          "398,400,1055"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر التربية الفنية/ كتاب الطالب ",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K04-SM1-tart.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الرابع الابتدائي-مقررات العام الدراسي-التربية الفنية"
+        }
+      ]
+    },
+    {
+      "subjectId": "408",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الرابع الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 20,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الرابع الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          63
+        ],
+        "matchedLessons": 20,
+        "parentAndLessonMatches": 20,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "408,409,1079",
+          "408,409,1081",
+          "408,409,1083",
+          "408,410,1084",
+          "408,411,1085"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر المهارات الحياتية والاسرية  /كتاب الطالب ",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K04-SM1-tfml.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الرابع الابتدائي-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        }
+      ]
+    },
+    {
+      "subjectId": "418",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 45,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          72
+        ],
+        "matchedLessons": 45,
+        "parentAndLessonMatches": 45,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "418,419,1103",
+          "418,419,1110",
+          "418,419,1106",
+          "418,419,1109",
+          "418,419,1182"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر لغتي الجميلة / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K05-SM1-BLNG.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الخامس الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        },
+        {
+          "title": "مقرر لغتي الجميلة / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K05-SM1-blng.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الخامس الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        }
+      ]
+    },
+    {
+      "subjectId": "423",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 99,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          61
+        ],
+        "matchedLessons": 99,
+        "parentAndLessonMatches": 99,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "423,424,44027",
+          "423,424,1129",
+          "423,424,1130",
+          "423,424,69289",
+          "423,424,1131"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر الرياضيات /كتاب الطالب الجزء الأول ",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-math-part1.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-الرياضيات"
+        },
+        {
+          "title": "مقررالرياضيات /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-math-PART2.PDF",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-الرياضيات"
+        }
+      ]
+    },
+    {
+      "subjectId": "429",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 25,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          216
+        ],
+        "matchedLessons": 25,
+        "parentAndLessonMatches": 25,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "429,430,431,1164",
+          "429,430,431,1165",
+          "429,430,432,1166",
+          "429,430,432,1167",
+          "429,433,434,1168"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقررالعلوم / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-scin.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-العلوم"
+        },
+        {
+          "title": "مقرر العلوم /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K03-SM1-scin-PART2.PDF",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الثالث الابتدائي-مقررات العام الدراسي-العلوم"
+        }
+      ]
+    },
+    {
+      "subjectId": "459",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 113,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          75
+        ],
+        "matchedLessons": 113,
+        "parentAndLessonMatches": 113,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "459,460,44001",
+          "459,460,1215",
+          "459,460,171533",
+          "459,460,1216",
+          "459,460,69358"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر الرياضيات / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K05-SM1-math.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الخامس الابتدائي-مقررات العام الدراسي-الرياضيات"
+        },
+        {
+          "title": "مقرر الرياضيات / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K05-SM1-math.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الخامس الابتدائي-مقررات العام الدراسي-الرياضيات"
+        }
+      ]
+    },
+    {
+      "subjectId": "466",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          220
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "466,467,468,1256",
+          "466,467,468,1257",
+          "466,467,469,1258",
+          "466,467,469,1259",
+          "466,470,471,1260"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K05-SM1-SCIN.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الخامس الابتدائي-مقررات العام الدراسي-العلوم"
+        },
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K05-SM1-scin.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الخامس الابتدائي-مقررات العام الدراسي-العلوم"
+        }
+      ]
+    },
+    {
+      "subjectId": "476",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 20,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          73
+        ],
+        "matchedLessons": 20,
+        "parentAndLessonMatches": 20,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "476,477,1270",
+          "476,477,1268",
+          "476,477,1269",
+          "476,478,1271",
+          "476,478,1272"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر التربية الفنية / كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K05-SM1-tart.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الخامس الابتدائي-مقررات العام الدراسي-التربية الفنية"
+        }
+      ]
+    },
+    {
+      "subjectId": "485",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 16,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          80
+        ],
+        "matchedLessons": 16,
+        "parentAndLessonMatches": 16,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "485,486,1294",
+          "485,486,1296",
+          "485,487,1297",
+          "485,488,1298",
+          "485,490,1302"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر المهارات الحياتية والاسرية /كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K05-SM1-tfml.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف  الخامس الابتدائي-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        }
+      ]
+    },
+    {
+      "subjectId": "509",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 44,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          83
+        ],
+        "matchedLessons": 44,
+        "parentAndLessonMatches": 44,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "509,510,1370",
+          "509,510,39905",
+          "509,510,39673",
+          "509,510,151753",
+          "509,510,39917"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر لغتي الجميلة / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K06-SM1-BLNG.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف السادس الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        },
+        {
+          "title": "مقرر لغتي الجميلة / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K06-SM1-blng.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف السادس الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        }
+      ]
+    },
+    {
+      "subjectId": "528",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 94,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          82
+        ],
+        "matchedLessons": 94,
+        "parentAndLessonMatches": 94,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "528,529,43991",
+          "528,529,1400",
+          "528,529,1401",
+          "528,529,1402",
+          "528,529,1403"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر الرياضيات / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K06-SM1-math.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف السادس الابتدائي-مقررات العام الدراسي-الرياضيات"
+        },
+        {
+          "title": "مقرر الرياضيات / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K06-SM1-math.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف السادس الابتدائي-مقررات العام الدراسي-الرياضيات"
+        }
+      ]
+    },
+    {
+      "subjectId": "534",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          222
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "534,535,536,1435",
+          "534,535,536,1436",
+          "534,535,537,1437",
+          "534,535,537,1438",
+          "534,538,539,1439"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K06-SM1-SCIN.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف السادس الابتدائي-مقررات العام الدراسي-العلوم"
+        },
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K06-SM1-scin.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف السادس الابتدائي-مقررات العام الدراسي-العلوم"
+        }
+      ]
+    },
+    {
+      "subjectId": "544",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 16,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          90
+        ],
+        "matchedLessons": 16,
+        "parentAndLessonMatches": 16,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "544,545,69677",
+          "544,545,1449",
+          "544,545,1447",
+          "544,546,1450",
+          "544,546,1451"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر التربية الفنية / كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K06-SM1-tart.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف السادس الابتدائي-مقررات العام الدراسي-التربية الفنية"
+        }
+      ]
+    },
+    {
+      "subjectId": "555",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 16,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          88
+        ],
+        "matchedLessons": 16,
+        "parentAndLessonMatches": 16,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "555,556,1470",
+          "555,556,131322",
+          "555,556,151713",
+          "555,557,1471",
+          "555,558,1472"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر المهارات الحياتية والاسرية /كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K06-SM1-tfml.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف السادس الابتدائي-مقررات العام الدراسي-المهارات الحياتية والأسرية"
+        }
+      ]
+    },
+    {
+      "subjectId": "606",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 29,
+      "evidence": null,
+      "candidates": [
+        {
+          "subjectName": "الحديث 1",
+          "gradeName": "السنة الأولى المشتركة",
+          "stageName": "الثانوية العامة",
+          "tracks": [],
+          "trackEvidence": [
+            {
+              "track": "السنة الأولى المشتركة",
+              "matchedLessons": 10
+            }
+          ],
+          "haderSubjectIds": [
+            342
+          ],
+          "matchedLessons": 10,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.3448,
+          "sampleLessonIds": [
+            "606,608,1703",
+            "606,608,1714",
+            "606,608,1719",
+            "606,608,1720",
+            "606,608,1721"
+          ]
+        }
+      ],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "610",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "الكفايات اللغوية 1",
+      "gradeName": "السنة الأولى المشتركة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "السنة الأولى المشتركة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 46,
+      "evidence": {
+        "subjectName": "الكفايات اللغوية 1",
+        "gradeName": "السنة الأولى المشتركة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "السنة الأولى المشتركة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "السنة الأولى المشتركة",
+            "matchedLessons": 46
+          }
+        ],
+        "haderSubjectIds": [
+          337
+        ],
+        "matchedLessons": 46,
+        "parentAndLessonMatches": 46,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "610,27867,1756",
+          "610,27867,43595",
+          "610,27867,43596",
+          "610,27867,43597",
+          "610,27868,155966"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "616",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "الكفايات اللغوية 1",
+      "gradeName": "السنة الأولى المشتركة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "السنة الأولى المشتركة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 46,
+      "evidence": {
+        "subjectName": "الكفايات اللغوية 1",
+        "gradeName": "السنة الأولى المشتركة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "السنة الأولى المشتركة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "السنة الأولى المشتركة",
+            "matchedLessons": 46
+          }
+        ],
+        "haderSubjectIds": [
+          337
+        ],
+        "matchedLessons": 46,
+        "parentAndLessonMatches": 46,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "616,27867,1756",
+          "616,27867,43595",
+          "616,27867,43596",
+          "616,27867,43597",
+          "616,27868,155966"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "622",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 22,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "628",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "الكفايات اللغوية 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "المسار العام",
+        "مسار إدارة الأعمال",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 36,
+      "evidence": {
+        "subjectName": "الكفايات اللغوية 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "المسار العام",
+          "مسار إدارة الأعمال",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 36
+          },
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 36
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 36
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 36
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 36
+          }
+        ],
+        "haderSubjectIds": [
+          93,
+          228,
+          229,
+          230,
+          231
+        ],
+        "matchedLessons": 36,
+        "parentAndLessonMatches": 36,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "628,33540,1761",
+          "628,33540,161999",
+          "628,33540,162000",
+          "628,33540,162001",
+          "628,33540,162002"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "912",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 40,
+      "evidence": null,
+      "candidates": [
+        {
+          "subjectName": "الفقه 2",
+          "gradeName": "السنة الثالثة",
+          "stageName": "الثانوية العامة",
+          "tracks": [],
+          "trackEvidence": [
+            {
+              "track": "المسار الشرعي",
+              "matchedLessons": 3
+            }
+          ],
+          "haderSubjectIds": [
+            142
+          ],
+          "matchedLessons": 3,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.075,
+          "sampleLessonIds": [
+            "912,8291,40904",
+            "912,8291,40913",
+            "912,8291,40917"
+          ]
+        }
+      ],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1066",
+      "originalSubjectName": "الحاسب والتقنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 59,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1074",
+      "originalSubjectName": "الحاسب والتقنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 52,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1120",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 98,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          32
+        ],
+        "matchedLessons": 98,
+        "parentAndLessonMatches": 98,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1120,33666,33667,162390",
+          "1120,33666,33667,162391",
+          "1120,33666,33667,162392",
+          "1120,33666,33667,162393",
+          "1120,33666,33667,162394"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر الرياضيات /كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K09-SM1-MATH-part1.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف  الثالث المتوسط-مقررات العام الدراسي-الرياضيات"
+        },
+        {
+          "title": "مقرر الرياضيات /كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K09-SM1-MATH-part2.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف  الثالث المتوسط-مقررات العام الدراسي-الرياضيات"
+        }
+      ]
+    },
+    {
+      "subjectId": "1121",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 28,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          210
+        ],
+        "matchedLessons": 28,
+        "parentAndLessonMatches": 28,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1121,1127,1128,3153",
+          "1121,1127,1128,3154",
+          "1121,1127,1128,3155",
+          "1121,1127,1129,3156",
+          "1121,1127,1129,3157"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K09-SM1-SCIN.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف  الثالث المتوسط-مقررات العام الدراسي-العلوم"
+        },
+        {
+          "title": "مقرر العلوم / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K09-SM1-SCIN-part2.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف  الثالث المتوسط-مقررات العام الدراسي-العلوم"
+        }
+      ]
+    },
+    {
+      "subjectId": "1141",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "الدراسات الأدبية",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "المسار العام",
+        "مسار إدارة الأعمال",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 37,
+      "evidence": {
+        "subjectName": "الدراسات الأدبية",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "المسار العام",
+          "مسار إدارة الأعمال",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 35
+          },
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 35
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 35
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 35
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 35
+          }
+        ],
+        "haderSubjectIds": [
+          123,
+          305,
+          306,
+          307,
+          308
+        ],
+        "matchedLessons": 35,
+        "parentAndLessonMatches": 0,
+        "coverage": 0.9459,
+        "sampleLessonIds": [
+          "1141,1142,3180",
+          "1141,1142,3181",
+          "1141,1142,3182",
+          "1141,1142,43647",
+          "1141,1142,43648"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1144",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "الدراسات البلاغية والنقدية",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "مسار إدارة الأعمال"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 33,
+      "evidence": {
+        "subjectName": "الدراسات البلاغية والنقدية",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "مسار إدارة الأعمال"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 29
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 29
+          }
+        ],
+        "haderSubjectIds": [
+          144,
+          328
+        ],
+        "matchedLessons": 29,
+        "parentAndLessonMatches": 0,
+        "coverage": 0.8788,
+        "sampleLessonIds": [
+          "1144,1146,41191",
+          "1144,1146,41192",
+          "1144,1146,41194",
+          "1144,1146,41195",
+          "1144,1146,41196"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1147",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "الدراسات اللغوية",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "مسار إدارة الأعمال"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 9,
+      "evidence": {
+        "subjectName": "الدراسات اللغوية",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "مسار إدارة الأعمال"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 9
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 9
+          }
+        ],
+        "haderSubjectIds": [
+          137,
+          326
+        ],
+        "matchedLessons": 9,
+        "parentAndLessonMatches": 9,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1147,48483,3195",
+          "1147,48483,43631",
+          "1147,48483,43632",
+          "1147,48483,43633",
+          "1147,48484,3199"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1150",
+      "originalSubjectName": "الاجتماعيات",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 32,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1158",
+      "originalSubjectName": "الاجتماعيات",
+      "subjectName": "مبادئ الاقتصاد",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "مسار إدارة الأعمال"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "مبادئ الاقتصاد",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "مسار إدارة الأعمال"
+        ],
+        "trackEvidence": [
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 24
+          }
+        ],
+        "haderSubjectIds": [
+          151
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1158,34448,3211",
+          "1158,34448,3212",
+          "1158,34448,3213",
+          "1158,34449,3214",
+          "1158,34449,3215"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1205",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات 1",
+      "gradeName": "السنة الأولى المشتركة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "السنة الأولى المشتركة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 73,
+      "evidence": {
+        "subjectName": "الرياضيات 1",
+        "gradeName": "السنة الأولى المشتركة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "السنة الأولى المشتركة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "السنة الأولى المشتركة",
+            "matchedLessons": 73
+          }
+        ],
+        "haderSubjectIds": [
+          333
+        ],
+        "matchedLessons": 73,
+        "parentAndLessonMatches": 73,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1205,27586,44039",
+          "1205,27586,3348",
+          "1205,27586,3349",
+          "1205,27586,3350",
+          "1205,27586,3351"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1210",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات 1",
+      "gradeName": "السنة الأولى المشتركة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "السنة الأولى المشتركة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 73,
+      "evidence": {
+        "subjectName": "الرياضيات 1",
+        "gradeName": "السنة الأولى المشتركة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "السنة الأولى المشتركة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "السنة الأولى المشتركة",
+            "matchedLessons": 73
+          }
+        ],
+        "haderSubjectIds": [
+          333
+        ],
+        "matchedLessons": 73,
+        "parentAndLessonMatches": 73,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1210,27586,44039",
+          "1210,27586,3348",
+          "1210,27586,3349",
+          "1210,27586,3350",
+          "1210,27586,3351"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1215",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 74,
+      "evidence": {
+        "subjectName": "الرياضيات 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 74
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 74
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 74
+          }
+        ],
+        "haderSubjectIds": [
+          92,
+          226,
+          227
+        ],
+        "matchedLessons": 74,
+        "parentAndLessonMatches": 74,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1215,33503,44013",
+          "1215,33503,3366",
+          "1215,33503,3367",
+          "1215,33503,80232",
+          "1215,33503,3368"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1220",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 74,
+      "evidence": {
+        "subjectName": "الرياضيات 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 74
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 74
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 74
+          }
+        ],
+        "haderSubjectIds": [
+          92,
+          226,
+          227
+        ],
+        "matchedLessons": 74,
+        "parentAndLessonMatches": 74,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1220,33503,44013",
+          "1220,33503,3366",
+          "1220,33503,3367",
+          "1220,33503,80232",
+          "1220,33503,3368"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1266",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية 1",
+      "gradeName": "السنة الأولى المشتركة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "السنة الأولى المشتركة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 84,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية 1",
+        "gradeName": "السنة الأولى المشتركة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "السنة الأولى المشتركة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "السنة الأولى المشتركة",
+            "matchedLessons": 84
+          }
+        ],
+        "haderSubjectIds": [
+          334
+        ],
+        "matchedLessons": 84,
+        "parentAndLessonMatches": 84,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1266,27604,42972",
+          "1266,27604,42978",
+          "1266,27604,42979",
+          "1266,27604,42981",
+          "1266,27604,42982"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1269",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "المسار العام",
+        "مسار إدارة الأعمال",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 84,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "المسار العام",
+          "مسار إدارة الأعمال",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 84
+          },
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 84
+          }
+        ],
+        "haderSubjectIds": [
+          98,
+          241,
+          242,
+          243,
+          244
+        ],
+        "matchedLessons": 84,
+        "parentAndLessonMatches": 84,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1269,34026,40365",
+          "1269,34026,40366",
+          "1269,34026,40367",
+          "1269,34026,40368",
+          "1269,34026,40369"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1273",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية 3",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "المسار العام",
+        "مسار إدارة الأعمال",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 84,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية 3",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "المسار العام",
+          "مسار إدارة الأعمال",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 84
+          },
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 84
+          }
+        ],
+        "haderSubjectIds": [
+          111,
+          285,
+          286,
+          287,
+          288
+        ],
+        "matchedLessons": 84,
+        "parentAndLessonMatches": 84,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1273,41536,41615",
+          "1273,41536,41618",
+          "1273,41536,41620",
+          "1273,41536,41625",
+          "1273,41536,41634"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1283",
+      "originalSubjectName": "المهارات الحياتية",
+      "subjectName": "الدراسات النفسية والاجتماعية",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "المسار العام",
+        "مسار إدارة الأعمال"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 20,
+      "evidence": {
+        "subjectName": "الدراسات النفسية والاجتماعية",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "المسار العام",
+          "مسار إدارة الأعمال"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 13
+          },
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 13
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 13
+          }
+        ],
+        "haderSubjectIds": [
+          112,
+          289,
+          290
+        ],
+        "matchedLessons": 13,
+        "parentAndLessonMatches": 0,
+        "coverage": 0.65,
+        "sampleLessonIds": [
+          "1283,1285,39765",
+          "1283,1285,3468",
+          "1283,1284,3467",
+          "1283,1284,39763",
+          "1283,1284,39764"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1293",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 34,
+      "evidence": null,
+      "candidates": [
+        {
+          "subjectName": "الفقه 2",
+          "gradeName": "السنة الثالثة",
+          "stageName": "الثانوية العامة",
+          "tracks": [],
+          "trackEvidence": [
+            {
+              "track": "المسار الشرعي",
+              "matchedLessons": 14
+            }
+          ],
+          "haderSubjectIds": [
+            142
+          ],
+          "matchedLessons": 14,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.4118,
+          "sampleLessonIds": [
+            "1293,8273,40767",
+            "1293,8273,40769",
+            "1293,8273,40770",
+            "1293,8273,40771",
+            "1293,8273,40772"
+          ]
+        }
+      ],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1297",
+      "originalSubjectName": "المهارات الحياتية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 40,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1301",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "التفسير2",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 44,
+      "evidence": {
+        "subjectName": "التفسير2",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 28
+          }
+        ],
+        "haderSubjectIds": [
+          143
+        ],
+        "matchedLessons": 28,
+        "parentAndLessonMatches": 0,
+        "coverage": 0.6364,
+        "sampleLessonIds": [
+          "1301,1305,3546",
+          "1301,1305,3547",
+          "1301,1305,3549",
+          "1301,1305,3551",
+          "1301,1306,3553"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1312",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "التوحيد 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "التوحيد 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 24
+          }
+        ],
+        "haderSubjectIds": [
+          134
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1312,34053,3590",
+          "1312,34053,3591",
+          "1312,34054,3596",
+          "1312,34054,3597",
+          "1312,34055,3598"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1328",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الأحياء 1",
+      "gradeName": "السنة الأولى المشتركة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "السنة الأولى المشتركة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 20,
+      "evidence": {
+        "subjectName": "الأحياء 1",
+        "gradeName": "السنة الأولى المشتركة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "السنة الأولى المشتركة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "السنة الأولى المشتركة",
+            "matchedLessons": 20
+          }
+        ],
+        "haderSubjectIds": [
+          336
+        ],
+        "matchedLessons": 20,
+        "parentAndLessonMatches": 20,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1328,29693,2212",
+          "1328,29693,2211",
+          "1328,29694,2213",
+          "1328,29694,2214",
+          "1328,29695,2215"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1339",
+      "originalSubjectName": "العلوم",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 20,
+      "evidence": null,
+      "candidates": [
+        {
+          "subjectName": "الفيزياء 1",
+          "gradeName": "السنة الأولى المشتركة",
+          "stageName": "الثانوية العامة",
+          "tracks": [],
+          "trackEvidence": [
+            {
+              "track": "السنة الأولى المشتركة",
+              "matchedLessons": 10
+            }
+          ],
+          "haderSubjectIds": [
+            340
+          ],
+          "matchedLessons": 10,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.5,
+          "sampleLessonIds": [
+            "1339,1340,2217",
+            "1339,1340,2218",
+            "1339,1343,2227",
+            "1339,1343,2228",
+            "1339,1345,27714"
+          ]
+        },
+        {
+          "subjectName": "الفيزياء 2",
+          "gradeName": "السنة الثانية",
+          "stageName": "الثانوية العامة",
+          "tracks": [],
+          "trackEvidence": [
+            {
+              "track": "المسار العام",
+              "matchedLessons": 2
+            },
+            {
+              "track": "مسار علوم الحاسب والهندسة",
+              "matchedLessons": 2
+            },
+            {
+              "track": "مسار الصحة والحياة",
+              "matchedLessons": 2
+            }
+          ],
+          "haderSubjectIds": [
+            87,
+            224,
+            225
+          ],
+          "matchedLessons": 2,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.1,
+          "sampleLessonIds": [
+            "1339,1346,27717",
+            "1339,1346,27718"
+          ]
+        }
+      ],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1375",
+      "originalSubjectName": "الحاسب والتقنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 43,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1408",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الكيمياء 1",
+      "gradeName": "السنة الأولى المشتركة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "السنة الأولى المشتركة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 20,
+      "evidence": {
+        "subjectName": "الكيمياء 1",
+        "gradeName": "السنة الأولى المشتركة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "السنة الأولى المشتركة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "السنة الأولى المشتركة",
+            "matchedLessons": 18
+          }
+        ],
+        "haderSubjectIds": [
+          335
+        ],
+        "matchedLessons": 18,
+        "parentAndLessonMatches": 0,
+        "coverage": 0.9,
+        "sampleLessonIds": [
+          "1408,1409,2844",
+          "1408,1409,2845",
+          "1408,1409,2846",
+          "1408,1409,2847",
+          "1408,1412,27660"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1420",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 15,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1422",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الأحياء 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 47,
+      "evidence": {
+        "subjectName": "الأحياء 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 47
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 47
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 47
+          }
+        ],
+        "haderSubjectIds": [
+          102,
+          257,
+          258
+        ],
+        "matchedLessons": 47,
+        "parentAndLessonMatches": 47,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1422,33552,162034",
+          "1422,33552,162035",
+          "1422,33553,3628",
+          "1422,33553,3629",
+          "1422,33554,3630"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1423",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الكيمياء 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 52,
+      "evidence": {
+        "subjectName": "الكيمياء 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 52
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 52
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 52
+          }
+        ],
+        "haderSubjectIds": [
+          94,
+          232,
+          233
+        ],
+        "matchedLessons": 52,
+        "parentAndLessonMatches": 52,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1423,33520,27666",
+          "1423,33520,27667",
+          "1423,33520,38020",
+          "1423,33520,38021",
+          "1423,33520,38022"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1424",
+      "originalSubjectName": "العلوم",
+      "subjectName": "علوم الأرض والفضاء",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 36,
+      "evidence": {
+        "subjectName": "علوم الأرض والفضاء",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 36
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 36
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 36
+          }
+        ],
+        "haderSubjectIds": [
+          116,
+          297,
+          298
+        ],
+        "matchedLessons": 36,
+        "parentAndLessonMatches": 36,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1424,43244,166690",
+          "1424,43244,166691",
+          "1424,43245,166692",
+          "1424,43245,166693",
+          "1424,43246,166694"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1425",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الفيزياء 3",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 41,
+      "evidence": {
+        "subjectName": "الفيزياء 3",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 41
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 41
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 41
+          }
+        ],
+        "haderSubjectIds": [
+          109,
+          279,
+          280
+        ],
+        "matchedLessons": 41,
+        "parentAndLessonMatches": 41,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "1425,39670,39832",
+          "1425,39670,39833",
+          "1425,39671,68209",
+          "1425,39671,68299",
+          "1425,39672,68300"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1481",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 19,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1489",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 41,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1503",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 44,
+      "evidence": null,
+      "candidates": [
+        {
+          "subjectName": "الفقه1",
+          "gradeName": "السنة الثالثة",
+          "stageName": "الثانوية العامة",
+          "tracks": [],
+          "trackEvidence": [
+            {
+              "track": "المسار العام",
+              "matchedLessons": 17
+            },
+            {
+              "track": "المسار الشرعي",
+              "matchedLessons": 17
+            },
+            {
+              "track": "مسار إدارة الأعمال",
+              "matchedLessons": 17
+            },
+            {
+              "track": "مسار علوم الحاسب والهندسة",
+              "matchedLessons": 17
+            },
+            {
+              "track": "مسار الصحة والحياة",
+              "matchedLessons": 17
+            }
+          ],
+          "haderSubjectIds": [
+            115,
+            293,
+            294,
+            295,
+            296
+          ],
+          "matchedLessons": 17,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.3864,
+          "sampleLessonIds": [
+            "1503,8216,40485",
+            "1503,8216,40491",
+            "1503,8216,40504",
+            "1503,8279,40801",
+            "1503,8221,40515"
+          ]
+        },
+        {
+          "subjectName": "الفقه 2",
+          "gradeName": "السنة الثالثة",
+          "stageName": "الثانوية العامة",
+          "tracks": [],
+          "trackEvidence": [
+            {
+              "track": "المسار الشرعي",
+              "matchedLessons": 7
+            }
+          ],
+          "haderSubjectIds": [
+            142
+          ],
+          "matchedLessons": 7,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.1591,
+          "sampleLessonIds": [
+            "1503,8244,40666",
+            "1503,8244,40667",
+            "1503,8243,40663",
+            "1503,8243,40664",
+            "1503,8242,40658"
+          ]
+        }
+      ],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "1521",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 35,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3000",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "القرآن الكريم والدراسات الإسلامية",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 89,
+      "evidence": {
+        "subjectName": "القرآن الكريم والدراسات الإسلامية",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          213
+        ],
+        "matchedLessons": 89,
+        "parentAndLessonMatches": 89,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3000,34340,34345,802",
+          "3000,34340,34346,803",
+          "3000,34340,34346,804",
+          "3000,34340,34346,805",
+          "3000,34340,34346,806"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3001",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "القرآن الكريم والدراسات الإسلامية",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 85,
+      "evidence": {
+        "subjectName": "القرآن الكريم والدراسات الإسلامية",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          215
+        ],
+        "matchedLessons": 85,
+        "parentAndLessonMatches": 85,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3001,34348,34350,912",
+          "3001,34348,34350,913",
+          "3001,34348,34350,914",
+          "3001,34348,34351,915",
+          "3001,34348,34351,916"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3002",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "القرآن الكريم والدراسات الإسلامية",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 90,
+      "evidence": {
+        "subjectName": "القرآن الكريم والدراسات الإسلامية",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          218
+        ],
+        "matchedLessons": 90,
+        "parentAndLessonMatches": 90,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3002,34356,34358,966",
+          "3002,34356,34359,967",
+          "3002,34356,34359,968",
+          "3002,34356,34359,969",
+          "3002,34356,34359,970"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3003",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "القرآن الكريم والدراسات الإسلامية",
+      "gradeName": "الصف الرابع الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 101,
+      "evidence": {
+        "subjectName": "القرآن الكريم والدراسات الإسلامية",
+        "gradeName": "الصف الرابع الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          219
+        ],
+        "matchedLessons": 101,
+        "parentAndLessonMatches": 101,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3003,34364,34367,1095",
+          "3003,34364,34367,1096",
+          "3003,34364,34367,1097",
+          "3003,34364,34367,1098",
+          "3003,34364,30923,1100"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3004",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "القرآن الكريم والدراسات الإسلامية",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 205,
+      "evidence": {
+        "subjectName": "القرآن الكريم والدراسات الإسلامية",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          221
+        ],
+        "matchedLessons": 205,
+        "parentAndLessonMatches": 205,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3004,34373,34376,1357",
+          "3004,34373,34376,1356",
+          "3004,34373,34376,1358",
+          "3004,34373,34376,1361",
+          "3004,34373,34377,1367"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3005",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "القرآن الكريم والدراسات الإسلامية",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 185,
+      "evidence": {
+        "subjectName": "القرآن الكريم والدراسات الإسلامية",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          223
+        ],
+        "matchedLessons": 185,
+        "parentAndLessonMatches": 185,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3005,34389,34392,1528",
+          "3005,34389,34392,1529",
+          "3005,34389,34392,1530",
+          "3005,34389,34393,27465",
+          "3005,34389,34393,27492"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3006",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "القرآن الكريم والدراسات الإسلامية",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 129,
+      "evidence": {
+        "subjectName": "القرآن الكريم والدراسات الإسلامية",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          207
+        ],
+        "matchedLessons": 129,
+        "parentAndLessonMatches": 129,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3006,69,73,248",
+          "3006,69,73,250",
+          "3006,69,73,2856",
+          "3006,69,74,252",
+          "3006,69,76,254"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3007",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "القرآن الكريم والدراسات الإسلامية",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 119,
+      "evidence": {
+        "subjectName": "القرآن الكريم والدراسات الإسلامية",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          209
+        ],
+        "matchedLessons": 119,
+        "parentAndLessonMatches": 119,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3007,143,144,418",
+          "3007,143,145,2865",
+          "3007,143,145,43112",
+          "3007,143,145,43115",
+          "3007,143,145,43116"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3008",
+      "originalSubjectName": "العلوم",
+      "subjectName": "القرآن الكريم والدراسات الإسلامية",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 119,
+      "evidence": {
+        "subjectName": "القرآن الكريم والدراسات الإسلامية",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          211
+        ],
+        "matchedLessons": 118,
+        "parentAndLessonMatches": 118,
+        "coverage": 0.9916,
+        "sampleLessonIds": [
+          "3008,221,222,599",
+          "3008,221,222,43205",
+          "3008,221,222,43206",
+          "3008,221,223,604",
+          "3008,221,223,43215"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3578",
+      "originalSubjectName": "الاجتماعيات",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3643",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 16,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3734",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 41,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          53
+        ],
+        "matchedLessons": 41,
+        "parentAndLessonMatches": 41,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3734,27426,38626",
+          "3734,27426,38627",
+          "3734,27426,38628",
+          "3734,27426,38629",
+          "3734,27427,38622"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3747",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 41,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          53
+        ],
+        "matchedLessons": 41,
+        "parentAndLessonMatches": 41,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3747,27426,38626",
+          "3747,27426,38627",
+          "3747,27426,38628",
+          "3747,27426,38629",
+          "3747,27427,38622"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3749",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 48,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          65
+        ],
+        "matchedLessons": 48,
+        "parentAndLessonMatches": 48,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3749,41717,38640",
+          "3749,41717,38641",
+          "3749,41717,38642",
+          "3749,41717,38643",
+          "3749,41718,38644"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3750",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 96,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          2
+        ],
+        "matchedLessons": 96,
+        "parentAndLessonMatches": 96,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3750,8116,39956",
+          "3750,8116,39958",
+          "3750,8116,39960",
+          "3750,8116,43263",
+          "3750,8116,39962"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر SUPER GOAL1 / كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K07-SM1-ENGLMH.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الأول المتوسط-مقررات العام الدراسي-اللغة الإنجليزية"
+        }
+      ]
+    },
+    {
+      "subjectId": "3751",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 96,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          18
+        ],
+        "matchedLessons": 96,
+        "parentAndLessonMatches": 96,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3751,8200,40407",
+          "3751,8200,40408",
+          "3751,8200,40410",
+          "3751,8200,40409",
+          "3751,8200,40411"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر super Goal2 /كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K08-SM1-ENGLMH.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف الثاني المتوسط-مقررات العام الدراسي-اللغة الإنجليزية"
+        }
+      ]
+    },
+    {
+      "subjectId": "3752",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 72,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          33
+        ],
+        "matchedLessons": 72,
+        "parentAndLessonMatches": 72,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3752,8226,40543",
+          "3752,8226,40544",
+          "3752,8226,40545",
+          "3752,8226,40546",
+          "3752,8226,40547"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر SUPER GOAL3 /كتاب الطالب",
+          "url": "https://files.tahdiri.com/books/1448-GE-ME-K09-SM1-ENGLMH.pdf",
+          "treePath": "التعليم العام-المرحلة المتوسطة-الصف  الثالث المتوسط-مقررات العام الدراسي-اللغة الإنجليزية"
+        }
+      ]
+    },
+    {
+      "subjectId": "3792",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الفيزياء 3",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 41,
+      "evidence": {
+        "subjectName": "الفيزياء 3",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 41
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 41
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 41
+          }
+        ],
+        "haderSubjectIds": [
+          109,
+          279,
+          280
+        ],
+        "matchedLessons": 41,
+        "parentAndLessonMatches": 41,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3792,39670,39832",
+          "3792,39670,39833",
+          "3792,39671,68209",
+          "3792,39671,68299",
+          "3792,39672,68300"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3801",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الكيمياء 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 52,
+      "evidence": {
+        "subjectName": "الكيمياء 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 52
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 52
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 52
+          }
+        ],
+        "haderSubjectIds": [
+          94,
+          232,
+          233
+        ],
+        "matchedLessons": 52,
+        "parentAndLessonMatches": 52,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3801,33520,27666",
+          "3801,33520,27667",
+          "3801,33520,38020",
+          "3801,33520,38021",
+          "3801,33520,38022"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3822",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات 3",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 57,
+      "evidence": {
+        "subjectName": "الرياضيات 3",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 57
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 57
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 57
+          }
+        ],
+        "haderSubjectIds": [
+          121,
+          299,
+          300
+        ],
+        "matchedLessons": 57,
+        "parentAndLessonMatches": 57,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3822,39464,44061",
+          "3822,39464,25177",
+          "3822,39464,25178",
+          "3822,39464,25179",
+          "3822,39465,44062"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3827",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات 3",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 57,
+      "evidence": {
+        "subjectName": "الرياضيات 3",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 57
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 57
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 57
+          }
+        ],
+        "haderSubjectIds": [
+          121,
+          299,
+          300
+        ],
+        "matchedLessons": 57,
+        "parentAndLessonMatches": 57,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3827,39464,44061",
+          "3827,39464,25177",
+          "3827,39464,25178",
+          "3827,39464,25179",
+          "3827,39465,44062"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3832",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الفيزياء 3",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 41,
+      "evidence": {
+        "subjectName": "الفيزياء 3",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 41
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 41
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 41
+          }
+        ],
+        "haderSubjectIds": [
+          109,
+          279,
+          280
+        ],
+        "matchedLessons": 41,
+        "parentAndLessonMatches": 41,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3832,39670,39832",
+          "3832,39670,39833",
+          "3832,39671,68209",
+          "3832,39671,68299",
+          "3832,39672,68300"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3888",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الكيمياء 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 52,
+      "evidence": {
+        "subjectName": "الكيمياء 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 52
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 52
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 52
+          }
+        ],
+        "haderSubjectIds": [
+          94,
+          232,
+          233
+        ],
+        "matchedLessons": 52,
+        "parentAndLessonMatches": 52,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3888,33520,27666",
+          "3888,33520,27667",
+          "3888,33520,38020",
+          "3888,33520,38021",
+          "3888,33520,38022"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3898",
+      "originalSubjectName": "العلوم",
+      "subjectName": "الأحياء 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار العام",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 47,
+      "evidence": {
+        "subjectName": "الأحياء 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار العام",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 47
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 47
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 47
+          }
+        ],
+        "haderSubjectIds": [
+          102,
+          257,
+          258
+        ],
+        "matchedLessons": 47,
+        "parentAndLessonMatches": 47,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3898,33552,162034",
+          "3898,33552,162035",
+          "3898,33553,3628",
+          "3898,33553,3629",
+          "3898,33554,3630"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3909",
+      "originalSubjectName": "العلوم",
+      "subjectName": "علم البيئة",
+      "gradeName": "السنة الأولى المشتركة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "السنة الأولى المشتركة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 13,
+      "evidence": {
+        "subjectName": "علم البيئة",
+        "gradeName": "السنة الأولى المشتركة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "السنة الأولى المشتركة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "السنة الأولى المشتركة",
+            "matchedLessons": 13
+          }
+        ],
+        "haderSubjectIds": [
+          339
+        ],
+        "matchedLessons": 13,
+        "parentAndLessonMatches": 13,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3909,27887,44236",
+          "3909,27887,44237",
+          "3909,27887,44238",
+          "3909,27888,44241",
+          "3909,27888,44242"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3927",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية 1",
+      "gradeName": "السنة الأولى المشتركة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "السنة الأولى المشتركة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 84,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية 1",
+        "gradeName": "السنة الأولى المشتركة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "السنة الأولى المشتركة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "السنة الأولى المشتركة",
+            "matchedLessons": 84
+          }
+        ],
+        "haderSubjectIds": [
+          334
+        ],
+        "matchedLessons": 84,
+        "parentAndLessonMatches": 84,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3927,27604,42972",
+          "3927,27604,42978",
+          "3927,27604,42979",
+          "3927,27604,42981",
+          "3927,27604,42982"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3938",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية 3",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "المسار العام",
+        "مسار إدارة الأعمال",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 84,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية 3",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "المسار العام",
+          "مسار إدارة الأعمال",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 84
+          },
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 84
+          }
+        ],
+        "haderSubjectIds": [
+          111,
+          285,
+          286,
+          287,
+          288
+        ],
+        "matchedLessons": 84,
+        "parentAndLessonMatches": 84,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3938,41536,41615",
+          "3938,41536,41618",
+          "3938,41536,41620",
+          "3938,41536,41625",
+          "3938,41536,41634"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3942",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية 3",
+      "gradeName": "السنة الثالثة",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "المسار العام",
+        "مسار إدارة الأعمال",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 84,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية 3",
+        "gradeName": "السنة الثالثة",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "المسار العام",
+          "مسار إدارة الأعمال",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 84
+          },
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 84
+          }
+        ],
+        "haderSubjectIds": [
+          111,
+          285,
+          286,
+          287,
+          288
+        ],
+        "matchedLessons": 84,
+        "parentAndLessonMatches": 84,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3942,41536,41615",
+          "3942,41536,41618",
+          "3942,41536,41620",
+          "3942,41536,41625",
+          "3942,41536,41634"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3971",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية 2",
+      "gradeName": "السنة الثانية",
+      "stageName": "الثانوية العامة",
+      "tracks": [
+        "المسار الشرعي",
+        "المسار العام",
+        "مسار إدارة الأعمال",
+        "مسار الصحة والحياة",
+        "مسار علوم الحاسب والهندسة"
+      ],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 84,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية 2",
+        "gradeName": "السنة الثانية",
+        "stageName": "الثانوية العامة",
+        "tracks": [
+          "المسار الشرعي",
+          "المسار العام",
+          "مسار إدارة الأعمال",
+          "مسار الصحة والحياة",
+          "مسار علوم الحاسب والهندسة"
+        ],
+        "trackEvidence": [
+          {
+            "track": "المسار العام",
+            "matchedLessons": 84
+          },
+          {
+            "track": "المسار الشرعي",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار إدارة الأعمال",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار علوم الحاسب والهندسة",
+            "matchedLessons": 84
+          },
+          {
+            "track": "مسار الصحة والحياة",
+            "matchedLessons": 84
+          }
+        ],
+        "haderSubjectIds": [
+          98,
+          241,
+          242,
+          243,
+          244
+        ],
+        "matchedLessons": 84,
+        "parentAndLessonMatches": 84,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3971,34026,40365",
+          "3971,34026,40366",
+          "3971,34026,40367",
+          "3971,34026,40368",
+          "3971,34026,40369"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3972",
+      "originalSubjectName": "الحاسب والتقنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 10,
+      "evidence": null,
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3993",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 97,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          30
+        ],
+        "matchedLessons": 97,
+        "parentAndLessonMatches": 97,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3993,232,618",
+          "3993,232,38671",
+          "3993,232,38685",
+          "3993,232,38686",
+          "3993,232,38687"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "3997",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 98,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          32
+        ],
+        "matchedLessons": 98,
+        "parentAndLessonMatches": 98,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "3997,33666,33667,162390",
+          "3997,33666,33667,162391",
+          "3997,33666,33667,162392",
+          "3997,33666,33667,162393",
+          "3997,33666,33667,162394"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4003",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 28,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          210
+        ],
+        "matchedLessons": 28,
+        "parentAndLessonMatches": 28,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4003,1127,1128,3153",
+          "4003,1127,1128,3154",
+          "4003,1127,1128,3155",
+          "4003,1127,1129,3156",
+          "4003,1127,1129,3157"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4013",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 13,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          29
+        ],
+        "matchedLessons": 13,
+        "parentAndLessonMatches": 13,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4013,236,621",
+          "4013,237,622",
+          "4013,238,623",
+          "4013,4014,25652",
+          "4013,4015,25653"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4020",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 31,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          27
+        ],
+        "matchedLessons": 31,
+        "parentAndLessonMatches": 31,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4020,242,161260",
+          "4020,242,161261",
+          "4020,242,161262",
+          "4020,243,630",
+          "4020,243,631"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4049",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 113,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          75
+        ],
+        "matchedLessons": 113,
+        "parentAndLessonMatches": 113,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4049,460,44001",
+          "4049,460,1215",
+          "4049,460,171533",
+          "4049,460,1216",
+          "4049,460,69358"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4056",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          220
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4056,467,468,1256",
+          "4056,467,468,1257",
+          "4056,467,469,1258",
+          "4056,467,469,1259",
+          "4056,470,471,1260"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4066",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 16,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          80
+        ],
+        "matchedLessons": 16,
+        "parentAndLessonMatches": 16,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4066,486,1294",
+          "4066,486,1296",
+          "4066,487,1297",
+          "4066,488,1298",
+          "4066,490,1302"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4069",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الخامس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 45,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الخامس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          72
+        ],
+        "matchedLessons": 45,
+        "parentAndLessonMatches": 45,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4069,419,1103",
+          "4069,419,1110",
+          "4069,419,1106",
+          "4069,419,1109",
+          "4069,419,1182"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4071",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 20,
+      "evidence": null,
+      "candidates": [
+        {
+          "subjectName": "التربية الفنية",
+          "gradeName": "الصف الخامس الابتدائي",
+          "stageName": "المرحلة الابتدائية",
+          "tracks": [],
+          "trackEvidence": [],
+          "haderSubjectIds": [
+            73
+          ],
+          "matchedLessons": 20,
+          "parentAndLessonMatches": 20,
+          "coverage": 1,
+          "sampleLessonIds": [
+            "4071,477,1270",
+            "4071,477,1268",
+            "4071,477,1269",
+            "4071,478,1271",
+            "4071,478,1272"
+          ]
+        },
+        {
+          "subjectName": "التربية الفنية",
+          "gradeName": "الصف الثالث",
+          "stageName": "التعليم المستمر أو غير محدد",
+          "tracks": [],
+          "trackEvidence": [],
+          "haderSubjectIds": [
+            192
+          ],
+          "matchedLessons": 15,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.75,
+          "sampleLessonIds": [
+            "4071,477,1270",
+            "4071,477,1268",
+            "4071,477,1269",
+            "4071,478,1271",
+            "4071,478,1272"
+          ]
+        }
+      ],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4124",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 73,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          208
+        ],
+        "matchedLessons": 73,
+        "parentAndLessonMatches": 73,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4124,167,168,476",
+          "4124,167,168,477",
+          "4124,167,169,478",
+          "4124,167,169,479",
+          "4124,170,171,480"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4141",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 94,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          82
+        ],
+        "matchedLessons": 94,
+        "parentAndLessonMatches": 94,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4141,529,43991",
+          "4141,529,1400",
+          "4141,529,1401",
+          "4141,529,1402",
+          "4141,529,1403"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4147",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          222
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4147,535,536,1435",
+          "4147,535,536,1436",
+          "4147,535,537,1437",
+          "4147,535,537,1438",
+          "4147,538,539,1439"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4157",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 16,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          88
+        ],
+        "matchedLessons": 16,
+        "parentAndLessonMatches": 16,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4157,556,1470",
+          "4157,556,131322",
+          "4157,556,151713",
+          "4157,557,1471",
+          "4157,558,1472"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4170",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 44,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          83
+        ],
+        "matchedLessons": 44,
+        "parentAndLessonMatches": 44,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4170,510,1370",
+          "4170,510,39905",
+          "4170,510,39673",
+          "4170,510,151753",
+          "4170,510,39917"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4172",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف السادس الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 16,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف السادس الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          90
+        ],
+        "matchedLessons": 16,
+        "parentAndLessonMatches": 16,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4172,545,69677",
+          "4172,545,1449",
+          "4172,545,1447",
+          "4172,546,1450",
+          "4172,546,1451"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4219",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 88,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          3
+        ],
+        "matchedLessons": 88,
+        "parentAndLessonMatches": 88,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4219,87,273",
+          "4219,87,38499",
+          "4219,87,38500",
+          "4219,87,38501",
+          "4219,87,38502"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4223",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 85,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          1
+        ],
+        "matchedLessons": 85,
+        "parentAndLessonMatches": 85,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4223,91,44052",
+          "4223,91,276",
+          "4223,91,277",
+          "4223,91,278",
+          "4223,91,279"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4228",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 28,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          206
+        ],
+        "matchedLessons": 28,
+        "parentAndLessonMatches": 28,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4228,96,97,307",
+          "4228,96,97,308",
+          "4228,96,97,309",
+          "4228,96,98,310",
+          "4228,96,98,311"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4239",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 17,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          7
+        ],
+        "matchedLessons": 17,
+        "parentAndLessonMatches": 17,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4239,106,321",
+          "4239,106,322",
+          "4239,106,323",
+          "4239,107,324",
+          "4239,107,325"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4244",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 30,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          8
+        ],
+        "matchedLessons": 30,
+        "parentAndLessonMatches": 30,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4244,111,332",
+          "4244,111,333",
+          "4244,111,155852",
+          "4244,111,24854",
+          "4244,112,155853"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4284",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 97,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          15
+        ],
+        "matchedLessons": 97,
+        "parentAndLessonMatches": 97,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4284,157,438",
+          "4284,157,38545",
+          "4284,157,38546",
+          "4284,157,38547",
+          "4284,157,38548"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4295",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 20,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          17
+        ],
+        "matchedLessons": 20,
+        "parentAndLessonMatches": 20,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4295,177,489",
+          "4295,177,490",
+          "4295,177,491",
+          "4295,178,492",
+          "4295,178,493"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4301",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 32,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          20
+        ],
+        "matchedLessons": 32,
+        "parentAndLessonMatches": 32,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4301,183,501",
+          "4301,183,502",
+          "4301,183,503",
+          "4301,183,504",
+          "4301,183,24747"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4391",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 113,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          16
+        ],
+        "matchedLessons": 113,
+        "parentAndLessonMatches": 113,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4391,33657,33658,162346",
+          "4391,33657,33658,162347",
+          "4391,33657,33658,162348",
+          "4391,33657,33658,162349",
+          "4391,33657,33658,162350"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4393",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 117,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          57
+        ],
+        "matchedLessons": 117,
+        "parentAndLessonMatches": 117,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4393,315,44032",
+          "4393,315,825",
+          "4393,315,826",
+          "4393,315,827",
+          "4393,315,828"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4394",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          214
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4394,324,325,874",
+          "4394,324,325,875",
+          "4394,324,326,876",
+          "4394,324,326,877",
+          "4394,327,328,878"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4395",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 21,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          55
+        ],
+        "matchedLessons": 21,
+        "parentAndLessonMatches": 21,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4395,334,68872",
+          "4395,334,886",
+          "4395,334,887",
+          "4395,335,888",
+          "4395,335,889"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4396",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 13,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          56
+        ],
+        "matchedLessons": 13,
+        "parentAndLessonMatches": 13,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4396,339,896",
+          "4396,339,897",
+          "4396,339,159965",
+          "4396,340,910",
+          "4396,340,908"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4399",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 99,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          61
+        ],
+        "matchedLessons": 99,
+        "parentAndLessonMatches": 99,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4399,424,44027",
+          "4399,424,1129",
+          "4399,424,1130",
+          "4399,424,69289",
+          "4399,424,1131"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4400",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 25,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          216
+        ],
+        "matchedLessons": 25,
+        "parentAndLessonMatches": 25,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4400,430,431,1164",
+          "4400,430,431,1165",
+          "4400,430,432,1166",
+          "4400,430,432,1167",
+          "4400,433,434,1168"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4401",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 18,
+      "evidence": null,
+      "candidates": [
+        {
+          "subjectName": "التربية الفنية",
+          "gradeName": "الصف الثالث الابتدائي",
+          "stageName": "المرحلة الابتدائية",
+          "tracks": [],
+          "trackEvidence": [],
+          "haderSubjectIds": [
+            59
+          ],
+          "matchedLessons": 18,
+          "parentAndLessonMatches": 18,
+          "coverage": 1,
+          "sampleLessonIds": [
+            "4401,360,943",
+            "4401,360,944",
+            "4401,361,945",
+            "4401,361,946",
+            "4401,362,947"
+          ]
+        },
+        {
+          "subjectName": "التربية الفنية",
+          "gradeName": "الصف الأول",
+          "stageName": "التعليم المستمر أو غير محدد",
+          "tracks": [],
+          "trackEvidence": [],
+          "haderSubjectIds": [
+            171
+          ],
+          "matchedLessons": 18,
+          "parentAndLessonMatches": 0,
+          "coverage": 1,
+          "sampleLessonIds": [
+            "4401,360,943",
+            "4401,360,944",
+            "4401,361,945",
+            "4401,361,946",
+            "4401,362,947"
+          ]
+        }
+      ],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4402",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 14,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          60
+        ],
+        "matchedLessons": 14,
+        "parentAndLessonMatches": 14,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4402,365,951",
+          "4402,365,952",
+          "4402,365,1469",
+          "4402,365,159958",
+          "4402,366,907"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4441",
+      "originalSubjectName": "الدراسات الإسلامية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الثاني الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الثاني الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          52
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4441,310,69058",
+          "4441,310,69059",
+          "4441,310,69060",
+          "4441,311,69137",
+          "4441,311,69134"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4442",
+      "originalSubjectName": "العلوم",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الثالث الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 24,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الثالث الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          58
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4442,355,69062",
+          "4442,355,69065",
+          "4442,355,69063",
+          "4442,356,69158",
+          "4442,356,69155"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4446",
+      "originalSubjectName": "الحاسب والتقنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 34,
+      "evidence": null,
+      "candidates": [
+        {
+          "subjectName": "البحث ومصادر المعلومات",
+          "gradeName": "السنة الثالثة",
+          "stageName": "الثانوية العامة",
+          "tracks": [],
+          "trackEvidence": [
+            {
+              "track": "المسار العام",
+              "matchedLessons": 9
+            },
+            {
+              "track": "المسار الشرعي",
+              "matchedLessons": 9
+            },
+            {
+              "track": "مسار إدارة الأعمال",
+              "matchedLessons": 9
+            },
+            {
+              "track": "مسار علوم الحاسب والهندسة",
+              "matchedLessons": 9
+            },
+            {
+              "track": "مسار الصحة والحياة",
+              "matchedLessons": 9
+            }
+          ],
+          "haderSubjectIds": [
+            108,
+            275,
+            276,
+            277,
+            278
+          ],
+          "matchedLessons": 9,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.2647,
+          "sampleLessonIds": [
+            "4446,4452,2422",
+            "4446,4452,2425",
+            "4446,4452,2426",
+            "4446,4452,90454",
+            "4446,4452,90459"
+          ]
+        }
+      ],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4624",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "المهارات الحياتية والأسرية",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 14,
+      "evidence": {
+        "subjectName": "المهارات الحياتية والأسرية",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          46
+        ],
+        "matchedLessons": 14,
+        "parentAndLessonMatches": 14,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4624,302,792",
+          "4624,302,791",
+          "4624,302,159961",
+          "4624,303,797",
+          "4624,303,159963"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4635",
+      "originalSubjectName": "التربية الصحية والبدنية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 50,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          36
+        ],
+        "matchedLessons": 50,
+        "parentAndLessonMatches": 50,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4635,274,69049",
+          "4635,274,69050",
+          "4635,274,69051",
+          "4635,274,69052",
+          "4635,274,69053"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4637",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": "التربية الفنية",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 23,
+      "evidence": {
+        "subjectName": "التربية الفنية",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          45
+        ],
+        "matchedLessons": 23,
+        "parentAndLessonMatches": 23,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4637,298,779",
+          "4637,298,780",
+          "4637,298,776",
+          "4637,298,775",
+          "4637,299,777"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4641",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الرابع الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 57,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الرابع الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          64
+        ],
+        "matchedLessons": 57,
+        "parentAndLessonMatches": 57,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4641,4965,27889",
+          "4641,4965,39683",
+          "4641,4965,151740",
+          "4641,4965,39652",
+          "4641,4965,39643"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4643",
+      "originalSubjectName": "التربية الفنية",
+      "subjectName": null,
+      "gradeName": null,
+      "stageName": null,
+      "tracks": [],
+      "status": "needs-review",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 19,
+      "evidence": null,
+      "candidates": [
+        {
+          "subjectName": "التربية الفنية",
+          "gradeName": "الصف الرابع الابتدائي",
+          "stageName": "المرحلة الابتدائية",
+          "tracks": [],
+          "trackEvidence": [],
+          "haderSubjectIds": [
+            62
+          ],
+          "matchedLessons": 19,
+          "parentAndLessonMatches": 19,
+          "coverage": 1,
+          "sampleLessonIds": [
+            "4643,399,1053",
+            "4643,399,1052",
+            "4643,399,1051",
+            "4643,400,1054",
+            "4643,400,1055"
+          ]
+        },
+        {
+          "subjectName": "التربية الفنية",
+          "gradeName": "الصف الثاني",
+          "stageName": "التعليم المستمر أو غير محدد",
+          "tracks": [],
+          "trackEvidence": [],
+          "haderSubjectIds": [
+            182
+          ],
+          "matchedLessons": 16,
+          "parentAndLessonMatches": 0,
+          "coverage": 0.8421,
+          "sampleLessonIds": [
+            "4643,399,1053",
+            "4643,399,1052",
+            "4643,399,1051",
+            "4643,400,1054",
+            "4643,400,1055"
+          ]
+        }
+      ],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4688",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 97,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          38
+        ],
+        "matchedLessons": 97,
+        "parentAndLessonMatches": 97,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4688,278,44021",
+          "4688,278,712",
+          "4688,278,713",
+          "4688,278,714",
+          "4688,278,715"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4690",
+      "originalSubjectName": "الرياضيات",
+      "subjectName": "الرياضيات",
+      "gradeName": "الصف الرابع الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 111,
+      "evidence": {
+        "subjectName": "الرياضيات",
+        "gradeName": "الصف الرابع الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          67
+        ],
+        "matchedLessons": 111,
+        "parentAndLessonMatches": 111,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4690,384,43996",
+          "4690,384,1005",
+          "4690,384,69300",
+          "4690,384,1006",
+          "4690,384,1007"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4692",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الرابع الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 35,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الرابع الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          217
+        ],
+        "matchedLessons": 24,
+        "parentAndLessonMatches": 24,
+        "coverage": 0.6857,
+        "sampleLessonIds": [
+          "4692,391,392,1041",
+          "4692,391,392,1042",
+          "4692,391,393,1043",
+          "4692,391,393,1044",
+          "4692,391,393,1045"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4695",
+      "originalSubjectName": "العلوم",
+      "subjectName": "العلوم",
+      "gradeName": "الصف الأول الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 22,
+      "evidence": {
+        "subjectName": "العلوم",
+        "gradeName": "الصف الأول الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          212
+        ],
+        "matchedLessons": 22,
+        "parentAndLessonMatches": 22,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4695,285,286,753",
+          "4695,285,286,754",
+          "4695,285,287,755",
+          "4695,285,287,756",
+          "4695,288,289,757"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4959",
+      "originalSubjectName": "اللغة العربية",
+      "subjectName": "اللغة العربية",
+      "gradeName": "الصف الرابع الابتدائي",
+      "stageName": "المرحلة الابتدائية",
+      "tracks": [],
+      "status": "matched-local-course-and-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 57,
+      "evidence": {
+        "subjectName": "اللغة العربية",
+        "gradeName": "الصف الرابع الابتدائي",
+        "stageName": "المرحلة الابتدائية",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          64
+        ],
+        "matchedLessons": 57,
+        "parentAndLessonMatches": 57,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4959,4965,27889",
+          "4959,4965,39683",
+          "4959,4965,151740",
+          "4959,4965,39652",
+          "4959,4965,39643"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": [
+        {
+          "title": "مقرر لغتي الجميلة / كتاب الطالب الجزء الأول",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K04-SM1-BLNG.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الرابع الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        },
+        {
+          "title": "مقرر لغتي الجميلة / كتاب الطالب الجزء الثاني",
+          "url": "https://files.tahdiri.com/books/1448-GE-PE-K04-SM1-BLNG.part.pdf",
+          "treePath": "التعليم العام-المرحلة الابتدائية-الصف الرابع الابتدائي-مقررات العام الدراسي-اللغة العربية"
+        }
+      ]
+    },
+    {
+      "subjectId": "4992",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية",
+      "gradeName": "الصف الثالث المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 72,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية",
+        "gradeName": "الصف الثالث المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          33
+        ],
+        "matchedLessons": 72,
+        "parentAndLessonMatches": 72,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4992,8226,40543",
+          "4992,8226,40544",
+          "4992,8226,40545",
+          "4992,8226,40546",
+          "4992,8226,40547"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4996",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية",
+      "gradeName": "الصف الثاني المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 96,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية",
+        "gradeName": "الصف الثاني المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          18
+        ],
+        "matchedLessons": 96,
+        "parentAndLessonMatches": 96,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4996,8200,40407",
+          "4996,8200,40408",
+          "4996,8200,40410",
+          "4996,8200,40409",
+          "4996,8200,40411"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    },
+    {
+      "subjectId": "4998",
+      "originalSubjectName": "اللغة الإنجليزية",
+      "subjectName": "اللغة الإنجليزية",
+      "gradeName": "الصف الأول المتوسط",
+      "stageName": "المرحلة المتوسطة",
+      "tracks": [],
+      "status": "matched-local-lesson-ids",
+      "officialMadrasatiMappingVerified": false,
+      "totalLessons": 96,
+      "evidence": {
+        "subjectName": "اللغة الإنجليزية",
+        "gradeName": "الصف الأول المتوسط",
+        "stageName": "المرحلة المتوسطة",
+        "tracks": [],
+        "trackEvidence": [],
+        "haderSubjectIds": [
+          2
+        ],
+        "matchedLessons": 96,
+        "parentAndLessonMatches": 96,
+        "coverage": 1,
+        "sampleLessonIds": [
+          "4998,8116,39956",
+          "4998,8116,39958",
+          "4998,8116,39960",
+          "4998,8116,43263",
+          "4998,8116,39962"
+        ]
+      },
+      "candidates": [],
+      "bookReferences": []
+    }
+  ]
+}
