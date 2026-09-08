@@ -7,9 +7,9 @@ import {
   Query,
   SetMetadata,
 } from '@nestjs/common';
-import { ApiQuery, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { CatalogService } from './catalog.service';
-import { PaginationDto } from '../pagination/dto/pagination.dto';
+import { CatalogQueryDto } from './dto/catalog-query.dto';
 import { MongoIdPipe } from '../common/pipes/mongo-id.pipe';
 import { PlatformOnly } from '../tenancy/decorators/platform-only.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -22,14 +22,8 @@ export class CatalogController {
   constructor(private readonly service: CatalogService) {}
   @SetMetadata(CATALOG_READ_KEY, true)
   @Get('subjects')
-  @ApiQuery({
-    name: 'q',
-    required: false,
-    description: 'Search the subject name or the course variant',
-    example: 'رياضيات',
-  })
-  list(@Query() query: PaginationDto, @Query('q') q?: string) {
-    return this.service.listSubjects(query, q);
+  list(@Query() query: CatalogQueryDto) {
+    return this.service.listSubjects(query, query.q);
   }
   @SetMetadata(CATALOG_READ_KEY, true)
   @Get('subjects/:id/units')

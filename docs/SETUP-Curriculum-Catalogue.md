@@ -59,11 +59,20 @@ Dry run first — it prints the counts and writes nothing:
 npm run seed:catalog -- --source catalog-source.json
 ```
 
-Then, with a **SUPER_ADMIN** token:
+Get a SUPER_ADMIN token — note the field is `identifier`, not `email`:
+
+```bash
+TOKEN=$(curl -s -X POST "$API/platform/auth/login" \
+  -H 'Content-Type: application/json' \
+  -d '{"identifier":"<super admin email>","password":"<password>"}' \
+  | node -pe 'JSON.parse(require("fs").readFileSync(0)).data.accessToken')
+```
+
+Then:
 
 ```bash
 CATALOG_API_URL=https://api.nasaq.185.170.196.120.sslip.io \
-CATALOG_ADMIN_TOKEN=<super admin JWT> \
+CATALOG_ADMIN_TOKEN=$TOKEN \
 npm run seed:catalog -- --source catalog-source.json --apply
 ```
 
