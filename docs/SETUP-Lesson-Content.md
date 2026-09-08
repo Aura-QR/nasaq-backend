@@ -18,11 +18,23 @@ POST /preparation/:id/generate
         ├─ the lesson, its unit, the subject, the grade,
         │  and the objectives the school wrote on that lesson
         ▼
-   n8n webhook  ──▶  Claude  ──▶  eight fields back
+   n8n webhook  ──▶  Claude  ──▶  the content, and a homework
         │
-        ▼
-   fills ONLY the fields that are still empty
+        ├─ fills ONLY the fields that are still empty
+        ├─ attaches a library item, if one fits this subject and grade
+        └─ files the homework, if the teacher has added no assignment
 ```
+
+Those last two are not decoration. Nasaq refuses to submit a preparation
+without a lesson, a digital content item, an assignment and an objective —
+the *لا يمكن الإرسال* wall with three bullets. Writing the prose and leaving
+those empty produces a draft that still cannot be sent, which is the wall this
+exists to remove.
+
+The library item is chosen from what actually fits: an item on this subject
+and grade, or a school-wide one. When the library holds neither, nothing is
+attached — a wrong video attached silently is worse than a bullet asking the
+teacher to choose one.
 
 A teacher who picks a lesson already gets its name and the school's objectives.
 Everything else is a blank page — and a blank page is why teachers upload a PDF

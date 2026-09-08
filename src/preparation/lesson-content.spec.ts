@@ -14,6 +14,11 @@ import {
   SubjectOffering,
   SubjectOfferingSchema,
 } from '../subject-offerings/schemas/subject-offering.schema';
+import {
+  PreparationResource,
+  PreparationResourceSchema,
+} from './schemas/preparation-resource.schema';
+import { Library, LibrarySchema } from '../library/schemas/library.schema';
 import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
 import {
   GradeLevel,
@@ -50,6 +55,8 @@ describe('LessonContentService', () => {
   let lessons: Model<CurriculumLesson>;
   let units: Model<CurriculumUnit>;
   let offerings: Model<SubjectOffering>;
+  let resources: Model<PreparationResource>;
+  let library: Model<Library>;
   let service: LessonContentService;
   let fetchMock: jest.Mock;
   const originalFetch = global.fetch;
@@ -67,11 +74,19 @@ describe('LessonContentService', () => {
     objectives: ['هدف ١', 'هدف ٢'],
     teachingStrategies: ['التعلم التعاوني'],
     teachingAids: ['السبورة الذكية'],
+    homework: { title: 'احسب متوسط درجاتك', description: 'اجمع خمس درجات واقسمها.' },
   };
 
   const ok = (body: any = generated) =>
     ({ ok: true, status: 200, json: async () => body, text: async () => '' }) as any;
 
+  /*
+   * Every query must be EXECUTED inside the callback, not merely built there.
+   * A mongoose query is lazy: `asTenant(() => Model.countDocuments(f))` hands
+   * back an unexecuted Query, the await happens outside the AsyncLocalStorage
+   * scope, and the tenant hook then scopes it to `schoolId: null` — a silent
+   * zero. Always finish with `.exec()` (or await) inside.
+   */
   const asTenant = <T>(fn: () => Promise<T>) =>
     tenantLocalStorage.run({ schoolId: String(schoolId), isAdminContext: false }, fn);
 
@@ -103,6 +118,8 @@ describe('LessonContentService', () => {
     lessons = model<CurriculumLesson>(CurriculumLesson.name, CurriculumLessonSchema);
     units = model<CurriculumUnit>(CurriculumUnit.name, CurriculumUnitSchema);
     offerings = model<SubjectOffering>(SubjectOffering.name, SubjectOfferingSchema);
+    resources = model<PreparationResource>(PreparationResource.name, PreparationResourceSchema);
+    library = model<Library>(Library.name, LibrarySchema);
     model(Subject.name, SubjectSchema);
     model(GradeLevel.name, GradeLevelSchema);
   });
@@ -154,9 +171,18 @@ describe('LessonContentService', () => {
     );
     lessonId = lesson._id as Types.ObjectId;
 
+    // Inside the tenant: both models are tenant-scoped, so a delete with no
+    // context is scoped to schoolId: null and leaves last test's rows behind.
+    await asTenant(async () => {
+      await resources.deleteMany({});
+      await library.deleteMany({});
+    });
+
     fetchMock = jest.fn().mockResolvedValue(ok());
     global.fetch = fetchMock as any;
-    service = new LessonContentService(preparations, lessons, units, offerings);
+    service = new LessonContentService(
+      preparations, lessons, units, offerings, resources, library,
+    );
   });
 
   // Inside the tenant: Preparation is tenant-scoped, so a read with no
@@ -207,6 +233,116 @@ describe('LessonContentService', () => {
       const prep = await makePreparation();
       await asTenant(() => service.generate(String(prep._id), TEACHER));
       expect((await reload(prep._id)).warmUp).toBe('تمهيد مولّد');
+    });
+  });
+
+  describe('the other three things a submit needs', () => {
+    /*
+     * Filling the prose alone leaves a draft that still cannot be sent —
+     * 'لا يمكن الإرسال' with three bullets — which is the wall this exists
+     * to remove.
+     */
+    const addLibraryItem = (over: Record<string, any> = {}) =>
+      asTenant(() =>
+        library.create({
+          schoolId,
+          title: 'شرح المتوسط الحسابي',
+          link: 'https://example.test/lesson',
+          kind: 'link',
+          subjectOfferingId: offeringId,
+          ...over,
+        }),
+      );
+
+    it('attaches a library item that belongs to this subject and grade', async () => {
+      await addLibraryItem();
+      const prep = await makePreparation();
+      const result: any = await asTenant(() => service.generate(String(prep._id), TEACHER));
+
+      expect(result.data.attachedContent).toBe(1);
+      expect((await reload(prep._id)).digitalContentIds).toHaveLength(1);
+    });
+
+    it('accepts a school-wide item, which belongs to every lecture', async () => {
+      await addLibraryItem({ subjectOfferingId: null });
+      const prep = await makePreparation();
+      expect(
+        (await asTenant(() => service.generate(String(prep._id), TEACHER))) as any,
+      ).toMatchObject({ data: { attachedContent: 1 } });
+    });
+
+    it('attaches nothing when the library has nothing that fits', async () => {
+      // A video from another subject would be refused on submit anyway, and a
+      // wrong one attached silently is worse than a bullet asking her to pick.
+      await addLibraryItem({ subjectOfferingId: new Types.ObjectId() });
+      const prep = await makePreparation();
+      const result: any = await asTenant(() => service.generate(String(prep._id), TEACHER));
+
+      expect(result.data.attachedContent).toBe(0);
+      expect((await reload(prep._id)).digitalContentIds ?? []).toHaveLength(0);
+    });
+
+    it('leaves the content the teacher chose alone', async () => {
+      const item = await addLibraryItem();
+      const other = await addLibraryItem({ title: 'آخر' });
+      const prep = await makePreparation({ digitalContentIds: [other._id] });
+
+      await asTenant(() => service.generate(String(prep._id), TEACHER));
+      const saved = await reload(prep._id);
+      expect(saved.digitalContentIds.map(String)).toEqual([String(other._id)]);
+      expect(saved.digitalContentIds.map(String)).not.toContain(String(item._id));
+    });
+
+    it('files the homework the workflow wrote, by its own title', async () => {
+      const prep = await makePreparation();
+      const result: any = await asTenant(() => service.generate(String(prep._id), TEACHER));
+
+      expect(result.data.homeworkAdded).toBe(true);
+      const rows = await asTenant(async () =>
+        resources.find({ preparationId: prep._id }).lean().exec(),
+      );
+      expect(rows).toHaveLength(1);
+      // Not the literal word "واجب": a teacher reviewing twenty-two of those
+      // learns to ignore them.
+      expect(rows[0]).toMatchObject({ type: 'homework', title: 'احسب متوسط درجاتك' });
+    });
+
+    it('adds no homework when the teacher already filed an assignment', async () => {
+      const prep = await makePreparation();
+      await asTenant(() =>
+        resources.create({
+          preparationId: prep._id, type: 'activity', title: 'نشاطي أنا',
+        } as any),
+      );
+
+      const result: any = await asTenant(() => service.generate(String(prep._id), TEACHER));
+      expect(result.data.homeworkAdded).toBe(false);
+      expect(
+        await asTenant(async () =>
+          resources.countDocuments({ preparationId: prep._id }).exec(),
+        ),
+      ).toBe(1);
+    });
+
+    it('adds no homework when the workflow returned none', async () => {
+      fetchMock.mockResolvedValue(ok({ ...generated, homework: null }));
+      const prep = await makePreparation();
+      const result: any = await asTenant(() => service.generate(String(prep._id), TEACHER));
+      expect(result.data.homeworkAdded).toBe(false);
+    });
+
+    it('a second run adds neither again', async () => {
+      await addLibraryItem();
+      const prep = await makePreparation();
+      await asTenant(() => service.generate(String(prep._id), TEACHER));
+
+      const second: any = await asTenant(() => service.generate(String(prep._id), TEACHER));
+      expect(second.data).toMatchObject({ filled: [], attachedContent: 0, homeworkAdded: false });
+      expect(
+        await asTenant(async () =>
+          resources.countDocuments({ preparationId: prep._id }).exec(),
+        ),
+      ).toBe(1);
     });
   });
 
@@ -283,7 +419,9 @@ describe('LessonContentService', () => {
 
     it('says so when the service is not configured, instead of failing obscurely', async () => {
       delete process.env.AI_WEBHOOK_URL;
-      service = new LessonContentService(preparations, lessons, units, offerings);
+      service = new LessonContentService(
+        preparations, lessons, units, offerings, resources, library,
+      );
       const prep = await makePreparation();
       await expect(
         asTenant(() => service.generate(String(prep._id), TEACHER)),
@@ -292,7 +430,9 @@ describe('LessonContentService', () => {
 
     it('honours AI_ENABLED=false', async () => {
       process.env.AI_ENABLED = 'false';
-      service = new LessonContentService(preparations, lessons, units, offerings);
+      service = new LessonContentService(
+        preparations, lessons, units, offerings, resources, library,
+      );
       const prep = await makePreparation();
       await expect(
         asTenant(() => service.generate(String(prep._id), TEACHER)),

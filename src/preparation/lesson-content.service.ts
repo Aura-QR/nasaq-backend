@@ -10,6 +10,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { createHmac } from 'crypto';
 import { Preparation } from './schemas/preparation.schema';
+import { PreparationResource } from './schemas/preparation-resource.schema';
+import { Library } from '../library/schemas/library.schema';
 import { CurriculumLesson } from '../curriculum/schemas/curriculum-lesson.schema';
 import { CurriculumUnit } from '../curriculum/schemas/curriculum-unit.schema';
 import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.schema';
@@ -60,6 +62,10 @@ export class LessonContentService implements OnModuleInit {
     private readonly units: Model<CurriculumUnit>,
     @InjectModel(SubjectOffering.name)
     private readonly offerings: Model<SubjectOffering>,
+    @InjectModel(PreparationResource.name)
+    private readonly resources: Model<PreparationResource>,
+    @InjectModel(Library.name)
+    private readonly library: Model<Library>,
   ) {}
 
   private get webhookUrl(): string {
@@ -133,25 +139,110 @@ export class LessonContentService implements OnModuleInit {
     const generated = await this.ask(context);
     const changes = this.onlyBlanks(prep, generated);
 
-    if (!Object.keys(changes).length) {
+    /*
+     * The three other things a preparation needs before it can be sent.
+     *
+     * Filling the prose and leaving these empty produces a draft that still
+     * cannot be submitted — 'لا يمكن الإرسال' with three bullets — which is
+     * exactly the wall this feature exists to remove. Each is attached only
+     * when the teacher has not already made the choice herself.
+     */
+    const attached = await this.attachDigitalContent(prep, changes);
+    const homework = await this.attachHomework(prep, generated);
+
+    if (!Object.keys(changes).length && !homework) {
       return {
         message: 'كل الحقول مكتوبة بالفعل — لم يتم تغيير شيء',
-        data: { id, filled: [] },
+        data: { id, filled: [], attachedContent: 0, homeworkAdded: false },
       };
     }
 
-    const updated = await this.preparations
-      .findByIdAndUpdate(
-        id,
-        { $set: changes, $inc: { contentRevision: 1 } },
-        { new: true },
-      )
-      .exec();
+    const updated = Object.keys(changes).length
+      ? await this.preparations
+          .findByIdAndUpdate(
+            id,
+            { $set: changes, $inc: { contentRevision: 1 } },
+            { new: true },
+          )
+          .exec()
+      : await this.preparations.findById(id).exec();
 
     return {
       message: `تم توليد ${Object.keys(changes).length} حقلًا`,
-      data: { id, filled: Object.keys(changes), preparation: updated },
+      data: {
+        id,
+        filled: Object.keys(changes),
+        attachedContent: attached,
+        homeworkAdded: homework,
+        preparation: updated,
+      },
     };
+  }
+
+  /**
+   * Attach a library item, when one actually fits.
+   *
+   * Submission requires digital content that belongs to the lecture's own
+   * subject and grade — or is school-wide. Anything else is refused by
+   * `validateReferences`, so this picks from exactly those two sets and
+   * attaches nothing when neither has a member. A wrong video attached
+   * silently is worse than a bullet telling the teacher to choose one.
+   */
+  private async attachDigitalContent(
+    prep: any,
+    changes: Record<string, any>,
+  ): Promise<number> {
+    if (prep.digitalContentIds?.length) return 0;
+
+    const offering: any = await this.offerings.findById(prep.subject).lean().exec();
+    if (!offering) return 0;
+
+    const siblings = await this.offerings
+      .find({
+        subjectId: offering.subjectId,
+        gradeLevelId: offering.gradeLevelId,
+      })
+      .select('_id')
+      .lean()
+      .exec();
+
+    const item = await this.library
+      .findOne({
+        $or: [
+          { subjectOfferingId: { $in: siblings.map((s: any) => s._id) } },
+          { subjectOfferingId: null },
+          { subjectOfferingId: { $exists: false } },
+        ],
+      })
+      .select('_id')
+      .lean()
+      .exec();
+
+    if (!item) return 0;
+    changes.digitalContentIds = [item._id];
+    return 1;
+  }
+
+  /**
+   * Add the homework the workflow wrote, when the teacher has filed nothing.
+   *
+   * Submission needs at least one assignment. The title comes from the model
+   * — a homework about this lesson — rather than the literal word "واجب",
+   * because a teacher reviewing twenty-two of those learns to ignore them.
+   */
+  private async attachHomework(prep: any, generated: any): Promise<boolean> {
+    if (await this.resources.exists({ preparationId: prep._id })) return false;
+
+    const title = String(generated?.homework?.title ?? '').trim();
+    if (!title) return false;
+
+    await this.resources.create({
+      preparationId: prep._id,
+      type: 'homework',
+      title: title.slice(0, 300),
+      description: String(generated?.homework?.description ?? '').trim().slice(0, 10000),
+    });
+    return true;
   }
 
   /** Everything the workflow needs to write about this lesson. */
