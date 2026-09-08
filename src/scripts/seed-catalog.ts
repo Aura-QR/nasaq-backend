@@ -7,6 +7,8 @@ export function parseCatalog(input: unknown) {
     {
       subjectId: string;
       subjectName: string;
+      subjectVariant: string;
+      gradeName: string;
       lessons: { id: string; unit: string; lessonName: string }[];
     }
   >();
@@ -24,6 +26,10 @@ export function parseCatalog(input: unknown) {
       subjects.set(subjectId, {
         subjectId,
         subjectName: row.subjectName.trim(),
+        // Optional so a source without them still seeds — the catalogue is
+        // usable without a variant, just harder to pick from.
+        subjectVariant: String(row.subjectVariant ?? '').trim(),
+        gradeName: String(row.gradeName ?? '').trim(),
         lessons: [],
       });
     for (const lesson of row.lessons) {

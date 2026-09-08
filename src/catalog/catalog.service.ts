@@ -12,6 +12,11 @@ import { SeedCatalogSubjectDto } from './dto/seed-catalog.dto';
 import { PaginationDto } from '../pagination/dto/pagination.dto';
 import { getPagination } from '../pagination/common/paginationUtils';
 
+/** A course label can contain ( ) ? and . — none of which may act as regex. */
+function escapeRegex(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 @Injectable()
 export class CatalogService {
   constructor(
@@ -21,12 +26,26 @@ export class CatalogService {
     @InjectModel(CatalogLesson.name)
     private readonly lessons: Model<CatalogLesson>,
   ) {}
-  async listSubjects(pagination: PaginationDto = {}) {
-    const totalDocs = await this.subjects.countDocuments();
+  /**
+   * @param q  matches the subject or the variant. Without it the caller pages
+   *           through 162 courses ten at a time to find one book.
+   */
+  async listSubjects(pagination: PaginationDto = {}, q?: string) {
+    const term = (q ?? '').trim();
+    const filter = term
+      ? {
+          $or: [
+            { name: { $regex: escapeRegex(term), $options: 'i' } },
+            { variant: { $regex: escapeRegex(term), $options: 'i' } },
+          ],
+        }
+      : {};
+
+    const totalDocs = await this.subjects.countDocuments(filter);
     const page = getPagination(pagination.page, pagination.limit, totalDocs);
     const data = await this.subjects
-      .find()
-      .sort({ name: 1, _id: 1 })
+      .find(filter)
+      .sort({ name: 1, variant: 1, _id: 1 })
       .skip(page.skip)
       .limit(page.limit)
       .lean();
@@ -56,11 +75,8 @@ export class CatalogService {
       throw new BadRequestException(
         'Lesson source ID does not belong to subject',
       );
-    const subject = await this.subjects.findOneAndUpdate(
-      { sourceId: dto.subjectId },
-      { $set: { name: dto.subjectName } },
-      { upsert: true, new: true, runValidators: true },
-    );
+    // Group first: the counts and the preview below describe what was sent,
+    // so they have to be computed before the subject row is written.
     const units = new Map<
       string,
       { name: string; lessons: typeof dto.lessons }
@@ -71,6 +87,21 @@ export class CatalogService {
         units.set(sourceId, { name: lesson.unit, lessons: [] });
       units.get(sourceId).lessons.push(lesson);
     }
+
+    const subject = await this.subjects.findOneAndUpdate(
+      { sourceId: dto.subjectId },
+      {
+        $set: {
+          name: dto.subjectName,
+          variant: dto.subjectVariant ?? '',
+          gradeName: dto.gradeName ?? '',
+          unitCount: units.size,
+          lessonCount: dto.lessons.length,
+          unitPreview: [...units.values()].slice(0, 5).map((u) => u.name),
+        },
+      },
+      { upsert: true, new: true, runValidators: true },
+    );
     let order = 0;
     for (const [sourceId, group] of units) {
       const unit = await this.units.findOneAndUpdate(
