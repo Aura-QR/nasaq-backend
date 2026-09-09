@@ -128,7 +128,7 @@ Pointing the backend at the test URL is the most common way this ends up
 | Node | Job |
 |---|---|
 | **Webhook** | Receives the event. **Raw Body is ON** — the signature covers the exact bytes, so re-serialising the parsed JSON would break it. |
-| **Verify signature** | Recomputes the HMAC and compares it in constant time. It probes for whichever crypto the Code node exposes — Node's `createHmac` first, then WebCrypto's `subtle` — and uses `Buffer` rather than `TextEncoder`, which the sandbox does not define. |
+| **Verify signature** | Recomputes the HMAC and compares it in constant time. It borrows nothing from the host: the Code node sandbox has no `TextEncoder` and no `crypto` of either kind, so SHA-256 and HMAC are computed in plain JavaScript inside the node. `src/messaging/n8n-verify-node.spec.ts` runs this node's real source in an equally bare sandbox. |
 | **Signature valid?** | Splits valid from forged. |
 | **Build message** | **This is the node you edit to change the wording.** Three texts: welcome, password reset, connection test. |
 | **Evolution — sendText** | `POST {EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}`, `apikey` header. |

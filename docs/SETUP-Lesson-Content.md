@@ -79,6 +79,10 @@ Without the third line the **Verify signature** node cannot read the secret
 and says so by name. Setting it is the tidy fix; pasting the secret straight
 into the node works too, at the cost of keeping it in the workflow JSON.
 
+Nothing else needs configuring on the n8n side. The node computes its own
+HMAC in plain JavaScript because this sandbox exposes neither `TextEncoder`
+nor `crypto`, so `NODE_FUNCTION_ALLOW_BUILTIN` is not required either.
+
 Optional, to tune output against cost:
 
 ```bash
