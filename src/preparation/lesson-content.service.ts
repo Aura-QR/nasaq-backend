@@ -368,13 +368,45 @@ export class LessonContentService implements OnModuleInit {
       throw new BadRequestException('تعذر توليد المحتوى — راجع إعدادات الخدمة');
     }
 
-    const payload = await response.json().catch(() => null);
+    /*
+     * A workflow that throws before it reaches its Respond node still answers
+     * 200, with an empty body or with n8n's own `{ message }` envelope — from
+     * out here a broken Code node looks exactly like a success. Read the body
+     * as text first so the log can say which, instead of leaving a bare
+     * "unreadable reply" as the only trace of a `TextEncoder is not defined`.
+     */
+    const text = await response.text().catch(() => '');
+    let payload: any = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = null;
+    }
+
     // n8n hands back either the object or a one-element array of it.
     const data = Array.isArray(payload) ? payload[0] : payload;
-    if (!data || typeof data !== 'object') {
-      throw new BadRequestException('رد غير مفهوم من خدمة توليد المحتوى');
+    const content = data && typeof data === 'object' ? (data.data ?? data) : null;
+
+    // Content is content only if it carries a field we asked for. An n8n
+    // error envelope carries none, and neither does an empty body.
+    const answered =
+      content &&
+      typeof content === 'object' &&
+      [...TEXT_FIELDS, ...LIST_FIELDS, 'resources', 'homework', 'exam'].some(
+        (field) => content[field] !== undefined,
+      );
+
+    if (!answered) {
+      this.logger.error(
+        `Generation webhook returned no usable content: HTTP ${response.status} ` +
+          (text ? text.slice(0, 300) : '(empty body)'),
+      );
+      throw new BadRequestException(
+        'سير عمل التوليد لم يُرجع محتوى — راجع آخر تنفيذ في n8n',
+      );
     }
-    return (data as any).data ?? data;
+
+    return content;
   }
 
   /**

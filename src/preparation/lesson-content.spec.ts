@@ -78,8 +78,32 @@ describe('LessonContentService', () => {
     homework: { title: 'احسب متوسط درجاتك', description: 'اجمع خمس درجات واقسمها.' },
   };
 
+  /*
+   * `text()` returns the same bytes `json()` would parse, the way a real
+   * Response does. It used to answer '' regardless, which quietly made the
+   * empty-body case — the shape a broken n8n workflow actually returns —
+   * unreachable from these tests.
+   */
   const ok = (body: any = generated) =>
-    ({ ok: true, status: 200, json: async () => body, text: async () => '' }) as any;
+    ({
+      ok: true,
+      status: 200,
+      json: async () => body,
+      text: async () => JSON.stringify(body),
+    }) as any;
+
+  /** 200 with nothing in it: a workflow that threw before its Respond node. */
+  const okEmpty = () =>
+    ({ ok: true, status: 200, json: async () => null, text: async () => '' }) as any;
+
+  /** 200 carrying n8n's own error envelope. */
+  const okN8nError = () =>
+    ({
+      ok: true,
+      status: 200,
+      json: async () => ({ message: 'Error in workflow' }),
+      text: async () => JSON.stringify({ message: 'Error in workflow' }),
+    }) as any;
 
   /*
    * Every query must be EXECUTED inside the callback, not merely built there.
@@ -464,7 +488,43 @@ describe('LessonContentService', () => {
       const prep = await makePreparation();
       await expect(
         asTenant(() => service.generate(String(prep._id), TEACHER)),
-      ).rejects.toThrow('غير مفهوم');
+      ).rejects.toThrow('لم يُرجع محتوى');
+    });
+
+    /*
+     * The shape a thrown Code node actually produces. n8n answers the webhook
+     * 200 whether or not the workflow reached its Respond node, so a
+     * `TextEncoder is not defined` arrives here looking like a success with
+     * nothing in it. It must not be mistaken for generated content.
+     */
+    it('rejects a 200 with an empty body', async () => {
+      fetchMock.mockResolvedValue(okEmpty());
+      const prep = await makePreparation();
+      await expect(
+        asTenant(() => service.generate(String(prep._id), TEACHER)),
+      ).rejects.toThrow('لم يُرجع محتوى');
+    });
+
+    it("rejects n8n's own error envelope", async () => {
+      fetchMock.mockResolvedValue(okN8nError());
+      const prep = await makePreparation();
+      await expect(
+        asTenant(() => service.generate(String(prep._id), TEACHER)),
+      ).rejects.toThrow('لم يُرجع محتوى');
+    });
+
+    it('writes nothing to the preparation when the workflow failed', async () => {
+      fetchMock.mockResolvedValue(okEmpty());
+      const prep = await makePreparation();
+      await expect(
+        asTenant(() => service.generate(String(prep._id), TEACHER)),
+      ).rejects.toThrow();
+
+      const after: any = await asTenant(() =>
+        preparations.findById(prep._id).lean().exec(),
+      );
+      expect(after?.warmUp ?? '').toBe('');
+      expect(after?.objectives ?? []).toEqual([]);
     });
 
     it('404s an id that is not there', async () => {

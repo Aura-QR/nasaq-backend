@@ -72,7 +72,12 @@ rather than failing obscurely.
 ```bash
 NASAQ_WEBHOOK_SECRET=<same as AI_WEBHOOK_SECRET>
 ANTHROPIC_API_KEY=sk-ant-…
+N8N_BLOCK_ENV_ACCESS_IN_NODE=false   # otherwise $env throws inside a Code node
 ```
+
+Without the third line the **Verify signature** node cannot read the secret
+and says so by name. Setting it is the tidy fix; pasting the secret straight
+into the node works too, at the cost of keeping it in the workflow JSON.
 
 Optional, to tune output against cost:
 

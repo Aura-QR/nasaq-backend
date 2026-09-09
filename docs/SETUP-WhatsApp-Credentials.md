@@ -128,7 +128,7 @@ Pointing the backend at the test URL is the most common way this ends up
 | Node | Job |
 |---|---|
 | **Webhook** | Receives the event. **Raw Body is ON** — the signature covers the exact bytes, so re-serialising the parsed JSON would break it. |
-| **Verify signature** | Recomputes the HMAC and compares it in constant time. Uses WebCrypto, so no `NODE_FUNCTION_ALLOW_BUILTIN` is needed. |
+| **Verify signature** | Recomputes the HMAC and compares it in constant time. It probes for whichever crypto the Code node exposes — Node's `createHmac` first, then WebCrypto's `subtle` — and uses `Buffer` rather than `TextEncoder`, which the sandbox does not define. |
 | **Signature valid?** | Splits valid from forged. |
 | **Build message** | **This is the node you edit to change the wording.** Three texts: welcome, password reset, connection test. |
 | **Evolution — sendText** | `POST {EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}`, `apikey` header. |
