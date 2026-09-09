@@ -31,6 +31,15 @@ const TEXT_FIELDS = [
 
 const LIST_FIELDS = ['objectives', 'teachingStrategies', 'teachingAids'] as const;
 
+/** Content changed, so whatever a reviewer decided about the old content is void. */
+const REVIEW_RESET = {
+  reviewStatus: 'draft',
+  reviewedBy: null,
+  reviewedByName: '',
+  reviewedAt: null,
+  reviewNote: '',
+} as const;
+
 /**
  * Filling a preparation's content from the school's own workflow.
  *
@@ -132,9 +141,20 @@ export class LessonContentService implements OnModuleInit {
       throw new ForbiddenException('ليس مسموحاً لك بتعديل هذا التحضير');
     }
 
-    if (!['draft', 'needs_revision'].includes(prep.reviewStatus)) {
-      throw new BadRequestException('التوليد متاح للمسودة أو التحضير المطلوب تعديله فقط');
-    }
+    /*
+     * Submitting does not close the door.
+     *
+     * This used to refuse anything past `draft`, and the extension submits
+     * every period it finishes — so the moment a teacher let it run, the
+     * generate button was dead on all twenty of that week's lectures, and the
+     * only way back was a manager pressing "needs revision", which is not a
+     * step this school actually performs. A teacher owns their preparation;
+     * ownership is checked above and that is the check that matters.
+     *
+     * What a later generation must not do is leave a reviewed preparation
+     * carrying content the reviewer never saw, so anything written below
+     * returns it to draft.
+     */
     const includeContent = options.includeContent !== false;
     const explicit = options.resourceTypes !== undefined;
     if (explicit && (!Array.isArray(options.resourceTypes) ||
@@ -200,10 +220,18 @@ export class LessonContentService implements OnModuleInit {
       // Reject stale model output rather than overwrite content written during generation.
       updated = await this.preparations.findOneAndUpdate({
         _id: prep._id,
-        reviewStatus: { $in: ['draft', 'needs_revision'] },
+        // Matching the exact status read a moment ago still rejects a submit or
+        // a review that landed during generation, without pinning it to draft.
+        reviewStatus: prep.reviewStatus,
         $or: [{ contentRevision: prep.contentRevision ?? 0 },
           ...(prep.contentRevision ? [] : [{ contentRevision: { $exists: false } }])],
-      }, { $set: changes, $inc: { contentRevision: 1 } }, { new: true }).exec();
+      }, {
+        $set: {
+          ...changes,
+          ...(prep.reviewStatus === 'draft' ? {} : REVIEW_RESET),
+        },
+        $inc: { contentRevision: 1 },
+      }, { new: true }).exec();
       if (!updated) throw new ConflictException('تم تعديل التحضير أثناء التوليد. حدّث الأسبوع وأعد المحاولة.');
     }
     for (const addition of additions) {
@@ -248,7 +276,7 @@ export class LessonContentService implements OnModuleInit {
     if (added.length) {
       // A concurrent submit cannot leave newly added resources marked reviewed.
       updated = await this.preparations.findByIdAndUpdate(prep._id, {
-        $set: { reviewStatus: 'draft', reviewedBy: null, reviewedByName: '', reviewedAt: null, reviewNote: '' },
+        $set: REVIEW_RESET,
         $inc: { contentRevision: 1 },
       }, { new: true }).exec();
     }

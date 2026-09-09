@@ -348,6 +348,67 @@ describe('Structured preparation integration', () => {
     );
     await http('post', '/preparation/' + id + '/submit').expect(400);
   });
+  /*
+   * One rule, three readers.
+   *
+   * `submit()` has always enforced these four requirements, but nothing else
+   * could see them: the list returned rows without `resources` or
+   * `digitalContentIds`, and `/weekly` counted `reviewStatus !== 'draft'`
+   * instead. So the same week read "20 prepared" on the teacher's page and
+   * "17 missing" from the API, and the two screens grew their own copies of
+   * the rule and fetched every preparation individually to feed them.
+   */
+  it.each([
+    ['objectives', []],
+    ['digitalContentIds', []],
+    ['lessonId', null],
+  ])(
+    'reports isComplete=false and counts as missing without %s',
+    async (field, value) => {
+      const id = await completeDraft();
+      await model('Preparation').collection.updateOne(
+        { _id: new Types.ObjectId(id) },
+        { $set: { [field]: value } },
+      );
+
+      const list = await http('get', '/preparation?page=1&limit=50').expect(200);
+      const row = list.body.data.find((item: any) => String(item._id) === id);
+      expect(row.isComplete).toBe(false);
+
+      const week = await http('get', '/preparation/weekly').expect(200);
+      expect(week.body.stats.submitted).toBe(0);
+
+      // And the gate agrees, which is the whole point.
+      await http('post', '/preparation/' + id + '/submit').expect(400);
+    },
+  );
+
+  it('reports isComplete=true for a preparation submit accepts', async () => {
+    const id = await completeDraft();
+
+    const list = await http('get', '/preparation?page=1&limit=50').expect(200);
+    const row = list.body.data.find((item: any) => String(item._id) === id);
+    expect(row.isComplete).toBe(true);
+
+    const week = await http('get', '/preparation/weekly').expect(200);
+    expect(week.body.stats.submitted).toBe(1);
+    expect(week.body.stats.missing).toBe(week.body.stats.total - 1);
+
+    await http('post', '/preparation/' + id + '/submit').expect(201);
+  });
+
+  /*
+   * Sending it for review does not make it "more finished" — it was already
+   * finished, which is what let it be sent. The counter must not move.
+   */
+  it('counts a finished preparation the same before and after submitting', async () => {
+    const id = await completeDraft();
+    const before = await http('get', '/preparation/weekly').expect(200);
+    await http('post', '/preparation/' + id + '/submit').expect(201);
+    const after = await http('get', '/preparation/weekly').expect(200);
+    expect(after.body.stats.submitted).toBe(before.body.stats.submitted);
+  });
+
   it('submits with homework, backfills objectives and preserves a manager override', async () => {
     const id = await completeDraft();
     const result = await http('post', '/preparation/' + id + '/submit').expect(

@@ -24,6 +24,11 @@ import {
   REQUIRED_RESOURCE_MESSAGE,
   STUDENT_FIELDS,
 } from './constants/preparation-constants';
+import {
+  COMPLETION_GAP_MESSAGES,
+  completionGaps,
+  usableObjectives,
+} from './preparation-completion';
 
 @Injectable()
 export class PreparationContentService {
@@ -130,17 +135,13 @@ export class PreparationContentService {
         'يمكن إرسال المسودة أو التحضير المطلوب تعديله فقط',
       );
     const resources = await this.resources.find({ preparationId: id });
-    if (!resources.length)
-      throw new BadRequestException(REQUIRED_RESOURCE_MESSAGE);
-    const objectives = (prep.objectives ?? [])
-      .map((v) => v.trim())
-      .filter(Boolean);
-    if (!objectives.length)
-      throw new BadRequestException('يجب إضافة هدف واحد على الأقل');
-    if (!prep.digitalContentIds?.length)
-      throw new BadRequestException('يجب إضافة محتوى رقمي واحد على الأقل');
-    if (!prep.lessonId)
-      throw new BadRequestException('يجب اختيار درس من المنهج');
+
+    // The same four requirements the list endpoint reports as `isComplete`,
+    // read from one place so the screens cannot drift from the gate.
+    const [gap] = completionGaps(prep, resources.length);
+    if (gap) throw new BadRequestException(COMPLETION_GAP_MESSAGES[gap]);
+
+    const objectives = usableObjectives(prep);
     await this.validateReferences(prep, prep.subject);
     for (const resource of resources)
       await this.validateResource(resource, prep);
@@ -237,6 +238,26 @@ export class PreparationContentService {
   deleteResources(id: string) {
     return this.resources.deleteMany({ preparationId: id });
   }
+  /**
+   * How many resources each of these preparations carries, in one query.
+   *
+   * Asking per preparation is what turned the teacher's two screens into a
+   * five-hundred-request fan-out; the answer is a single grouped read.
+   */
+  async resourceCounts(ids: any[]): Promise<Map<string, number>> {
+    const objectIds = (ids ?? [])
+      .map((id) => String(id ?? ''))
+      .filter((id) => Types.ObjectId.isValid(id))
+      .map((id) => new Types.ObjectId(id));
+    if (!objectIds.length) return new Map();
+
+    const rows = await this.resources.aggregate([
+      { $match: { preparationId: { $in: objectIds } } },
+      { $group: { _id: '$preparationId', count: { $sum: 1 } } },
+    ]);
+    return new Map(rows.map((row: any) => [String(row._id), Number(row.count) || 0]));
+  }
+
   async details(id: string) {
     const resources = await this.resources
       .find({ preparationId: id })

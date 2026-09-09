@@ -646,13 +646,49 @@ describe('LessonContentService', () => {
       expect(await asTenant(() => resources.countDocuments({ preparationId: prep._id }).exec())).toBe(0);
     });
 
-    it('does not generate into submitted or approved preparations', async () => {
+    /*
+     * Submitting is not a one-way door.
+     *
+     * Generation used to refuse anything past `draft`, and the extension
+     * submits every period it finishes — so one run of it killed the generate
+     * button on a teacher's whole week, and only a manager pressing "needs
+     * revision" could bring it back. This school does not run that step.
+     */
+    it('generates into a submitted or approved preparation', async () => {
       for (const reviewStatus of ['pending', 'approved']) {
         const prep = await makePreparation({ reviewStatus });
-        await expect(asTenant(() => service.generate(String(prep._id), TEACHER)))
-          .rejects.toBeInstanceOf(BadRequestException);
+        const result: any = await asTenant(() =>
+          service.generate(String(prep._id), TEACHER),
+        );
+        expect(result.data.filled).toContain('warmUp');
       }
-      expect(fetchMock).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    /*
+     * What it must not do is leave a reviewed preparation carrying content the
+     * reviewer never saw, so writing to one returns it to draft.
+     */
+    it('returns a reviewed preparation to draft when it writes to it', async () => {
+      for (const reviewStatus of ['pending', 'approved']) {
+        const prep = await makePreparation({
+          reviewStatus,
+          reviewedByName: 'مديرة المدرسة',
+          reviewNote: 'ملاحظة قديمة',
+        });
+        await asTenant(() => service.generate(String(prep._id), TEACHER));
+
+        const after: any = await reload(prep._id);
+        expect(after.reviewStatus).toBe('draft');
+        expect(after.reviewNote).toBe('');
+        expect(after.reviewedByName).toBe('');
+      }
+    });
+
+    it('leaves a draft as a draft', async () => {
+      const prep = await makePreparation({ reviewStatus: 'draft' });
+      await asTenant(() => service.generate(String(prep._id), TEACHER));
+      expect((await reload(prep._id)).reviewStatus).toBe('draft');
     });
   });
 

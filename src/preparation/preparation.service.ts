@@ -18,6 +18,7 @@ import { getPagination } from 'src/pagination/common/paginationUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PreparationContentService } from './preparation-content.service';
+import { isPreparationComplete } from './preparation-completion';
 import { STRUCTURED_FIELDS } from './constants/preparation-constants';
 import {
   currentWeekOf,
@@ -697,10 +698,24 @@ export class PreparationService {
     
     const baseUrl =
       req?.protocol && req?.host ? `${req.protocol}://${req.host}` : '';
-    const preparationsWithUrls = preparations.map((preparation) =>
-      this.addUrlsToFiles(preparation, baseUrl),
+
+    /*
+     * `isComplete` answers the only question the teacher's screens ask of a
+     * row: is this finished, or is it still a draft? It is the same rule
+     * `submit()` enforces. Reporting it here is what lets those pages stop
+     * fetching every preparation individually to work it out for themselves.
+     */
+    const counts = await this.content.resourceCounts(
+      preparations.map((preparation: any) => preparation._id),
     );
-  
+    const preparationsWithUrls = preparations.map((preparation) => ({
+      ...this.addUrlsToFiles(preparation, baseUrl),
+      isComplete: isPreparationComplete(
+        preparation,
+        counts.get(String((preparation as any)._id)) ?? 0,
+      ),
+    }));
+
     if (isPaginationRequested) {
       return {
         data: preparationsWithUrls,
@@ -775,8 +790,22 @@ export class PreparationService {
     const baseUrl =
       req?.protocol && req?.host ? `${req.protocol}://${req.host}` : '';
 
+    /*
+     * "Finished" means one thing across the product: the four requirements
+     * `submit()` enforces. This used to count `reviewStatus !== 'draft'`
+     * instead, so the same week could read "20 prepared" on the page and
+     * "17 missing" here, and both were telling the truth about a different
+     * question. One grouped query answers it for the whole week.
+     */
+    const counts = await this.content.resourceCounts(
+      preparations.map((prep: any) => prep._id),
+    );
+    const isFinished = (prep: any) =>
+      Boolean(prep) &&
+      isPreparationComplete(prep, counts.get(String(prep._id)) ?? 0);
+
     if (!teacherId) {
-      return this.summariseByTeacher(lectures, byLecture, weekOf);
+      return this.summariseByTeacher(lectures, byLecture, weekOf, isFinished);
     }
 
     const days = WEEK_DAYS.map((day) => {
@@ -827,7 +856,10 @@ export class PreparationService {
                 }
               : null,
             preparation: prep
-              ? this.addUrlsToFiles({ ...prep, lecture: l }, baseUrl)
+              ? {
+                  ...this.addUrlsToFiles({ ...prep, lecture: l }, baseUrl),
+                  isComplete: isFinished(prep),
+                }
               : null,
           };
         });
@@ -840,10 +872,9 @@ export class PreparationService {
     }).filter((d) => d.slots.length > 0);
 
     const total = lectures.length;
-    const submitted = lectures.filter((l: any) => {
-      const prep = byLecture.get(String(l._id));
-      return prep && prep.reviewStatus !== 'draft';
-    }).length;
+    const submitted = lectures.filter((l: any) =>
+      isFinished(byLecture.get(String(l._id))),
+    ).length;
 
     const teacherDoc: any = lectures.find(
       (l: any) => l.teacherId && String(l.teacherId._id) === String(teacherId),
@@ -886,6 +917,7 @@ export class PreparationService {
     lectures: any[],
     byLecture: Map<string, any>,
     weekOf: Date,
+    isFinished: (prep: any) => boolean,
   ) {
     const rows = new Map<string, any>();
 
@@ -906,7 +938,7 @@ export class PreparationService {
       const row = rows.get(id);
       row.total += 1;
       const prep = byLecture.get(String(lecture._id));
-      if (prep && prep.reviewStatus !== 'draft') row.submitted += 1;
+      if (isFinished(prep)) row.submitted += 1;
     }
 
     const teachers = [...rows.values()].map((row) => ({
