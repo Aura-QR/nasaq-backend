@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -10,6 +11,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { createHmac } from 'crypto';
 import { Preparation } from './schemas/preparation.schema';
+import { GeneratePreparationDto } from './dto/generate-preparation.dto';
+import { RESOURCE_TYPES } from './schemas/preparation-resource.schema';
+import { ExamsService } from '../exams/exams.service';
 import { PreparationResource } from './schemas/preparation-resource.schema';
 import { Library } from '../library/schemas/library.schema';
 import { CurriculumLesson } from '../curriculum/schemas/curriculum-lesson.schema';
@@ -66,6 +70,7 @@ export class LessonContentService implements OnModuleInit {
     private readonly resources: Model<PreparationResource>,
     @InjectModel(Library.name)
     private readonly library: Model<Library>,
+    private readonly exams?: ExamsService,
   ) {}
 
   private get webhookUrl(): string {
@@ -107,7 +112,7 @@ export class LessonContentService implements OnModuleInit {
    * page to fill in. A caller preparing a whole week loops over this and shows
    * progress, so one lesson that fails is one row that failed.
    */
-  async generate(id: string, user: any) {
+  async generate(id: string, user: any, options: GeneratePreparationDto = {}) {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('معرّف غير صالح');
     }
@@ -127,55 +132,133 @@ export class LessonContentService implements OnModuleInit {
       throw new ForbiddenException('ليس مسموحاً لك بتعديل هذا التحضير');
     }
 
+    if (!['draft', 'needs_revision'].includes(prep.reviewStatus)) {
+      throw new BadRequestException('التوليد متاح للمسودة أو التحضير المطلوب تعديله فقط');
+    }
+    const includeContent = options.includeContent !== false;
+    const explicit = options.resourceTypes !== undefined;
+    if (explicit && (!Array.isArray(options.resourceTypes) ||
+        options.resourceTypes.some((type) => !RESOURCE_TYPES.includes(type)))) {
+      throw new BadRequestException('نوع الإضافة غير صالح');
+    }
+    // Older clients asked for homework only when there were no assignments at all.
+    const requested = explicit ? [...new Set(options.resourceTypes)] :
+      (await this.resources.exists({ preparationId: prep._id })) ? [] : ['homework'];
+    const resourceResults: { type: string; status: string; message?: string; examId?: string }[] = [];
+    const missing: string[] = [];
+    for (const type of requested) {
+      if (await this.resources.exists({ preparationId: prep._id, type, ...(type === 'quiz' ? { examId: { $ne: null } } : {}) }))
+        resourceResults.push({ type, status: 'existing' });
+      else missing.push(type);
+    }
+    if (missing.includes('quiz')) {
+      if (user?.role !== 'TEACHER' || !Array.isArray(user.permissions) ||
+          !['*', 'school.exams.create', 'school.exams.manage'].some((p) => user.permissions.includes(p))) {
+        throw new ForbiddenException('إنشاء الامتحان يتطلب حساب معلم وصلاحية إنشاء الامتحانات');
+      }
+      const exam = options.exam;
+      const validDate = (value: unknown): value is string => typeof value === 'string' &&
+        /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) &&
+        new Date(value).toISOString().slice(0, 10) === value;
+      if (!exam || !prep.classId || !prep.subject || !this.exams ||
+          !['quiz', 'final', 'assignment', 'activity'].includes(exam.examType) ||
+          !Number.isInteger(exam.duration) || exam.duration < 1 || exam.duration > 240 ||
+          !Number.isInteger(exam.questionCount) || exam.questionCount < 1 || exam.questionCount > 20 ||
+          !validDate(exam.startDate) || !validDate(exam.endDate) || exam.endDate < exam.startDate) {
+        throw new BadRequestException('حدد نوع الامتحان وتواريخ صحيحة والمدة (١–٢٤٠ دقيقة) وعدد الأسئلة (١–٢٠)، وتأكد من فصل ومادة الحصة');
+      }
+    }
     const context = await this.describe(prep);
     if (!context.lessonTitle) {
-      // Without a lesson there is nothing to write about, and a warm-up
-      // generated from a subject name alone is filler.
-      throw new BadRequestException(
-        'اختر درسًا من المنهج أولًا — التوليد يحتاج اسم الدرس.',
-      );
+      throw new BadRequestException('اختر درسًا من المنهج أولًا — التوليد يحتاج اسم الدرس.');
     }
-
-    const generated = await this.ask(context);
-    const changes = this.onlyBlanks(prep, generated);
-
-    /*
-     * The three other things a preparation needs before it can be sent.
-     *
-     * Filling the prose and leaving these empty produces a draft that still
-     * cannot be submitted — 'لا يمكن الإرسال' with three bullets — which is
-     * exactly the wall this feature exists to remove. Each is attached only
-     * when the teacher has not already made the choice herself.
-     */
-    const attached = await this.attachDigitalContent(prep, changes);
-    const homework = await this.attachHomework(prep, generated);
-
-    if (!Object.keys(changes).length && !homework) {
-      return {
-        message: 'كل الحقول مكتوبة بالفعل — لم يتم تغيير شيء',
-        data: { id, filled: [], attachedContent: 0, homeworkAdded: false },
-      };
+    const generated = includeContent || missing.length
+      ? await this.ask({ ...context, resourceTypes: missing, includeContent,
+          ...(missing.includes('quiz') ? { exam: options.exam } : {}) }) : {};
+    const changes = includeContent ? this.onlyBlanks(prep, generated) : {};
+    const attached = includeContent ? await this.attachDigitalContent(prep, changes) : 0;
+    const additions: { type: string; title: string; description: string }[] = [];
+    for (const type of missing) {
+      // A manual addition created while the model worked always takes precedence.
+      if (await this.resources.exists({ preparationId: prep._id, type, ...(type === 'quiz' ? { examId: { $ne: null } } : {}) })) {
+        resourceResults.push({ type, status: 'existing' });
+        continue;
+      }
+      const resource = Array.isArray(generated.resources)
+        ? generated.resources.find((item: any) => item?.type === type)
+        : type === 'homework' ? generated.homework : null;
+      const title = typeof resource?.title === 'string' ? resource.title.trim() : '';
+      const description = typeof resource?.description === 'string' ? resource.description.trim() : '';
+      if (!title || !description || title.length > 300 || description.length > 10000) {
+        resourceResults.push({ type, status: 'failed', message: 'لم تُرجع خدمة التوليد محتوى صالحًا لهذه الإضافة. حدّث سير عمل التوليد ثم أعد المحاولة.' });
+        continue;
+      }
+      additions.push({ type, title, description });
     }
-
-    const updated = Object.keys(changes).length
-      ? await this.preparations
-          .findByIdAndUpdate(
-            id,
-            { $set: changes, $inc: { contentRevision: 1 } },
-            { new: true },
-          )
-          .exec()
-      : await this.preparations.findById(id).exec();
-
+    let updated: any = prep;
+    if (Object.keys(changes).length || additions.length) {
+      // Reject stale model output rather than overwrite content written during generation.
+      updated = await this.preparations.findOneAndUpdate({
+        _id: prep._id,
+        reviewStatus: { $in: ['draft', 'needs_revision'] },
+        $or: [{ contentRevision: prep.contentRevision ?? 0 },
+          ...(prep.contentRevision ? [] : [{ contentRevision: { $exists: false } }])],
+      }, { $set: changes, $inc: { contentRevision: 1 } }, { new: true }).exec();
+      if (!updated) throw new ConflictException('تم تعديل التحضير أثناء التوليد. حدّث الأسبوع وأعد المحاولة.');
+    }
+    for (const addition of additions) {
+      let examId: string | undefined;
+      if (addition.type === 'quiz') {
+        try {
+          const questions = generated.exam?.questions;
+          if (!Array.isArray(questions) || questions.length !== options.exam.questionCount ||
+              questions.some((q: any) => typeof q?.question !== 'string' || !q.question.trim() ||
+                q.question.length > 2000 || !Array.isArray(q.options) || q.options.length < 2 || q.options.length > 6 ||
+                q.options.some((option: any) => typeof option !== 'string' || !option.trim() || option.length > 1000) ||
+                new Set(q.options).size !== q.options.length || !q.options.includes(q.correctAnswer))) {
+            throw new BadRequestException('لم تُرجع خدمة التوليد أسئلة امتحان صالحة بالعدد المطلوب');
+          }
+          const startDate = new Date(options.exam.startDate); startDate.setHours(0, 0, 0, 0);
+          const endDate = new Date(options.exam.endDate); endDate.setHours(23, 59, 59, 999);
+          const exam: any = await this.exams.create({
+            subjectOfferingId: String(prep.subject), classIds: [String(prep.classId)],
+            examType: options.exam.examType, duration: options.exam.duration, startDate, endDate,
+            questions: questions.map((q: any) => ({ question: q.question, options: q.options, correctAnswer: q.correctAnswer })),
+          }, user, String(prep._id));
+          examId = String(exam._id ?? exam.id ?? '');
+          if (!Types.ObjectId.isValid(examId)) throw new Error('Invalid generated exam response');
+        } catch (error: any) {
+          if (typeof error?.getStatus !== 'function' || error.getStatus() >= 500) throw error;
+          resourceResults.push({ type: 'quiz', status: 'failed', message: error.message });
+          continue;
+        }
+      }
+      try {
+        const saved = await this.resources.updateOne({
+          preparationId: prep._id, generationKey: addition.type,
+        }, { $setOnInsert: { ...addition, ...(examId ? { examId } : {}), preparationId: prep._id, generationKey: addition.type } },
+        { upsert: true, runValidators: true }).exec();
+        resourceResults.push({ type: addition.type, status: saved.upsertedCount ? 'created' : 'existing', ...(examId ? { examId } : {}) });
+      } catch (error: any) {
+        if (error?.code !== 11000) throw error;
+        resourceResults.push({ type: addition.type, status: 'existing' });
+      }
+    }
+    const added = resourceResults.filter((row) => row.status === 'created');
+    if (added.length) {
+      // A concurrent submit cannot leave newly added resources marked reviewed.
+      updated = await this.preparations.findByIdAndUpdate(prep._id, {
+        $set: { reviewStatus: 'draft', reviewedBy: null, reviewedByName: '', reviewedAt: null, reviewNote: '' },
+        $inc: { contentRevision: 1 },
+      }, { new: true }).exec();
+    }
     return {
-      message: `تم توليد ${Object.keys(changes).length} حقلًا`,
-      data: {
-        id,
-        filled: Object.keys(changes),
-        attachedContent: attached,
-        homeworkAdded: homework,
-        preparation: updated,
-      },
+      message: resourceResults.some((row) => row.status === 'failed')
+        ? 'حُفظ المحتوى المتاح، وتعذر توليد بعض الإضافات'
+        : `تم توليد ${Object.keys(changes).length} حقلًا وإضافة ${added.length} تكليف`,
+      data: { id, filled: Object.keys(changes), attachedContent: attached,
+        homeworkAdded: added.some((row) => row.type === 'homework'),
+        resourceResults, preparation: updated },
     };
   }
 
@@ -221,28 +304,6 @@ export class LessonContentService implements OnModuleInit {
     if (!item) return 0;
     changes.digitalContentIds = [item._id];
     return 1;
-  }
-
-  /**
-   * Add the homework the workflow wrote, when the teacher has filed nothing.
-   *
-   * Submission needs at least one assignment. The title comes from the model
-   * — a homework about this lesson — rather than the literal word "واجب",
-   * because a teacher reviewing twenty-two of those learns to ignore them.
-   */
-  private async attachHomework(prep: any, generated: any): Promise<boolean> {
-    if (await this.resources.exists({ preparationId: prep._id })) return false;
-
-    const title = String(generated?.homework?.title ?? '').trim();
-    if (!title) return false;
-
-    await this.resources.create({
-      preparationId: prep._id,
-      type: 'homework',
-      title: title.slice(0, 300),
-      description: String(generated?.homework?.description ?? '').trim().slice(0, 10000),
-    });
-    return true;
   }
 
   /** Everything the workflow needs to write about this lesson. */

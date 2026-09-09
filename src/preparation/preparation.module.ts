@@ -12,10 +12,12 @@ import { LecturesModule } from '../lectures/lectures.module';
 import { CaslModule } from '../casl/casl.module';
 import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
 import { PreparationContentModule } from './preparation-content.module';
+import { ExamsModule } from '../exams/exams.module';
 
 @Module({
   imports: [
     PreparationContentModule,
+    ExamsModule,
     MongooseModule.forFeature([
       { name: Preparation.name, schema: PreparationSchema },
       { name: Teacher.name, schema: TeacherSchema },

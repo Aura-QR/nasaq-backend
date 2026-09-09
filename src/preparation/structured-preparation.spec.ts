@@ -8,6 +8,7 @@ import { PreparationContentModule } from './preparation-content.module';
 import { PreparationContentService } from './preparation-content.service';
 import { PreparationService } from './preparation.service';
 import { LessonContentService } from './lesson-content.service';
+import { ExamsModule } from '../exams/exams.module';
 import { PreparationController } from './preparation.controller';
 import { CurriculumModule } from '../curriculum/curriculum.module';
 import { CurriculumService } from '../curriculum/curriculum.service';
@@ -122,6 +123,7 @@ describe('Structured preparation integration', () => {
           { name: Class.name, schema: ClassSchema },
         ]),
         PreparationContentModule,
+        ExamsModule,
         CurriculumModule,
         CatalogModule,
         LibraryModule,

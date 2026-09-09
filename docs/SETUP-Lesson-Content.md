@@ -18,11 +18,11 @@ POST /preparation/:id/generate
         ├─ the lesson, its unit, the subject, the grade,
         │  and the objectives the school wrote on that lesson
         ▼
-   n8n webhook  ──▶  Claude  ──▶  the content, and a homework
+   n8n webhook  ──▶  Claude  ──▶  content and selected additions
         │
         ├─ fills ONLY the fields that are still empty
         ├─ attaches a library item, if one fits this subject and grade
-        └─ files the homework, if the teacher has added no assignment
+        └─ adds selected homework, activity, enrichment or a linked real exam
 ```
 
 Those last two are not decoration. Nasaq refuses to submit a preparation
@@ -45,8 +45,9 @@ instead.
 **It never overwrites what the teacher wrote.** A field already holding text is
 left exactly as it is; only blanks are filled. That is enforced in
 `LessonContentService`, not asked for in the prompt, and it is what makes the
-endpoint safe to press twice — a second run reports `filled: []` and changes
-nothing.
+endpoint safe to press twice. Existing additions of the requested type are
+preserved; a linked exam is reused when a previous creation succeeded but
+linking was interrupted. Old text-only quiz resources do not count as an exam.
 
 It refuses when no lesson has been chosen. A warm-up written from a subject
 name alone is filler.
@@ -112,6 +113,63 @@ nothing was written.
 
 ## 4. Try it
 
+The extension 1.2.0 sends explicit choices per lesson:
+
+```json
+{
+  "resourceTypes": ["enrichment", "homework", "quiz", "activity"],
+  "includeContent": true,
+  "exam": {
+    "examType": "quiz",
+    "startDate": "2026-10-01",
+    "endDate": "2026-10-02",
+    "duration": 30,
+    "questionCount": 5
+  }
+}
+```
+
+`resourceTypes: []` generates no additions. Omission retains legacy homework
+behavior (only if no resource exists). `includeContent: false` generates only
+selected additions without changing preparation fields or attaching library
+content. Unchecking a type never deletes an existing resource.
+
+Selecting `quiz` requires the `exam` settings, a teacher who owns the preparation,
+and `school.exams.create` / `school.exams.manage` (or `*`). The same ExamsService
+used by the dashboard checks class assignment, grade criteria, exam-type weight
+and existing finals. Types: `quiz`, `final`, `assignment`, `activity`. Duration:
+1–240 minutes. Questions: 1–20 multiple-choice questions. Dates use YYYY-MM-DD
+and the dashboard's full-day start/end convention; the same day is allowed.
+
+The saved exam belongs to the teacher and appears in their exam list. Its
+availability to students follows its dates, independently of preparation review.
+Use a future start date to allow teacher review before students can take it.
+Correct answers stay in the Exam questions, not in the resource description.
+
+The response adds `data.resourceResults`: one `{type,status,message?,examId?}`
+entry per selection, with `status` equal to `created`, `existing`, or `failed`.
+Partial generation failures preserve successful content/resources; clients must
+show each failure and skip submission of that preparation. Stale writes return
+409. Ambiguous network/save errors require refreshing before retrying.
+
+`GET /preparation/generation-options` reports version 1, supported resourceTypes,
+includeContent and linkedExams. It confirms backend support, not n8n deployment.
+Import the updated workflow as well: old workflows cannot supply all types or
+real exam questions, so missing outputs will be reported as failures.
+
+Deploy the backend and updated workflow before extension 1.2.0. Ensure the new
+unique partial indexes declared in the schemas exist (through Mongoose index
+creation, or the deployment's index migration if automatic indexes are disabled):
+
+- `preparation_resources`: `{schoolId:1, preparationId:1, generationKey:1}`, partial
+  filter `{generationKey: {$type: 'string'}}`.
+- `exams`: `{schoolId:1, generatedFromPreparation:1}`, partial filter
+  `{generatedFromPreparation: {$type: 'objectId'}}`.
+
+These keys are internal; manual resources and ordinary dashboard exams do not
+receive them. Retrying does not update an already generated exam's settings;
+edit it in the dashboard. No existing indexes need removal.
+
 ```http
 POST /preparation/<id>/generate
 Authorization: Bearer <teacher or owner token>
@@ -128,10 +186,9 @@ Authorization: Bearer <teacher or owner token>
 
 ## Cost
 
-One lesson is a small request. At `claude-opus-5` rates ($5 / $25 per MTok)
-expect on the order of **$0.01–0.03 per lesson** — a teacher's 22-period week
-is a few tens of cents, and a 26-teacher school preparing every week is a few
-dollars a week.
+Cost depends on the configured model, selected additions and number of exam
+questions. The workflow permits up to 10,000 output tokens for larger requests;
+measure actual token usage before estimating a week's cost.
 
 `NASAQ_AI_EFFORT` is the first lever if that matters; `NASAQ_AI_MODEL` is the
 second. Measure before dropping either — thin content that a teacher rewrites

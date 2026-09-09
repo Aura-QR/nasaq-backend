@@ -13,6 +13,8 @@ export class PreparationResource extends Document {
   @Prop({ type: M.Types.ObjectId, ref: 'Preparation', required: true })
   preparationId: Types.ObjectId;
   @Prop({ type: String, required: true, enum: RESOURCE_TYPES }) type: string;
+  // Only automated resources have this key. Manual resources remain unrestricted.
+  @Prop({ type: String, enum: RESOURCE_TYPES }) generationKey?: string;
   @Prop({ type: M.Types.ObjectId, ref: 'Exam', default: null })
   examId: Types.ObjectId;
   @Prop({ type: M.Types.ObjectId, ref: 'Project', default: null })
@@ -29,3 +31,7 @@ export const PreparationResourceSchema =
   SchemaFactory.createForClass(PreparationResource);
 PreparationResourceSchema.plugin(tenantScopedPlugin);
 PreparationResourceSchema.index({ schoolId: 1, preparationId: 1 });
+PreparationResourceSchema.index(
+  { schoolId: 1, preparationId: 1, generationKey: 1 },
+  { unique: true, partialFilterExpression: { generationKey: { $type: 'string' } } },
+);

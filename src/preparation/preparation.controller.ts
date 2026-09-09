@@ -21,6 +21,8 @@ import { CreatePreparationDto } from './dto/create-preparation.dto';
 import { UpdatePreparationDto } from './dto/update-preparation.dto';
 import { ReviewPreparationDto } from './dto/review-preparation.dto';
 import { BulkCreatePreparationDto } from './dto/bulk-create-preparation.dto';
+import { GeneratePreparationDto } from './dto/generate-preparation.dto';
+import { RESOURCE_TYPES } from './schemas/preparation-resource.schema';
 import {
   ApiOperation,
   ApiResponse,
@@ -267,6 +269,12 @@ export class PreparationController {
   @CheckAbilities({ action: 'read', subject: 'Preparation' })
   referenceLists() { return this.content.referenceLists(); }
 
+  @Get('generation-options')
+  @CheckAbilities({ action: 'read', subject: 'Preparation' })
+  generationOptions() {
+    return { version: 1, resourceTypes: RESOURCE_TYPES, includeContent: true, linkedExams: true };
+  }
+
   @Get(':id/student-view')
   @Roles(Role.STUDENT, Role.TEACHER, Role.OWNER, Role.MANAGER, Role.SUPERVISOR)
   studentView(@Param('id', MongoIdPipe) id: string, @CurrentUser() user: any) {
@@ -287,8 +295,8 @@ export class PreparationController {
   @Post(':id/generate')
   @CheckAbilities({ action: 'update', subject: 'Preparation' })
   @HttpCode(HttpStatus.OK)
-  async generateContent(@Param('id') id: string, @CurrentUser() user: any) {
-    return await this.lessonContent.generate(id, user);
+  async generateContent(@Param('id') id: string, @CurrentUser() user: any, @Body() options: GeneratePreparationDto) {
+    return await this.lessonContent.generate(id, user, options);
   }
 
   @Post(':id/submit')

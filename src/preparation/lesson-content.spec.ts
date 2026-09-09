@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import mongoose, { Model, Types } from 'mongoose';
 import { LessonContentService } from './lesson-content.service';
 import { Preparation, PreparationSchema } from './schemas/preparation.schema';
@@ -24,6 +24,7 @@ import {
   GradeLevel,
   GradeLevelSchema,
 } from '../grade-levels/schemas/grade-level.schema';
+import { ExamType } from '../exams/enums/exam-type.enum';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 
 /*
@@ -472,4 +473,127 @@ describe('LessonContentService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+  describe('selected lesson additions', () => {
+    const examOptions = { startDate: '2026-10-01', endDate: '2026-10-02', duration: 30, questionCount: 2, examType: ExamType.QUIZ };
+    const examQuestions = [
+      { question: 'ما متوسط ٢ و٤؟', options: ['٣', '٢', '٤', '٦'], correctAnswer: '٣' },
+      { question: 'ما متوسط ٤ و٦؟', options: ['٥', '٤', '٦', '١٠'], correctAnswer: '٥' },
+    ];
+    const allGenerated = { ...generated, resources: ['homework', 'activity', 'enrichment', 'quiz'].map(type => ({
+      type, title: `عنوان ${type}`, description: `تعليمات ${type}`,
+    })), exam: { questions: examQuestions } };
+
+    it('explicit [] generates no homework even when the workflow sends one', async () => {
+      const prep = await makePreparation();
+      const result = await asTenant(() => service.generate(String(prep._id), TEACHER, { resourceTypes: [] }));
+      expect(result.data.resourceResults).toEqual([]);
+      expect(await asTenant(() => resources.countDocuments({ preparationId: prep._id }).exec())).toBe(0);
+      expect(JSON.parse(fetchMock.mock.calls[0][1].body).resourceTypes).toEqual([]);
+    });
+
+    it('generates only selected additions without writing preparation fields', async () => {
+      fetchMock.mockResolvedValue(ok(allGenerated));
+      const prep = await makePreparation();
+      const result = await asTenant(() => service.generate(String(prep._id), TEACHER,
+        { resourceTypes: ['activity', 'enrichment'], includeContent: false }));
+      expect(result.data.filled).toEqual([]);
+      const records = await asTenant(() => resources.find({ preparationId: prep._id }).lean().exec());
+      expect(records.map(r => r.type).sort()).toEqual(['activity', 'enrichment']);
+      expect((await reload(prep._id)).warmUp || '').toBe('');
+    });
+
+    it('keeps a manual addition and adds missing types without duplicates on retry', async () => {
+      fetchMock.mockResolvedValue(ok(allGenerated));
+      const prep = await makePreparation();
+      await asTenant(() => resources.create({ preparationId: prep._id, type: 'activity', title: 'نشاط المعلم', description: 'تعليماته' }));
+      await asTenant(() => service.generate(String(prep._id), TEACHER, { resourceTypes: ['activity', 'enrichment'] }));
+      const result = await asTenant(() => service.generate(String(prep._id), TEACHER, { resourceTypes: ['activity', 'enrichment'] }));
+      expect(result.data.resourceResults.every(r => r.status === 'existing')).toBe(true);
+      expect(await asTenant(() => resources.countDocuments({ preparationId: prep._id }).exec())).toBe(2);
+      expect((await asTenant(() => resources.findOne({ preparationId: prep._id, type: 'activity' }).lean().exec())).title).toBe('نشاط المعلم');
+    });
+
+    it('reports an unsupported/empty addition from the workflow without silently creating homework', async () => {
+      const prep = await makePreparation();
+      const result = await asTenant(() => service.generate(String(prep._id), TEACHER, { resourceTypes: ['enrichment'] }));
+      expect(result.data.resourceResults).toEqual([expect.objectContaining({ type: 'enrichment', status: 'failed' })]);
+      expect(await asTenant(() => resources.countDocuments({ preparationId: prep._id }).exec())).toBe(0);
+    });
+
+    it('creates and links a dashboard exam through ExamsService with teacher-owned context', async () => {
+      fetchMock.mockResolvedValue(ok(allGenerated));
+      const classId = new Types.ObjectId(); const examId = new Types.ObjectId();
+      const examService = { create: jest.fn().mockResolvedValue({ _id: examId }) };
+      service = new LessonContentService(preparations, lessons, units, offerings, resources, library, examService as any);
+      const prep = await makePreparation({ classId });
+      const user = { ...TEACHER, permissions: ['school.exams.create'] };
+      const result = await asTenant(() => service.generate(String(prep._id), user, { resourceTypes: ['quiz'], exam: examOptions }));
+      expect(examService.create).toHaveBeenCalledWith(expect.objectContaining({
+        subjectOfferingId: String(offeringId), classIds: [String(classId)], duration: 30,
+        examType: 'quiz', questions: examQuestions,
+      }), user, String(prep._id));
+      expect(result.data.resourceResults).toEqual([expect.objectContaining({ type: 'quiz', status: 'created', examId: String(examId) })]);
+      const linked = await asTenant(() => resources.findOne({ preparationId: prep._id, type: 'quiz' }).lean().exec());
+      expect(String(linked.examId)).toBe(String(examId));
+      await asTenant(() => service.generate(String(prep._id), user, { resourceTypes: ['quiz'], exam: examOptions }));
+      expect(examService.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not bypass exam creation permissions or impersonate the teacher for an administrator', async () => {
+      const prep = await makePreparation({ classId: new Types.ObjectId() });
+      for (const user of [TEACHER, { ...OWNER, permissions: ['*'] }]) {
+        await expect(asTenant(() => service.generate(String(prep._id), user, { resourceTypes: ['quiz'], exam: examOptions })))
+          .rejects.toBeInstanceOf(ForbiddenException);
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('reports exam rule failure while retaining successful content and other additions', async () => {
+      fetchMock.mockResolvedValue(ok(allGenerated));
+      const examService = { create: jest.fn().mockRejectedValue(new BadRequestException('لا يوجد توزيع درجات')) };
+      service = new LessonContentService(preparations, lessons, units, offerings, resources, library, examService as any);
+      const prep = await makePreparation({ classId: new Types.ObjectId() });
+      const result = await asTenant(() => service.generate(String(prep._id), { ...TEACHER, permissions: ['school.exams.create'] },
+        { resourceTypes: ['homework', 'quiz'], exam: examOptions }));
+      expect(result.data.resourceResults).toEqual(expect.arrayContaining([
+        expect.objectContaining({ type: 'homework', status: 'created' }),
+        expect.objectContaining({ type: 'quiz', status: 'failed', message: 'لا يوجد توزيع درجات' }),
+      ]));
+      expect((await reload(prep._id)).warmUp).toBe('تمهيد مولّد');
+    });
+
+    it('rejects incomplete or invalid exam questions instead of creating a text-only quiz', async () => {
+      fetchMock.mockResolvedValue(ok({ ...allGenerated, exam: { questions: [examQuestions[0]] } }));
+      const examService = { create: jest.fn() };
+      service = new LessonContentService(preparations, lessons, units, offerings, resources, library, examService as any);
+      const prep = await makePreparation({ classId: new Types.ObjectId() });
+      const result = await asTenant(() => service.generate(String(prep._id), { ...TEACHER, permissions: ['school.exams.create'] },
+        { resourceTypes: ['quiz'], exam: examOptions }));
+      expect(result.data.resourceResults[0].status).toBe('failed');
+      expect(examService.create).not.toHaveBeenCalled();
+      expect(await asTenant(() => resources.countDocuments({ preparationId: prep._id }).exec())).toBe(0);
+    });
+
+    it('rejects content that became stale during the model request', async () => {
+      const prep = await makePreparation();
+      fetchMock.mockImplementation(async () => {
+        await asTenant(() => preparations.updateOne({ _id: prep._id }, { $set: { warmUp: 'كتبه المعلم الآن' }, $inc: { contentRevision: 1 } }).exec());
+        return ok(allGenerated);
+      });
+      await expect(asTenant(() => service.generate(String(prep._id), TEACHER, { resourceTypes: ['activity'] })))
+        .rejects.toBeInstanceOf(ConflictException);
+      expect((await reload(prep._id)).warmUp).toBe('كتبه المعلم الآن');
+      expect(await asTenant(() => resources.countDocuments({ preparationId: prep._id }).exec())).toBe(0);
+    });
+
+    it('does not generate into submitted or approved preparations', async () => {
+      for (const reviewStatus of ['pending', 'approved']) {
+        const prep = await makePreparation({ reviewStatus });
+        await expect(asTenant(() => service.generate(String(prep._id), TEACHER)))
+          .rejects.toBeInstanceOf(BadRequestException);
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
 });

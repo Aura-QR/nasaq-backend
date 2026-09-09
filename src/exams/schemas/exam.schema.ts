@@ -19,6 +19,9 @@ export const QuestionSchema = SchemaFactory.createForClass(Question);
 
 @Schema({ collection: 'exams', timestamps: true })
 export class Exam extends Document {
+  // Internal retry key for an exam generated from a preparation. Not accepted by the public DTO.
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Preparation' })
+  generatedFromPreparation?: mongoose.Types.ObjectId;
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
@@ -76,3 +79,6 @@ ExamSchema.index({ schoolId: 1, gradesCriteriaId: 1, examType: 1 });
 ExamSchema.index({ schoolId: 1, classIds: 1 });
 ExamSchema.index({ schoolId: 1, subjectOfferingId: 1 });
 ExamSchema.index({ schoolId: 1, createdAt: -1 });
+ExamSchema.index({ schoolId: 1, generatedFromPreparation: 1 }, {
+  unique: true, partialFilterExpression: { generatedFromPreparation: { $type: 'objectId' } },
+});

@@ -88,7 +88,7 @@ export class ExamsService {
     }
   }
 
-  async create(createExamDto: CreateExamDto, user: any) {
+  async create(createExamDto: CreateExamDto, user: any, generatedFromPreparation?: string) {
 
     const { subjectOfferingId, classIds, examType, questions, startDate, endDate, duration } = createExamDto;
 
@@ -132,6 +132,19 @@ export class ExamsService {
       classIds,
       subjectOfferingId,
     );
+
+    if (generatedFromPreparation) {
+      this.validateObjectId(generatedFromPreparation, 'preparation');
+      const existing = await this.examModel.findOne({ generatedFromPreparation }).exec();
+      if (existing) {
+        if (String(existing.createdBy) !== String(user.userId) ||
+            String(existing.subjectOfferingId) !== subjectOfferingId ||
+            !classIds.every((id) => existing.classIds.some((c) => String(c) === id))) {
+          throw new ForbiddenException('الامتحان المولّد لا يطابق المعلم أو مادة وفصل التحضير');
+        }
+        return transformExamResponse(existing);
+      }
+    }
 
     for (const classId of classIds) {
       this.validateObjectId(classId, 'class');
@@ -210,7 +223,7 @@ export class ExamsService {
 
 
 
-    const exam = await this.examModel.create({
+    const fields = {
        gradesCriteriaId: gradesCriteria._id,
        subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
        classIds,
@@ -221,7 +234,20 @@ export class ExamsService {
        duration,
        questions,
        createdBy: user.userId,
-    });
+    };
+    // Same creation rules as the dashboard, with an internal idempotency key.
+    let exam;
+    if (generatedFromPreparation) {
+      try {
+        exam = await this.examModel.findOneAndUpdate({ generatedFromPreparation },
+          { $setOnInsert: { ...fields, generatedFromPreparation } },
+          { upsert: true, new: true, runValidators: true }).exec();
+      } catch (error: any) {
+        if (error?.code !== 11000) throw error;
+        exam = await this.examModel.findOne({ generatedFromPreparation }).exec();
+        if (!exam) throw error;
+      }
+    } else exam = await this.examModel.create(fields);
 
     await exam.populate([
       ExamsService.GRADES_CRITERIA_POPULATE,
