@@ -383,6 +383,32 @@ describe('Structured preparation integration', () => {
     },
   );
 
+  /*
+   * The row prints "٣ تكليف". List rows have never carried `resources`, so
+   * the page used to fetch each preparation to count them — the same fan-out
+   * `isComplete` replaced. The count is already in hand here.
+   */
+  it('reports how many resources each row has', async () => {
+    const id = await completeDraft();
+    await asA(() =>
+      content.createResource(
+        id,
+        { type: 'activity', title: 'نشاط' },
+        users.teacher,
+      ),
+    );
+
+    const list = await http('get', '/preparation?page=1&limit=50').expect(200);
+    const row = list.body.data.find((item: any) => String(item._id) === id);
+    expect(row.resourcesCount).toBe(2);
+
+    const week = await http('get', '/preparation/weekly').expect(200);
+    const slot = week.body.days
+      .flatMap((day: any) => day.slots)
+      .find((s: any) => s.preparation && String(s.preparation._id) === id);
+    expect(slot.preparation.resourcesCount).toBe(2);
+  });
+
   it('reports isComplete=true for a preparation submit accepts', async () => {
     const id = await completeDraft();
 

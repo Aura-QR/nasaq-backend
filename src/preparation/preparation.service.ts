@@ -708,13 +708,17 @@ export class PreparationService {
     const counts = await this.content.resourceCounts(
       preparations.map((preparation: any) => preparation._id),
     );
-    const preparationsWithUrls = preparations.map((preparation) => ({
-      ...this.addUrlsToFiles(preparation, baseUrl),
-      isComplete: isPreparationComplete(
-        preparation,
-        counts.get(String((preparation as any)._id)) ?? 0,
-      ),
-    }));
+    const preparationsWithUrls = preparations.map((preparation) => {
+      const resourcesCount = counts.get(String((preparation as any)._id)) ?? 0;
+      return {
+        ...this.addUrlsToFiles(preparation, baseUrl),
+        // The row shows "٣ تكليف" and the page has no other way to know: list
+        // rows do not carry `resources`. It is the same count `isComplete`
+        // was computed from, so it costs nothing to say it out loud.
+        resourcesCount,
+        isComplete: isPreparationComplete(preparation, resourcesCount),
+      };
+    });
 
     if (isPaginationRequested) {
       return {
@@ -858,6 +862,7 @@ export class PreparationService {
             preparation: prep
               ? {
                   ...this.addUrlsToFiles({ ...prep, lecture: l }, baseUrl),
+                  resourcesCount: counts.get(String(prep._id)) ?? 0,
                   isComplete: isFinished(prep),
                 }
               : null,
