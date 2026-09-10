@@ -131,9 +131,7 @@ export class PreparationContentService {
   async submit(id: string, user: any) {
     const prep = await this.owned(id, user);
     if (!['draft', 'needs_revision'].includes(prep.reviewStatus))
-      throw new BadRequestException(
-        'يمكن إرسال المسودة أو التحضير المطلوب تعديله فقط',
-      );
+      throw new BadRequestException('هذا التحضير مكتمل بالفعل');
     const resources = await this.resources.find({ preparationId: id });
 
     // The same four requirements the list endpoint reports as `isComplete`,
@@ -170,7 +168,7 @@ export class PreparationContentService {
       },
       { $set: { objectives } },
     );
-    return { message: 'تم إرسال التحضير للمراجعة', data: updated };
+    return { message: 'تم اكتمال التحضير', data: updated };
   }
   private async validateResource(dto: any, prep: any) {
     if (dto.examId && dto.projectId)
