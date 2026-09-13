@@ -359,6 +359,28 @@ export class TripService {
     const record = await this.getRecord(studentId, academicYearId);
     const tripIndex = record.trips.findIndex(t => (t as any)._id.toString() === tripId);
     if (tripIndex === -1) throw new NotFoundException('الرحلة غير موجودة');
+
+    /*
+     * Money held on this trip would leave with it. Every payment and refund is
+     * recorded inside the trip's installments, so splicing a paid trip out
+     * erases the record that the school ever took the money.
+     *
+     * The mobile app refused this on the client — "refund first, a refund
+     * leaves a trail, a delete leaves nothing" — but read the paid amount from
+     * a field the record does not have, so its guard never fired. A rule about
+     * money cannot live only in a client. Summed from the installments rather
+     * than read from `totalPaid`, which is derived from them.
+     */
+    const held = (record.trips[tripIndex].installments ?? []).reduce(
+      (sum, installment) => sum + (Number(installment?.paidAmount) || 0),
+      0,
+    );
+    if (held > 0) {
+      throw new BadRequestException(
+        `لا يمكن حذف رحلة سُدّد منها ${held}. استرجع المبلغ أولًا ثم احذفها.`,
+      );
+    }
+
     record.trips.splice(tripIndex, 1);
     await record.save();
     return { message: 'تم حذف الرحلة بنجاح' };
