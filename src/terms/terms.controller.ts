@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Query,
 } from '@nestjs/common';
 import { TermsService } from './terms.service';
 import { CreateTermDto } from './dto/create-term.dto';
@@ -52,6 +53,15 @@ export class TermsController {
       targetYearId,
       createTermsBulkDto.terms,
     );
+  }
+
+  @Get()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "List the school's terms, or one academic year's with ?academicYearId" })
+  @ApiResponse({ status: 200, description: 'Terms fetched successfully' })
+  @ApiResponse({ status: 400, description: 'academicYearId is not a valid id' })
+  async findAll(@Query('academicYearId') academicYearId?: string) {
+    return await this.termsService.findAll(academicYearId);
   }
 
   @Get('by-year/:academicYearId')

@@ -60,6 +60,26 @@ export class TermsService {
     return this.termModel.insertMany(termDocs);
   }
 
+  /**
+   * The school's terms — every year's, most recent first — or one year's.
+   *
+   * The mobile app's timetable and teaching-plan screens load this before
+   * anything else, and the route did not exist: both opened straight onto an
+   * error with nothing behind it. The web client already falls back here with
+   * `?academicYearId=` when `by-year` is unavailable.
+   *
+   * Scoped to the caller's school by the tenant plugin, like every read.
+   */
+  async findAll(academicYearId?: string) {
+    if (academicYearId !== undefined && academicYearId !== '') {
+      if (!mongoose.Types.ObjectId.isValid(academicYearId)) {
+        throw new BadRequestException('معرّف السنة الدراسية غير صالح');
+      }
+      return this.findByAcademicYear(academicYearId);
+    }
+    return this.termModel.find().sort({ startDate: -1, order: 1 }).exec();
+  }
+
   async findByAcademicYear(academicYearId: string) {
     return this.termModel
       .find({ academicYearId: new mongoose.Types.ObjectId(academicYearId) })
