@@ -23,6 +23,7 @@ const ALL: EntityPermission = { read: true, add: true, edit: true, delete: true 
 const NONE: EntityPermission = { read: false, add: false, edit: false, delete: false };
 
 export const OWNER_PERMISSIONS: RolePermissions = {
+  staffAttendance: ALL,
   students: ALL,
   teachers: ALL,
   classes: ALL,
@@ -60,6 +61,9 @@ export const OWNER_PERMISSIONS: RolePermissions = {
  * on OWNER: creation is a teacher-only action enforced in the services.
  */
 export const MANAGER_PERMISSIONS: RolePermissions = {
+  // Deliberate default deny, including pre-version-2 tokens. Personal
+  // location check-in remains role-based and does not need this permission.
+  staffAttendance: NONE,
   students: ALL,
   teachers: ALL,
   classes: ALL,

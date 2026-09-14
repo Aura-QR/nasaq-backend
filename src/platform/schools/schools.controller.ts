@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { SchoolsService } from './schools.service';
 import { RegisterSchoolDto } from './dto/register-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
@@ -82,7 +83,19 @@ export class SchoolsController {
   async updateMySettings(
     @CurrentSchool() schoolId: string,
     @Body() updateSettingsDto: UpdateSchoolSettingsDto,
+    @CurrentUser() user: any,
   ) {
+    // A general schoolSettings grant must not let an assistant move the
+    // attendance geofence, approve their own network or disable verification.
+    const attendanceSettings = [
+      'location', 'schoolNetworkIps', 'checkInRadiusMeters',
+      'staffCheckInEnabled', 'teacherCheckInEnabled', 'timezone',
+      'workSchedule', 'workStartTime',
+    ];
+    if (![Role.OWNER, Role.SUPERVISOR].includes(user.role) &&
+        attendanceSettings.some(key => Object.prototype.hasOwnProperty.call(updateSettingsDto, key))) {
+      throw new ForbiddenException('تعديل إعدادات التحقق من الحضور والدوام متاح للمالك والمشرف فقط');
+    }
     return this.schoolsService.updateMySettings(schoolId, updateSettingsDto);
   }
 }

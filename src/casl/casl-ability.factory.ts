@@ -12,6 +12,7 @@ export type Subjects =
   | 'Grade'
   | 'Attendance'
   | 'TeacherAttendance'
+  | 'StaffAttendance'
   | 'Lecture'
   | 'GradesCriteria'
   | 'Preparation'
@@ -37,6 +38,7 @@ const ENTITY_TO_SUBJECT_MAP: Record<string, Subjects> = {
   lectures: 'Lecture',
   attendance: 'Attendance',
   teacherAttendance: 'TeacherAttendance',
+  staffAttendance: 'StaffAttendance',
   gradesCriteria: 'GradesCriteria',
   exams: 'Exam',
   projects: 'Project',

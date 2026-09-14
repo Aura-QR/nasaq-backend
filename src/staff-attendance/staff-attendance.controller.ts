@@ -13,6 +13,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 import { Role } from '../auth/enums/role.enum';
 import {
   CreateManualStaffAttendanceDto,
@@ -68,6 +69,7 @@ export class StaffAttendanceController {
   }
 
   @Get('staff')
+  @CheckAbilities({ action: 'read', subject: 'StaffAttendance' })
   @ApiOperation({
     summary: 'Eligible managers and supervisors for manual entry and filters',
   })
@@ -84,6 +86,7 @@ export class StaffAttendanceController {
   }
 
   @Get('absent')
+  @CheckAbilities({ action: 'read', subject: 'StaffAttendance' })
   @ApiOperation({
     summary: 'Managers/supervisors with no record on a school working day',
   })
@@ -92,6 +95,7 @@ export class StaffAttendanceController {
   }
 
   @Get('summary')
+  @CheckAbilities({ action: 'read', subject: 'StaffAttendance' })
   @ApiOperation({
     summary: 'Attendance totals per staff member for an inclusive period',
   })
@@ -100,12 +104,14 @@ export class StaffAttendanceController {
   }
 
   @Get()
+  @CheckAbilities({ action: 'read', subject: 'StaffAttendance' })
   @ApiOperation({ summary: 'Paginated staff attendance records' })
   findAll(@CurrentUser() user: any, @Query() query: QueryStaffAttendanceDto) {
     return this.service.findAll(user, query);
   }
 
   @Post()
+  @CheckAbilities({ action: 'create', subject: 'StaffAttendance' })
   @ApiOperation({
     summary: 'Record manual attendance for a manager or supervisor',
   })
@@ -117,6 +123,7 @@ export class StaffAttendanceController {
   }
 
   @Patch(':id')
+  @CheckAbilities({ action: 'update', subject: 'StaffAttendance' })
   @ApiOperation({ summary: 'Correct staff attendance times or notes' })
   update(
     @CurrentUser() user: any,
@@ -127,6 +134,7 @@ export class StaffAttendanceController {
   }
 
   @Delete(':id')
+  @CheckAbilities({ action: 'delete', subject: 'StaffAttendance' })
   @ApiOperation({ summary: 'Delete a staff attendance record' })
   delete(@CurrentUser() user: any, @Param('id') id: string) {
     return this.service.delete(user, id);

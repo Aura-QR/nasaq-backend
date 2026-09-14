@@ -1,3 +1,5 @@
+import { BadRequestException } from '@nestjs/common';
+
 export function calculateHaversineDistance(
   coords1: { lat: number; lng: number },
   coords2: { lat: number; lng: number },
@@ -26,29 +28,60 @@ export function normalizeDate(dateInput?: string | Date): Date {
   );
 }
 
+/** Resolve a wall-clock time using the offset on that date, including DST.
+ * Ambiguous/nonexistent local times need an explicit ISO offset instead.
+ */
 export function parseCheckInTime(
   dateInput: string | Date,
   timeOrIsoStr: string,
+  timezone = 'Asia/Riyadh',
 ): Date {
-  if (timeOrIsoStr.includes('T') || timeOrIsoStr.includes('Z')) {
-    return new Date(timeOrIsoStr);
+  const invalid = () => new BadRequestException('وقت غير صالح؛ استخدم HH:mm بتوقيت المدرسة أو ISO مع إزاحة زمنية');
+  if (typeof timeOrIsoStr !== 'string') throw invalid();
+  const instantPattern = /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+  const validDate = (key: string) => {
+    const day = new Date(key + 'T00:00:00.000Z');
+    return Number.isFinite(day.getTime()) && day.toISOString().slice(0, 10) === key;
+  };
+  if (instantPattern.test(timeOrIsoStr)) {
+    const instant = new Date(timeOrIsoStr);
+    if (!validDate(timeOrIsoStr.slice(0, 10)) || !Number.isFinite(instant.getTime())) throw invalid();
+    return instant;
   }
-  if (/^\d{1,2}:\d{2}$/.test(timeOrIsoStr)) {
-    const normDate = normalizeDate(dateInput);
-    const [hours, minutes] = timeOrIsoStr.split(':').map(Number);
-    return new Date(
-      Date.UTC(
-        normDate.getUTCFullYear(),
-        normDate.getUTCMonth(),
-        normDate.getUTCDate(),
-        hours,
-        minutes,
-      ),
-    );
-  }
-  return new Date(timeOrIsoStr);
-}
 
+  // Retain support for old offset-less ISO clients, interpreting their clock
+  // in the school timezone as well. Explicit-offset ISO always stays an instant.
+  const localIso = timeOrIsoStr.match(/^(\d{4}-\d{2}-\d{2})T((?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?)$/);
+  const date = localIso ? localIso[1] : dateInput instanceof Date
+    ? dateInput.toISOString().slice(0, 10) : String(dateInput);
+  const time = localIso ? localIso[2] : timeOrIsoStr;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !validDate(date) ||
+      !/^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?$/.test(time)) throw invalid();
+
+  const desired = new Date(date + 'T' + (time.length === 5 ? time + ':00' : time) + 'Z').getTime();
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone || 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
+    });
+    const wallAsUtc = (timestamp: number) => {
+      const parts = formatter.formatToParts(new Date(timestamp));
+      const read = (key: string) => Number(parts.find(p => p.type === key)?.value);
+      return Date.UTC(read('year'), read('month') - 1, read('day'), read('hour'), read('minute'), read('second'));
+    };
+    const whole = Math.floor(desired / 1000) * 1000;
+    const offsets = new Set([-36, 0, 36].map(h => {
+      const sample = whole + h * 3600000;
+      return wallAsUtc(sample) - sample;
+    }));
+    const matches = [...offsets].map(offset => desired - offset)
+      .filter(candidate => wallAsUtc(candidate) === whole);
+    if (matches.length !== 1) throw invalid();
+    return new Date(matches[0]);
+  } catch {
+    throw invalid();
+  }
+}
 /**
  * How many minutes past the school's official start did this check-in land?
  *

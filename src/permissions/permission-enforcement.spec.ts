@@ -67,19 +67,11 @@ function routes(): Route[] {
  */
 const NO_ABILITY_BY_DESIGN: Record<string, string> = {
   'TeacherAttendanceController.detectClientIp': 'reads the caller\'s own IP; changes nothing',
-  // Staff attendance management is being moved onto a `staffAttendance` key in
-  // docs/STAFF-ATTENDANCE-REVIEW.md, issue 1. Self check-in stays role-based.
+  // Personal attendance never depends on the management permission.
   'StaffAttendanceController.checkIn': 'self check-in by location',
   'StaffAttendanceController.checkOut': 'self check-out by location',
   'StaffAttendanceController.getMine': 'own history',
   'StaffAttendanceController.detectIp': 'reads the caller\'s own IP; changes nothing',
-  'StaffAttendanceController.staff': 'pending staffAttendance key (review issue 1)',
-  'StaffAttendanceController.absent': 'pending staffAttendance key (review issue 1)',
-  'StaffAttendanceController.summary': 'pending staffAttendance key (review issue 1)',
-  'StaffAttendanceController.findAll': 'pending staffAttendance key (review issue 1)',
-  'StaffAttendanceController.create': 'pending staffAttendance key (review issue 1)',
-  'StaffAttendanceController.update': 'pending staffAttendance key (review issue 1)',
-  'StaffAttendanceController.delete': 'pending staffAttendance key (review issue 1)',
 };
 
 describe('permission enforcement — route sweep', () => {

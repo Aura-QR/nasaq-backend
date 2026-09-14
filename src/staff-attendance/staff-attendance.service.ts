@@ -271,6 +271,7 @@ export class StaffAttendanceService {
   }
 
   async createManual(user: any, dto: CreateManualStaffAttendanceDto) {
+    this.assertNotOwnRecord(user, dto.staffId);
     const staff = await this.staffMember(user, dto.staffId);
     const settings = await this.settings(user);
     const date = this.date(dto.date);
@@ -504,15 +505,18 @@ export class StaffAttendanceService {
       _id: this.objectId(id),
     });
     if (!record) throw new NotFoundException('سجل الحضور غير موجود');
+    this.assertNotOwnRecord(user, record.staffId);
     if (dto.checkInAt !== undefined || dto.checkOutAt !== undefined) {
       const settings = await this.settings(user);
       const schedule = resolveDaySchedule(settings, record.date);
-      if (dto.checkInAt !== undefined) {
-        record.checkInAt = this.manualTime(
-          dto.checkInAt,
-          record.date,
-          settings,
-        );
+      const checkInAt = dto.checkInAt !== undefined
+        ? this.manualTime(dto.checkInAt, record.date, settings) : record.checkInAt;
+      const checkOutAt = dto.checkOutAt !== undefined
+        ? this.manualTime(dto.checkOutAt, record.date, settings) : record.checkOutAt;
+      const checkInChanged = checkInAt.getTime() !== record.checkInAt.getTime();
+      const checkOutChanged = checkOutAt?.getTime() !== record.checkOutAt?.getTime();
+      if (checkInChanged) {
+        record.checkInAt = checkInAt;
         record.method = 'manual';
         record.coordinates = null;
         record.distanceMeters = null;
@@ -526,12 +530,8 @@ export class StaffAttendanceService {
         record.expectedWorkMinutes = schedule.expectedWorkMinutes;
         record.isWorkingDay = schedule.isWorkingDay;
       }
-      if (dto.checkOutAt !== undefined) {
-        record.checkOutAt = this.manualTime(
-          dto.checkOutAt,
-          record.date,
-          settings,
-        );
+      if (checkOutChanged) {
+        record.checkOutAt = checkOutAt;
         record.checkOutMethod = 'manual';
         record.checkOutCoordinates = null;
         record.checkOutDistanceMeters = null;
@@ -543,7 +543,7 @@ export class StaffAttendanceService {
           settings.timezone,
         );
       }
-      if (record.checkOutAt)
+      if ((checkInChanged || checkOutChanged) && record.checkOutAt)
         record.workMinutes = this.workMinutes(
           record.checkInAt,
           record.checkOutAt,
@@ -556,11 +556,21 @@ export class StaffAttendanceService {
   }
 
   async delete(user: any, id: string) {
-    const record = await this.records.findOneAndDelete({
+    const filter = {
       ...this.scope(user),
       _id: this.objectId(id),
-    });
+    };
+    const record = await this.records.findOne(filter).select('staffId').lean();
     if (!record) throw new NotFoundException('سجل الحضور غير موجود');
+    this.assertNotOwnRecord(user, record.staffId);
+    const removed = await this.records.findOneAndDelete({ ...filter, staffId: record.staffId });
+    if (!removed) throw new NotFoundException('سجل الحضور غير موجود');
     return { status: true, message: 'تم حذف سجل الحضور بنجاح' };
+  }
+
+  private assertNotOwnRecord(user: any, staffId: unknown) {
+    if (String(staffId) === String(user.userId)) {
+      throw new ForbiddenException('لا يمكن تسجيل أو تعديل أو حذف حضورك بنفسك. اطلب ذلك من مالك المدرسة.');
+    }
   }
 }

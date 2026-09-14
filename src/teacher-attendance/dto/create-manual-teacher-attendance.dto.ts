@@ -16,8 +16,8 @@ export class CreateManualTeacherAttendanceDto {
   // Accepts both forms parseCheckInTime() understands: 24h HH:mm, or a full
   // ISO timestamp. Kept permissive on purpose — narrowing it to HH:mm would
   // break any caller already sending ISO.
-  @ApiProperty({ description: 'Arrival time (24h HH:mm, or an ISO date string)', example: '07:45' })
-  @Matches(/^(([01]\d|2[0-3]):[0-5]\d|\d{4}-\d{2}-\d{2}T[\d:.]+Z?)$/, {
+  @ApiProperty({ description: 'Arrival time (HH:mm in the school timezone, or an ISO instant with offset)', example: '07:45' })
+  @Matches(/^(([01]\d|2[0-3]):[0-5]\d|\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)$/, {
     message: 'checkInAt must be 24h HH:mm (e.g., 07:45) or an ISO date string',
   })
   @IsString()

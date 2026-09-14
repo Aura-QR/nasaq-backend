@@ -186,8 +186,8 @@ export class TeacherAttendanceService {
       throw new ConflictException('تم تسجيل حضور هذا المعلم لهذا اليوم بالفعل');
     }
 
-    const checkInAtDate = parseCheckInTime(dto.date, dto.checkInAt);
     const settings = await this.getSchoolSettings(user.schoolId);
+    const checkInAtDate = parseCheckInTime(dto.date, dto.checkInAt, settings?.timezone);
     const daySchedule = resolveDaySchedule(settings, normDate);
 
     const attendance = await this.teacherAttendanceModel.create({
@@ -603,13 +603,25 @@ export class TeacherAttendanceService {
     // Every derived figure is measured against the school's hours for that
     // weekday, so the schedule is resolved once and reused below.
     const settings =
-      dto.checkInAt || dto.checkOutAt
+      dto.checkInAt !== undefined || dto.checkOutAt !== undefined
         ? await this.getSchoolSettings(user.schoolId)
         : null;
     const daySchedule = settings ? resolveDaySchedule(settings, record.date) : null;
 
-    if (dto.checkInAt) {
-      record.checkInAt = parseCheckInTime(record.date, dto.checkInAt);
+    const checkInAt = dto.checkInAt !== undefined
+      ? parseCheckInTime(record.date, dto.checkInAt, settings?.timezone) : record.checkInAt;
+    const checkOutAt = dto.checkOutAt !== undefined
+      ? parseCheckInTime(record.date, dto.checkOutAt, settings?.timezone) : record.checkOutAt;
+    const checkInChanged = checkInAt.getTime() !== record.checkInAt.getTime();
+    const checkOutChanged = checkOutAt?.getTime() !== record.checkOutAt?.getTime();
+
+    if (checkInChanged) {
+      record.checkInAt = checkInAt;
+      record.method = 'manual';
+      record.coordinates = null;
+      record.distanceMeters = null;
+      record.verification = { gps: false, network: false };
+      record.mockLocationSuspected = false;
 
       // Lateness is derived from checkInAt, so correcting the time has to
       // correct the figure with it — otherwise a stale value survives the fix.
@@ -622,9 +634,13 @@ export class TeacherAttendanceService {
       record.isWorkingDay = daySchedule?.isWorkingDay ?? true;
     }
 
-    if (dto.checkOutAt) {
-      record.checkOutAt = parseCheckInTime(record.date, dto.checkOutAt);
+    if (checkOutChanged) {
+      record.checkOutAt = checkOutAt;
       record.checkOutMethod = 'manual';
+      record.checkOutCoordinates = null;
+      record.checkOutDistanceMeters = null;
+      record.checkOutVerification = { gps: false, network: false };
+      record.checkOutMockLocationSuspected = false;
       record.earlyLeaveMinutes = computeEarlyLeaveMinutes(
         record.checkOutAt,
         daySchedule?.endTime,
@@ -633,7 +649,7 @@ export class TeacherAttendanceService {
     }
 
     // Either timestamp moving changes the duration, so this runs after both.
-    if ((dto.checkInAt || dto.checkOutAt) && record.checkOutAt) {
+    if ((checkInChanged || checkOutChanged) && record.checkOutAt) {
       record.workMinutes = this.computeWorkMinutes(record.checkInAt, record.checkOutAt);
     }
 
