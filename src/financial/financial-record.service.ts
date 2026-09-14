@@ -172,52 +172,52 @@ export class FinancialRecordService {
    * - no installment's amount is below what has been paid on it;
    * - the amounts total the net fee whenever the student owes anything.
    */
-  rebalanceInstallments(installments: any[], netFee: number): void {
+  rebalanceInstallments(
+    installments: any[],
+    netFee: number,
+    { force = false }: { force?: boolean } = {},
+  ): void {
     const paidOn = (installment: any) => Number(installment?.paidAmount) || 0;
+    const amountOf = (installment: any) => Number(installment?.amount) || 0;
     const totalPaid = installments.reduce((sum, i) => sum + paidOn(i), 0);
-    const remaining = netFee - totalPaid;
     const open = installments.filter(i => i.status !== PaymentStatus.PAID);
+    const settled = installments.filter(i => i.status === PaymentStatus.PAID);
 
     // Already consistent: leave the schedule alone. A recalculation that
     // changed nothing — saving a student's profile, re-saving the same fee
     // criteria — must not reshuffle amounts a parent has already been told.
-    const scheduled = installments.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-    const coherent = installments.every(i => (Number(i.amount) || 0) >= paidOn(i));
-    if (coherent && (scheduled === netFee || (remaining <= 0 && open.length === 0))) {
-      return;
+    // `force` is for an explicit, reviewed correction of a known record.
+    if (!force) {
+      const scheduled = installments.reduce((sum, i) => sum + amountOf(i), 0);
+      const coherent = installments.every(i => amountOf(i) >= paidOn(i));
+      if (coherent && (scheduled === netFee || (netFee <= totalPaid && open.length === 0))) {
+        return;
+      }
     }
 
     const settle = (installment: any) => {
       const paid = paidOn(installment);
       installment.status =
-        paid >= Number(installment.amount)
+        paid >= amountOf(installment)
           ? PaymentStatus.PAID
           : paid > 0
           ? PaymentStatus.PARTIAL
           : PaymentStatus.PENDING;
     };
 
-    if (remaining <= 0) {
-      // Nothing more is owed — or a discount now leaves the student in credit,
-      // which is a refund to make, not an amount to push below what was paid.
-      open.forEach((installment) => {
-        installment.amount = paidOn(installment);
-        settle(installment);
-      });
-      return;
-    }
-
     if (open.length === 0) {
       // Every installment is settled but more is owed: the fee went up after
       // the last payment. It gets an installment of its own, due now, so it
       // can be collected rather than owed and unpayable.
+      const owed = netFee - totalPaid;
+      if (owed <= 0) return;
       const lastNumber = installments.reduce(
         (max, i) => Math.max(max, Number(i.installmentNumber) || 0),
         0,
       );
       installments.push({
         installmentNumber: lastNumber + 1,
-        amount: remaining,
+        amount: owed,
         dueDate: new Date(),
         status: PaymentStatus.PENDING,
         paidAmount: 0,
@@ -226,20 +226,54 @@ export class FinancialRecordService {
       return;
     }
 
-    // Share what is still owed across the open installments, on top of what
-    // has already been paid on each.
-    const base = Math.floor(remaining / open.length);
-    const extra = remaining - base * open.length;
-    open.forEach((installment, index) => {
-      installment.amount = paidOn(installment) + (index < extra ? base + 1 : base);
-      settle(installment);
-    });
+    /*
+     * Split what the open installments must carry between them *evenly*, the
+     * way a new schedule is built, and never set one below what has been paid
+     * on it. An installment whose share would fall below its paid amount is
+     * closed at that amount and taken out of the split; the rest is shared
+     * again.
+     *
+     * An even split of the amounts is what restores the plan the parent was
+     * given. The first version of this shared the *remaining balance* evenly
+     * on top of what was paid, which is arithmetically consistent but piles
+     * the difference onto a partly paid installment: 15,000 over three with
+     * 3,000 paid on the first came out 7,000 / 4,000 / 4,000 instead of the
+     * plan's 5,000 / 5,000 / 5,000 — and the first installment, usually the
+     * one already past due, showed twice the arrears it really had.
+     *
+     * Settled installments keep their amounts: a closed installment stays
+     * closed. A negative pool — a discount that leaves the student in credit —
+     * closes everything at what was paid.
+     */
+    let active = [...open];
+    let pool = netFee - settled.reduce((sum, i) => sum + amountOf(i), 0);
+    while (active.length > 0) {
+      const base = Math.floor(pool / active.length);
+      const extra = pool - base * active.length;
+      const targets = active.map((_, index) => base + (index < extra ? 1 : 0));
+      const tooLow = active.filter((installment, index) => targets[index] < paidOn(installment));
+
+      if (tooLow.length === 0) {
+        active.forEach((installment, index) => {
+          installment.amount = targets[index];
+          settle(installment);
+        });
+        break;
+      }
+
+      tooLow.forEach((installment) => {
+        installment.amount = paidOn(installment);
+        settle(installment);
+        pool -= paidOn(installment);
+      });
+      active = active.filter((installment) => !tooLow.includes(installment));
+    }
   }
 
   /** Rebalance a tuition, bus or trip section and bring its totals with it. */
-  rebalanceSection(section: any): void {
+  rebalanceSection(section: any, options: { force?: boolean } = {}): void {
     if (!section || !Array.isArray(section.installments)) return;
-    this.rebalanceInstallments(section.installments, this.effectiveNetFee(section));
+    this.rebalanceInstallments(section.installments, this.effectiveNetFee(section), options);
     section.totalPaid = section.installments.reduce(
       (sum: number, i: any) => sum + (Number(i.paidAmount) || 0),
       0,

@@ -113,6 +113,62 @@ describe('repair-installment-totals', () => {
     expect(changes[0].section.installments[2]).toMatchObject({ amount: 200, status: 'pending' });
   });
 
+  describe('--reshape on named records', () => {
+    // The four states the first run left on a live system: totals right, the
+    // stranded amount piled onto the partly paid first installment.
+    const liveStates: [string, number, number, number, number[]][] = [
+      ['طارق', 15000, 7000, 3000, [5000, 5000, 5000]],
+      ['يزيد', 16000, 6000, 1000, [5334, 5333, 5333]],
+      ['وريف', 11000, 4890, 1834, [3667, 3667, 3666]],
+      ['ياسمين', 11000, 5000, 2000, [3667, 3667, 3666]],
+    ];
+    const lopsided = (netFee: number, first: number, paid: number) => {
+      const rest = (netFee - first) / 2;
+      const r = record([inst(1, first, paid), inst(2, rest), inst(3, rest)]);
+      r.tuition.fee = r.tuition.grossFee = r.tuition.netFee = netFee;
+      return r;
+    };
+
+    it('restores each of the four to its plan, payments untouched', async () => {
+      const docs = liveStates.map(([, netFee, first, paid]) => lopsided(netFee, first, paid));
+      await db.collection('studentFinancialRecords').insertMany(docs);
+
+      const summary = await repairAll(db, { apply: true, reshapeRecordIds: docs.map((d) => String(d._id)) });
+      expect(summary).toMatchObject({ scanned: 4, affected: 4, repaired: 4 });
+
+      for (const [index, [, netFee, , paid, plan]] of liveStates.entries()) {
+        const after: any = await db.collection('studentFinancialRecords').findOne({ _id: docs[index]._id });
+        expect(after.tuition.installments.map((i: any) => i.amount)).toEqual(plan);
+        expect(after.tuition.installments[0].paidAmount).toBe(paid);
+        expect(after.tuition.installments[0].payments).toHaveLength(1);
+        expect(after.tuition.installments[0].status).toBe('partial');
+        expect(after.tuition.totalPaid).toBe(paid);
+        expect(after.tuition.installments.reduce((s: number, i: any) => s + i.amount, 0)).toBe(netFee);
+      }
+    });
+
+    it('leaves them alone on a normal run — they already add up', async () => {
+      const doc = lopsided(15000, 7000, 3000);
+      await db.collection('studentFinancialRecords').insertOne(doc);
+      expect(await repairAll(db, { apply: true })).toMatchObject({ affected: 0 });
+    });
+
+    it('touches only the records it is given', async () => {
+      const named = lopsided(15000, 7000, 3000);
+      const other = lopsided(11000, 5000, 2000);
+      await db.collection('studentFinancialRecords').insertMany([named, other]);
+
+      await repairAll(db, { apply: true, reshapeRecordIds: [String(named._id)] });
+      const untouched: any = await db.collection('studentFinancialRecords').findOne({ _id: other._id });
+      expect(untouched.tuition.installments.map((i: any) => i.amount)).toEqual([5000, 3000, 3000]);
+    });
+
+    it('refuses to run without an explicit list', async () => {
+      await expect(repairAll(db, { apply: true, reshapeRecordIds: [] })).rejects.toThrow('--records');
+      await expect(repairAll(db, { apply: true, reshapeRecordIds: ['not-an-id'] })).rejects.toThrow('--records');
+    });
+  });
+
   it('is idempotent', async () => {
     await db.collection('studentFinancialRecords').insertOne(
       record([inst(1, 30000, 30000), inst(2, 25000, 25000), inst(3, 25000, 25000)]),

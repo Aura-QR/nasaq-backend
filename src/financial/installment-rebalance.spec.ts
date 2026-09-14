@@ -39,8 +39,10 @@ describe('FinancialRecordService.rebalanceInstallments', () => {
       svc.rebalanceInstallments(installments, 100000);
 
       expect(total(installments, 'amount')).toBe(100000);
-      // 60,000 still owed, 30,000 each on top of what was paid on each.
-      expect(installments.map((i) => i.amount)).toEqual([30000, 40000, 30000]);
+      // The settled first installment keeps 30,000; the other 70,000 splits
+      // evenly — not 40,000 / 30,000, which piled the difference onto the
+      // partly paid one.
+      expect(installments.map((i) => i.amount)).toEqual([30000, 35000, 35000]);
       expect(installments[1].amount).toBeGreaterThan(installments[1].paidAmount);
     });
 
@@ -65,6 +67,55 @@ describe('FinancialRecordService.rebalanceInstallments', () => {
       expect(section.totalPaid).toBe(90000);
       expect(section.status).toBe(FeeStatus.PAID);
     });
+  });
+
+  /*
+   * The four records the first repair run reshaped on a live system. It kept
+   * the money right but piled the stranded amount onto each student's first,
+   * partly paid installment. Forced, the rule restores the plan the parent was
+   * given — the same amounts buildInstallments produces for that fee.
+   */
+  describe.each([
+    ['طارق',   15000, [7000, 3000], [5000, 5000, 5000]],
+    ['يزيد',   16000, [6000, 1000], [5334, 5333, 5333]],
+    ['وريف',   11000, [4890, 1834], [3667, 3667, 3666]],
+    ['ياسمين', 11000, [5000, 2000], [3667, 3667, 3666]],
+  ])('%s: a lopsided repair corrected back to the plan', (_, netFee, [firstAmount, firstPaid], plan) => {
+    const lopsided = () => {
+      const rest = (netFee - firstAmount) / 2;
+      return [inst(1, firstAmount, firstPaid), inst(2, rest), inst(3, rest)];
+    };
+
+    it('is what a fresh schedule for that fee would be', () => {
+      const installments = lopsided();
+      svc.rebalanceInstallments(installments, netFee, { force: true });
+
+      const fresh = svc.buildInstallments(netFee, { numberOfInstallments: 3, dueDates: ['a', 'b', 'c'] } as any);
+      expect(installments.map((i) => i.amount)).toEqual(plan);
+      expect(installments.map((i) => i.amount)).toEqual(fresh.map((i: any) => i.amount));
+      // Nothing that was paid moved, and the first installment is only partly due.
+      expect(installments[0].paidAmount).toBe(firstPaid);
+      expect(installments[0].status).toBe(PaymentStatus.PARTIAL);
+      expect(total(installments, 'amount')).toBe(netFee);
+    });
+
+    it('is not reshaped by an ordinary recalculation — it already adds up', () => {
+      const installments = lopsided();
+      svc.rebalanceInstallments(installments, netFee);
+      expect(installments[0].amount).toBe(firstAmount);
+    });
+  });
+
+  it('closes a partly paid installment at what was paid when its even share would be less', () => {
+    // 6,000 over three would be 2,000 each, but 3,000 is already paid on the
+    // first: it closes at 3,000 and the other two share the remaining 3,000.
+    const installments = [inst(1, 5000, 3000), inst(2, 5000), inst(3, 5000)];
+    svc.rebalanceInstallments(installments, 6000);
+    expect(installments.map((i) => [i.amount, i.status])).toEqual([
+      [3000, PaymentStatus.PAID],
+      [1500, PaymentStatus.PENDING],
+      [1500, PaymentStatus.PENDING],
+    ]);
   });
 
   it('leaves a schedule alone when nothing changed', () => {

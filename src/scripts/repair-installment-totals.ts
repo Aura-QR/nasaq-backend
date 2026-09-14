@@ -20,8 +20,23 @@
  * Idempotent, and each write only lands if the record has not been updated
  * since it was read.
  *
- *   npm run repair:installment-totals -- --dry-run
- *   npm run repair:installment-totals
+ *   node dist/scripts/repair-installment-totals.js --dry-run
+ *   node dist/scripts/repair-installment-totals.js
+ *
+ * Reshaping named records (--reshape --records id,id,...):
+ *
+ * The first run of this script used a version of the rule that shared the
+ * stranded amount across a student's open installments on top of what was
+ * paid, piling it onto the partly paid first installment — right totals, the
+ * wrong schedule (15,000 over three with 3,000 paid became 7,000 / 4,000 /
+ * 4,000 instead of 5,000 / 5,000 / 5,000). Those records already add up, so a
+ * normal run leaves them alone, correctly. `--reshape` forces the corrected
+ * rule on the records named, and only those: it refuses to run without an
+ * explicit list, because reshaping every consistent schedule in the database
+ * is not a repair.
+ *
+ *   node dist/scripts/repair-installment-totals.js --reshape --records <id>,<id> --dry-run
+ *   node dist/scripts/repair-installment-totals.js --reshape --records <id>,<id>
  */
 import * as mongoose from 'mongoose';
 import { config } from 'dotenv';
@@ -56,7 +71,7 @@ const snapshot = (service: FinancialRecordService, section: any): SectionSnapsho
 });
 
 /** The sections of one record that would change, with before and after. */
-export function planRepair(record: any): SectionChange[] {
+export function planRepair(record: any, options: { force?: boolean } = {}): SectionChange[] {
   const sections: { path: string; label: string; section: any }[] = [
     { path: 'tuition', label: 'المصروفات', section: record.tuition },
   ];
@@ -74,7 +89,7 @@ export function planRepair(record: any): SectionChange[] {
     if (!section || !Array.isArray(section.installments)) continue;
     const copy = JSON.parse(JSON.stringify(section));
     const before = snapshot(service, copy);
-    service.rebalanceSection(copy);
+    service.rebalanceSection(copy, options);
     const after = snapshot(service, copy);
     if (JSON.stringify(before) !== JSON.stringify(after)) {
       // Installments added by the rebalance are subdocuments with their own id.
@@ -90,15 +105,26 @@ export function planRepair(record: any): SectionChange[] {
 
 export async function repairAll(
   db: mongoose.mongo.Db,
-  { apply }: { apply: boolean },
+  { apply, reshapeRecordIds }: { apply: boolean; reshapeRecordIds?: string[] },
 ): Promise<{ scanned: number; affected: number; repaired: number; skipped: number }> {
   const records = db.collection('studentFinancialRecords');
   const students = db.collection('students');
   let scanned = 0, affected = 0, repaired = 0, skipped = 0;
 
-  for await (const record of records.find({})) {
+  const reshape = reshapeRecordIds !== undefined;
+  if (reshape) {
+    const ids = reshapeRecordIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (!ids.length || ids.length !== reshapeRecordIds.length) {
+      throw new Error('--reshape needs --records with valid record ids, and runs on those only');
+    }
+  }
+  const filter = reshape
+    ? { _id: { $in: reshapeRecordIds.map((id) => new mongoose.Types.ObjectId(id)) } }
+    : {};
+
+  for await (const record of records.find(filter)) {
     scanned += 1;
-    const changes = planRepair(record);
+    const changes = planRepair(record, { force: reshape });
     if (!changes.length) continue;
     affected += 1;
 
@@ -136,17 +162,26 @@ export async function repairAll(
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
+  const reshape = process.argv.includes('--reshape');
+  const recordsArg = process.argv[process.argv.indexOf('--records') + 1];
+  const reshapeRecordIds = reshape
+    ? (process.argv.includes('--records') && recordsArg ? recordsArg.split(',').map((id) => id.trim()).filter(Boolean) : [])
+    : undefined;
+
   const uri = process.env.MONGODB_URI || process.env.DATABASE_URL;
   if (!uri) throw new Error('MONGODB_URI is not set');
 
   await mongoose.connect(uri);
-  const summary = await repairAll(mongoose.connection.db, { apply: !dryRun });
-  console.log('\n──────────');
-  console.log(`سجلات مفحوصة : ${summary.scanned}`);
-  console.log(`سجلات متأثرة  : ${summary.affected}`);
-  if (dryRun) console.log('(تشغيل تجريبي — لم يُعدَّل شيء. شغّله بدون --dry-run للإصلاح)');
-  else console.log(`تم إصلاحها    : ${summary.repaired}${summary.skipped ? ` · تخطّي ${summary.skipped}` : ''}`);
-  await mongoose.disconnect();
+  try {
+    const summary = await repairAll(mongoose.connection.db, { apply: !dryRun, reshapeRecordIds });
+    console.log('\n──────────');
+    console.log(`سجلات مفحوصة : ${summary.scanned}`);
+    console.log(`سجلات متأثرة  : ${summary.affected}`);
+    if (dryRun) console.log('(تشغيل تجريبي — لم يُعدَّل شيء. شغّله بدون --dry-run للإصلاح)');
+    else console.log(`تم إصلاحها    : ${summary.repaired}${summary.skipped ? ` · تخطّي ${summary.skipped}` : ''}`);
+  } finally {
+    await mongoose.disconnect();
+  }
 }
 
 if (require.main === module) {
