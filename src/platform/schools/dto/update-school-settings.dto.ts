@@ -100,6 +100,10 @@ export class UpdateSchoolSettingsDto {
   @IsBoolean()
   teacherCheckInEnabled?: boolean;
 
+  @IsOptional()
+  @IsBoolean()
+  staffCheckInEnabled?: boolean;
+
   /**
    * The school week. Sending the array replaces it wholesale, so read the
    * current value first and send back the full seven days.

@@ -1,5 +1,9 @@
 # Nasaq — Teacher Attendance Feature Documentation (Location Check-In & Manual Fallback)
 
+Manager (`MANAGER`) and supervisor (`SUPERVISOR`) attendance is available through
+`/staff-attendance`. See the [Web and Mobile integration guide](../../docs/STAFF_ATTENDANCE_FRONTEND_INTEGRATION.md)
+for its endpoints, independent `staffCheckInEnabled` setting, and response contracts.
+
 ---
 
 ## 1. Executive Summary & Core Philosophy

@@ -212,7 +212,7 @@ export class SchoolsService {
   }
 
   async updateMySettings(schoolId: string, settingsDto: Partial<Record<string, any>>) {
-    if (settingsDto.teacherCheckInEnabled === true) {
+    if (settingsDto.teacherCheckInEnabled === true || settingsDto.staffCheckInEnabled === true) {
       const school = await this.schoolModel
         .findById(schoolId, { settings: 1 })
         .setOptions({ skipTenantScope: true })

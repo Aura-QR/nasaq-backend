@@ -73,6 +73,9 @@ export class SchoolSettings {
   @Prop({ default: false })
   teacherCheckInEnabled: boolean;
 
+  @Prop({ default: false })
+  staffCheckInEnabled: boolean;
+
   /**
    * The school week: which days are worked, and the hours on each.
    *
