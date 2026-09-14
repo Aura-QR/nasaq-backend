@@ -7,4 +7,5 @@ export type AuthJwtPayload = {
     role: Role | string;
     schoolId: string | null;
     permissions?: string[];
+    permissionsVersion?: number;
 }

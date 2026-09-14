@@ -15,6 +15,7 @@ import { ImportAssignmentsDto } from './dto/import-assignments.dto';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @ApiTags('teacher-assignments')
 @Controller('teacher-assignments')
@@ -22,6 +23,7 @@ export class TeacherAssignmentsController {
   constructor(private readonly teacherAssignmentsService: TeacherAssignmentsService) {}
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Assign a teacher to a subject offering' })
@@ -32,6 +34,7 @@ export class TeacherAssignmentsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
   @Post('import')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -51,6 +54,7 @@ export class TeacherAssignmentsController {
 
   // Declared above the two by-* routes purely for readability; they are literal
   // paths so there is no wildcard here to shadow them.
+  @CheckAbilities({ action: 'read', subject: 'Teacher', roles: [Role.MANAGER] })
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List teacher assignments, optionally filtered' })
@@ -77,6 +81,7 @@ export class TeacherAssignmentsController {
     });
   }
 
+  @CheckAbilities({ action: 'read', subject: 'Teacher', roles: [Role.MANAGER] })
   @Get('by-offering/:subjectOfferingId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get teacher assignments for a subject offering' })
@@ -84,6 +89,7 @@ export class TeacherAssignmentsController {
     return await this.teacherAssignmentsService.findByOffering(subjectOfferingId);
   }
 
+  @CheckAbilities({ action: 'read', subject: 'Teacher', roles: [Role.MANAGER] })
   @Get('by-teacher/:teacherId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get subject offerings assigned to a teacher' })
@@ -92,6 +98,7 @@ export class TeacherAssignmentsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Remove teacher assignment' })

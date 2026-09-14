@@ -32,9 +32,16 @@ export class AbilitiesGuard implements CanActivate {
       throw new ForbiddenException('المستخدم غير مصرح له');
     }
 
+    const applicable = requiredAbilities.filter(
+      (permission) => !permission.roles || permission.roles.includes(user.role),
+    );
+    if (applicable.length === 0) {
+      return true;
+    }
+
     const ability = await this.caslAbilityFactory.defineAbilitiesFor(user);
 
-    const hasPermission = requiredAbilities.every((permission) =>
+    const hasPermission = applicable.every((permission) =>
       ability.can(permission.action as Actions, permission.subject as Subjects),
     );
 

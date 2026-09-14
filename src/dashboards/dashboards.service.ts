@@ -147,6 +147,12 @@ export class DashboardsService {
 
   async getManagerDashboard(userPermissions: string[]) {
     const isOwnerOrAll = userPermissions.includes('*');
+    // Login emits school.<entity>.read/create/update/delete — never `.manage`.
+    // Gating on `.manage` hid every card but students from every manager.
+    const canRead = (entity: string) =>
+      isOwnerOrAll ||
+      userPermissions.includes(`school.${entity}.read`) ||
+      userPermissions.includes(`school.${entity}.manage`);
     const activeYear = await this.getActiveYear();
     const result: any = {
       permissions: userPermissions,
@@ -156,7 +162,7 @@ export class DashboardsService {
       metrics: {},
     };
 
-    if (isOwnerOrAll || userPermissions.includes('school.students.read')) {
+    if (canRead('students')) {
       const studentYearFilter = activeYear
         ? await this.getStudentsForYearFilter(activeYear._id)
         : null;
@@ -174,24 +180,24 @@ export class DashboardsService {
       result.metrics.students = { totalStudents, activeStudents };
     }
 
-    if (isOwnerOrAll || userPermissions.includes('school.teachers.manage')) {
+    if (canRead('teachers')) {
       const totalTeachers = await this.teacherModel.countDocuments();
       result.metrics.teachers = { totalTeachers };
     }
 
-    if (isOwnerOrAll || userPermissions.includes('school.classes.manage')) {
+    if (canRead('classes')) {
       const totalClasses = activeYear
         ? await this.classModel.countDocuments({ academicYearId: activeYear._id })
         : 0;
       result.metrics.classes = { totalClasses };
     }
 
-    if (isOwnerOrAll || userPermissions.includes('school.attendance.manage')) {
+    if (canRead('attendance')) {
       const todayAttendance = await this.getTodayAttendanceCount();
       result.metrics.attendanceToday = todayAttendance;
     }
 
-    if (isOwnerOrAll || userPermissions.includes('school.financial.manage')) {
+    if (canRead('financial')) {
       const [expensesAgg, financialRecords] = await Promise.all([
         this.expenseModel.aggregate([
           { $group: { _id: null, totalAmount: { $sum: '$amount' } } },

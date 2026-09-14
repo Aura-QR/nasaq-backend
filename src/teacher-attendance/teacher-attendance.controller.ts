@@ -25,6 +25,7 @@ import { CheckOutTeacherAttendanceDto } from './dto/check-out-teacher-attendance
 import { SummaryTeacherAttendanceDto } from './dto/summary-teacher-attendance.dto';
 import { UpdateTeacherAttendanceDto } from './dto/update-teacher-attendance.dto';
 import { extractClientIp, TeacherAttendanceService } from './teacher-attendance.service';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @Controller('teacher-attendance')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -71,6 +72,7 @@ export class TeacherAttendanceController {
 
   // MUST stay above @Get(':id')-style routes if any are ever added, and above
   // nothing else here — 'summary' is a literal path.
+  @CheckAbilities({ action: 'read', subject: 'TeacherAttendance' })
   @Get('summary')
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -91,6 +93,7 @@ export class TeacherAttendanceController {
     return this.teacherAttendanceService.getMyAttendance(user, query);
   }
 
+  @CheckAbilities({ action: 'create', subject: 'TeacherAttendance' })
   @Post()
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
@@ -105,6 +108,7 @@ export class TeacherAttendanceController {
     return this.teacherAttendanceService.createManual(user, dto);
   }
 
+  @CheckAbilities({ action: 'read', subject: 'TeacherAttendance' })
   @Get('absent')
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -115,6 +119,7 @@ export class TeacherAttendanceController {
     return this.teacherAttendanceService.findAbsent(date, user);
   }
 
+  @CheckAbilities({ action: 'read', subject: 'TeacherAttendance' })
   @Get()
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -124,6 +129,7 @@ export class TeacherAttendanceController {
     return this.teacherAttendanceService.findAll(query);
   }
 
+  @CheckAbilities({ action: 'update', subject: 'TeacherAttendance' })
   @Patch(':id')
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
@@ -138,6 +144,7 @@ export class TeacherAttendanceController {
     return this.teacherAttendanceService.update(id, dto, user);
   }
 
+  @CheckAbilities({ action: 'delete', subject: 'TeacherAttendance' })
   @Delete(':id')
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)

@@ -6,6 +6,7 @@ import { TeacherConstraintsService } from './teacher-constraints.service';
 import { SetTeacherConstraintDto } from './dto/set-teacher-constraint.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @ApiTags('teacher-constraints')
 @ApiBearerAuth()
@@ -14,6 +15,7 @@ export class TeacherConstraintsController {
   constructor(private readonly service: TeacherConstraintsService) {}
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
   @Put()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -29,6 +31,7 @@ export class TeacherConstraintsController {
     return this.service.set(dto);
   }
 
+  @CheckAbilities({ action: 'read', subject: 'Teacher', roles: [Role.MANAGER] })
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Every teacher's constraints for a term" })
@@ -38,6 +41,7 @@ export class TeacherConstraintsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
   @Delete(':teacherId/:termId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: "Clear a teacher's constraints for a term" })

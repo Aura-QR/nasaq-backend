@@ -20,6 +20,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
+
 @Controller('subjects')
 @ApiTags('Subjects')
 export class SubjectsController {
@@ -30,6 +32,7 @@ export class SubjectsController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 409, description: 'Subject already exists' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'Subject' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createSubjectDto: CreateSubjectDto) {
@@ -42,6 +45,7 @@ export class SubjectsController {
   @ApiResponse({ status: 404, description: 'Subjects not found' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
+  @CheckAbilities({ action: 'read', subject: 'Subject', roles: [Role.MANAGER] })
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
@@ -77,6 +81,7 @@ export class SubjectsController {
   @ApiResponse({ status: 200, description: 'List of subjects fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'List of subjects not found' })
+  @CheckAbilities({ action: 'read', subject: 'Subject', roles: [Role.MANAGER] })
   @Get('list')
   @HttpCode(HttpStatus.OK)
   async list() {
@@ -88,6 +93,7 @@ export class SubjectsController {
   @ApiResponse({ status: 200, description: 'Subject fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Subject not found' })
+  @CheckAbilities({ action: 'read', subject: 'Subject', roles: [Role.MANAGER] })
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
@@ -99,6 +105,7 @@ export class SubjectsController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Subject not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Subject' })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
@@ -113,6 +120,7 @@ export class SubjectsController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Subject not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'delete', subject: 'Subject' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {

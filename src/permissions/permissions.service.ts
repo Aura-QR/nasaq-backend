@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Permission } from './schemas/permission.schema';
-import { getDefaultPermissionsForRole } from './default-permissions';
+import { DERIVED_DEFAULTS, getDefaultPermissionsForRole } from './default-permissions';
 
 @Injectable()
 export class PermissionsService implements OnModuleInit {
@@ -61,7 +61,9 @@ export class PermissionsService implements OnModuleInit {
 
     for (const [key, defaultVal] of Object.entries(defaults)) {
       if (currentPermissions[key] === undefined || currentPermissions[key] === null) {
-        currentPermissions[key] = defaultVal;
+        const source = DERIVED_DEFAULTS[key];
+        const derived = source ? currentPermissions[source] : undefined;
+        currentPermissions[key] = derived ? { ...derived } : defaultVal;
         hasMissing = true;
       }
     }
@@ -125,8 +127,10 @@ export class PermissionsService implements OnModuleInit {
     }
 
     if (!permissionDoc && schoolId && Types.ObjectId.isValid(schoolId)) {
+      // userId: null — the school's role row, never one account's override row.
       permissionDoc = await this.permissionModel.findOne({
         schoolId: new Types.ObjectId(schoolId),
+        userId: null,
         role,
       }).setOptions({ skipTenantScope: true });
     }

@@ -23,6 +23,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { libraryMulterConfig } from './config/multer.config';
 import { ApiConsumes } from '@nestjs/swagger';
 import { unlink } from 'fs/promises';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @Controller('library')
 @ApiTags('Library')
@@ -34,6 +35,7 @@ export class LibraryController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Subject not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN, Role.TEACHER)
+  @CheckAbilities({ action: 'create', subject: 'Library', roles: [Role.MANAGER] })
   @Post()
   @UseInterceptors(FileInterceptor('file', libraryMulterConfig))
   @ApiConsumes('application/json', 'multipart/form-data')
@@ -52,6 +54,7 @@ export class LibraryController {
   @ApiQuery({ name: 'subjectOfferingId', required: false, type: String, description: 'Filter by SubjectOffering ID' })
   @ApiQuery({ name: 'subjectId', required: false, type: String, description: 'Filter by Subject ID' })
   @ApiQuery({ name: 'academicYearId', required: false, type: String, description: 'Filter by Academic Year ID' })
+  @CheckAbilities({ action: 'read', subject: 'Library', roles: [Role.MANAGER] })
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(@Query() queryParams: any) {
@@ -64,6 +67,7 @@ export class LibraryController {
   @ApiResponse({ status: 200, description: 'List of library items fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'List of library items not found' })
+  @CheckAbilities({ action: 'read', subject: 'Library', roles: [Role.MANAGER] })
   @Get('list')
   @HttpCode(HttpStatus.OK)
   async list() {
@@ -74,6 +78,7 @@ export class LibraryController {
   @ApiResponse({ status: 200, description: 'Library items fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Library items not found' })
+  @CheckAbilities({ action: 'read', subject: 'Library', roles: [Role.MANAGER] })
   @Get('by-subject/:subjectId')
   @HttpCode(HttpStatus.OK)
   async findBySubject(@Param('subjectId') subjectId: string) {
@@ -84,6 +89,7 @@ export class LibraryController {
   @ApiResponse({ status: 200, description: 'Library item fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Library item not found' })
+  @CheckAbilities({ action: 'read', subject: 'Library', roles: [Role.MANAGER] })
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
@@ -95,6 +101,7 @@ export class LibraryController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Library item not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Library' })
   @Patch(':id')
   @UseInterceptors(FileInterceptor('file', libraryMulterConfig))
   @ApiConsumes('application/json', 'multipart/form-data')
@@ -113,6 +120,7 @@ export class LibraryController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Library item not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'delete', subject: 'Library' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {

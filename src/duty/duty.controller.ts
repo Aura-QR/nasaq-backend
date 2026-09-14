@@ -28,6 +28,7 @@ import { CreateSubstitutionDto } from './dto/substitution.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 const STAFF = [
   Role.OWNER,
@@ -59,6 +60,7 @@ export class DutyController {
     description: 'YYYY-MM-DD. Defaults to today.',
   })
   @Roles(...STAFF)
+  @CheckAbilities({ action: 'read', subject: 'Duty' })
   @Get('coverage')
   @HttpCode(HttpStatus.OK)
   async coverage(@CurrentUser() user: any, @Query('date') date?: string) {
@@ -93,6 +95,7 @@ export class DutyController {
   @ApiQuery({ name: 'from', required: true, description: 'YYYY-MM-DD' })
   @ApiQuery({ name: 'to', required: true, description: 'YYYY-MM-DD' })
   @Roles(...STAFF)
+  @CheckAbilities({ action: 'read', subject: 'Duty' })
   @Get('cover-report')
   @HttpCode(HttpStatus.OK)
   async coverReport(@Query('from') from: string, @Query('to') to: string) {
@@ -108,6 +111,7 @@ export class DutyController {
     description: 'The substitute is busy in that slot, or the lecture is not on that weekday',
   })
   @Roles(...STAFF)
+  @CheckAbilities({ action: 'create', subject: 'Duty' })
   @Post('substitutions')
   @HttpCode(HttpStatus.CREATED)
   async assignCover(
@@ -125,6 +129,7 @@ export class DutyController {
   })
   @ApiQuery({ name: 'date', required: false })
   @ApiQuery({ name: 'teacherId', required: false })
+  @CheckAbilities({ action: 'read', subject: 'Duty', roles: [Role.MANAGER] })
   @Get('substitutions')
   @HttpCode(HttpStatus.OK)
   async listCover(
@@ -137,6 +142,7 @@ export class DutyController {
 
   @ApiOperation({ summary: 'Remove a cover assignment' })
   @Roles(...STAFF)
+  @CheckAbilities({ action: 'delete', subject: 'Duty' })
   @Delete('substitutions/:id')
   @HttpCode(HttpStatus.OK)
   async removeCover(@Param('id') id: string) {
@@ -152,6 +158,7 @@ export class DutyController {
       'one supervisor, some have two.',
   })
   @Roles(...STAFF)
+  @CheckAbilities({ action: 'update', subject: 'Duty' })
   @Put('supervisors')
   @HttpCode(HttpStatus.OK)
   async setSupervisors(
@@ -165,6 +172,7 @@ export class DutyController {
   @ApiQuery({ name: 'date', required: false, description: 'Defaults to today' })
   @ApiQuery({ name: 'from', required: false })
   @ApiQuery({ name: 'to', required: false })
+  @CheckAbilities({ action: 'read', subject: 'Duty', roles: [Role.MANAGER] })
   @Get('supervisors')
   @HttpCode(HttpStatus.OK)
   async getSupervisors(
@@ -207,6 +215,7 @@ export class DutyController {
     enum: ['pending', 'approved', 'rejected'],
   })
   @ApiQuery({ name: 'teacherId', required: false })
+  @CheckAbilities({ action: 'read', subject: 'Duty', roles: [Role.MANAGER] })
   @Get('leave-requests')
   @HttpCode(HttpStatus.OK)
   async listLeave(
@@ -226,6 +235,7 @@ export class DutyController {
   @ApiOperation({ summary: 'Approve or reject a leave request' })
   @ApiResponse({ status: 403, description: 'A teacher cannot review their own' })
   @Roles(...STAFF)
+  @CheckAbilities({ action: 'update', subject: 'Duty' })
   @Patch('leave-requests/:id/review')
   @HttpCode(HttpStatus.OK)
   async reviewLeave(

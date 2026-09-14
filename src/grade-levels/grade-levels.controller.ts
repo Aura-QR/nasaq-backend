@@ -16,6 +16,7 @@ import { UpdateGradeLevelDto } from './dto/update-grade-level.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @ApiTags('grade-levels')
 @Controller('grade-levels')
@@ -23,6 +24,7 @@ export class GradeLevelsController {
   constructor(private readonly gradeLevelsService: GradeLevelsService) {}
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'AcademicStructure' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new grade level' })
@@ -60,6 +62,7 @@ export class GradeLevelsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'AcademicStructure' })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update grade level' })
@@ -73,6 +76,7 @@ export class GradeLevelsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'delete', subject: 'AcademicStructure' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete grade level' })

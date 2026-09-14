@@ -18,6 +18,7 @@ import { AuthJwtPayload } from './types/auth.jwtPayload';
 import { Role } from './enums/role.enum';
 import { PasswordUtil } from './utils/password.util';
 import { PermissionsService } from 'src/permissions/permissions.service';
+import { PERMISSIONS_VERSION } from 'src/permissions/default-permissions';
 import { EmailService } from 'src/email/email.service';
 
 import { PlatformAdmin } from 'src/platform/platform-admins/schemas/platform-admin.schema';
@@ -227,6 +228,7 @@ export class AuthService {
             role: role,
             schoolId: user.schoolId ? user.schoolId.toString() : null,
             permissions: permissions,
+            permissionsVersion: PERMISSIONS_VERSION,
         };
 
         const accessToken = await this.jwtService.signAsync(payload);

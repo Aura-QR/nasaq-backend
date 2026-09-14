@@ -22,6 +22,8 @@ import {
   UpdateCurriculumUnitDto,
   CurriculumQueryDto,
 } from './dto/curriculum.dto';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
+
 @Controller('curriculum')
 @ApiTags('Curriculum')
 // Curriculum objectives are staff content; student preparation reads have their own projection.
@@ -29,24 +31,29 @@ import {
 export class CurriculumController {
   constructor(private readonly service: CurriculumService) {}
   @Roles(Role.OWNER, Role.MANAGER)
+  @CheckAbilities({ action: 'create', subject: 'Curriculum' })
   @Post('import')
   import(@Body() dto: ImportCurriculumDto) {
     return this.service.import(dto);
   }
+  @CheckAbilities({ action: 'read', subject: 'Curriculum', roles: [Role.MANAGER] })
   @Get('units')
   units(@Query() query: CurriculumQueryDto) {
     return this.service.listUnits(query);
   }
+  @CheckAbilities({ action: 'read', subject: 'Curriculum', roles: [Role.MANAGER] })
   @Get('units/:id/lessons')
   lessons(@Param('id', MongoIdPipe) id: string) {
     return this.service.listLessons(id);
   }
   @Roles(Role.OWNER, Role.MANAGER)
+  @CheckAbilities({ action: 'create', subject: 'Curriculum' })
   @Post('units')
   createUnit(@Body() dto: CreateCurriculumUnitDto) {
     return this.service.createUnit(dto);
   }
   @Roles(Role.OWNER, Role.MANAGER)
+  @CheckAbilities({ action: 'update', subject: 'Curriculum' })
   @Patch('units/:id')
   updateUnit(
     @Param('id', MongoIdPipe) id: string,
@@ -55,11 +62,13 @@ export class CurriculumController {
     return this.service.updateUnit(id, dto);
   }
   @Roles(Role.OWNER, Role.MANAGER)
+  @CheckAbilities({ action: 'delete', subject: 'Curriculum' })
   @Delete('units/:id')
   deleteUnit(@Param('id', MongoIdPipe) id: string) {
     return this.service.deleteUnit(id);
   }
   @Roles(Role.OWNER, Role.MANAGER)
+  @CheckAbilities({ action: 'create', subject: 'Curriculum' })
   @Post('units/:id/lessons')
   createLesson(
     @Param('id', MongoIdPipe) id: string,
@@ -68,6 +77,7 @@ export class CurriculumController {
     return this.service.createLesson(id, dto);
   }
   @Roles(Role.OWNER, Role.MANAGER)
+  @CheckAbilities({ action: 'create', subject: 'Curriculum' })
   @Post('units/:id/lessons-bulk')
   createLessonsBulk(
     @Param('id', MongoIdPipe) id: string,
@@ -76,6 +86,7 @@ export class CurriculumController {
     return this.service.createLessonsBulk(id, dto);
   }
   @Roles(Role.OWNER, Role.MANAGER)
+  @CheckAbilities({ action: 'update', subject: 'Curriculum' })
   @Patch('lessons/:id')
   updateLesson(
     @Param('id', MongoIdPipe) id: string,
@@ -84,6 +95,7 @@ export class CurriculumController {
     return this.service.updateLesson(id, dto);
   }
   @Roles(Role.OWNER, Role.MANAGER)
+  @CheckAbilities({ action: 'delete', subject: 'Curriculum' })
   @Delete('lessons/:id')
   deleteLesson(@Param('id', MongoIdPipe) id: string) {
     return this.service.deleteLesson(id);

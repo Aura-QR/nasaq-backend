@@ -23,6 +23,7 @@ import { TenantContextInterceptor } from '../tenancy/tenant-context.interceptor'
 import { StaffAttendance } from './schemas/staff-attendance.schema';
 import { StaffAttendanceModule } from './staff-attendance.module';
 import { staffCalendarDate } from './staff-attendance.service';
+import { getDefaultPermissionsForRole } from '../permissions/default-permissions';
 
 // Always a new, isolated local database. Never use the application's MONGODB_URI.
 const dbName = `nasaq_staff_attendance_test_${new Types.ObjectId()}`;
@@ -50,6 +51,16 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
   let admins: Model<Admin>;
   let records: Model<StaffAttendance>;
 
+  // The permissions AuthService signs for each role's default row, so routes
+  // guarded by the permissions screen see the same token a real login gives.
+  const loginPermissions = (role: string): string[] => {
+    if (role === 'OWNER' || role === 'SUPERVISOR') return ['*'];
+    const row = getDefaultPermissionsForRole(role) as Record<string, any>;
+    const verbs: [string, string][] = [['read', 'read'], ['add', 'create'], ['edit', 'update'], ['delete', 'delete']];
+    return Object.entries(row).flatMap(([entity, p]) =>
+      verbs.filter(([box]) => p[box]).map(([, action]) => `school.${entity}.${action}`),
+    );
+  };
   const token = (
     role = 'MANAGER',
     sub = managerId,
@@ -60,6 +71,7 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
       role,
       schoolId: tenant ? String(tenant) : null,
       email: 'test@example.invalid',
+      permissions: loginPermissions(role),
     });
   const api = (role = 'MANAGER', sub = managerId, tenant = schoolId) => {
     const bearer = `Bearer ${token(role, sub, tenant)}`;

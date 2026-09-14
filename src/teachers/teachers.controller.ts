@@ -34,6 +34,7 @@ export class TeachersController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 409, description: 'Teacher already exists' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'Teacher' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createTeacherDto: CreateTeacherDto) {
@@ -46,6 +47,7 @@ export class TeachersController {
   @ApiResponse({ status: 404, description: 'Teachers not found' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
+  @CheckAbilities({ action: 'read', subject: 'Teacher', roles: [Role.MANAGER] })
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(@Query() queryParams: any) {
@@ -99,6 +101,7 @@ export class TeachersController {
   @ApiResponse({ status: 200, description: 'List of teachers fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'List of teachers not found' })
+  @CheckAbilities({ action: 'read', subject: 'Teacher', roles: [Role.MANAGER] })
   @Get('list')
   @HttpCode(HttpStatus.OK)
   async list() {
@@ -125,6 +128,7 @@ export class TeachersController {
   @ApiResponse({ status: 200, description: 'Teacher fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
+  @CheckAbilities({ action: 'read', subject: 'Teacher', roles: [Role.MANAGER] })
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
@@ -136,6 +140,7 @@ export class TeachersController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
@@ -149,6 +154,7 @@ export class TeachersController {
   @ApiResponse({ status: 200, description: 'تم تعيين كلمة المرور' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
   @Patch(':id/password')
   @HttpCode(HttpStatus.OK)
   async setAdminPassword(
@@ -163,6 +169,7 @@ export class TeachersController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
   @Patch(':id/toggle-active')
   @HttpCode(HttpStatus.OK)
   async toggleActive(@Param('id') id: string) {
@@ -200,6 +207,7 @@ export class TeachersController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Teacher not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'delete', subject: 'Teacher' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {

@@ -6,6 +6,7 @@ import { UpdateStageDto } from './dto/update-stage.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @ApiTags('stages')
 @Controller('stages')
@@ -13,6 +14,7 @@ export class StagesController {
   constructor(private readonly stagesService: StagesService) {}
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'AcademicStructure' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new stage' })
@@ -40,6 +42,7 @@ export class StagesController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'AcademicStructure' })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update a stage' })
@@ -50,6 +53,7 @@ export class StagesController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'delete', subject: 'AcademicStructure' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete a stage' })

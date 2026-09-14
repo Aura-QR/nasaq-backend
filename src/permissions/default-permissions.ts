@@ -74,7 +74,42 @@ export const MANAGER_PERMISSIONS: RolePermissions = {
   preparation: { read: true, add: false, edit: false, delete: true },
   financial: ALL,
   financialSettings: { read: true, add: false, edit: false, delete: false },
+
+  // Areas every manager could already reach through role-only routes. They are
+  // written out so the permissions screen shows them and a school can withhold
+  // them; the defaults keep exactly the reach managers have today.
+  expenses: ALL,
+  teacherAttendance: ALL,
+  duty: ALL,
+  curriculum: ALL,
+  academicStructure: ALL,
+  // Deleting a year stays OWNER/SUPERVISOR by role, whatever is ticked here.
+  academicYears: { read: true, add: true, edit: true, delete: false },
+  schoolSettings: { read: true, add: false, edit: true, delete: false },
+  messaging: { read: true, add: false, edit: true, delete: false },
 };
+
+/**
+ * A key missing from a stored row normally takes the role default. These take
+ * the row's own value for another key instead, because the new key splits an
+ * area the school has already configured.
+ *
+ * Expense routes used to check `financial`. A school that unticked financial for
+ * managers had shut them out of expenses too; defaulting `expenses` to ALL would
+ * quietly let them back in.
+ */
+export const DERIVED_DEFAULTS: Record<string, string> = {
+  expenses: 'financial',
+};
+
+/**
+ * Stamped into every school login token. Bump it whenever a release adds keys
+ * that routes start checking, so tokens signed before it can be recognised.
+ *
+ * 2 — expenses, teacherAttendance, duty, curriculum, academicStructure,
+ *     academicYears, schoolSettings, messaging became enforced.
+ */
+export const PERMISSIONS_VERSION = 2;
 
 export const TEACHER_PERMISSIONS: RolePermissions = {
   students: { read: true, add: false, edit: false, delete: false },

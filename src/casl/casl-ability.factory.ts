@@ -19,6 +19,13 @@ export type Subjects =
   | 'Financial'
   | 'FinancialSettings'
   | 'Expense'
+  | 'Subject'
+  | 'Library'
+  | 'Duty'
+  | 'AcademicStructure'
+  | 'AcademicYear'
+  | 'SchoolSettings'
+  | 'Messaging'
   | 'all';
 
 export type AppAbility = PureAbility<[Actions, Subjects]>;
@@ -39,6 +46,15 @@ const ENTITY_TO_SUBJECT_MAP: Record<string, Subjects> = {
   financial: 'Financial',
   financialSettings: 'FinancialSettings',
   expenses: 'Expense',
+  // subjects and library were stored and shown on the permissions screen but
+  // missing here, so their boxes were dropped before any check could read them.
+  subjects: 'Subject',
+  library: 'Library',
+  duty: 'Duty',
+  academicStructure: 'AcademicStructure',
+  academicYears: 'AcademicYear',
+  schoolSettings: 'SchoolSettings',
+  messaging: 'Messaging',
 };
 
 @Injectable()
@@ -78,6 +94,40 @@ export class CaslAbilityFactory {
       });
     }
 
+    if (user.role === 'MANAGER' && !(Number(user.permissionsVersion) >= 2)) {
+      grantPreVersion2ManagerReach(can, user.permissions);
+    }
+
     return build();
+  }
+}
+
+/**
+ * A manager token signed before PERMISSIONS_VERSION 2 carries no key for the
+ * areas that release started checking — they were role-only, so every manager
+ * reached them. Without this, everyone still logged in at deploy would hit 403
+ * there until they signed in again.
+ *
+ * Grants exactly the pre-release reach and nothing more: the role-only areas in
+ * full, and expenses mirroring whatever the token says about financial, which is
+ * what expense routes checked before. Tokens expire (JWT_EXPIRE_IN), so this
+ * only ever applies for one token lifetime after deploy.
+ */
+const PRE_V2_ROLE_ONLY_SUBJECTS: Subjects[] = [
+  'TeacherAttendance',
+  'Duty',
+  'Curriculum',
+  'AcademicStructure',
+  'AcademicYear',
+  'SchoolSettings',
+  'Messaging',
+];
+
+function grantPreVersion2ManagerReach(can: AbilityBuilder<AppAbility>['can'], permissions: unknown) {
+  for (const subject of PRE_V2_ROLE_ONLY_SUBJECTS) can('manage', subject);
+  if (!Array.isArray(permissions)) return;
+  for (const perm of permissions) {
+    const [scope, entity, action] = String(perm).split('.');
+    if (scope === 'school' && entity === 'financial' && action) can(action as Actions, 'Expense');
   }
 }

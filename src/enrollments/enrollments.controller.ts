@@ -15,6 +15,7 @@ import { BulkPromoteDto } from './dto/bulk-promote.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @ApiTags('enrollments')
 @Controller('enrollments')
@@ -22,6 +23,7 @@ export class EnrollmentsController {
   constructor(private readonly enrollmentsService: EnrollmentsService) {}
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Student' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Enroll a student in a class for an academic year' })
@@ -32,6 +34,7 @@ export class EnrollmentsController {
     return await this.enrollmentsService.enroll(createEnrollmentDto);
   }
 
+  @CheckAbilities({ action: 'read', subject: 'Student', roles: [Role.MANAGER] })
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Find enrollments by academic year and class' })
@@ -47,6 +50,7 @@ export class EnrollmentsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'read', subject: 'Student' })
   @Get('promotion-preview/:targetAcademicYearId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get promotion preview data for Wizard Step 5' })
@@ -62,6 +66,7 @@ export class EnrollmentsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Student' })
   @Post('bulk-promote/:targetAcademicYearId')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Execute bulk promotion for Wizard Step 5' })
@@ -73,6 +78,7 @@ export class EnrollmentsController {
     return await this.enrollmentsService.bulkPromote(targetAcademicYearId, dto);
   }
 
+  @CheckAbilities({ action: 'read', subject: 'Student', roles: [Role.MANAGER] })
   @Get('student/:studentId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get all enrollments for a specific student' })
@@ -81,6 +87,7 @@ export class EnrollmentsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Student' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Unenroll student (soft withdraw)' })

@@ -109,6 +109,27 @@ describe('Dashboards Service Integration', () => {
     });
   });
 
+  it('shows a manager every card their read permissions allow, as login actually emits them', async () => {
+    await contextService.runWithTenant(schoolIdA, false, async () => {
+      // The strings AuthService puts in a default manager's token. There is no
+      // `.manage` among them, which is what used to hide every card but students.
+      const dash = await service.getManagerDashboard([
+        'school.students.read',
+        'school.teachers.read',
+        'school.classes.read',
+        'school.attendance.read',
+        'school.financial.read',
+      ]);
+      expect(Object.keys(dash.metrics).sort()).toEqual(
+        ['attendanceToday', 'classes', 'financial', 'students', 'teachers'],
+      );
+
+      const noFinance = await service.getManagerDashboard(['school.students.read', 'school.teachers.read']);
+      expect(noFinance.metrics.financial).toBeUndefined();
+      expect(noFinance.metrics.classes).toBeUndefined();
+    });
+  });
+
   it('counts this year\'s classes, not last year\'s as well', async () => {
     await contextService.runWithTenant(schoolIdB, false, async () => {
       const archived = await academicYearModel.create({
@@ -150,7 +171,7 @@ describe('Dashboards Service Integration', () => {
       expect(dash.academicYear?.name).toEqual('1448');
 
       // The manager dashboard reads the same number the owner does.
-      const managerDash = await service.getManagerDashboard(['school.classes.manage']);
+      const managerDash = await service.getManagerDashboard(['school.classes.read']);
       expect(managerDash.metrics.classes.totalClasses).toEqual(3);
     });
   });

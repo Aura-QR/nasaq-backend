@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @ApiTags('classes')
 @Controller('classes')
@@ -29,6 +30,7 @@ export class ClassesController {
   @ApiResponse({ status: 201, description: 'Class created successfully' })
   @ApiResponse({ status: 409, description: 'Class name already exists in academic year' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'Class' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createClassDto: CreateClassDto) {
@@ -39,6 +41,7 @@ export class ClassesController {
   @ApiResponse({ status: 200, description: 'Classes fetched successfully' })
   @ApiQuery({ name: 'academicYearId', required: false })
   @ApiQuery({ name: 'gradeLevelId', required: false })
+  @CheckAbilities({ action: 'read', subject: 'Class', roles: [Role.MANAGER] })
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(
@@ -51,6 +54,7 @@ export class ClassesController {
   @ApiOperation({ summary: 'Get summary list of classes' })
   @ApiResponse({ status: 200, description: 'List of classes fetched successfully' })
   @ApiQuery({ name: 'academicYearId', required: false })
+  @CheckAbilities({ action: 'read', subject: 'Class', roles: [Role.MANAGER] })
   @Get('list')
   @HttpCode(HttpStatus.OK)
   async list(@Query('academicYearId') academicYearId?: string) {
@@ -62,6 +66,7 @@ export class ClassesController {
   @ApiResponse({ status: 404, description: 'Source year has no classes' })
   @ApiResponse({ status: 409, description: 'Target year already has classes' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'Class' })
   @Post('copy-from/:targetYearId/:sourceYearId')
   @HttpCode(HttpStatus.CREATED)
   async copyFromYear(
@@ -97,6 +102,7 @@ export class ClassesController {
   @ApiOperation({ summary: 'Get class by ID' })
   @ApiResponse({ status: 200, description: 'Class fetched successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
+  @CheckAbilities({ action: 'read', subject: 'Class', roles: [Role.MANAGER] })
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
@@ -107,6 +113,7 @@ export class ClassesController {
   @ApiResponse({ status: 200, description: 'Class updated successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Class' })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
@@ -120,6 +127,7 @@ export class ClassesController {
   @ApiResponse({ status: 200, description: 'Active status toggled successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Class' })
   @Patch(':id/toggle-active')
   @HttpCode(HttpStatus.OK)
   async toggleActive(@Param('id') id: string) {
@@ -130,6 +138,7 @@ export class ClassesController {
   @ApiResponse({ status: 200, description: 'Class deleted successfully' })
   @ApiResponse({ status: 404, description: 'Class not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'delete', subject: 'Class' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {

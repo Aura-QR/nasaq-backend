@@ -25,6 +25,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { AdminSetPasswordDto } from '../auth/dto/admin-set-password.dto';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @Controller('students')
 @ApiTags('Students')
@@ -32,6 +33,7 @@ export class StudentsController {
   constructor(private readonly studentsService: StudentsService) { }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'Student' })
   @Post()
   @ApiOperation({ summary: 'Create a new student' })
   @ApiResponse({ status: 201, description: 'Student created successfully' })
@@ -48,6 +50,7 @@ export class StudentsController {
   @ApiResponse({ status: 404, description: 'Students not found' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 10, max: 100)' })
+  @CheckAbilities({ action: 'read', subject: 'Student', roles: [Role.MANAGER] })
   @Get()
   @HttpCode(HttpStatus.OK)
   async findAll(@Query() queryParams: any) {
@@ -60,6 +63,7 @@ export class StudentsController {
   @ApiResponse({ status: 200, description: 'List of students fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'List of students not found' })
+  @CheckAbilities({ action: 'read', subject: 'Student', roles: [Role.MANAGER] })
   @Get('list')
   @HttpCode(HttpStatus.OK)
   async list() {
@@ -81,6 +85,7 @@ export class StudentsController {
   @ApiResponse({ status: 200, description: 'Student fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Student not found' })
+  @CheckAbilities({ action: 'read', subject: 'Student', roles: [Role.MANAGER] })
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string) {
@@ -92,6 +97,7 @@ export class StudentsController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Student not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Student' })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   async update(
@@ -105,6 +111,7 @@ export class StudentsController {
   @ApiResponse({ status: 200, description: 'تم تعيين كلمة المرور' })
   @ApiResponse({ status: 404, description: 'Student not found' })
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Student' })
   @Patch(':id/password')
   @HttpCode(HttpStatus.OK)
   async setAdminPassword(
@@ -119,6 +126,7 @@ export class StudentsController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Student not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Student' })
   @Patch(':id/toggle-active')
   @HttpCode(HttpStatus.OK)
   async toggleActive(@Param('id') id: string) {
@@ -130,6 +138,7 @@ export class StudentsController {
   @ApiResponse({ status: 400, description: 'Bad request' })
   @ApiResponse({ status: 404, description: 'Student not found' })
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'delete', subject: 'Student' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string) {

@@ -18,6 +18,7 @@ import { CreateTermsBulkDto } from './dto/create-terms-bulk.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @ApiTags('terms')
 @Controller('terms')
@@ -25,6 +26,7 @@ export class TermsController {
   constructor(private readonly termsService: TermsService) {}
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'AcademicStructure' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new term' })
@@ -35,6 +37,7 @@ export class TermsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'AcademicStructure' })
   @Post(['bulk', 'bulk/:academicYearId'])
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create multiple terms for an academic year (accepts academicYearId in URL or body)' })
@@ -73,6 +76,7 @@ export class TermsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'AcademicStructure' })
   @Post('copy-from/:targetYearId/:sourceYearId')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Copy terms from a previous academic year' })
@@ -101,6 +105,7 @@ export class TermsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'AcademicStructure' })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update term' })
@@ -111,6 +116,7 @@ export class TermsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'delete', subject: 'AcademicStructure' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete term' })

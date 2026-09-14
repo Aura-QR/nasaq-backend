@@ -16,7 +16,7 @@ export class ExpenseCategoryController {
   constructor(private readonly expenseCategoryService: ExpenseCategoryService) {}
 
   @Post()
-  @CheckAbilities({ action: 'create', subject: 'Financial' })
+  @CheckAbilities({ action: 'create', subject: 'Expense' })
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create an expense category' })
   async create(@Body() dto: CreateExpenseCategoryDto, @CurrentUser() user: any) {
@@ -24,7 +24,7 @@ export class ExpenseCategoryController {
   }
 
   @Get()
-  @CheckAbilities({ action: 'read', subject: 'Financial' })
+  @CheckAbilities({ action: 'read', subject: 'Expense' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List all expense categories' })
   async find() {
@@ -32,7 +32,7 @@ export class ExpenseCategoryController {
   }
 
   @Get(':id')
-  @CheckAbilities({ action: 'read', subject: 'Financial' })
+  @CheckAbilities({ action: 'read', subject: 'Expense' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get expense category by ID' })
   async findOne(@Param('id') id: string) {
@@ -40,7 +40,7 @@ export class ExpenseCategoryController {
   }
 
   @Patch(':id')
-  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @CheckAbilities({ action: 'update', subject: 'Expense' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update an expense category' })
   async update(@Param('id') id: string, @Body() dto: UpdateExpenseCategoryDto) {
@@ -48,7 +48,7 @@ export class ExpenseCategoryController {
   }
 
   @Delete(':id')
-  @CheckAbilities({ action: 'delete', subject: 'Financial' })
+  @CheckAbilities({ action: 'delete', subject: 'Expense' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete an expense category (blocked if has expenses)' })
   async delete(@Param('id') id: string) {

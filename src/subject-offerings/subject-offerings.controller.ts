@@ -18,6 +18,7 @@ import { ImportPlanDto } from './dto/import-plan.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @ApiTags('subject-offerings')
 @Controller('subject-offerings')
@@ -25,6 +26,7 @@ export class SubjectOfferingsController {
   constructor(private readonly subjectOfferingsService: SubjectOfferingsService) {}
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'Subject' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new subject offering' })
@@ -34,6 +36,7 @@ export class SubjectOfferingsController {
     return await this.subjectOfferingsService.create(dto);
   }
 
+  @CheckAbilities({ action: 'read', subject: 'Subject', roles: [Role.MANAGER] })
   @Get()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get all subject offerings, optionally filtered' })
@@ -47,6 +50,7 @@ export class SubjectOfferingsController {
     return await this.subjectOfferingsService.findAll({ termId, gradeLevelId });
   }
 
+  @CheckAbilities({ action: 'read', subject: 'Subject', roles: [Role.MANAGER] })
   @Get('by-term/:termId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get subject offerings for a term' })
@@ -59,6 +63,7 @@ export class SubjectOfferingsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'Subject' })
   @Post('copy-from/:targetYearId/:sourceYearId')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Copy subject offerings from a previous year (Wizard Step 6)' })
@@ -70,6 +75,7 @@ export class SubjectOfferingsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'Subject' })
   @Post('import-plan')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -88,6 +94,7 @@ export class SubjectOfferingsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Subject' })
   @Patch('plan')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -103,6 +110,7 @@ export class SubjectOfferingsController {
     return await this.subjectOfferingsService.updatePlan(dto);
   }
 
+  @CheckAbilities({ action: 'read', subject: 'Subject', roles: [Role.MANAGER] })
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Get subject offering by ID' })
@@ -111,6 +119,7 @@ export class SubjectOfferingsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Subject' })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update a subject offering (periods per week)' })
@@ -123,6 +132,7 @@ export class SubjectOfferingsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'delete', subject: 'Subject' })
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete subject offering' })

@@ -6,6 +6,7 @@ import { UpdateAcademicYearDto } from './dto/update-academic-year.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 @ApiTags('academic-years')
 @Controller('academic-years')
@@ -13,6 +14,7 @@ export class AcademicYearsController {
   constructor(private readonly academicYearsService: AcademicYearsService) {}
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'create', subject: 'AcademicYear' })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new academic year' })
@@ -49,6 +51,7 @@ export class AcademicYearsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'AcademicYear' })
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update an academic year' })
@@ -59,6 +62,7 @@ export class AcademicYearsController {
   }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'AcademicYear' })
   @Patch(':id/setup-step')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Update setup step for an academic year' })

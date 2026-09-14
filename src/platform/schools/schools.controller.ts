@@ -11,6 +11,7 @@ import { TenantGuard } from 'src/tenancy/guards/tenant.guard';
 import { PlatformOnly } from 'src/tenancy/decorators/platform-only.decorator';
 import { Public } from 'src/auth/decorators/public.decorator';
 import { CurrentSchool } from 'src/tenancy/decorators/current-school.decorator';
+import { CheckAbilities } from '../../casl/decorators/check-abilities.decorator';
 
 @Controller()
 export class SchoolsController {
@@ -74,6 +75,7 @@ export class SchoolsController {
   // locally — see the note in grades-criteria.controller.ts.
   //
   // GET stays open on purpose: the teacher check-in screen reads it.
+  @CheckAbilities({ action: 'update', subject: 'SchoolSettings' })
   @Patch('schools/me/settings')
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)

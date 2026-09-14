@@ -16,6 +16,7 @@ import { SendTestMessageDto } from './dto/send-test.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { CurrentSchool } from '../tenancy/decorators/current-school.decorator';
+import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
 /**
  * What the school can see and do about its own WhatsApp messages.
@@ -37,6 +38,7 @@ export class MessagingController {
   @ApiQuery({ name: 'status', required: false, enum: OUTBOUND_STATUSES })
   @ApiQuery({ name: 'limit', required: false, example: 50 })
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'read', subject: 'Messaging' })
   @Get('deliveries')
   async list(
     @CurrentSchool() schoolId: string,
@@ -60,6 +62,7 @@ export class MessagingController {
   @ApiOperation({ summary: 'Queue a failed delivery again' })
   @ApiResponse({ status: 200, description: 'تمت إعادة الجدولة' })
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Messaging' })
   @Post('deliveries/:id/retry')
   @HttpCode(HttpStatus.OK)
   async retry(@CurrentSchool() schoolId: string, @Param('id') id: string) {
