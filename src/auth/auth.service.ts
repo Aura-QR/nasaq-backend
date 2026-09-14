@@ -179,6 +179,7 @@ export class AuthService {
 
         // Fetch flat permissions
         let permissions: string[] = [];
+        let jobTitle: { id: string; name: string } | null = null;
         if (role === 'OWNER' || role === 'SUPERVISOR') {
             permissions = ['*'];
         } else if (role === 'MANAGER') {
@@ -192,10 +193,13 @@ export class AuthService {
             //
             // admin.permissions is left on the document untouched — it is no
             // longer read for authorisation.
-            permissions = await this.permissionsService.getFlatPermissions(
-                'MANAGER',
+            //
+            // A job title, when the owner assigned one, replaces that row for
+            // this account only.
+            ({ permissions, jobTitle } = await this.permissionsService.resolveManagerPermissions(
                 user.schoolId?.toString(),
-            );
+                user.jobTitleId?.toString(),
+            ));
         } else if (role === Role.TEACHER) {
             const basePerms = await this.permissionsService.getFlatPermissions(
                 Role.TEACHER,
@@ -206,11 +210,12 @@ export class AuthService {
                 // manager, merged on top of their own teaching rights — so
                 // "manager" means one thing regardless of which door you came
                 // through. teacher.managerPermissions is no longer read.
-                const managerPerms = await this.permissionsService.getFlatPermissions(
-                    'MANAGER',
+                const manager = await this.permissionsService.resolveManagerPermissions(
                     user.schoolId?.toString(),
+                    user.jobTitleId?.toString(),
                 );
-                permissions = Array.from(new Set([...basePerms, ...managerPerms]));
+                jobTitle = manager.jobTitle;
+                permissions = Array.from(new Set([...basePerms, ...manager.permissions]));
             } else {
                 permissions = basePerms;
             }
@@ -240,7 +245,8 @@ export class AuthService {
                 id: user._id,
                 email: user.email,
                 role: role,
-                schoolId: user.schoolId
+                schoolId: user.schoolId,
+                jobTitle,
             },
             permissions
         };

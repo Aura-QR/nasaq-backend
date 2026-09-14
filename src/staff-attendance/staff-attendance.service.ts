@@ -271,8 +271,10 @@ export class StaffAttendanceService {
   }
 
   async createManual(user: any, dto: CreateManualStaffAttendanceDto) {
-    this.assertNotOwnRecord(user, dto.staffId);
+    // Resolve the target first: the owner is not staff, so a record for them is
+    // "not found" whoever asks. Only a real staff member can be one's own.
     const staff = await this.staffMember(user, dto.staffId);
+    this.assertNotOwnRecord(user, staff._id);
     const settings = await this.settings(user);
     const date = this.date(dto.date);
     const checkInAt = this.manualTime(dto.checkInAt, date, settings);

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ timestamps: true })
@@ -54,6 +54,13 @@ export class Teacher extends Document {
 
   @Prop({ type: [String], default: [] })
   managerPermissions: string[];
+
+  /**
+   * For a teacher promoted to manager: the job title whose permissions are
+   * merged on top of their teaching rights. null — the school's MANAGER row.
+   */
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'JobTitle', default: null })
+  jobTitleId: Types.ObjectId | null;
 }
 
 export const TeacherSchema = SchemaFactory.createForClass(Teacher);

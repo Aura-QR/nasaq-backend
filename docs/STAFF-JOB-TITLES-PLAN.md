@@ -1,6 +1,7 @@
 # Staff Job Titles — Plan
 
-> Status: **Phases 1–2 implemented** (backend + frontend, not yet released) — everything except the `staffAttendance` key, which the staff-attendance fix owns. Phases 3–5 not started.
+> Status: **Phases 1–2 released** (`cd84ed2`, `5db67c1`). **Phases 3–5 implemented, not yet released.** The `staffAttendance` key is owned by the staff-attendance fix; once it lands in `MANAGER_PERMISSIONS` it becomes a box on every title automatically (withheld until ticked).
+> As built, assignment is `PATCH /job-titles/assignments/:accountId` with `{ type: 'admin' | 'teacher', jobTitleId | null }` (not `/managers/:id/job-title`), and the managers table assigns inline from a dropdown in the role column.
 > Starter titles: «المالية», «وكيل شؤون الطلاب», «وكيل شؤون المعلمين», «المسؤول الأكاديمي».
 > Scope: `nasaq-backend`, `nasaq-frontend`. `nasaq_mobile` is not changed.
 

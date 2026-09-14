@@ -7,7 +7,7 @@
 
 | نوع الحساب في تسجيل الدخول `role` | الحضور الشخصي | مسار الحضور الشخصي | إدارة حضور الإداريين والمشرفين |
 | --- | --- | --- | --- |
-| `MANAGER` | متاح | `/staff-attendance` | متاحة |
+| `MANAGER` | متاح | `/staff-attendance` | بصلاحية `staffAttendance` فقط (مقفولة افتراضيًا) |
 | `SUPERVISOR` | متاح | `/staff-attendance` | متاحة |
 | `OWNER` | غير مشمول | — | متاحة |
 | `TEACHER` | الميزة الحالية للمعلمين | `/teacher-attendance` | غير متاحة |
@@ -34,8 +34,16 @@ Content-Type: application/json
 - لا ترسل `schoolId` أو `recordedBy` في الطلب. لا يمكن اختيار مدرسة أخرى بهيدر.
 - التسجيل الذاتي يأخذ هوية الشخص من التوكن؛ لا ترسل `staffId` أو `role` أو توقيت الجهاز في `check-in` و`check-out`.
 - الحقول غير المعرفة في طلبات الجسم أو الاستعلام المعرّفة بـ DTO تُرفض بـ `400`.
-- صلاحيات هذه المسارات تعتمد على `role` مباشرة. لا تنتظر مفتاحًا جديدًا مثل `school.staffAttendance.create` داخل `permissions`.
-- الحسابات الإدارية الثلاثة `OWNER` و`MANAGER` و`SUPERVISOR` تستطيع عرض السجلات والتقارير والتسجيل اليدوي والتعديل والحذف لجميع الإداريين والمشرفين داخل المدرسة، بما في ذلك سجلاتها هي.
+- **الحضور الشخصي** (`check-in` و`check-out` و`me`) يعتمد على `role`: متاح لـ `MANAGER` و`SUPERVISOR` دائمًا، بلا صلاحية.
+- **إدارة حضور الإداريين** تعتمد على صلاحية `staffAttendance` داخل `permissions`:
+  | المسار | الصلاحية |
+  | --- | --- |
+  | `GET /staff-attendance`، `/staff`، `/absent`، `/summary` | `school.staffAttendance.read` |
+  | `POST /staff-attendance` | `school.staffAttendance.create` |
+  | `PATCH /staff-attendance/:id` | `school.staffAttendance.update` |
+  | `DELETE /staff-attendance/:id` | `school.staffAttendance.delete` |
+- `OWNER` و`SUPERVISOR` يملكان كل الصلاحيات. `MANAGER` لا يملكها افتراضيًا؛ يمنحها المالك من شاشة الصلاحيات أو من مسمى وظيفي.
+- **لا أحد يسجّل أو يعدّل أو يحذف حضوره هو يدويًا**، حتى مع كل الصلاحيات: يُرفض بـ `403` «لا يمكن تسجيل أو تعديل أو حذف حضورك بنفسك». اخفِ أزرار التعديل والحذف على صف المستخدم نفسه، واستبعده من قائمة الاختيار في التسجيل اليدوي.
 
 ## 3. إعداد المدرسة وتفعيل التسجيل الذاتي
 
@@ -89,7 +97,7 @@ PATCH /schools/me/settings
 }
 ```
 
-- الصلاحيات: `OWNER`، `MANAGER`، `SUPERVISOR`.
+- الصلاحيات: إعدادات الحضور والدوام (`location`، `schoolNetworkIps`، `checkInRadiusMeters`، `staffCheckInEnabled`، `teacherCheckInEnabled`، `timezone`، `workSchedule`) لـ `OWNER` و`SUPERVISOR` فقط؛ `MANAGER` يُرفض بـ `403` حتى مع صلاحية إعدادات المدرسة.
 - النجاح `200`، وبنفس غلاف قراءة الإعدادات، وتحت `data` الإعدادات المحفوظة.
 - التفعيل يتطلب موقعًا محفوظًا أو موقعًا في الطلب نفسه؛ وإلا `400`.
 - الموقع والشبكة والمنطقة الزمنية وجدول العمل إعدادات مشتركة مع حضور المعلمين.

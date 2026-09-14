@@ -1,7 +1,10 @@
 # Staff Attendance — Review
 
 > Reviewed: backend `e13cc1c` (feat: added self attendance for managers), frontend `7612cf4` (add adent), re-checked against frontend `d6b4b6c` (fix: centralize shared attendance settings) — both issues are still present there; line numbers below are for `d6b4b6c`.
-> Date: 2026-09-14. Status: **findings only, nothing changed yet.**
+> Date: 2026-09-14. Status: **all three issues fixed.**
+> - **Issue 1** — backend `a7f86f3` (Hamdy): `staffAttendance` key, `@CheckAbilities`, own-record rule, attendance settings owner/supervisor-only. Frontend `39d2f0e` (Arwa): page and actions gated on the key. Tests and the integration doc updated afterwards.
+> - **Issue 2** — frontend `39d2f0e`: 24-hour prefill, only changed times sent, in both edit dialogs.
+> - **Issue 3** — backend `a7f86f3`: `parseCheckInTime` reads HH:mm in the school timezone and rejects invalid times; frontend sends instants. Old records: run the read-only `node dist/scripts/count-shifted-teacher-attendance.js`.
 
 ## Summary
 
@@ -254,5 +257,5 @@ These endpoints are role-based only, with no permission key. `docs/STAFF-JOB-TIT
 | Issue | Backend | Frontend |
 |---|---|---|
 | 1 — assistants write their own attendance | permission key, `@CheckAbilities`, own-record rule, tests, integration doc | hide management page and toggle from assistants (sidebars + route), hide own-row actions |
-| 2 — staff edit dialog | — | 24-hour prefill, send only changed times |
-| 3 — teacher manual times 3 h late | `parseCheckInTime` in school timezone, reject invalid, tests, data count | 24-hour prefill in teacher edit dialog, send only changed times |
+| 2 — staff edit dialog | — | ✅ done: 24-hour prefill, send only changed times |
+| 3 — teacher manual times 3 h late | `parseCheckInTime` in school timezone, reject invalid, tests, data count | ✅ done: ISO instants in school timezone for manual + edit, 24-hour prefill, send only changed times |

@@ -5,6 +5,7 @@ import { Admin } from 'src/admin/schemas/admin.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CreateManagerDto } from './dto/managers.dto';
 import { PasswordUtil } from 'src/auth/utils/password.util';
+import { JobTitle } from 'src/permissions/job-titles/job-title.schema';
 
 /** Roles that live on the Admin collection (not Teacher) */
 const ADMIN_ROLES = ['OWNER', 'MANAGER', 'SUPERVISOR'] as const;
@@ -16,6 +17,7 @@ export class ManagersService {
   constructor(
     @InjectModel(Admin.name) private readonly adminModel: Model<Admin>,
     @InjectModel(Teacher.name) private readonly teacherModel: Model<Teacher>,
+    @InjectModel(JobTitle.name) private readonly jobTitleModel?: Model<JobTitle>,
   ) {}
 
   async createManagerAdmin(schoolId: string, dto: CreateManagerDto) {
@@ -88,6 +90,7 @@ export class ManagersService {
 
     teacher.isManager = false;
     teacher.managerPermissions = [];
+    teacher.jobTitleId = null;
     await teacher.save();
 
     return {
@@ -136,6 +139,18 @@ export class ManagersService {
       .lean();
     const teachers = await this.teacherModel.find({ isManager: true }).lean();
 
+    // The title each assistant logs in with, so the table can show «المالية»
+    // instead of «مساعد إداري» for everyone.
+    const titleIds = [...admins, ...teachers].map((account: any) => account.jobTitleId).filter(Boolean);
+    const titles = this.jobTitleModel && titleIds.length
+      ? await this.jobTitleModel.find({ _id: { $in: titleIds } }).select('name').lean()
+      : [];
+    const titleNames = new Map(titles.map((title: any) => [String(title._id), title.name]));
+    const jobTitleOf = (account: any) => {
+      const id = account.jobTitleId ? String(account.jobTitleId) : null;
+      return id && titleNames.has(id) ? { id, name: titleNames.get(id) } : null;
+    };
+
     const formattedAdmins = admins.map((a: any) => ({
       id: a._id,
       name: a.username,
@@ -144,6 +159,7 @@ export class ManagersService {
       role: a.role,
       permissions: a.permissions || [],
       isActive: true,
+      jobTitle: a.role === 'MANAGER' ? jobTitleOf(a) : null,
     }));
 
     const formattedTeachers = teachers.map((t: any) => ({
@@ -154,6 +170,7 @@ export class ManagersService {
       role: 'TEACHER',
       permissions: t.managerPermissions || [],
       isActive: t.isActive,
+      jobTitle: jobTitleOf(t),
     }));
 
     return [...formattedAdmins, ...formattedTeachers];
@@ -244,6 +261,7 @@ export class ManagersService {
       }
       teacher.isManager = false;
       teacher.managerPermissions = [];
+      teacher.jobTitleId = null;
       await teacher.save();
     }
     return { success: true };

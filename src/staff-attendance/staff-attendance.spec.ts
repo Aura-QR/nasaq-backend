@@ -65,16 +65,23 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
     role = 'MANAGER',
     sub = managerId,
     tenant: Types.ObjectId | null = schoolId,
+    extra: string[] = [],
   ) =>
     jwt.sign({
       sub: String(sub),
       role,
       schoolId: tenant ? String(tenant) : null,
       email: 'test@example.invalid',
-      permissions: loginPermissions(role),
+      permissions: [...loginPermissions(role), ...extra],
+      permissionsVersion: 2,
     });
-  const api = (role = 'MANAGER', sub = managerId, tenant = schoolId) => {
-    const bearer = `Bearer ${token(role, sub, tenant)}`;
+  const api = (
+    role = 'MANAGER',
+    sub = managerId,
+    tenant: Types.ObjectId | null = schoolId,
+    extra: string[] = [],
+  ) => {
+    const bearer = `Bearer ${token(role, sub, tenant, extra)}`;
     return {
       get: (path: string) =>
         request(app.getHttpServer()).get(path).set('Authorization', bearer),
@@ -86,6 +93,13 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
         request(app.getHttpServer()).delete(path).set('Authorization', bearer),
     };
   };
+
+  // Managing staff attendance is the `staffAttendance` permission; by default a
+  // manager has none. OWNER and SUPERVISOR hold every permission.
+  const owner = () => api('OWNER', ownerId);
+  const STAFF_ATTENDANCE_ALL = ['read', 'create', 'update', 'delete'].map(
+    (action) => `school.staffAttendance.${action}`,
+  );
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -338,23 +352,23 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
         'role',
         'staffId',
       ]);
-    const filtered = await api()
+    const filtered = await owner()
       .get('/staff-attendance/staff?role=SUPERVISOR')
       .expect(200);
     expect(filtered.body.data).toHaveLength(1);
   });
 
   it.each([
-    ['OWNER', ownerId],
-    ['MANAGER', managerId],
-    ['SUPERVISOR', supervisorId],
+    ['OWNER', 'OWNER', ownerId, [], managerId],
+    ['SUPERVISOR', 'SUPERVISOR', supervisorId, [], managerId],
+    ['a MANAGER granted staffAttendance', 'MANAGER', managerId, STAFF_ATTENDANCE_ALL, supervisorId],
   ])(
-    '%s can create, correct and delete staff attendance',
-    async (role: string, id: Types.ObjectId) => {
-      const client = api(role, id);
+    '%s can create, correct and delete staff attendance for someone else',
+    async (_label: string, role: string, id: Types.ObjectId, extra: string[], target: Types.ObjectId) => {
+      const client = api(role, id, schoolId, extra);
       const created = await client
         .post('/staff-attendance')
-        .send(manual)
+        .send({ ...manual, staffId: String(target) })
         .expect(201);
       expect(created.body.data).toMatchObject({
         lateMinutes: 15,
@@ -378,12 +392,89 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
     },
   );
 
+
+  it('refuses a MANAGER without staffAttendance every management route, but not their own check-in', async () => {
+    const client = api();
+    for (const path of [
+      '',
+      '/staff',
+      '/absent',
+      '/summary?dateFrom=2025-01-01&dateTo=2025-01-31',
+    ]) {
+      await client.get(`/staff-attendance${path}`).expect(403);
+    }
+    await client
+      .post('/staff-attendance')
+      .send({ ...manual, staffId: String(supervisorId) })
+      .expect(403);
+    const other = await owner()
+      .post('/staff-attendance')
+      .send({ ...manual, staffId: String(supervisorId) })
+      .expect(201);
+    await client
+      .patch(`/staff-attendance/${other.body.data._id}`)
+      .send({ notes: 'x' })
+      .expect(403);
+    await client.delete(`/staff-attendance/${other.body.data._id}`).expect(403);
+
+    await client.post('/staff-attendance/check-in').send(location).expect(200);
+    await client.get('/staff-attendance/me').expect(200);
+  });
+
+  it.each([
+    ['SUPERVISOR', 'SUPERVISOR', supervisorId, []],
+    ['a MANAGER granted staffAttendance', 'MANAGER', managerId, STAFF_ATTENDANCE_ALL],
+  ])(
+    '%s cannot record, correct or delete their own attendance by hand',
+    async (_label: string, role: string, id: Types.ObjectId, extra: string[]) => {
+      const self = api(role, id, schoolId, extra);
+      const own = await self
+        .post('/staff-attendance')
+        .send({ ...manual, staffId: String(id) })
+        .expect(403);
+      expect(own.body.message).toContain('حضورك بنفسك');
+
+      const byOwner = await owner()
+        .post('/staff-attendance')
+        .send({ ...manual, staffId: String(id) })
+        .expect(201);
+      const recordId = byOwner.body.data._id;
+      await self
+        .patch(`/staff-attendance/${recordId}`)
+        .send({ checkInAt: '2025-01-06T07:00:00+03:00' })
+        .expect(403);
+      await self.delete(`/staff-attendance/${recordId}`).expect(403);
+
+      const saved = await records.collection.findOne({ _id: new Types.ObjectId(recordId) });
+      expect(saved.checkInAt.toISOString()).toBe('2025-01-06T04:45:00.000Z');
+      await owner().delete(`/staff-attendance/${recordId}`).expect(200);
+    },
+  );
+
+  it('keeps attendance verification settings with the owner and supervisor', async () => {
+    // A default manager holds schoolSettings.update, which is not enough to move
+    // the geofence, trust a network or switch verification off.
+    for (const change of [
+      { checkInRadiusMeters: 2000 },
+      { schoolNetworkIps: ['203.0.113.9'] },
+      { staffCheckInEnabled: false },
+      { location: { lat: 0, lng: 0 } },
+    ]) {
+      await api().patch('/schools/me/settings').send(change).expect(403);
+    }
+    await owner().patch('/schools/me/settings').send({ checkInRadiusMeters: 200 }).expect(200);
+    await api('SUPERVISOR', supervisorId)
+      .patch('/schools/me/settings')
+      .send({ checkInRadiusMeters: 250 })
+      .expect(200);
+  });
+
   it('manual entry also supports supervisors and stays available when self check-in is disabled', async () => {
-    await api()
+    await owner()
       .patch('/schools/me/settings')
       .send({ staffCheckInEnabled: false })
       .expect(200);
-    const created = await api()
+    const created = await owner()
       .post('/staff-attendance')
       .send({ ...manual, staffId: String(supervisorId) })
       .expect(201);
@@ -404,11 +495,11 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
         },
       },
     );
-    await api()
+    await owner()
       .patch('/schools/me/settings')
       .send({ staffCheckInEnabled: true })
       .expect(400);
-    await api()
+    await owner()
       .patch('/schools/me/settings')
       .send({ staffCheckInEnabled: true, location })
       .expect(200);
@@ -422,7 +513,7 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
   });
 
   it('accepts network-only verification and rejects a spoofed forwarding header', async () => {
-    await api()
+    await owner()
       .patch('/schools/me/settings')
       .send({ schoolNetworkIps: ['127.0.0.1'] })
       .expect(200);
@@ -434,7 +525,7 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
       gps: false,
       network: true,
     });
-    await api()
+    await owner()
       .patch('/schools/me/settings')
       .send({ schoolNetworkIps: ['203.0.113.10'] })
       .expect(200);
@@ -476,8 +567,8 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
   });
 
   it('preserves duplicate semantics for manual records', async () => {
-    await api().post('/staff-attendance').send(manual).expect(201);
-    const duplicate = await api()
+    await owner().post('/staff-attendance').send(manual).expect(201);
+    const duplicate = await owner()
       .post('/staff-attendance')
       .send(manual)
       .expect(409);
@@ -485,8 +576,8 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
   });
 
   it('locks personal history to the caller while preserving pagination and exact date filters', async () => {
-    await api().post('/staff-attendance').send(manual).expect(201);
-    await api()
+    await owner().post('/staff-attendance').send(manual).expect(201);
+    await owner()
       .post('/staff-attendance')
       .send({ ...manual, staffId: String(supervisorId) })
       .expect(201);
@@ -501,7 +592,7 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
       .get('/staff-attendance/me?date=2025-01-07')
       .expect(200);
     expect(empty.body.meta.total).toBe(0);
-    const list = await api()
+    const list = await owner()
       .get('/staff-attendance?limit=1&page=2&method=manual')
       .expect(200);
     expect(list.body.meta).toEqual({
@@ -510,53 +601,54 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
       limit: 1,
       totalPages: 2,
     });
-    const role = await api()
+    const role = await owner()
       .get('/staff-attendance?role=SUPERVISOR')
       .expect(200);
     expect(role.body.data[0].role).toBe('SUPERVISOR');
   });
 
   it('isolates manual targets, reads, aggregates, corrections and deletion between schools', async () => {
-    const foreign = api('MANAGER', otherManagerId, otherSchoolId);
+    // A supervisor of the other school, recording for that school's manager.
+    const foreign = api('SUPERVISOR', new Types.ObjectId(), otherSchoolId);
     const record = await foreign
       .post('/staff-attendance')
       .send({ ...manual, staffId: String(otherManagerId) })
       .expect(201);
-    await api()
+    await owner()
       .post('/staff-attendance')
       .send({ ...manual, staffId: String(otherManagerId) })
       .expect(404);
-    await api()
+    await owner()
       .post('/staff-attendance')
       .send({ ...manual, staffId: String(ownerId) })
       .expect(404);
-    const list = await api()
+    const list = await owner()
       .get('/staff-attendance')
       .set('X-School-Id', String(otherSchoolId))
       .expect(200);
     expect(list.body.data).toEqual([]);
-    const summary = await api()
+    const summary = await owner()
       .get('/staff-attendance/summary?dateFrom=2025-01-01&dateTo=2025-01-31')
       .expect(200);
     expect(summary.body.totalStaff).toBe(0);
-    await api()
+    await owner()
       .patch(`/staff-attendance/${record.body.data._id}`)
       .send({ notes: 'blocked' })
       .expect(404);
-    await api().delete(`/staff-attendance/${record.body.data._id}`).expect(404);
+    await owner().delete(`/staff-attendance/${record.body.data._id}`).expect(404);
     expect(await records.collection.countDocuments()).toBe(1);
   });
 
   it('computes absences on working days and returns nobody on days off', async () => {
-    await api().post('/staff-attendance').send(manual).expect(201);
-    const absent = await api()
+    await owner().post('/staff-attendance').send(manual).expect(201);
+    const absent = await owner()
       .get('/staff-attendance/absent?date=2025-01-06')
       .expect(200);
     expect(absent.body).toMatchObject({
       totalAbsent: 1,
       absentStaff: [{ staffId: String(supervisorId) }],
     });
-    const off = await api()
+    const off = await owner()
       .get('/staff-attendance/absent?date=2025-01-10')
       .expect(200);
     expect(off.body).toMatchObject({
@@ -564,17 +656,17 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
       totalAbsent: 0,
       absentStaff: [],
     });
-    const filtered = await api()
+    const filtered = await owner()
       .get('/staff-attendance/absent?date=2025-01-06&role=MANAGER')
       .expect(200);
     expect(filtered.body.totalAbsent).toBe(0);
-    await api().get('/staff-attendance/absent?date=2099-01-01').expect(400);
+    await owner().get('/staff-attendance/absent?date=2099-01-01').expect(400);
   });
 
   it('summarizes measured time and missing check-outs, retaining deleted staff history', async () => {
-    await api().post('/staff-attendance').send(manual).expect(201);
+    await owner().post('/staff-attendance').send(manual).expect(201);
     const open = { ...manual, checkOutAt: undefined };
-    await api()
+    await owner()
       .post('/staff-attendance')
       .send({
         ...open,
@@ -610,19 +702,30 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
       .post('/staff-attendance/check-in')
       .send(location)
       .expect(200);
-    const corrected = await api()
+    // Resending the same time is not a correction: the location proof stays.
+    const unchanged = await owner()
       .patch(`/staff-attendance/${result.body.data._id}`)
-      .send({ checkInAt: result.body.data.checkInAt })
+      .send({ checkInAt: result.body.data.checkInAt, notes: 'ملاحظة فقط' })
+      .expect(200);
+    expect(unchanged.body.data).toMatchObject({
+      method: 'location',
+      verification: { gps: true, network: false },
+      notes: 'ملاحظة فقط',
+    });
+    const earlier = new Date(new Date(result.body.data.checkInAt).getTime() - 60_000).toISOString();
+    const corrected = await owner()
+      .patch(`/staff-attendance/${result.body.data._id}`)
+      .send({ checkInAt: earlier })
       .expect(200);
     expect(corrected.body.data).toMatchObject({
       method: 'manual',
       coordinates: null,
       distanceMeters: null,
       verification: { gps: false, network: false },
-      recordedBy: String(managerId),
+      recordedBy: String(ownerId),
     });
-    const old = await api().post('/staff-attendance').send(manual).expect(201);
-    await api()
+    const old = await owner().post('/staff-attendance').send(manual).expect(201);
+    await owner()
       .patch(`/staff-attendance/${old.body.data._id}`)
       .send({ checkInAt: '2025-01-06T14:00:00+03:00' })
       .expect(400);
@@ -648,23 +751,23 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
       .post('/staff-attendance/check-in')
       .send({ lat: 91, lng: 0 })
       .expect(400);
-    await api()
+    await owner()
       .post('/staff-attendance')
       .send({ ...manual, date: '2025-02-30' })
       .expect(400);
-    await api()
+    await owner()
       .post('/staff-attendance')
       .send({ ...manual, checkInAt: '07:45' })
       .expect(400);
-    await api()
+    await owner()
       .post('/staff-attendance')
       .send({ ...manual, checkInAt: '2025-01-07T07:45:00+03:00' })
       .expect(400);
-    await api()
+    await owner()
       .post('/staff-attendance')
       .send({ ...manual, checkOutAt: '2025-01-06T06:00:00+03:00' })
       .expect(400);
-    await api()
+    await owner()
       .post('/staff-attendance')
       .send({
         ...manual,
@@ -672,13 +775,13 @@ describe('Staff attendance HTTP integration (isolated local MongoDB)', () => {
         checkInAt: '2099-01-01T07:45:00+03:00',
       })
       .expect(400);
-    await api()
+    await owner()
       .get('/staff-attendance?dateFrom=2025-01-10&dateTo=2025-01-01')
       .expect(400);
-    await api().get('/staff-attendance?limit=101').expect(400);
-    await api().get('/staff-attendance/staff?role=OWNER').expect(400);
-    await api().get('/staff-attendance/summary').expect(400);
-    await api().delete('/staff-attendance/not-an-id').expect(400);
+    await owner().get('/staff-attendance?limit=101').expect(400);
+    await owner().get('/staff-attendance/staff?role=OWNER').expect(400);
+    await owner().get('/staff-attendance/summary').expect(400);
+    await owner().delete('/staff-attendance/not-an-id').expect(400);
   });
 });
 

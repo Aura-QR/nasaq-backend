@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Permission } from './schemas/permission.schema';
 import { DERIVED_DEFAULTS, getDefaultPermissionsForRole } from './default-permissions';
+import { JobTitle } from './job-titles/job-title.schema';
+import { normalizeTitlePermissions } from './job-titles/job-title-permissions';
 
 @Injectable()
 export class PermissionsService implements OnModuleInit {
@@ -10,6 +12,7 @@ export class PermissionsService implements OnModuleInit {
 
   constructor(
     @InjectModel(Permission.name) private permissionModel: Model<Permission>,
+    @InjectModel(JobTitle.name) private jobTitleModel?: Model<JobTitle>,
   ) {}
 
   async onModuleInit() {
@@ -156,6 +159,39 @@ export class PermissionsService implements OnModuleInit {
     }
 
     return this.convertPermissionsToStrings(permissionDoc.permissions);
+  }
+
+  /**
+   * What a manager logs in with: their job title's permissions when they have
+   * one, otherwise the school's MANAGER row.
+   *
+   * The title is looked up inside the account's own school, so an id pointing at
+   * another school's title — or at a title deleted since — falls back to the
+   * MANAGER row rather than failing the login.
+   */
+  async resolveManagerPermissions(
+    schoolId?: string,
+    jobTitleId?: string | null,
+  ): Promise<{ permissions: string[]; jobTitle: { id: string; name: string } | null }> {
+    if (
+      this.jobTitleModel &&
+      jobTitleId &&
+      Types.ObjectId.isValid(String(jobTitleId)) &&
+      schoolId &&
+      Types.ObjectId.isValid(schoolId)
+    ) {
+      const title = await this.jobTitleModel
+        .findOne({ _id: new Types.ObjectId(String(jobTitleId)), schoolId: new Types.ObjectId(schoolId) })
+        .setOptions({ skipTenantScope: true })
+        .lean();
+      if (title) {
+        return {
+          permissions: this.convertPermissionsToStrings(normalizeTitlePermissions(title.permissions)),
+          jobTitle: { id: String(title._id), name: title.name },
+        };
+      }
+    }
+    return { permissions: await this.getFlatPermissions('MANAGER', schoolId), jobTitle: null };
   }
 
   private convertPermissionsToStrings(permissionsObj: any): string[] {

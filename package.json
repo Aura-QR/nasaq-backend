@@ -27,6 +27,7 @@
     "repair:preparation-lectures": "ts-node -r tsconfig-paths/register src/scripts/repair-preparation-lectures.ts",
     "repair:installment-totals": "ts-node -r tsconfig-paths/register src/scripts/repair-installment-totals.ts",
     "repair:installment-totals:dry": "ts-node -r tsconfig-paths/register src/scripts/repair-installment-totals.ts --dry-run",
+    "count:shifted-teacher-attendance": "ts-node -r tsconfig-paths/register src/scripts/count-shifted-teacher-attendance.ts",
     "seed:mwahb": "ts-node src/scripts/seed-mwahb.ts",
     "cleanup:dup-teachers": "ts-node src/scripts/cleanup-duplicate-teachers.ts",
     "cleanup:classes": "ts-node src/scripts/cleanup-stray-classes.ts",

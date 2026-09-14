@@ -343,6 +343,49 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
       expect(result.name).toBe('فاطمة علي');
     });
 
+    it('stores a manual 07:45 as 07:45 school time and measures lateness from it', async () => {
+      teacherModel.findById.mockResolvedValue({ _id: mockTeacherId, name: 'فاطمة علي' });
+      teacherAttendanceModel.findOne.mockResolvedValue(null);
+      teacherAttendanceModel.create.mockImplementation((doc) => Promise.resolve({ _id: 'rec3', ...doc }));
+      const everyDay = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].map((day) => ({
+        day,
+        isWorkingDay: true,
+        startTime: '07:30',
+        endTime: '14:00',
+      }));
+      schoolModel.findById.mockReturnValue({
+        setOptions: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({
+            settings: { ...defaultSchoolSettings, timezone: 'Asia/Riyadh', workSchedule: everyDay },
+          }),
+        }),
+      });
+
+      const result = await service.createManual(adminUser, {
+        teacherId: mockTeacherId,
+        date: yesterday,
+        checkInAt: '07:45',
+      });
+
+      // Was saved as 07:45 UTC — 10:45 in Riyadh — and 195 minutes late.
+      expect(result.checkInAt.toISOString()).toBe(`${yesterday}T04:45:00.000Z`);
+      expect(result.lateMinutes).toBe(15);
+    });
+
+    it('refuses an unreadable manual time instead of saving Invalid Date', async () => {
+      teacherModel.findById.mockResolvedValue({ _id: mockTeacherId, name: 'فاطمة علي' });
+      teacherAttendanceModel.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.createManual(adminUser, {
+          teacherId: mockTeacherId,
+          date: yesterday,
+          checkInAt: '07:45 ص',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(teacherAttendanceModel.create).not.toHaveBeenCalled();
+    });
+
     it('should reject a future date', async () => {
       teacherModel.findById.mockResolvedValue({ _id: mockTeacherId, name: 'فاطمة علي' });
 

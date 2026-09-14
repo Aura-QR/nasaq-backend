@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ timestamps: true })
@@ -20,6 +20,13 @@ export class Admin extends Document {
 
   @Prop({ type: [String], default: [] })
   permissions: string[];
+
+  /**
+   * MANAGER only: the school job title whose permissions this account logs in
+   * with. null — the school's MANAGER row, as before titles existed.
+   */
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'JobTitle', default: null })
+  jobTitleId: Types.ObjectId | null;
 
   @Prop({ select: false })
   otp?: string;
