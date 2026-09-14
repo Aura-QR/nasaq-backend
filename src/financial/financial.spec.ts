@@ -67,7 +67,7 @@ describe('Financial Module — Remainder Front-Loading & Linked Discounts', () =
     });
   });
 
-  describe('redistributeUnpaidInstallments rounding remainder front-loading', () => {
+  describe('rebalanceInstallments rounding remainder front-loading', () => {
     it('should front-load remainder when redistributing unpaid balance', () => {
       const installments = [
         { status: PaymentStatus.PENDING, amount: 0 },
@@ -75,7 +75,7 @@ describe('Financial Module — Remainder Front-Loading & Linked Discounts', () =
         { status: PaymentStatus.PENDING, amount: 0 },
       ];
 
-      (discountService as any).redistributeUnpaidInstallments(installments, 8000);
+      recordService.rebalanceInstallments(installments, 8000);
       expect(installments[0].amount).toBe(2667);
       expect(installments[1].amount).toBe(2667);
       expect(installments[2].amount).toBe(2666);

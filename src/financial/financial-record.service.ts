@@ -141,17 +141,110 @@ export class FinancialRecordService {
    * Shared helper: redistribute remaining balance across unpaid installments.
    * Used by DiscountService and BusService when fee or discount changes.
    */
-  redistributeUnpaidInstallments(installments: any[], newBalance: number) {
-    const unpaid = installments.filter(i => i.status !== PaymentStatus.PAID);
-    const n = unpaid.length;
-    if (n === 0) return;
+  /**
+   * The fee a section actually charges. `netFee` is written whenever a record,
+   * a discount or a recalculation touches the section, but it defaults to 0
+   * and older records may never have had it set — so a section with no
+   * discount falls back to its gross fee. Reading a stray 0 as "nothing is
+   * owed" would close every open installment.
+   */
+  effectiveNetFee(section: any): number {
+    if (section?.discount) return Number(section.netFee) || 0;
+    return Number(section?.netFee) || Number(section?.grossFee) || Number(section?.fee) || 0;
+  }
 
-    const base = Math.floor(newBalance / n);
-    const remainder = newBalance - base * n;
+  /**
+   * Make a section's installments add up to its net fee again, after the fee
+   * changed — a fee-criteria edit, a nationality change, a class move, a
+   * discount applied or removed.
+   *
+   * This replaces four copies of a redistribution that set each unsettled
+   * installment's amount to its share of the *remaining balance*. For a
+   * partly paid installment that threw away what had already been paid on it:
+   * 30,000 / 30,000(10,000 paid) / 30,000 became 30,000 / 25,000 / 25,000,
+   * and a student owing 90,000 ended with installments totalling 80,000, every
+   * one of them settled, "paid in full" on the page, and 10,000 owed that no
+   * installment could take. It happened on any recalculation, even one that
+   * changed no fee.
+   *
+   * Afterwards:
+   * - settled installments are untouched;
+   * - no installment's amount is below what has been paid on it;
+   * - the amounts total the net fee whenever the student owes anything.
+   */
+  rebalanceInstallments(installments: any[], netFee: number): void {
+    const paidOn = (installment: any) => Number(installment?.paidAmount) || 0;
+    const totalPaid = installments.reduce((sum, i) => sum + paidOn(i), 0);
+    const remaining = netFee - totalPaid;
+    const open = installments.filter(i => i.status !== PaymentStatus.PAID);
 
-    unpaid.forEach((inst, index) => {
-      inst.amount = index < remainder ? base + 1 : base;
+    // Already consistent: leave the schedule alone. A recalculation that
+    // changed nothing — saving a student's profile, re-saving the same fee
+    // criteria — must not reshuffle amounts a parent has already been told.
+    const scheduled = installments.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+    const coherent = installments.every(i => (Number(i.amount) || 0) >= paidOn(i));
+    if (coherent && (scheduled === netFee || (remaining <= 0 && open.length === 0))) {
+      return;
+    }
+
+    const settle = (installment: any) => {
+      const paid = paidOn(installment);
+      installment.status =
+        paid >= Number(installment.amount)
+          ? PaymentStatus.PAID
+          : paid > 0
+          ? PaymentStatus.PARTIAL
+          : PaymentStatus.PENDING;
+    };
+
+    if (remaining <= 0) {
+      // Nothing more is owed — or a discount now leaves the student in credit,
+      // which is a refund to make, not an amount to push below what was paid.
+      open.forEach((installment) => {
+        installment.amount = paidOn(installment);
+        settle(installment);
+      });
+      return;
+    }
+
+    if (open.length === 0) {
+      // Every installment is settled but more is owed: the fee went up after
+      // the last payment. It gets an installment of its own, due now, so it
+      // can be collected rather than owed and unpayable.
+      const lastNumber = installments.reduce(
+        (max, i) => Math.max(max, Number(i.installmentNumber) || 0),
+        0,
+      );
+      installments.push({
+        installmentNumber: lastNumber + 1,
+        amount: remaining,
+        dueDate: new Date(),
+        status: PaymentStatus.PENDING,
+        paidAmount: 0,
+        payments: [],
+      });
+      return;
+    }
+
+    // Share what is still owed across the open installments, on top of what
+    // has already been paid on each.
+    const base = Math.floor(remaining / open.length);
+    const extra = remaining - base * open.length;
+    open.forEach((installment, index) => {
+      installment.amount = paidOn(installment) + (index < extra ? base + 1 : base);
+      settle(installment);
     });
+  }
+
+  /** Rebalance a tuition, bus or trip section and bring its totals with it. */
+  rebalanceSection(section: any): void {
+    if (!section || !Array.isArray(section.installments)) return;
+    this.rebalanceInstallments(section.installments, this.effectiveNetFee(section));
+    section.totalPaid = section.installments.reduce(
+      (sum: number, i: any) => sum + (Number(i.paidAmount) || 0),
+      0,
+    );
+    section.status = this.computeFeeStatus(section.installments);
   }
 
   async assertCanCreateRecord(studentId: string, classId: string, schoolId: string): Promise<void> {
@@ -244,16 +337,7 @@ export class FinancialRecordService {
       record.tuition.netFee = grossFee;
     }
 
-    const unpaidInstallments = record.tuition.installments.filter(i => i.status !== 'paid');
-    const totalUnpaid = record.tuition.netFee - record.tuition.totalPaid;
-    if (unpaidInstallments.length > 0 && totalUnpaid > 0) {
-      const n = unpaidInstallments.length;
-      const base = Math.floor(totalUnpaid / n);
-      const remainder = totalUnpaid - base * n;
-      unpaidInstallments.forEach((inst, i) => {
-        inst.amount = i < remainder ? base + 1 : base;
-      });
-    }
+    this.rebalanceSection(record.tuition);
 
     record.markModified('tuition');
     await record.save();
@@ -443,16 +527,7 @@ export class FinancialRecordService {
             record.tuition.netFee = grossFee;
           }
 
-          const unpaidInstallments = record.tuition.installments.filter(i => i.status !== 'paid');
-          const totalUnpaid = record.tuition.netFee - record.tuition.totalPaid;
-          if (unpaidInstallments.length > 0 && totalUnpaid > 0) {
-            const n = unpaidInstallments.length;
-            const base = Math.floor(totalUnpaid / n);
-            const remainder = totalUnpaid - base * n;
-            unpaidInstallments.forEach((inst, i) => {
-              inst.amount = i < remainder ? base + 1 : base;
-            });
-          }
+          this.rebalanceSection(record.tuition);
           record.markModified('tuition');
           await record.save();
         }
@@ -502,16 +577,7 @@ export class FinancialRecordService {
         record.tuition.netFee = grossFee;
       }
 
-      const unpaidInstallments = record.tuition.installments.filter(i => i.status !== 'paid');
-      const totalUnpaid = record.tuition.netFee - record.tuition.totalPaid;
-      if (unpaidInstallments.length > 0 && totalUnpaid > 0) {
-        const n = unpaidInstallments.length;
-        const base = Math.floor(totalUnpaid / n);
-        const remainder = totalUnpaid - base * n;
-        unpaidInstallments.forEach((inst, i) => {
-          inst.amount = i < remainder ? base + 1 : base;
-        });
-      }
+      this.rebalanceSection(record.tuition);
 
       record.markModified('tuition');
       await record.save();

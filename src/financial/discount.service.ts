@@ -7,7 +7,6 @@ import { StudentFinancialRecord } from './schemas/student-financial-record.schem
 import { CreateDiscountDto } from './dto/create-discount.dto';
 import { UpdateDiscountDto } from './dto/update-discount.dto';
 import { ApplyDiscountDto } from './dto/apply-discount.dto';
-import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
 import { FinancialRecordService } from './financial-record.service';
 
 @Injectable()
@@ -28,8 +27,9 @@ export class DiscountService {
     return Math.round((fee * value) / 100);
   }
 
-  private redistributeUnpaidInstallments(installments: any[], newBalance: number) {
-    this.financialRecordService.redistributeUnpaidInstallments(installments, newBalance);
+  /** Installments, totals and status follow the new net fee. */
+  private rebalance(section: any) {
+    this.financialRecordService.rebalanceSection(section);
   }
 
   async create(dto: CreateDiscountDto, adminId: string) {
@@ -100,7 +100,6 @@ export class DiscountService {
     const grossFee = record.tuition.grossFee || record.tuition.fee;
     const discountAmount = this.computeDiscountAmount(grossFee, discount.percentage);
     const netFee = grossFee - discountAmount;
-    const newBalance = netFee - record.tuition.totalPaid;
 
     record.tuition.discount = {
       discountId: discount._id as mongoose.Types.ObjectId,
@@ -109,9 +108,7 @@ export class DiscountService {
       discountAmount,
     } as any;
     record.tuition.netFee = netFee;
-    record.tuition.status = newBalance <= 0 ? FeeStatus.PAID : record.tuition.totalPaid > 0 ? FeeStatus.PARTIAL : FeeStatus.UNPAID;
-
-    this.redistributeUnpaidInstallments(record.tuition.installments, Math.max(newBalance, 0));
+    this.rebalance(record.tuition);
     record.markModified('tuition');
     await record.save();
 
@@ -124,8 +121,7 @@ export class DiscountService {
     const grossFee = record.tuition.grossFee || record.tuition.fee;
     record.tuition.discount = null;
     record.tuition.netFee = grossFee;
-    const newBalance = grossFee - record.tuition.totalPaid;
-    this.redistributeUnpaidInstallments(record.tuition.installments, Math.max(newBalance, 0));
+    this.rebalance(record.tuition);
     record.markModified('tuition');
     await record.save();
 
@@ -145,7 +141,6 @@ export class DiscountService {
 
     const discountAmount = this.computeDiscountAmount(record.bus.fee, discount.percentage);
     const netFee = record.bus.fee - discountAmount;
-    const newBalance = netFee - record.bus.totalPaid;
 
     record.bus.discount = {
       discountId: discount._id as mongoose.Types.ObjectId,
@@ -154,9 +149,7 @@ export class DiscountService {
       discountAmount,
     } as any;
     record.bus.netFee = netFee;
-    record.bus.status = newBalance <= 0 ? FeeStatus.PAID : record.bus.totalPaid > 0 ? FeeStatus.PARTIAL : FeeStatus.UNPAID;
-
-    this.redistributeUnpaidInstallments(record.bus.installments, Math.max(newBalance, 0));
+    this.rebalance(record.bus);
     record.markModified('bus');
     await record.save();
 
@@ -168,8 +161,7 @@ export class DiscountService {
 
     record.bus.discount = null;
     record.bus.netFee = record.bus.fee;
-    const newBalance = record.bus.fee - record.bus.totalPaid;
-    this.redistributeUnpaidInstallments(record.bus.installments, Math.max(newBalance, 0));
+    this.rebalance(record.bus);
     record.markModified('bus');
     await record.save();
 
@@ -192,7 +184,6 @@ export class DiscountService {
 
     const discountAmount = this.computeDiscountAmount(trip.fee, discount.percentage);
     const netFee = trip.fee - discountAmount;
-    const newBalance = netFee - trip.totalPaid;
 
     (trip as any).discount = {
       discountId: discount._id as mongoose.Types.ObjectId,
@@ -201,9 +192,7 @@ export class DiscountService {
       discountAmount,
     };
     (trip as any).netFee = netFee;
-    trip.status = newBalance <= 0 ? FeeStatus.PAID : trip.totalPaid > 0 ? FeeStatus.PARTIAL : FeeStatus.UNPAID;
-
-    this.redistributeUnpaidInstallments(trip.installments, Math.max(newBalance, 0));
+    this.rebalance(trip);
     record.markModified('trips');
     await record.save();
 
@@ -219,8 +208,7 @@ export class DiscountService {
 
     (trip as any).discount = null;
     (trip as any).netFee = trip.fee;
-    const newBalance = trip.fee - trip.totalPaid;
-    this.redistributeUnpaidInstallments(trip.installments, Math.max(newBalance, 0));
+    this.rebalance(trip);
     record.markModified('trips');
     await record.save();
 
