@@ -8,13 +8,18 @@ import { FinancialRecordService } from './financial-record.service';
 import { RecordPaymentDto } from './dto/record-payment.dto';
 import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { SwitchPlanDto } from './dto/switch-plan.dto';
+import { VoidPaymentDto } from './dto/void-payment.dto';
+import { PaymentVoidService } from './payment-void.service';
 
 @Controller('financial/records')
 @UseGuards(JwtAuthGuard, AbilitiesGuard)
 @ApiTags('Financial - Records')
 @ApiBearerAuth()
 export class FinancialRecordController {
-  constructor(private readonly financialRecordService: FinancialRecordService) {}
+  constructor(
+    private readonly financialRecordService: FinancialRecordService,
+    private readonly paymentVoidService: PaymentVoidService,
+  ) {}
 
   @Get()
   @CheckAbilities({ action: 'read', subject: 'Financial' })
@@ -107,6 +112,24 @@ export class FinancialRecordController {
       dto.academicYearId = academicYearId;
     }
     return this.financialRecordService.payTuition(studentId, dto, user.userId);
+  }
+
+  /**
+   * Void a payment that was recorded by mistake — tuition, bus, trip or
+   * additional fee. The entry stays in the record, marked with who voided it,
+   * when and why, and its amount comes back out of what was paid. The owner
+   * may void any payment; whoever recorded it may void it the same day.
+   */
+  @Post(':studentId/payments/void')
+  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Void a payment recorded by mistake (owner, or the recorder on the same day)' })
+  async voidPayment(
+    @Param('studentId') studentId: string,
+    @Body() dto: VoidPaymentDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.paymentVoidService.voidPayment(studentId, dto, user);
   }
 
   @Post(':studentId/tuition/refund')

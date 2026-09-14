@@ -49,6 +49,35 @@ class PaymentEvent {
 
   @Prop({ enum: ['payment', 'refund'], default: 'payment' })
   type: string;
+
+  /**
+   * When the entry was written — not `paidAt`, which is the date the cashier
+   * typed and may be days earlier. "Same day" for voiding is measured from
+   * this.
+   *
+   * Deliberately no default. Entries recorded before this field existed have
+   * no recording time, and a default would stamp them "now" the moment the
+   * record is loaded — letting anyone void any old payment as if it had been
+   * entered today. Without one, those entries can only be voided by the owner.
+   */
+  @Prop({ type: Date })
+  recordedAt?: Date;
+
+  /**
+   * Set when the entry is voided: it was recorded by mistake and the money
+   * never changed hands. The entry stays in the array — a void is part of the
+   * record, not a way to rewrite it — and its amount is taken back out of the
+   * installment's `paidAmount`. Distinct from a refund, which is money that
+   * did change hands and was then returned.
+   */
+  @Prop({ type: Date })
+  voidedAt?: Date;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId })
+  voidedBy?: mongoose.Types.ObjectId;
+
+  @Prop()
+  voidReason?: string;
 }
 const PaymentEventSchema = SchemaFactory.createForClass(PaymentEvent);
 

@@ -296,6 +296,7 @@ export class TripService {
     }
 
     (inst.payments as any[]).push({
+      recordedAt: new Date(),
       amount: dto.amount,
       paidAt: new Date(dto.paidAt),
       recordedBy: new mongoose.Types.ObjectId(adminId),
@@ -332,6 +333,7 @@ export class TripService {
     }
 
     (inst.payments as any[]).push({
+      recordedAt: new Date(),
       amount: dto.amount,
       paidAt: dto.refundedAt ? new Date(dto.refundedAt) : new Date(),
       recordedBy: new mongoose.Types.ObjectId(adminId),

@@ -28,6 +28,7 @@ import { BusPlan, BusPlanSchema } from './schemas/bus-plan.schema';
 import { BusPlanService } from './bus-plan.service';
 import { BusPlanController } from './bus-plan.controller';
 import { TripService } from './trip.service';
+import { PaymentVoidService } from './payment-void.service';
 import { TripController } from './trip.controller';
 import { TripModuleController } from './trip-module.controller';
 import { DiscountService } from './discount.service';
@@ -73,6 +74,7 @@ import { School, SchoolSchema } from '../platform/schools/schemas/school.schema'
     BusService,
     BusPlanService,
     TripService,
+    PaymentVoidService,
     DiscountService,
     AdditionalFeeService,
   ],
