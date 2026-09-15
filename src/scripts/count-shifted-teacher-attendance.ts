@@ -13,8 +13,15 @@
  * Location check-ins that were never edited are not affected.
  *
  * The web started sending the instant itself at frontend 39d2f0e
- * (2026-09-14 11:43 UTC); records last written after that are correct. Pass
- * --before to use a different cutoff.
+ * (2026-09-14 11:43 UTC). Pass --before with the time that build actually
+ * reached production — the commit time is only an upper bound on when the bug
+ * could still write.
+ *
+ * Candidates are records CREATED before the cutoff. A later write does not
+ * clear one: editing only the note of an old manual record after the fix
+ * moves updatedAt and leaves the wrong time exactly where it was. Those are
+ * counted apart, as "touched after the fix", because some of them had their
+ * time corrected by hand and some did not — the script cannot tell which.
  *
  * For each candidate it prints the stored local time and what it reads as if
  * the shift is undone. The script cannot know which edits changed a time and
@@ -50,7 +57,17 @@ export type SchoolReport = {
   timezone: string;
   manual: number;
   edited: number;
-  samples: { teacher: string; date: string; stored: string; ifShifted: string; lateMinutes: number | null; kind: string }[];
+  /** Of manual + edited: written again after the cutoff, time possibly fixed by hand since. */
+  touchedAfterFix: number;
+  samples: {
+    teacher: string;
+    date: string;
+    stored: string;
+    ifShifted: string;
+    lateMinutes: number | null;
+    kind: string;
+    touchedAfterFix: boolean;
+  }[];
 };
 
 export async function countShifted(
@@ -63,8 +80,11 @@ export async function countShifted(
   const candidates = await db
     .collection('teacherAttendance')
     .find({
-      updatedAt: { $lt: cutoff },
-      $or: [{ method: 'manual' }, { recordedBy: { $ne: null } }],
+      $and: [
+        // Records from before timestamps existed have no createdAt; they are old.
+        { $or: [{ createdAt: { $lt: cutoff } }, { createdAt: { $exists: false } }] },
+        { $or: [{ method: 'manual' }, { recordedBy: { $ne: null } }] },
+      ],
     })
     .sort({ schoolId: 1, date: 1 })
     .toArray();
@@ -83,11 +103,13 @@ export async function countShifted(
     const school = schoolById.get(key);
     const timezone = school?.settings?.timezone || 'Asia/Riyadh';
     if (!reports.has(key)) {
-      reports.set(key, { schoolId: key, schoolName: school?.name ?? '(unknown school)', timezone, manual: 0, edited: 0, samples: [] });
+      reports.set(key, { schoolId: key, schoolName: school?.name ?? '(unknown school)', timezone, manual: 0, edited: 0, touchedAfterFix: 0, samples: [] });
     }
     const report = reports.get(key)!;
     const kind = record.method === 'manual' ? 'manual' : 'edited';
     report[kind] += 1;
+    const touchedAfterFix = !!record.updatedAt && new Date(record.updatedAt) >= cutoff;
+    if (touchedAfterFix) report.touchedAfterFix += 1;
 
     if (report.samples.length < samples && record.checkInAt) {
       const stored = new Date(record.checkInAt);
@@ -99,6 +121,7 @@ export async function countShifted(
         ifShifted: localTime(undone, timezone),
         lateMinutes: record.lateMinutes ?? null,
         kind,
+        touchedAfterFix,
       });
     }
   }
@@ -120,14 +143,14 @@ async function main() {
       samples: Number(arg('--samples') ?? 10),
     });
     const total = reports.reduce((sum, r) => sum + r.manual + r.edited, 0);
-    console.log(`READ-ONLY — nothing was changed. Cutoff: records last written before ${arg('--before') ?? DEFAULT_CUTOFF}`);
+    console.log(`READ-ONLY — nothing was changed. Cutoff: records created before ${arg('--before') ?? DEFAULT_CUTOFF}`);
     console.log(`مدارس فيها سجلات محتملة: ${reports.length} · سجلات محتملة: ${total}\n`);
     for (const r of reports) {
       console.log(`■ ${r.schoolName} (${r.schoolId}) — ${r.timezone}`);
-      console.log(`  حضور يدوي: ${r.manual} · سجلات مُعدّلة: ${r.edited}`);
+      console.log(`  حضور يدوي: ${r.manual} · سجلات مُعدّلة: ${r.edited} · منها عُدّل بعد الإصلاح (يحتاج مراجعة): ${r.touchedAfterFix}`);
       for (const s of r.samples) {
         console.log(
-          `    ${s.date}  ${s.teacher}  المحفوظ ${s.stored}  ← لو كان مُزاحًا يكون ${s.ifShifted}  تأخير محفوظ: ${s.lateMinutes ?? '—'} د  (${s.kind === 'manual' ? 'يدوي' : 'مُعدّل'})`,
+          `    ${s.date}  ${s.teacher}  المحفوظ ${s.stored}  ← لو كان مُزاحًا يكون ${s.ifShifted}  تأخير محفوظ: ${s.lateMinutes ?? '—'} د  (${s.kind === 'manual' ? 'يدوي' : 'مُعدّل'}${s.touchedAfterFix ? ' · عُدّل بعد الإصلاح' : ''})`,
         );
       }
       console.log('');

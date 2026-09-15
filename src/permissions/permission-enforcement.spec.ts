@@ -132,6 +132,17 @@ describe('permission enforcement — route sweep', () => {
     const route = all.find((r) => r.id === id)!;
     expect(route.abilities).toEqual([expect.objectContaining({ action, subject })]);
   });
+
+  // The school director holds every other permission on students and teachers;
+  // resetting a forgotten password was the one thing left to the owner.
+  it.each([
+    ['StudentsController.setAdminPassword', 'Student'],
+    ['TeachersController.setAdminPassword', 'Teacher'],
+  ])('%s admits the school director as well as owner and assistant', (id, subject) => {
+    const route = all.find((r) => r.id === id)!;
+    expect(route.roles).toEqual(expect.arrayContaining(['OWNER', 'SUPERVISOR', 'MANAGER']));
+    expect(route.abilities).toEqual([expect.objectContaining({ action: 'update', subject })]);
+  });
 });
 
 describe('AbilitiesGuard — role-scoped requirements', () => {

@@ -110,7 +110,9 @@ export class StudentsController {
   @ApiOperation({ summary: 'Set or generate a student password' })
   @ApiResponse({ status: 200, description: 'تم تعيين كلمة المرور' })
   @ApiResponse({ status: 404, description: 'Student not found' })
-  @Roles(Role.OWNER, Role.MANAGER, Role.SUPER_ADMIN)
+  // The school director (SUPERVISOR) was left out here while holding every
+  // other permission on students; resetting a forgotten password is theirs too.
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @CheckAbilities({ action: 'update', subject: 'Student' })
   @Patch(':id/password')
   @HttpCode(HttpStatus.OK)
