@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
@@ -65,6 +65,37 @@ export class TripService {
       .exec();
     if (!updated) throw new NotFoundException('الرحلة غير موجودة');
     return { message: 'تم تحديث الرحلة بنجاح', data: updated };
+  }
+
+  /**
+   * Deletes a trip template that nobody is enrolled in.
+   *
+   * A student enrolled in the trip holds a copy of it on their financial
+   * record, with its fee, installments and any money paid, so a trip with
+   * students is refused: removing it would leave charges pointing at a trip
+   * nobody can open. Remove the students first (their own delete refuses a
+   * trip with money on it).
+   *
+   * Archives rather than erases: `isActive: false` takes the trip out of every
+   * list and lookup, which already read active templates only.
+   */
+  async removeTemplate(templateId: string) {
+    this.validateObjectId(templateId, 'الرحلة');
+    const template = await this.tripTemplateModel.findById(templateId).exec();
+    if (!template || !template.isActive) throw new NotFoundException('الرحلة غير موجودة');
+
+    const enrolled = await this.recordModel.countDocuments({
+      trips: { $elemMatch: { tripTemplateId: new mongoose.Types.ObjectId(templateId) } },
+    });
+    if (enrolled > 0) {
+      throw new ConflictException(
+        `لا يمكن حذف الرحلة «${template.name}» لأن فيها ${enrolled} من الطلاب المسجلين. أزلهم من الرحلة أولًا ثم احذفها.`,
+      );
+    }
+
+    template.isActive = false;
+    await template.save();
+    return { message: 'تم حذف الرحلة بنجاح', data: { _id: template._id } };
   }
 
   async findTemplates() {
@@ -238,6 +269,11 @@ export class TripService {
     const tripIndex = record.trips.findIndex((t: any) => t.tripTemplateId?.toString() === templateId);
     if (tripIndex === -1) throw new NotFoundException('الطالب غير مسجل في هذه الرحلة');
 
+    // The same money rule as deleting the trip from the student's own record
+    // (see delete below): removing the student from the trip's page took the
+    // trip, its payments and their history with it, paid or not.
+    this.assertNoMoneyHeld(record.trips[tripIndex]);
+
     record.trips.splice(tripIndex, 1);
     await record.save();
     return { message: 'تم إزالة الطالب من الرحلة بنجاح' };
@@ -356,6 +392,18 @@ export class TripService {
     return { message: 'تم تسجيل استرداد مبلغ الرحلة بنجاح', data: trip };
   }
 
+  private assertNoMoneyHeld(trip: any) {
+    const held = (trip?.installments ?? []).reduce(
+      (sum: number, installment: any) => sum + (Number(installment?.paidAmount) || 0),
+      0,
+    );
+    if (held > 0) {
+      throw new BadRequestException(
+        `لا يمكن حذف رحلة سُدّد منها ${held}. استرجع المبلغ أولًا ثم احذفها.`,
+      );
+    }
+  }
+
   async delete(studentId: string, tripId: string, academicYearId?: string) {
     this.validateObjectId(tripId, 'الرحلة');
     const record = await this.getRecord(studentId, academicYearId);
@@ -373,15 +421,7 @@ export class TripService {
      * money cannot live only in a client. Summed from the installments rather
      * than read from `totalPaid`, which is derived from them.
      */
-    const held = (record.trips[tripIndex].installments ?? []).reduce(
-      (sum, installment) => sum + (Number(installment?.paidAmount) || 0),
-      0,
-    );
-    if (held > 0) {
-      throw new BadRequestException(
-        `لا يمكن حذف رحلة سُدّد منها ${held}. استرجع المبلغ أولًا ثم احذفها.`,
-      );
-    }
+    this.assertNoMoneyHeld(record.trips[tripIndex]);
 
     record.trips.splice(tripIndex, 1);
     await record.save();

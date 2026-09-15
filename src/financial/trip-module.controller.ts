@@ -34,6 +34,19 @@ export class TripModuleController {
     return this.tripService.updateTemplate(tripTemplateId, dto);
   }
 
+  @Delete(':tripTemplateId')
+  @CheckAbilities({ action: 'delete', subject: 'FinancialSettings' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Delete a trip template',
+    description:
+      'Refused with 409 while any student is enrolled; remove them first. ' +
+      'The template is archived (isActive: false) and disappears from every list.',
+  })
+  async removeTemplate(@Param('tripTemplateId') tripTemplateId: string) {
+    return this.tripService.removeTemplate(tripTemplateId);
+  }
+
   @Get()
   @CheckAbilities({ action: 'read', subject: 'Financial' })
   @HttpCode(HttpStatus.OK)
