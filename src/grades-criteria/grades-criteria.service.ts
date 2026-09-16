@@ -160,6 +160,44 @@ export class GradesCriteriaService {
     };
   }
 
+  /**
+   * The term a student is in right now, out of the terms their subjects are
+   * offered in.
+   *
+   * A grade's subjects exist once per term, so «اللغة العربية» is three rows
+   * across a year of three terms. The student's pages want the term they are
+   * in: a term marked active, otherwise the one today falls inside, otherwise
+   * the latest one there is — never all of them at once.
+   */
+  private async resolveCurrentTermId(termIds: string[]): Promise<string | null> {
+    if (termIds.length <= 1) return termIds[0] ?? null;
+
+    const terms = await this.termModel
+      .find({ _id: { $in: termIds } })
+      .select('status startDate endDate order')
+      .lean()
+      .exec();
+    if (!terms.length) return null;
+
+    const now = Date.now();
+    const current =
+      terms.find((term: any) => term.status === 'active') ??
+      terms.find(
+        (term: any) =>
+          term.startDate &&
+          term.endDate &&
+          new Date(term.startDate).getTime() <= now &&
+          now <= new Date(term.endDate).getTime(),
+      ) ??
+      [...terms].sort(
+        (a: any, b: any) =>
+          new Date(b.startDate ?? 0).getTime() - new Date(a.startDate ?? 0).getTime() ||
+          (b.order ?? 0) - (a.order ?? 0),
+      )[0];
+
+    return current ? String(current._id) : null;
+  }
+
   async getMySubjects(studentId: string) {
     // The student's CURRENT class only — see StudentClassResolverService.
     const classIdsSet = new Set<string>(
@@ -194,9 +232,19 @@ export class GradesCriteriaService {
       .populate('subjectId')
       .exec();
 
+    // Every term's offerings were returned together, so the student's subject
+    // list showed «الرياضيات MATH1» once per term of the year.
+    const currentTermId = await this.resolveCurrentTermId(
+      Array.from(new Set(offerings.map((o) => o.termId?.toString()).filter(Boolean))),
+    );
+
+    const data = currentTermId
+      ? offerings.filter((o) => o.termId?.toString() === currentTermId)
+      : offerings;
+
     return {
       message: 'تم استرجاع المواد بنجاح',
-      data: offerings,
+      data,
     };
   }
 
