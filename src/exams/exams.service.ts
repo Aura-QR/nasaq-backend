@@ -758,6 +758,7 @@ export class ExamsService {
       achievedGrade: finalGrade,
       percentage: parseFloat(percentage.toFixed(2)),
       passed,
+      answers: results,
     });
 
     return {
@@ -772,6 +773,69 @@ export class ExamsService {
       achievedGrade: finalGrade,
       results: results,
       passed,
+    };
+  }
+
+  /**
+   * The caller's own result for one exam.
+   *
+   * Grading answered with the full breakdown, but only once, in the reply to
+   * the submission — reopening a finished exam had nothing to read, and the
+   * app was asking GET /exams/:examId/grade, a route that never existed. So a
+   * student could sit an exam and never see the mark again.
+   *
+   * `answers` is empty for anything submitted before the schema kept them;
+   * the score is still exact, since it was always stored.
+   */
+  async getMyResult(examId: string, user: any) {
+    this.validateObjectId(examId, 'exam');
+
+    const exam = await this.examModel
+      .findById(examId)
+      .select('_id examType grade questions')
+      .exec();
+    if (!exam) {
+      throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
+    }
+
+    const result = await this.examResultModel
+      .findOne({
+        examId: new mongoose.Types.ObjectId(examId),
+        studentId: new mongoose.Types.ObjectId(String(user.userId)),
+      })
+      .exec();
+
+    if (!result) {
+      throw new NotFoundException('لم تقم بدخول هذا الامتحان');
+    }
+    if (!result.submitted) {
+      throw new BadRequestException('لم تقم بتسليم هذا الامتحان بعد');
+    }
+
+    const totalQuestions = exam.questions?.length ?? 0;
+    const answers = result.answers ?? [];
+    // Older rows kept no answers, so the count has to come back out of the
+    // percentage that was stored alongside the grade.
+    const correctAnswers = answers.length
+      ? answers.filter((a) => a.isCorrect).length
+      : Math.round(((result.percentage ?? 0) / 100) * totalQuestions);
+
+    return {
+      message: 'تم استرجاع نتيجة الامتحان بنجاح',
+      data: {
+        examId: exam._id,
+        examType: (exam as any).examType,
+        totalQuestions,
+        answeredQuestions: answers.length,
+        correctAnswers,
+        incorrectAnswers: totalQuestions - correctAnswers,
+        percentage: result.percentage ?? 0,
+        maxGrade: (exam as any).grade,
+        achievedGrade: result.achievedGrade ?? 0,
+        passed: result.passed ?? false,
+        submittedAt: (result as any).updatedAt ?? null,
+        results: answers,
+      },
     };
   }
 

@@ -121,6 +121,25 @@ export class ExamsController {
     return await this.examsService.listResults(examId, user);
   }
 
+  // Also above @Get(':id'), for the same reason as listResults.
+  //
+  // Two addresses, one handler: `grade` is what the apps already ask for (the
+  // GET twin of POST :examId/grade, which they assumed existed and got a bare
+  // 404 from), and `my-result` is what it should have been called. Renaming
+  // alone would have broken every build already in a student's hand.
+  @ApiOperation({ summary: "The caller's own result for this exam, with the answer breakdown" })
+  @ApiParam({ name: 'examId', description: 'Exam ID' })
+  @ApiResponse({ status: 200, description: 'Result fetched successfully' })
+  @ApiResponse({ status: 400, description: 'Exam not submitted yet' })
+  @ApiResponse({ status: 404, description: 'Exam not found, or the student never sat it' })
+  @Get([':examId/my-result', ':examId/grade'])
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  async getMyResult(@Param('examId') examId: string, @CurrentUser() user: any) {
+    return await this.examsService.getMyResult(examId, user);
+  }
+
   @ApiOperation({ summary: 'Edit a student exam grade (Teacher only — must teach this subject in the student class)' })
   @ApiResponse({ status: 200, description: 'Grade updated successfully' })
   @ApiResponse({ status: 403, description: 'Teacher does not teach this subject in the student class' })
