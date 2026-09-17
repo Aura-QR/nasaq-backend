@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { CredentialsDeliveryService } from './credentials-delivery.service';
+import { WhatsappInstanceService } from './whatsapp-instance.service';
 import { MessagingController } from './messaging.controller';
 import { OutboundMessage, OutboundMessageSchema } from './schemas/outbound-message.schema';
 import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
@@ -19,7 +20,7 @@ import { School, SchoolSchema } from '../platform/schools/schemas/school.schema'
     ]),
   ],
   controllers: [MessagingController],
-  providers: [CredentialsDeliveryService],
-  exports: [CredentialsDeliveryService],
+  providers: [CredentialsDeliveryService, WhatsappInstanceService],
+  exports: [CredentialsDeliveryService, WhatsappInstanceService],
 })
 export class MessagingModule {}

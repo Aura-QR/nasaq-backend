@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -11,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CredentialsDeliveryService } from './credentials-delivery.service';
+import { WhatsappInstanceService } from './whatsapp-instance.service';
 import { OutboundStatus, OUTBOUND_STATUSES } from './schemas/outbound-message.schema';
 import { SendTestMessageDto } from './dto/send-test.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -32,7 +34,10 @@ import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 @ApiTags('Messaging')
 @Controller('messaging')
 export class MessagingController {
-  constructor(private readonly delivery: CredentialsDeliveryService) {}
+  constructor(
+    private readonly delivery: CredentialsDeliveryService,
+    private readonly whatsapp: WhatsappInstanceService,
+  ) {}
 
   @ApiOperation({ summary: 'Recent WhatsApp credential deliveries for this school' })
   @ApiQuery({ name: 'status', required: false, enum: OUTBOUND_STATUSES })
@@ -75,5 +80,53 @@ export class MessagingController {
   @HttpCode(HttpStatus.OK)
   async test(@CurrentSchool() schoolId: string, @Body() dto: SendTestMessageDto) {
     return this.delivery.sendTest(schoolId, dto.phone);
+  }
+
+  /*
+   * Connecting the school's own WhatsApp number.
+   *
+   * Owner and school director only, and never the manager: this pairs a phone
+   * the school owns, and whoever scans that code decides which number every
+   * parent will receive their child's password from.
+   *
+   * The school is taken from the token, never from the request, so one school
+   * cannot address another's instance by naming it.
+   */
+  @ApiOperation({ summary: "Whether this school's WhatsApp number is connected" })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @Get('whatsapp')
+  @HttpCode(HttpStatus.OK)
+  async whatsappStatus(@CurrentSchool() schoolId: string) {
+    return {
+      message: 'تم استرجاع حالة اتصال واتساب',
+      data: await this.whatsapp.status(schoolId),
+    };
+  }
+
+  @ApiOperation({
+    summary: 'Start pairing and return a QR code for the school to scan',
+    description:
+      'The code expires in under a minute. Call again for a fresh one, and poll ' +
+      'GET /messaging/whatsapp until state is "open".',
+  })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @Post('whatsapp/connect')
+  @HttpCode(HttpStatus.OK)
+  async whatsappConnect(@CurrentSchool() schoolId: string) {
+    return {
+      message: 'امسح الرمز من تطبيق واتساب على هاتف المدرسة',
+      data: await this.whatsapp.connect(schoolId),
+    };
+  }
+
+  @ApiOperation({ summary: "Disconnect the school's WhatsApp number" })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @Delete('whatsapp')
+  @HttpCode(HttpStatus.OK)
+  async whatsappDisconnect(@CurrentSchool() schoolId: string) {
+    return {
+      message: 'تم فصل واتساب عن هذه المدرسة',
+      data: await this.whatsapp.disconnect(schoolId),
+    };
   }
 }
