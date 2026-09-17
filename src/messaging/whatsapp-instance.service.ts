@@ -121,7 +121,9 @@ export class WhatsappInstanceService {
         signal: AbortSignal.timeout(WhatsappInstanceService.TIMEOUT_MS),
       });
     } catch (error: any) {
-      this.logger.error(`Evolution ${method} ${path} failed: ${error?.message}`);
+      this.logger.error(
+        `Evolution ${method} ${this.baseUrl}${path} failed: ${error?.message}`,
+      );
       throw new BadGatewayException('تعذر الاتصال بخدمة واتساب. حاول مرة أخرى.');
     }
 
@@ -151,7 +153,9 @@ export class WhatsappInstanceService {
       return { instance, state: 'missing', number: null, qr: null, connected: false };
     }
     if (!result.ok) {
-      throw new BadGatewayException(this.messageOf(result, 'تعذر قراءة حالة اتصال واتساب.'));
+      throw new BadGatewayException(
+        this.messageOf(result, 'تعذر قراءة حالة اتصال واتساب.', 'connectionState'),
+      );
     }
 
     const state = this.stateOf(result.data);
@@ -184,7 +188,7 @@ export class WhatsappInstanceService {
       });
       if (!created.ok) {
         throw new BadGatewayException(
-          this.messageOf(created, 'تعذر إنشاء اتصال واتساب لهذه المدرسة.'),
+          this.messageOf(created, 'تعذر إنشاء اتصال واتساب لهذه المدرسة.', 'create'),
         );
       }
       return {
@@ -197,7 +201,9 @@ export class WhatsappInstanceService {
     }
 
     if (!existing.ok) {
-      throw new BadGatewayException(this.messageOf(existing, 'تعذر قراءة حالة اتصال واتساب.'));
+      throw new BadGatewayException(
+        this.messageOf(existing, 'تعذر قراءة حالة اتصال واتساب.', 'state'),
+      );
     }
 
     if (this.stateOf(existing.data) === 'open') {
@@ -213,7 +219,7 @@ export class WhatsappInstanceService {
     const reconnect = await this.call('GET', `/instance/connect/${instance}`);
     if (!reconnect.ok) {
       throw new BadGatewayException(
-        this.messageOf(reconnect, 'تعذر بدء ربط واتساب. حاول مرة أخرى.'),
+        this.messageOf(reconnect, 'تعذر بدء ربط واتساب. حاول مرة أخرى.', 'connect'),
       );
     }
 
@@ -238,7 +244,7 @@ export class WhatsappInstanceService {
     const result = await this.call('DELETE', `/instance/logout/${instance}`);
 
     if (!result.ok && result.status !== 404) {
-      throw new BadGatewayException(this.messageOf(result, 'تعذر فصل واتساب.'));
+      throw new BadGatewayException(this.messageOf(result, 'تعذر فصل واتساب.', 'logout'));
     }
 
     return { instance, state: 'close', number: null, qr: null, connected: false };
@@ -289,13 +295,33 @@ export class WhatsappInstanceService {
     return value.startsWith('data:') ? value : `data:image/png;base64,${value}`;
   }
 
-  private messageOf(result: { data: any }, fallback: string): string {
+  /**
+   * What went wrong, said in a way that can be acted on.
+   *
+   * Evolution's own wording is used where it has some — "instance limit
+   * reached" tells a school something; a bare "Unauthorized" does not. So the
+   * step and the status code travel with it. This screen belongs to the owner
+   * and the director, and without them a failure here is indistinguishable
+   * from any other failure, which cost a long evening once.
+   */
+  private messageOf(
+    result: { status: number; data: any },
+    fallback: string,
+    step?: string,
+  ): string {
     const raw =
       result?.data?.response?.message ??
       result?.data?.message ??
       result?.data?.error ??
       null;
-    if (!raw) return fallback;
-    return Array.isArray(raw) ? raw.join(' — ') : String(raw);
+
+    const detail = raw
+      ? Array.isArray(raw)
+        ? raw.join(' — ')
+        : String(raw)
+      : fallback;
+
+    const where = step ? `${step} ` : '';
+    return `${detail} (${where}${result?.status ?? 0})`;
   }
 }
