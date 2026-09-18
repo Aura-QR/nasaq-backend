@@ -6,6 +6,8 @@ import { TeacherAttendance, TeacherAttendanceSchema } from './schemas/teacher-at
 import { TeacherAttendanceController } from './teacher-attendance.controller';
 import { TeacherAttendanceService } from './teacher-attendance.service';
 import { LeaveRequest, LeaveRequestSchema } from '../duty/schemas/leave-request.schema';
+import { Admin, AdminSchema } from 'src/admin/schemas/admin.schema';
+import { NotificationsModule } from 'src/notifications/notifications.module';
 
 @Module({
   imports: [
@@ -14,7 +16,10 @@ import { LeaveRequest, LeaveRequestSchema } from '../duty/schemas/leave-request.
       { name: Teacher.name, schema: TeacherSchema },
       { name: School.name, schema: SchoolSchema },
       { name: LeaveRequest.name, schema: LeaveRequestSchema },
+      // Who a lateness is reported to — owner, managers and supervisors.
+      { name: Admin.name, schema: AdminSchema },
     ]),
+    NotificationsModule,
   ],
   controllers: [TeacherAttendanceController],
   providers: [TeacherAttendanceService],

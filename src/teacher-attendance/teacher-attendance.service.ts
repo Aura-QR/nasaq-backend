@@ -5,14 +5,18 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { School } from 'src/platform/schools/schemas/school.schema';
+import { Admin } from 'src/admin/schemas/admin.schema';
+import { NotificationsService } from 'src/notifications/notifications.service';
 import { LeaveRequest } from '../duty/schemas/leave-request.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.dto';
+import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
 import { CreateManualTeacherAttendanceDto } from './dto/create-manual-teacher-attendance.dto';
 import { QueryTeacherAttendanceDto } from './dto/query-teacher-attendance.dto';
 import { CheckOutTeacherAttendanceDto } from './dto/check-out-teacher-attendance.dto';
@@ -35,6 +39,8 @@ export * from '../attendance/attendance.utils';
 
 @Injectable()
 export class TeacherAttendanceService {
+  private readonly logger = new Logger(TeacherAttendanceService.name);
+
   constructor(
     @InjectModel(TeacherAttendance.name)
     private readonly teacherAttendanceModel: Model<TeacherAttendance>,
@@ -47,7 +53,224 @@ export class TeacherAttendanceService {
     // attendance.
     @InjectModel(LeaveRequest.name)
     private readonly leaveRequestModel: Model<LeaveRequest>,
+    // Who a lateness is reported to. The owner, managers and supervisors of
+    // this school all live on the Admin collection.
+    @InjectModel(Admin.name)
+    private readonly adminModel: Model<Admin>,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /** "HH:mm" in the school's timezone — what a person would have read on the clock. */
+  private clockTime(at: Date, timezone?: string): string {
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: timezone || 'UTC',
+      }).format(at);
+    } catch {
+      // An unknown timezone string must not cost the notice.
+      return new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'UTC',
+      }).format(at);
+    }
+  }
+
+  /**
+   * The owner, managers and supervisors of a school.
+   *
+   * `exclude` drops whoever caused the event: an admin who records a lateness
+   * by hand does not need to be told about it, and a notice they wrote to
+   * themselves makes the bell look broken.
+   */
+  private async schoolAdminIds(schoolId: any, exclude?: any): Promise<string[]> {
+    if (!schoolId) return [];
+
+    const admins = await this.adminModel
+      .find({
+        schoolId: new Types.ObjectId(String(schoolId)),
+        role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] },
+      })
+      .select('_id')
+      .setOptions({ skipTenantScope: true })
+      .lean()
+      .exec();
+
+    const skip = exclude ? String(exclude) : null;
+    return admins
+      .map((admin: any) => String(admin._id))
+      .filter((id) => id !== skip);
+  }
+
+  /**
+   * Tell the school a teacher was late, and ask the teacher why.
+   *
+   * Both halves matter and neither works alone. A director who sees "20
+   * minutes" and nothing else is holding an accusation with no reply; a
+   * teacher asked for a reason nobody reads is filling in a form. So the ask
+   * goes out at the same moment as the report, and the answer
+   * (`submitLateReason`) travels back to the same people.
+   *
+   * Never throws. A teacher whose check-in succeeded must not be told it
+   * failed because a notice could not be written.
+   */
+  private async announceLateness(
+    record: any,
+    teacherName: string,
+    schoolId: any,
+    actorId?: any,
+    timezone?: string,
+  ): Promise<void> {
+    const lateMinutes = Number(record?.lateMinutes ?? 0);
+    if (!Number.isFinite(lateMinutes) || lateMinutes <= 0) return;
+
+    const dateLabel = normalizeDate(record.date).toISOString().slice(0, 10);
+    const arrivedAt = this.clockTime(record.checkInAt, timezone);
+    const payload = {
+      attendanceId: String(record._id),
+      teacherId: String(record.teacherId),
+      teacherName,
+      date: dateLabel,
+      lateMinutes,
+    };
+
+    try {
+      const admins = await this.schoolAdminIds(schoolId, actorId);
+
+      await Promise.all([
+        ...admins.map((recipientId) =>
+          this.notifications.notify({
+            recipientId,
+            type: 'teacher_late',
+            title: `تأخر ${teacherName} عن موعد الحضور`,
+            body: `تأخر ${lateMinutes} دقيقة — وصل الساعة ${arrivedAt} بتاريخ ${dateLabel}`,
+            data: { ...payload, hasReason: false },
+          }),
+        ),
+        this.notifications.notify({
+          recipientId: record.teacherId,
+          type: 'late_reason_required',
+          title: 'يُرجى بيان سبب التأخير',
+          body: `سُجّل تأخيرك اليوم ${lateMinutes} دقيقة. اذكر السبب ليصل إلى إدارة المدرسة.`,
+          data: payload,
+        }),
+      ]);
+    } catch (error: any) {
+      this.logger.error(
+        `Could not announce lateness on ${record._id}: ${error?.message}`,
+      );
+    }
+  }
+
+  /**
+   * The lateness this teacher still owes an explanation for, if any.
+   *
+   * The dialog cannot depend on the check-in response alone: a teacher who
+   * dismisses it, whose phone dies, or whose lateness was recorded for them by
+   * an administrator would never be asked. This is what the client checks on
+   * open, so the question survives all three.
+   */
+  async pendingLateReason(user: any) {
+    const today = normalizeDate(new Date());
+
+    const record = await this.teacherAttendanceModel
+      .findOne({
+        teacherId: new Types.ObjectId(String(user.userId)),
+        date: today,
+        lateMinutes: { $gt: 0 },
+        lateReason: null,
+      })
+      .lean()
+      .exec();
+
+    if (!record) {
+      return { status: true, data: { pending: false } };
+    }
+
+    return {
+      status: true,
+      data: {
+        pending: true,
+        attendanceId: String((record as any)._id),
+        date: today.toISOString().slice(0, 10),
+        lateMinutes: (record as any).lateMinutes,
+        checkInAt: (record as any).checkInAt,
+      },
+    };
+  }
+
+  /**
+   * The teacher's own account of a lateness, sent on to the school.
+   *
+   * Written once: a reason that can be revised after the director has read it
+   * is a reason the director cannot rely on. A correction is a conversation,
+   * not an edit.
+   */
+  async submitLateReason(user: any, dto: SubmitLateReasonDto) {
+    const date = normalizeDate(dto.date ?? new Date());
+
+    const record = await this.teacherAttendanceModel.findOne({
+      teacherId: new Types.ObjectId(String(user.userId)),
+      date,
+    });
+
+    if (!record) {
+      throw new NotFoundException('لا يوجد سجل حضور لك في هذا التاريخ');
+    }
+
+    if (!record.lateMinutes || record.lateMinutes <= 0) {
+      throw new BadRequestException('لا يوجد تأخير مسجل في هذا اليوم');
+    }
+
+    if (record.lateReason) {
+      throw new ConflictException('تم إرسال سبب التأخير لهذا اليوم بالفعل');
+    }
+
+    const reason = dto.reason.trim();
+    record.lateReason = reason;
+    record.lateReasonAt = new Date();
+    await record.save();
+
+    const dateLabel = date.toISOString().slice(0, 10);
+    const teacherName = record.name || 'المعلم';
+    const admins = await this.schoolAdminIds(user.schoolId);
+
+    await Promise.all(
+      admins.map((recipientId) =>
+        this.notifications.notify({
+          recipientId,
+          type: 'late_reason_submitted',
+          title: `سبب تأخير ${teacherName}`,
+          body: `${dateLabel} · تأخر ${record.lateMinutes} دقيقة — ${reason}`,
+          data: {
+            attendanceId: String(record._id),
+            teacherId: String(record.teacherId),
+            teacherName,
+            date: dateLabel,
+            lateMinutes: record.lateMinutes,
+            reason,
+            hasReason: true,
+          },
+        }),
+      ),
+    );
+
+    return {
+      status: true,
+      message: 'تم إرسال سبب التأخير إلى إدارة المدرسة',
+      data: {
+        attendanceId: String(record._id),
+        date: dateLabel,
+        lateMinutes: record.lateMinutes,
+        lateReason: record.lateReason,
+        lateReasonAt: record.lateReasonAt,
+      },
+    };
+  }
 
   async checkIn(user: any, dto: CheckInTeacherAttendanceDto, req?: any) {
     const school = await this.schoolModel
@@ -148,12 +371,26 @@ export class TeacherAttendanceService {
       name: teacher.name,
     });
 
+    await this.announceLateness(
+      attendance,
+      teacher.name,
+      user.schoolId,
+      // Nobody to exclude: the teacher's own copy is the request for a reason,
+      // which is a different notice from the one the admins receive.
+      null,
+      school.settings.timezone,
+    );
+
     return {
       status: true,
       message: 'تم تسجيل حضورك',
       data: {
         checkInAt: attendance.checkInAt,
         lateMinutes: attendance.lateMinutes,
+        // What the client opens the "why were you late" dialog on. Sending it
+        // with the check-in means the teacher is asked while they are still
+        // holding the phone, not at the next poll.
+        lateReasonRequired: (attendance.lateMinutes ?? 0) > 0,
         isWorkingDay: attendance.isWorkingDay,
         expectedWorkMinutes: attendance.expectedWorkMinutes,
         distanceMeters: attendance.distanceMeters,
@@ -210,6 +447,17 @@ export class TeacherAttendanceService {
       notes: dto.notes || '',
       name: teacher.name,
     });
+
+    // The teacher is asked for a reason here too. A lateness recorded by hand
+    // is the same lateness, and the teacher whose name is on it has no other
+    // way to answer it.
+    await this.announceLateness(
+      attendance,
+      teacher.name,
+      user.schoolId,
+      user.userId,
+      settings?.timezone,
+    );
 
     return attendance;
   }
@@ -632,6 +880,14 @@ export class TeacherAttendanceService {
       );
       record.expectedWorkMinutes = daySchedule?.expectedWorkMinutes ?? null;
       record.isWorkingDay = daySchedule?.isWorkingDay ?? true;
+
+      // Correcting the clock to show the teacher was on time leaves behind an
+      // explanation for a lateness that no longer exists — which reads to a
+      // director as an admission of something the record denies.
+      if (!record.lateMinutes || record.lateMinutes <= 0) {
+        record.lateReason = null;
+        record.lateReasonAt = null;
+      }
     }
 
     if (checkOutChanged) {

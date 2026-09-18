@@ -9,8 +9,28 @@ export const NOTIFICATION_TYPES = [
   'cover_removed',
   'duty_assigned',
   'duty_removed',
+  // Lateness. Three types rather than one, because they are three different
+  // things to do: the admin is being informed, the teacher is being asked for
+  // something, and the answer is coming back.
+  'teacher_late',
+  'late_reason_required',
+  'late_reason_submitted',
+  'student_absent',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/**
+ * Types a client should interrupt the user with rather than file away.
+ *
+ * A notice in a bell is read when somebody opens the bell. These two are
+ * useless read late — a teacher asked at noon why they were late at seven has
+ * forgotten, and a parent who learns on Thursday that their child missed
+ * Sunday learns it too late to do anything.
+ */
+export const PROMPT_NOTIFICATION_TYPES: readonly NotificationType[] = [
+  'late_reason_required',
+  'student_absent',
+];
 
 /**
  * Something a user needs to be told, held until they read it.

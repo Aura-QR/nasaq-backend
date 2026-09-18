@@ -14,6 +14,8 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
   let teacherModel: any;
   let schoolModel: any;
   let leaveRequestModel: any;
+  let adminModel: any;
+  let notifications: any;
 
   const mockSchoolId = '60d5ecb8b5c9c22b8c8b4561';
   const mockTeacherId = '60d5ecb8b5c9c22b8c8b4562';
@@ -77,11 +79,30 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
       }),
     };
 
+    // Nobody to report a lateness to by default. The lateness tests supply
+    // their own admins; every other case just needs these to resolve, because
+    // announceLateness runs inside checkIn and createManual.
+    adminModel = {
+      find: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          setOptions: jest.fn().mockReturnValue({
+            lean: jest.fn().mockReturnValue({
+              exec: jest.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+      }),
+    };
+
+    notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+
     service = new TeacherAttendanceService(
       teacherAttendanceModel as any,
       teacherModel as any,
       schoolModel as any,
       leaveRequestModel as any,
+      adminModel as any,
+      notifications as any,
     );
   });
 

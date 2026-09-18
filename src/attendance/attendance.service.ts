@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
   BadRequestException,
@@ -17,10 +18,13 @@ import { Lecture } from '../lectures/schemas/lecture.schema';
 import { Term } from '../terms/schemas/term.schema';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
+import { NotificationsService } from 'src/notifications/notifications.service';
 import { transformAttendanceResponse } from './transforms/response.transform';
 
 @Injectable()
 export class AttendanceService {
+  private readonly logger = new Logger(AttendanceService.name);
+
   // Constants for populate field selections
   private static readonly STUDENT_FIELDS = 'name schoolEmail academicYear';
   private static readonly CLASS_FIELDS = 'roomNumber academicYear';
@@ -38,7 +42,48 @@ export class AttendanceService {
     private readonly lectureModel: Model<Lecture>,
     @InjectModel(Term.name)
     private readonly termModel: Model<Term>,
+    private readonly notifications: NotificationsService,
   ) {}
+
+  /**
+   * Tell the student their absence was recorded today.
+   *
+   * The parent is the real reader. They sign in as their child, and until now
+   * the only way to learn of an absence was to go looking for it on a screen
+   * they had no reason to open — so a family found out on report day, weeks
+   * after anything could be done. The notice arrives the same morning.
+   *
+   * Never throws: an absence that was recorded must not be rolled back because
+   * a notice could not be written.
+   */
+  private async announceAbsence(attendance: any, student: any, classData: any) {
+    const date = new Date(attendance.date);
+    const dateLabel = date.toISOString().slice(0, 10);
+
+    try {
+      await this.notifications.notify({
+        recipientId: attendance.studentId,
+        type: 'student_absent',
+        title: 'تم تسجيل غياب اليوم',
+        body: [
+          `سُجّل غياب ${student?.name ?? 'الطالب'} بتاريخ ${dateLabel}`,
+          classData?.name ? `الفصل: ${classData.name}` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        data: {
+          attendanceId: String(attendance._id),
+          studentId: String(attendance.studentId),
+          classId: String(attendance.classId),
+          date: dateLabel,
+        },
+      });
+    } catch (error: any) {
+      // The record is the point. Rolling back an absence because a message
+      // failed would delete a fact to save a courtesy.
+      this.logger.error(`Could not announce absence ${attendance._id}: ${error?.message}`);
+    }
+  }
 
   // Index matches Date.getUTCDay(): 0 = Sunday
   private static readonly WEEKDAYS = [
@@ -192,6 +237,8 @@ export class AttendanceService {
       name: student.name,
       recordedBy: user?.userId ?? null,
     });
+
+    await this.announceAbsence(attendance, student, classData);
 
     await attendance.populate([
       { path: 'studentId', select: AttendanceService.DETAILED_STUDENT_FIELDS },

@@ -7,9 +7,11 @@ import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
 import { Term, TermSchema } from '../terms/schemas/term.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
+    NotificationsModule,
     MongooseModule.forFeature([
       { name: Attendance.name, schema: AttendanceSchema },
       { name: Student.name, schema: StudentSchema },

@@ -23,6 +23,7 @@ import { CreateManualTeacherAttendanceDto } from './dto/create-manual-teacher-at
 import { QueryTeacherAttendanceDto } from './dto/query-teacher-attendance.dto';
 import { CheckOutTeacherAttendanceDto } from './dto/check-out-teacher-attendance.dto';
 import { SummaryTeacherAttendanceDto } from './dto/summary-teacher-attendance.dto';
+import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
 import { UpdateTeacherAttendanceDto } from './dto/update-teacher-attendance.dto';
 import { extractClientIp, TeacherAttendanceService } from './teacher-attendance.service';
 import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
@@ -79,6 +80,40 @@ export class TeacherAttendanceController {
   @ApiOperation({ summary: 'Per-teacher attendance totals for a period' })
   async getSummary(@Query() query: SummaryTeacherAttendanceDto) {
     return this.teacherAttendanceService.getMonthlySummary(query);
+  }
+
+  // Both literal paths, so they must stay above any ':id' route.
+  @Get('me/late-reason/pending')
+  @Roles(Role.TEACHER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Today's lateness this teacher has not explained yet",
+    description:
+      'What the client polls to raise the "why were you late" dialog. Answers ' +
+      '{ pending: false } when there is nothing to ask.',
+  })
+  async pendingLateReason(@CurrentUser() user: any) {
+    return this.teacherAttendanceService.pendingLateReason(user);
+  }
+
+  @Post('me/late-reason')
+  @Roles(Role.TEACHER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "Submit the teacher's own reason for a lateness",
+    description:
+      'Goes straight to the owner, managers and supervisors as a notice. ' +
+      'Written once — a reason cannot be revised after it has been read.',
+  })
+  @ApiResponse({ status: 200, description: 'Reason recorded and reported' })
+  @ApiResponse({ status: 400, description: 'No lateness recorded on that day' })
+  @ApiResponse({ status: 404, description: 'No attendance record on that day' })
+  @ApiResponse({ status: 409, description: 'A reason was already submitted' })
+  async submitLateReason(
+    @CurrentUser() user: any,
+    @Body() dto: SubmitLateReasonDto,
+  ) {
+    return this.teacherAttendanceService.submitLateReason(user, dto);
   }
 
   @Get('me')

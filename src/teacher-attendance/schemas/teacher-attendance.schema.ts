@@ -70,6 +70,24 @@ export class TeacherAttendance extends Document {
   @Prop({ type: Number, default: null })
   lateMinutes: number | null;
 
+  /**
+   * Why the teacher was late, in their own words.
+   *
+   * A lateness figure on its own is an accusation with no reply. The minutes
+   * are the clock's account and cannot be edited; this is the teacher's, and
+   * the director reads both together — a bus that broke down and an overslept
+   * morning are the same twenty minutes and not the same thing at all.
+   *
+   * null means not answered yet, which is why the client can still ask. An
+   * empty string would be indistinguishable from a reason nobody gave.
+   */
+  @Prop({ type: String, default: null })
+  lateReason: string | null;
+
+  /** When the reason was given. null while there is none. */
+  @Prop({ type: Date, default: null })
+  lateReasonAt: Date | null;
+
   /** null until a check-out exists. */
   @Prop({ type: Number, default: null })
   workMinutes: number | null;
