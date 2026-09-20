@@ -16,6 +16,13 @@ export const NOTIFICATION_TYPES = [
   'late_reason_required',
   'late_reason_submitted',
   'student_absent',
+  // The family's side of an absence: the answer coming in, and the school's
+  // verdict going back out. Separate types because they are read by different
+  // people and mean different things to do.
+  'absence_excuse_submitted',
+  'absence_excuse_reviewed',
+  // The school's ruling on a teacher's account of a lateness.
+  'late_reason_reviewed',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

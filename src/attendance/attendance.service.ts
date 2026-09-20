@@ -20,6 +20,12 @@ import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { transformAttendanceResponse } from './transforms/response.transform';
+import { Admin } from '../admin/schemas/admin.schema';
+import {
+  ListAbsenceExcusesDto,
+  ReviewAbsenceExcuseDto,
+  SubmitAbsenceExcuseDto,
+} from './dto/absence-excuse.dto';
 
 @Injectable()
 export class AttendanceService {
@@ -42,8 +48,33 @@ export class AttendanceService {
     private readonly lectureModel: Model<Lecture>,
     @InjectModel(Term.name)
     private readonly termModel: Model<Term>,
+    @InjectModel(Admin.name)
+    private readonly adminModel: Model<Admin>,
     private readonly notifications: NotificationsService,
   ) {}
+
+  /**
+   * Everyone at the school who should see a family's answer.
+   *
+   * Sent to all of them rather than to whoever recorded the absence: the
+   * teacher who marked the register at eight is not the person who decides
+   * whether a medical note is accepted.
+   */
+  private async schoolAdminIds(schoolId: any): Promise<string[]> {
+    if (!schoolId) return [];
+
+    const admins = await this.adminModel
+      .find({
+        schoolId: new mongoose.Types.ObjectId(String(schoolId)),
+        role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] },
+      })
+      .select('_id')
+      .setOptions({ skipTenantScope: true })
+      .lean()
+      .exec();
+
+    return admins.map((admin: any) => String(admin._id));
+  }
 
   /**
    * Tell the student their absence was recorded today.
@@ -61,21 +92,26 @@ export class AttendanceService {
     const dateLabel = date.toISOString().slice(0, 10);
 
     try {
+      const studentName = student?.name ?? 'الطالب/ة';
+
       await this.notifications.notify({
         recipientId: attendance.studentId,
         type: 'student_absent',
-        title: 'تم تسجيل غياب اليوم',
-        body: [
-          `سُجّل غياب ${student?.name ?? 'الطالب'} بتاريخ ${dateLabel}`,
-          classData?.name ? `الفصل: ${classData.name}` : null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
+        title: `ولي أمر/الطالبة: ${studentName}`,
+        // The school's own wording. It asks for something, so the client must
+        // offer somewhere to answer — see submitExcuse below.
+        body:
+          'نأمل إيضاح سبب غياب ابنكم/ابنتكم عن المدرسة لهذا اليوم، ' +
+          'مع إرفاق العذر الطبي في حال وجوده.\n\nشاكرين لكم تعاونكم 🌷',
         data: {
           attendanceId: String(attendance._id),
           studentId: String(attendance.studentId),
+          studentName,
           classId: String(attendance.classId),
+          className: classData?.name ?? '',
           date: dateLabel,
+          // What the client needs to know it should show the excuse form.
+          excuseRequested: true,
         },
       });
     } catch (error: any) {
@@ -83,6 +119,245 @@ export class AttendanceService {
       // failed would delete a fact to save a courtesy.
       this.logger.error(`Could not announce absence ${attendance._id}: ${error?.message}`);
     }
+  }
+
+  // ───────────────────────────────────────────────── absence excuses
+
+  /**
+   * Absences this family has not explained yet.
+   *
+   * Recent rather than today only: a child off sick for three days is
+   * answered once, when somebody finally opens the app, and the other two
+   * days must still be there to answer.
+   */
+  async pendingExcuses(user: any, days = 14) {
+    const since = new Date();
+    since.setUTCHours(0, 0, 0, 0);
+    since.setUTCDate(since.getUTCDate() - days);
+
+    const rows = await this.attendanceModel
+      .find({
+        studentId: new mongoose.Types.ObjectId(String(user.userId)),
+        date: { $gte: since },
+        excuse: null,
+      })
+      .populate('classId', AttendanceService.CLASS_FIELDS)
+      .sort({ date: -1 })
+      .lean()
+      .exec();
+
+    return {
+      status: true,
+      data: {
+        pending: rows.length > 0,
+        count: rows.length,
+        items: rows.map((row: any) => ({
+          attendanceId: String(row._id),
+          date: new Date(row.date).toISOString().slice(0, 10),
+          className: row.classId?.name ?? row.name ?? '',
+        })),
+      },
+    };
+  }
+
+  /**
+   * The family's answer, sent on to the school.
+   *
+   * Written once, like the teacher's account of a lateness: an explanation a
+   * manager has already read and acted on cannot be quietly rewritten
+   * afterwards. A correction is a conversation, not an edit.
+   */
+  async submitExcuse(user: any, dto: SubmitAbsenceExcuseDto) {
+    const record = await this.attendanceModel.findById(dto.attendanceId);
+    if (!record) throw new NotFoundException('سجل الغياب غير موجود');
+
+    // The record must be this student's. Without this any signed-in family
+    // could explain away another child's absence.
+    if (String(record.studentId) !== String(user.userId)) {
+      throw new ForbiddenException('هذا السجل ليس لك');
+    }
+
+    if (record.excuse) {
+      throw new ConflictException('تم إرسال عذر لهذا اليوم بالفعل');
+    }
+
+    const reason = dto.reason.trim();
+    record.excuse = reason;
+    record.excuseAt = new Date();
+    record.excuseAttachment = dto.attachment?.trim() || null;
+    record.excuseStatus = 'pending';
+    await record.save();
+
+    const dateLabel = new Date(record.date).toISOString().slice(0, 10);
+    const student = await this.studentModel
+      .findById(record.studentId)
+      .select('name')
+      .lean()
+      .exec();
+    const studentName = (student as any)?.name ?? 'الطالب/ة';
+
+    // Never let a failed notice undo a submitted excuse — the family would be
+    // told to write it again, and would be right to stop bothering.
+    try {
+      const admins = await this.schoolAdminIds(user.schoolId);
+      await Promise.all(
+        admins.map((recipientId) =>
+          this.notifications.notify({
+            recipientId,
+            type: 'absence_excuse_submitted',
+            title: `عذر غياب: ${studentName}`,
+            body: `${dateLabel} — ${reason}${record.excuseAttachment ? ' (مرفق)' : ''}`,
+            data: {
+              attendanceId: String(record._id),
+              studentId: String(record.studentId),
+              studentName,
+              date: dateLabel,
+              reason,
+              hasAttachment: Boolean(record.excuseAttachment),
+            },
+          }),
+        ),
+      );
+    } catch (error: any) {
+      this.logger.error(`Could not announce excuse ${record._id}: ${error?.message}`);
+    }
+
+    return {
+      status: true,
+      message: 'تم إرسال العذر إلى إدارة المدرسة',
+      data: {
+        attendanceId: String(record._id),
+        date: dateLabel,
+        excuse: record.excuse,
+        excuseAt: record.excuseAt,
+        excuseAttachment: record.excuseAttachment,
+        excuseStatus: record.excuseStatus,
+      },
+    };
+  }
+
+  /**
+   * The manager's queue.
+   *
+   * Defaults to what is waiting: the list exists to be emptied, and opening it
+   * on every excuse ever sent buries the three that need a decision today.
+   */
+  async listExcuses(filters: ListAbsenceExcusesDto, pagination: PaginationDto) {
+    const query: any = { excuse: { $ne: null } };
+    query.excuseStatus = filters.status ?? 'pending';
+
+    if (filters.classId) {
+      query.classId = new mongoose.Types.ObjectId(filters.classId);
+    }
+    if (filters.from || filters.to) {
+      query.date = {};
+      if (filters.from) query.date.$gte = new Date(filters.from);
+      if (filters.to) query.date.$lte = new Date(filters.to);
+    }
+
+    // Count first: the page maths needs the total, and a page number past the
+    // end should come back empty rather than as a negative skip.
+    const total = await this.attendanceModel.countDocuments(query).exec();
+    const { skip, limit, ...meta } = getPagination(
+      pagination?.page as any,
+      pagination?.limit as any,
+      total,
+    );
+
+    const rows = await this.attendanceModel
+      .find(query)
+      .populate('studentId', AttendanceService.DETAILED_STUDENT_FIELDS)
+      .populate('classId', AttendanceService.CLASS_FIELDS)
+      .sort({ excuseAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
+      .exec();
+
+    return {
+      status: true,
+      data: {
+        ...meta,
+        limit,
+        total,
+        items: rows.map((row: any) => ({
+          attendanceId: String(row._id),
+          date: new Date(row.date).toISOString().slice(0, 10),
+          studentName: row.studentId?.name ?? row.name ?? '',
+          className: row.classId?.name ?? '',
+          excuse: row.excuse,
+          excuseAt: row.excuseAt,
+          excuseAttachment: row.excuseAttachment,
+          excuseStatus: row.excuseStatus,
+          excuseReviewedByName: row.excuseReviewedByName,
+          excuseReviewedAt: row.excuseReviewedAt,
+          excuseReviewNote: row.excuseReviewNote,
+        })),
+      },
+    };
+  }
+
+  /**
+   * Accept or refuse an excuse, and tell the family which.
+   *
+   * The verdict travels back on purpose. A school that collects explanations
+   * and answers none teaches families that the form is decoration.
+   */
+  async reviewExcuse(id: string, user: any, dto: ReviewAbsenceExcuseDto) {
+    const record = await this.attendanceModel.findById(id);
+    if (!record) throw new NotFoundException('سجل الغياب غير موجود');
+    if (!record.excuse) throw new BadRequestException('لا يوجد عذر لمراجعته');
+    if (record.excuseStatus && record.excuseStatus !== 'pending') {
+      throw new ConflictException('تمت مراجعة هذا العذر بالفعل');
+    }
+
+    const note = (dto.note ?? '').trim();
+    if (dto.verdict === 'rejected' && !note) {
+      throw new BadRequestException('اذكر سبب رفض العذر');
+    }
+
+    record.excuseStatus = dto.verdict;
+    record.excuseReviewedBy = new mongoose.Types.ObjectId(String(user.userId));
+    record.excuseReviewedByName = user.name ?? '';
+    record.excuseReviewedAt = new Date();
+    record.excuseReviewNote = note;
+    await record.save();
+
+    const dateLabel = new Date(record.date).toISOString().slice(0, 10);
+    const accepted = dto.verdict === 'accepted';
+
+    try {
+      await this.notifications.notify({
+        recipientId: record.studentId,
+        type: 'absence_excuse_reviewed',
+        title: accepted ? 'تم قبول عذر الغياب' : 'لم يُقبل عذر الغياب',
+        body: [
+          `غياب ${dateLabel}`,
+          note || (accepted ? 'شاكرين لكم تعاونكم 🌷' : null),
+        ]
+          .filter(Boolean)
+          .join(' — '),
+        data: {
+          attendanceId: String(record._id),
+          date: dateLabel,
+          excuseStatus: record.excuseStatus,
+          note,
+        },
+      });
+    } catch (error: any) {
+      this.logger.error(`Could not announce verdict on ${record._id}: ${error?.message}`);
+    }
+
+    return {
+      status: true,
+      message: accepted ? 'تم قبول العذر' : 'تم رفض العذر',
+      data: {
+        attendanceId: String(record._id),
+        excuseStatus: record.excuseStatus,
+        excuseReviewNote: record.excuseReviewNote,
+        excuseReviewedAt: record.excuseReviewedAt,
+      },
+    };
   }
 
   // Index matches Date.getUTCDay(): 0 = Sunday

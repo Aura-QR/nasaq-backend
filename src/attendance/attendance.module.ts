@@ -8,6 +8,7 @@ import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
 import { Term, TermSchema } from '../terms/schemas/term.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { Admin, AdminSchema } from 'src/admin/schemas/admin.schema';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Class.name, schema: ClassSchema },
       { name: Lecture.name, schema: LectureSchema },
       { name: Term.name, schema: TermSchema },
+      { name: Admin.name, schema: AdminSchema },
     ]),
   ],
   controllers: [AttendanceController],

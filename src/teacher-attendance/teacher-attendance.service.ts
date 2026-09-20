@@ -17,6 +17,10 @@ import { LeaveRequest } from '../duty/schemas/leave-request.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.dto';
 import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
+import {
+  ListLateReasonsDto,
+  ReviewLateReasonDto,
+} from './dto/review-late-reason.dto';
 import { CreateManualTeacherAttendanceDto } from './dto/create-manual-teacher-attendance.dto';
 import { QueryTeacherAttendanceDto } from './dto/query-teacher-attendance.dto';
 import { CheckOutTeacherAttendanceDto } from './dto/check-out-teacher-attendance.dto';
@@ -233,6 +237,9 @@ export class TeacherAttendanceService {
     const reason = dto.reason.trim();
     record.lateReason = reason;
     record.lateReasonAt = new Date();
+    // Waiting on the school from the moment it is written, so it lands in the
+    // review list rather than sitting in a field nobody rules on.
+    record.lateReasonStatus = 'pending';
     await record.save();
 
     const dateLabel = date.toISOString().slice(0, 10);
@@ -498,6 +505,145 @@ export class TeacherAttendanceService {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // ───────────────────────────────────── reviewing a lateness
+
+  /**
+   * Latenesses and what the teachers said about them.
+   *
+   * Four states rather than three: 'missing' is a lateness with no explanation
+   * at all, which is a different problem from one awaiting a ruling and the
+   * one a director most often wants to chase.
+   */
+  async listLateReasons(filters: ListLateReasonsDto, page = 1, limit = 20) {
+    const filter: any = { lateMinutes: { $gt: 0 } };
+
+    switch (filters.status ?? 'pending') {
+      case 'missing':
+        filter.lateReason = null;
+        break;
+      case 'accepted':
+      case 'rejected':
+        filter.lateReasonStatus = filters.status;
+        break;
+      default:
+        filter.lateReason = { $ne: null };
+        filter.lateReasonStatus = 'pending';
+    }
+
+    if (filters.teacherId) {
+      filter.teacherId = new Types.ObjectId(filters.teacherId);
+    }
+    if (filters.dateFrom || filters.dateTo) {
+      filter.date = {};
+      if (filters.dateFrom) filter.date.$gte = normalizeDate(filters.dateFrom);
+      if (filters.dateTo) filter.date.$lte = normalizeDate(filters.dateTo);
+    }
+
+    const skip = (Math.max(page, 1) - 1) * limit;
+
+    const [rows, total] = await Promise.all([
+      this.teacherAttendanceModel
+        .find(filter)
+        .populate('teacherId', 'name email phoneNumber')
+        .sort({ date: -1, lateMinutes: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.teacherAttendanceModel.countDocuments(filter).exec(),
+    ]);
+
+    return {
+      status: true,
+      data: {
+        page,
+        limit,
+        total,
+        items: rows.map((row: any) => ({
+          attendanceId: String(row._id),
+          teacherId: String(row.teacherId?._id ?? row.teacherId),
+          teacherName: row.teacherId?.name ?? row.name ?? '',
+          date: new Date(row.date).toISOString().slice(0, 10),
+          checkInAt: row.checkInAt,
+          lateMinutes: row.lateMinutes,
+          lateReason: row.lateReason,
+          lateReasonAt: row.lateReasonAt,
+          lateReasonStatus: row.lateReasonStatus,
+          lateReasonReviewedByName: row.lateReasonReviewedByName,
+          lateReasonReviewedAt: row.lateReasonReviewedAt,
+          lateReasonReviewNote: row.lateReasonReviewNote,
+        })),
+      },
+    };
+  }
+
+  /**
+   * Accept or refuse an explanation, and tell the teacher which.
+   *
+   * The ruling goes back on purpose. A teacher who explained a lateness and
+   * heard nothing does not know whether the matter is closed, and stops
+   * explaining the next one.
+   */
+  async reviewLateReason(id: string, user: any, dto: ReviewLateReasonDto) {
+    const record = await this.teacherAttendanceModel.findById(id);
+    if (!record) throw new NotFoundException('سجل الحضور غير موجود');
+    if (!record.lateReason) {
+      throw new BadRequestException('لا يوجد سبب تأخير لمراجعته');
+    }
+    if (record.lateReasonStatus && record.lateReasonStatus !== 'pending') {
+      throw new ConflictException('تمت مراجعة هذا السبب بالفعل');
+    }
+
+    const note = (dto.note ?? '').trim();
+    if (dto.verdict === 'rejected' && !note) {
+      throw new BadRequestException('اذكر سبب رفض العذر');
+    }
+
+    record.lateReasonStatus = dto.verdict;
+    record.lateReasonReviewedBy = new Types.ObjectId(String(user.userId));
+    record.lateReasonReviewedByName = user.name ?? '';
+    record.lateReasonReviewedAt = new Date();
+    record.lateReasonReviewNote = note;
+    await record.save();
+
+    const dateLabel = normalizeDate(record.date).toISOString().slice(0, 10);
+    const accepted = dto.verdict === 'accepted';
+
+    // Never let a failed notice undo a saved ruling.
+    try {
+      await this.notifications.notify({
+        recipientId: record.teacherId,
+        type: 'late_reason_reviewed',
+        title: accepted ? 'تم قبول عذر التأخير' : 'لم يُقبل عذر التأخير',
+        body: [`تأخير ${dateLabel} · ${record.lateMinutes} دقيقة`, note]
+          .filter(Boolean)
+          .join(' — '),
+        data: {
+          attendanceId: String(record._id),
+          date: dateLabel,
+          lateMinutes: record.lateMinutes,
+          lateReasonStatus: record.lateReasonStatus,
+          note,
+        },
+      });
+    } catch (error: any) {
+      this.logger.error(
+        `Could not announce late-reason verdict on ${record._id}: ${error?.message}`,
+      );
+    }
+
+    return {
+      status: true,
+      message: accepted ? 'تم قبول العذر' : 'تم رفض العذر',
+      data: {
+        attendanceId: String(record._id),
+        lateReasonStatus: record.lateReasonStatus,
+        lateReasonReviewNote: record.lateReasonReviewNote,
+        lateReasonReviewedAt: record.lateReasonReviewedAt,
       },
     };
   }

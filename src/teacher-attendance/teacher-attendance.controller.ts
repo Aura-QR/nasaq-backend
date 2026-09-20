@@ -27,6 +27,10 @@ import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
 import { UpdateTeacherAttendanceDto } from './dto/update-teacher-attendance.dto';
 import { extractClientIp, TeacherAttendanceService } from './teacher-attendance.service';
 import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
+import {
+  ListLateReasonsDto,
+  ReviewLateReasonDto,
+} from './dto/review-late-reason.dto';
 
 @Controller('teacher-attendance')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -80,6 +84,50 @@ export class TeacherAttendanceController {
   @ApiOperation({ summary: 'Per-teacher attendance totals for a period' })
   async getSummary(@Query() query: SummaryTeacherAttendanceDto) {
     return this.teacherAttendanceService.getMonthlySummary(query);
+  }
+
+  /*
+   * Reviewing latenesses. Literal paths, so they stay above ':id' like the
+   * rest — 'late-reasons' read as an id would 404 on a cast error.
+   */
+
+  @CheckAbilities({ action: 'read', subject: 'TeacherAttendance' })
+  @Get('late-reasons')
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Latenesses and what the teachers said about them',
+    description:
+      "status=pending (default) is explained and awaiting a ruling; " +
+      "'missing' is a lateness nobody explained at all, which is the one a " +
+      'director usually wants to chase.',
+  })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'accepted', 'rejected', 'missing'] })
+  @ApiQuery({ name: 'teacherId', required: false })
+  @ApiQuery({ name: 'dateFrom', required: false })
+  @ApiQuery({ name: 'dateTo', required: false })
+  async listLateReasons(@Query() query: any) {
+    const { page, limit, ...filters } = query;
+    return this.teacherAttendanceService.listLateReasons(
+      filters as ListLateReasonsDto,
+      Number(page) || 1,
+      Math.min(Number(limit) || 20, 100),
+    );
+  }
+
+  @CheckAbilities({ action: 'update', subject: 'TeacherAttendance' })
+  @Patch('late-reasons/:id/review')
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Accept or refuse an explanation — the teacher is told either way',
+  })
+  async reviewLateReason(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: ReviewLateReasonDto,
+  ) {
+    return this.teacherAttendanceService.reviewLateReason(id, user, dto);
   }
 
   // Both literal paths, so they must stay above any ':id' route.

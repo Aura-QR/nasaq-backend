@@ -88,6 +88,34 @@ export class TeacherAttendance extends Document {
   @Prop({ type: Date, default: null })
   lateReasonAt: Date | null;
 
+  // ───────────────────────────────────────── the school's answer to it
+  //
+  // A reason nobody rules on is a reason nobody reads. Before these the
+  // teacher wrote an explanation into a field that no screen displayed and
+  // no decision was ever attached to.
+
+  /**
+   * Where the explanation stands.
+   *
+   * null means none was given yet; 'pending' is an explanation waiting on the
+   * school — the state the review list exists to empty.
+   */
+  @Prop({ type: String, enum: ['pending', 'accepted', 'rejected'], default: null })
+  lateReasonStatus: 'pending' | 'accepted' | 'rejected' | null;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, default: null })
+  lateReasonReviewedBy: Types.ObjectId | null;
+
+  @Prop({ type: String, default: '' })
+  lateReasonReviewedByName: string;
+
+  @Prop({ type: Date, default: null })
+  lateReasonReviewedAt: Date | null;
+
+  /** Why it was accepted or refused — the teacher is told this. */
+  @Prop({ type: String, default: '' })
+  lateReasonReviewNote: string;
+
   /** null until a check-out exists. */
   @Prop({ type: Number, default: null })
   workMinutes: number | null;
