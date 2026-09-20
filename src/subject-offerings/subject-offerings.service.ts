@@ -91,7 +91,17 @@ export class SubjectOfferingsService {
       dto.entries.map((entry) => ({
         updateOne: {
           filter: { _id: new mongoose.Types.ObjectId(entry.subjectOfferingId) },
-          update: { $set: { periodsPerWeek: entry.periodsPerWeek } },
+          update: {
+            $set: {
+              periodsPerWeek: entry.periodsPerWeek,
+              // Only when the client actually sent one. A screen that edits
+              // period counts and does not know about preferences must not
+              // reset every subject to 'any' on save.
+              ...(entry.slotPreference !== undefined
+                ? { slotPreference: entry.slotPreference }
+                : {}),
+            },
+          },
         },
       })),
     );

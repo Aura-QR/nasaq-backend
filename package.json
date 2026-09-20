@@ -20,6 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:super-admin": "ts-node src/platform/seed-super-admin.ts",
     "db:reset": "ts-node src/scripts/reset-db.ts",
+    "audit:mwahb": "ts-node -r tsconfig-paths/register src/scripts/audit-mwahb-leftovers.ts",
+    "import:mwahb": "ts-node -r tsconfig-paths/register src/scripts/import-mwahb-timetable.ts",
     "migrate:timetable": "ts-node -r tsconfig-paths/register src/scripts/migrate-timetable-indexes.ts",
     "migrate:timetable:dry": "ts-node -r tsconfig-paths/register src/scripts/migrate-timetable-indexes.ts --dry-run",
     "migrate:preparation-week": "ts-node -r tsconfig-paths/register src/scripts/backfill-preparation-week.ts",
