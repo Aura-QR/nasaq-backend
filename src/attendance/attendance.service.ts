@@ -593,8 +593,48 @@ export class AttendanceService {
     return {
       message: 'تم استرجاع سجلات غياب الطالب بنجاح',
       total: records.length,
+      /*
+       * The same absences, split by what the school decided about them.
+       *
+       * `total` deliberately does not move. The school was asked and was
+       * explicit: an accepted excuse is still an absence, never a present —
+       * so no count, percentage or report changes, and this sits beside them
+       * rather than inside them.
+       *
+       * But an errand with no visible trace is an errand people stop running.
+       * A parent writes the reason, uploads the note, the manager accepts it,
+       * and if nothing anywhere looks different they write the next one less
+       * carefully and the one after that not at all. This is the trace.
+       */
+      breakdown: AttendanceService.excuseBreakdown(records),
       data: records.map(a => transformAttendanceResponse(a)),
     };
+  }
+
+  /** Counts that add up to the total, never replace it. */
+  private static excuseBreakdown(records: any[]) {
+    let excused = 0;
+    let refused = 0;
+    let awaiting = 0;
+    let unanswered = 0;
+
+    for (const row of records) {
+      switch (row.excuseStatus) {
+        case 'accepted':
+          excused++;
+          break;
+        case 'rejected':
+          refused++;
+          break;
+        case 'pending':
+          awaiting++;
+          break;
+        default:
+          unanswered++;
+      }
+    }
+
+    return { excused, refused, awaiting, unanswered };
   }
 
   /**
