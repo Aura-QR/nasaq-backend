@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, Max, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator';
 import { NATIONALITY_CODES } from '../../../common/constants/nationalities.constant';
 import { WEEKDAYS } from '../schemas/school.schema';
 
@@ -44,6 +44,28 @@ export class WorkDayDto {
   @Min(1)
   @Max(10)
   periodsPerDay?: number | null;
+}
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A named stretch of days the school does not work.
+ *
+ * A range, not a list of dates: a mid-term break is one thing with one name,
+ * and making somebody enter ten separate days is how a setting goes unused.
+ * A single day is a range whose ends are equal.
+ */
+export class SchoolHolidayDto {
+  @IsString()
+  @MaxLength(120)
+  name: string;
+
+  @Matches(DATE_PATTERN, { message: 'startDate يجب أن يكون بصيغة YYYY-MM-DD' })
+  startDate: string;
+
+  /** Inclusive. Equal to startDate for a single day. */
+  @Matches(DATE_PATTERN, { message: 'endDate يجب أن يكون بصيغة YYYY-MM-DD' })
+  endDate: string;
 }
 
 export class UpdateSchoolSettingsDto {
@@ -132,4 +154,19 @@ export class UpdateSchoolSettingsDto {
     message: 'workStartTime يجب أن يكون بصيغة HH:mm بنظام 24 ساعة',
   })
   workStartTime?: string | null;
+
+  /**
+   * Days off the weekly schedule cannot express — Eid, a mid-term break, a
+   * national day. Sending the array replaces it wholesale.
+   *
+   * `workSchedule` answers "is Friday a working day", which is the wrong
+   * question for the twelfth of Ramadan. Without this, a break counted as
+   * absence against every teacher in the school.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => SchoolHolidayDto)
+  holidays?: SchoolHolidayDto[];
 }

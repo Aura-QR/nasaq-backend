@@ -202,6 +202,53 @@ export interface DaySchedule {
   endTime: string | null;
   /** How long the day is meant to be, or null when its hours are not set. */
   expectedWorkMinutes: number | null;
+  /**
+   * The declared holiday that closed this day, when one did.
+   *
+   * A day off is a day off either way, but "إجازة" and "إجازة عيد الفطر" are
+   * not the same answer to a teacher asking why the app will not let them
+   * clock in.
+   */
+  holidayName?: string | null;
+}
+
+/**
+ * The declared holiday covering a date, if any.
+ *
+ * Ranges are inclusive at both ends and compared at UTC midnight, which is
+ * how every date in this system is keyed — so a holiday that starts today
+ * closes today, not tomorrow.
+ */
+export function findHoliday(settings: any, date: Date): { name: string } | null {
+  const holidays = settings?.holidays;
+  if (!Array.isArray(holidays) || holidays.length === 0) return null;
+
+  const day = Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+  );
+
+  for (const holiday of holidays) {
+    const from = holiday?.startDate ? new Date(holiday.startDate) : null;
+    const to = holiday?.endDate ? new Date(holiday.endDate) : from;
+    if (!from || !to || Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      continue;
+    }
+
+    const start = Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate());
+    const end = Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate());
+    // A range entered backwards is a typo, not an empty range: treating it as
+    // empty would silently drop a holiday somebody believes they declared.
+    const lower = Math.min(start, end);
+    const upper = Math.max(start, end);
+
+    if (day >= lower && day <= upper) {
+      return { name: String(holiday.name ?? '').trim() || 'إجازة' };
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -221,7 +268,28 @@ export function resolveDaySchedule(settings: any, date: Date): DaySchedule {
     startTime: null,
     endTime: null,
     expectedWorkMinutes: null,
+    holidayName: null,
   };
+
+  /*
+   * A declared holiday closes the day whatever the weekly schedule says, and
+   * it is checked first so that it also closes a school that has configured
+   * no schedule at all.
+   *
+   * Every caller that asks "is this a working day" goes through here — the
+   * absentee list, the monthly report, teacher and staff check-in — so
+   * holidays are handled once rather than remembered in six places.
+   */
+  const holiday = findHoliday(settings, date);
+  if (holiday) {
+    return {
+      isWorkingDay: false,
+      startTime: null,
+      endTime: null,
+      expectedWorkMinutes: null,
+      holidayName: holiday.name,
+    };
+  }
 
   if (!Array.isArray(schedule) || schedule.length === 0) return fallback;
 
@@ -244,7 +312,7 @@ export function resolveDaySchedule(settings: any, date: Date): DaySchedule {
     expectedWorkMinutes = span > 0 ? span : null;
   }
 
-  return { isWorkingDay, startTime, endTime, expectedWorkMinutes };
+  return { isWorkingDay, startTime, endTime, expectedWorkMinutes, holidayName: null };
 }
 
 /**

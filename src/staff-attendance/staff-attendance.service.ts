@@ -405,6 +405,7 @@ export class StaffAttendanceService {
         status: true,
         date: day,
         isWorkingDay: false,
+        holidayName: schedule.holidayName ?? null,
         totalAbsent: 0,
         absentStaff: [],
       };

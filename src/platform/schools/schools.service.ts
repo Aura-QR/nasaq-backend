@@ -253,6 +253,18 @@ export class SchoolsService {
       }
     }
 
+    /*
+     * Holidays are stored clean: UTC midnight, ends the right way round, in
+     * date order.
+     *
+     * Mongoose would cast the strings anyway, but a range entered backwards
+     * would then sit in the database looking like a mistake nobody made, and
+     * every reader would have to sort the list for itself.
+     */
+    if (Array.isArray(dto.holidays)) {
+      dto.holidays = normaliseHolidays(dto.holidays);
+    }
+
     const updateFields: Record<string, any> = {};
     for (const [key, value] of Object.entries(dto)) {
       updateFields[`settings.${key}`] = value;
@@ -273,6 +285,44 @@ export class SchoolsService {
 
     return withDerivedWorkStartTime(updated.settings);
   }
+}
+
+/** UTC midnight for a YYYY-MM-DD, which is how every date here is keyed. */
+function holidayDate(value: any): Date | null {
+  if (!value) return null;
+  const text = String(value).trim();
+  const parsed = new Date(
+    /^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00.000Z` : text,
+  );
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(
+    Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()),
+  );
+}
+
+function normaliseHolidays(rows: any[]): any[] {
+  const cleaned: any[] = [];
+
+  for (const row of rows) {
+    const start = holidayDate(row?.startDate);
+    // A missing end is a single day, which is what somebody adding "اليوم
+    // الوطني" means and should not have to say twice.
+    const end = holidayDate(row?.endDate) ?? start;
+    if (!start || !end) continue;
+
+    const name = String(row?.name ?? '').trim();
+    if (!name) continue;
+
+    cleaned.push({
+      name,
+      startDate: start <= end ? start : end,
+      endDate: start <= end ? end : start,
+    });
+  }
+
+  return cleaned.sort(
+    (a, b) => a.startDate.getTime() - b.startDate.getTime(),
+  );
 }
 
 /**

@@ -715,7 +715,12 @@ export class TeacherAttendanceService {
       return {
         date: targetDate,
         isWorkingDay: false,
-        message: 'هذا اليوم إجازة رسمية للمدرسة',
+        // Naming the holiday is the difference between an answer and a
+        // shrug: an administrator who sees "إجازة" on a Tuesday wonders
+        // whether the schedule is wrong.
+        message: daySchedule.holidayName
+          ? `هذا اليوم إجازة: ${daySchedule.holidayName}`
+          : 'هذا اليوم إجازة رسمية للمدرسة',
         totalAbsent: 0,
         absentTeachers: [],
       };
@@ -893,7 +898,7 @@ export class TeacherAttendanceService {
    * so the report says what was true on each day, not what today's settings
    * would make of it.
    */
-  async getMonthlySummary(query: SummaryTeacherAttendanceDto) {
+  async getMonthlySummary(query: SummaryTeacherAttendanceDto, user?: any) {
     const match: any = {
       date: {
         $gte: normalizeDate(query.dateFrom),
@@ -923,6 +928,11 @@ export class TeacherAttendanceService {
           // the same averages as a normal day would distort them.
           daysOnDayOff: {
             $sum: { $cond: [{ $eq: ['$isWorkingDay', false] }, 1, 0] },
+          },
+          // Only these count against the school's working days. A teacher who
+          // came in on a Friday has not thereby covered a Tuesday.
+          daysPresentOnWorkingDays: {
+            $sum: { $cond: [{ $eq: ['$isWorkingDay', false] }, 0, 1] },
           },
           // The honest count. Treating a missing check-out as zero work time
           // would quietly understate someone's hours and read as fact.
@@ -974,18 +984,116 @@ export class TeacherAttendanceService {
           daysLatenessNotTracked: 1,
           daysEarlyLeaveNotTracked: 1,
           daysOnDayOff: 1,
+          daysPresentOnWorkingDays: 1,
         },
       },
       { $sort: { teacherName: 1 } },
     ]);
 
+    /*
+     * Absence, which the totals above cannot express.
+     *
+     * Every figure so far is derived from a record that exists. Absence is the
+     * opposite: it is the days with no record at all, and a teacher who never
+     * came in all month has no records, so the report did not list them —
+     * the one person a monthly review is looking for was the one person
+     * missing from it.
+     */
+    const settings = await this.getSchoolSettings(user?.schoolId);
+    const workingDates = this.workingDatesBetween(
+      settings,
+      normalizeDate(query.dateFrom),
+      normalizeDate(query.dateTo),
+    );
+    const workingDays = workingDates.length;
+
+    const teacherFilter: any = { isActive: true };
+    if (query.teacherId) {
+      teacherFilter._id = new Types.ObjectId(query.teacherId);
+    }
+    const activeTeachers = await this.teacherModel
+      .find(teacherFilter)
+      .select('name')
+      .lean();
+
+    const byTeacher = new Map(
+      rows.map((row: any) => [String(row.teacherId), row]),
+    );
+
+    // A teacher with nothing on file is absent every working day, and belongs
+    // in the report as such rather than left out of it.
+    for (const teacher of activeTeachers as any[]) {
+      const id = String(teacher._id);
+      if (byTeacher.has(id)) continue;
+      const blank = {
+        teacherId: teacher._id,
+        teacherName: teacher.name,
+        teacherDeleted: false,
+        daysPresent: 0,
+        daysLate: 0,
+        totalLateMinutes: 0,
+        daysLeftEarly: 0,
+        totalEarlyLeaveMinutes: 0,
+        totalWorkMinutes: 0,
+        totalExpectedWorkMinutes: 0,
+        daysMissingCheckOut: 0,
+        daysLatenessNotTracked: 0,
+        daysEarlyLeaveNotTracked: 0,
+        daysOnDayOff: 0,
+        daysPresentOnWorkingDays: 0,
+      };
+      rows.push(blank);
+      byTeacher.set(id, blank);
+    }
+
+    for (const row of rows as any[]) {
+      // Never negative: a school that shortened its week mid-period can leave
+      // more attended days on file than the current schedule has working days,
+      // and "-2 days absent" is a number nobody can act on.
+      row.workingDays = workingDays;
+      row.daysAbsent = Math.max(
+        0,
+        workingDays - (row.daysPresentOnWorkingDays ?? 0),
+      );
+    }
+
+    rows.sort((a: any, b: any) =>
+      String(a.teacherName ?? '').localeCompare(String(b.teacherName ?? ''), 'ar'),
+    );
+
     return {
       status: true,
       dateFrom: query.dateFrom,
       dateTo: query.dateTo,
+      // What absence is measured against. Without it the column is a number
+      // with no denominator — 3 out of 5 reads very differently from 3 out
+      // of 22.
+      workingDays,
       totalTeachers: rows.length,
       data: rows,
     };
+  }
+
+  /**
+   * The school's working days in a period, read from its own weekly schedule.
+   *
+   * Weekly days off only: the schedule has no notion of a one-off holiday, so
+   * a mid-term break still counts as absence for everybody. Said out loud
+   * here rather than discovered from a report.
+   */
+  private workingDatesBetween(settings: any, from: Date, to: Date): Date[] {
+    const dates: Date[] = [];
+    if (!from || !to || from > to) return dates;
+
+    const cursor = new Date(from);
+    // A guard, not a rule: an accidental ten-year range should not spin here.
+    for (let guard = 0; cursor <= to && guard < 1000; guard++) {
+      if (resolveDaySchedule(settings, cursor).isWorkingDay) {
+        dates.push(new Date(cursor));
+      }
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return dates;
   }
 
   async update(id: string, dto: UpdateTeacherAttendanceDto, user: any) {

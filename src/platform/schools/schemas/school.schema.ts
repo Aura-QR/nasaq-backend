@@ -41,6 +41,32 @@ export class WorkDay {
 
 const WorkDaySchema = SchemaFactory.createForClass(WorkDay);
 
+/**
+ * A stretch of days the school does not work, on top of its weekly days off.
+ *
+ * A range rather than a list of dates: a mid-term break is one thing with a
+ * name, and asking somebody to enter ten separate days is how a feature goes
+ * unused. A single day is a range whose ends are equal.
+ *
+ * Dates are stored at UTC midnight, the same key every attendance record uses,
+ * so a comparison never has to reason about the hour.
+ */
+@Schema({ _id: true })
+export class SchoolHoliday {
+  /** Shown wherever a day is explained as non-working — "إجازة منتصف الفصل". */
+  @Prop({ required: true, trim: true })
+  name: string;
+
+  @Prop({ type: Date, required: true })
+  startDate: Date;
+
+  /** Inclusive. Equal to startDate for a single day. */
+  @Prop({ type: Date, required: true })
+  endDate: Date;
+}
+
+const SchoolHolidaySchema = SchemaFactory.createForClass(SchoolHoliday);
+
 @Schema({ _id: false })
 export class SchoolSettings {
   @Prop({ type: Types.ObjectId, ref: 'AcademicYear', default: null })
@@ -100,6 +126,19 @@ export class SchoolSettings {
    */
   @Prop({ default: 7, min: 1, max: 10 })
   periodsPerDay: number;
+
+  /**
+   * Days off the weekly schedule cannot express.
+   *
+   * `workSchedule` says which weekdays are worked, which is right for a
+   * Friday and useless for Eid. Without this, a mid-term break counted as
+   * absence against every teacher in the school, and the monthly report
+   * measured everyone against days nobody was asked to come in on.
+   *
+   * Empty = the behaviour before this existed.
+   */
+  @Prop({ type: [SchoolHolidaySchema], default: [] })
+  holidays: SchoolHoliday[];
 }
 
 const SchoolSettingsSchema = SchemaFactory.createForClass(SchoolSettings);

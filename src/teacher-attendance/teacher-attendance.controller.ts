@@ -82,8 +82,11 @@ export class TeacherAttendanceController {
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Per-teacher attendance totals for a period' })
-  async getSummary(@Query() query: SummaryTeacherAttendanceDto) {
-    return this.teacherAttendanceService.getMonthlySummary(query);
+  async getSummary(
+    @Query() query: SummaryTeacherAttendanceDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.teacherAttendanceService.getMonthlySummary(query, user);
   }
 
   /*
