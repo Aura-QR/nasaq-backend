@@ -29,6 +29,7 @@ export const NOTIFICATION_TYPES = [
   'lesson_observation_recorded',
   'lesson_observation_explained',
   'lesson_observation_reviewed',
+  'lesson_observation_withdrawn',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

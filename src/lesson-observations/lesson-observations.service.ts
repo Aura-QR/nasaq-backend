@@ -176,6 +176,16 @@ export class LessonObservationsService {
                 observedAt: row.observedAt,
                 note: row.note,
                 recordedByName: row.recordedByName,
+                /*
+                 * Whether it is still the supervisor's to change.
+                 *
+                 * The server freezes a record the teacher has answered, and
+                 * without saying so here the screen offers a correction it
+                 * will then refuse — the supervisor learns the rule from an
+                 * error message.
+                 */
+                answered: Boolean(row.reason),
+                editable: !row.reason,
               }
             : null,
         };
@@ -331,6 +341,72 @@ export class LessonObservationsService {
     } catch (error: any) {
       this.logger.error(
         `Could not announce observation ${row._id}: ${error?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Takes back a record that should not have been written.
+   *
+   * A round is walked on a phone in a corridor, and the wrong room gets
+   * tapped. Overwriting covers a wrong verdict but not a wrong room: a
+   * correction to 'present' still leaves a visit nobody made, and there is no
+   * status meaning "this never happened".
+   *
+   * The same freeze as `record`: once the teacher has answered, the record is
+   * part of a conversation and deleting it deletes their side of it.
+   */
+  async withdraw(id: string, user: any) {
+    const row: any = await this.observationModel.findById(id).lean().exec();
+    if (!row) throw new NotFoundException('الملاحظة غير موجودة');
+
+    if (row.reason) {
+      throw new ConflictException(
+        'لا يمكن حذف الملاحظة بعد أن ردّ عليها المعلم',
+      );
+    }
+
+    await this.observationModel.deleteOne({ _id: row._id }).exec();
+
+    // The teacher was told. Leaving that notice pointing at nothing is worse
+    // than the original mistake — they open it, find no record, and cannot
+    // tell whether it was withdrawn or they misread it.
+    if (row.status !== 'present') {
+      await this.announceWithdrawal(row, user);
+    }
+
+    return { status: true, message: 'تم حذف الملاحظة وإبلاغ المعلم' };
+  }
+
+  /** Never throws: the record is already gone either way. */
+  private async announceWithdrawal(row: any, user: any) {
+    if (!row.teacherId) return;
+
+    try {
+      await this.notifications.notify({
+        recipientId: row.teacherId,
+        type: 'lesson_observation_withdrawn',
+        title: 'تم حذف ملاحظة مسجلة على حصتك',
+        body: [
+          `${row.className} · الحصة ${row.slot} · ${label(new Date(row.date))}`,
+          row.status === 'late'
+              ? 'كانت مسجلة كتأخر عن الحصة.'
+              : 'كانت مسجلة كعدم حضور للحصة.',
+          'لا يلزمك بيان سبب.',
+        ]
+          .filter(Boolean)
+          .join(' — '),
+        data: {
+          lectureId: String(row.lectureId),
+          date: label(new Date(row.date)),
+          className: row.className,
+          slot: row.slot,
+          withdrawnByName: user?.name ?? '',
+        },
+      });
+    } catch (error: any) {
+      this.logger.error(
+        `Could not announce withdrawal of ${row._id}: ${error?.message}`,
       );
     }
   }

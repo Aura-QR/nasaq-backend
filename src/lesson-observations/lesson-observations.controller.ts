@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -105,6 +106,19 @@ export class LessonObservationsController {
   @HttpCode(HttpStatus.OK)
   async record(@Body() dto: RecordObservationDto, @CurrentUser() user: any) {
     return this.service.record(dto, user);
+  }
+
+  @ApiOperation({
+    summary: 'Withdraw a record written by mistake — the teacher is told',
+  })
+  @ApiResponse({ status: 404, description: 'No such observation' })
+  @ApiResponse({ status: 409, description: 'The teacher has already answered it' })
+  @Delete(':id')
+  @Roles(...ROUND_WALKERS)
+  @CheckAbilities({ action: 'delete', subject: 'Duty' })
+  @HttpCode(HttpStatus.OK)
+  async withdraw(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.service.withdraw(id, user);
   }
 
   @ApiOperation({ summary: "The teacher's account of what was written down" })
