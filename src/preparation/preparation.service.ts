@@ -105,7 +105,7 @@ export class PreparationService {
       // through both branches and the row saved with submittedBy: null.
       if (!lecture.teacherId) {
         throw new BadRequestException(
-          `المحاضرة ${createPreparationDto.lecture} مش متسند لمدرس، فمينفعش يتعملها تحضير`,
+          `الحصة ${createPreparationDto.lecture} غير مسندة إلى معلم، فلا يمكن إعداد تحضير لها`,
         );
       }
       const teacher = await this.teacherModel.findById(lecture.teacherId);
@@ -279,7 +279,7 @@ export class PreparationService {
       : (dto.lectureIds ?? []).map((id) => ({ lectureId: String(id) }));
 
     if (!requested.length) {
-      throw new BadRequestException('لازم تبعت حصة واحدة على الأقل');
+      throw new BadRequestException('يجب إرسال حصة واحدة على الأقل');
     }
 
     // Same lecture twice in one payload is a client slip, not two lessons.
@@ -315,7 +315,7 @@ export class PreparationService {
       const unassigned = lectureIds.filter((id) => !byId.get(id).teacherId);
       if (unassigned.length > 0) {
         throw new BadRequestException(
-          `محاضرات مش متسندة لمدرس: ${unassigned.join(', ')}`,
+          `حصص غير مسندة إلى معلم: ${unassigned.join(', ')}`,
         );
       }
     }
@@ -437,7 +437,7 @@ export class PreparationService {
       message:
         skipped === 0
           ? `تم إنشاء ${created} تحضير`
-          : `تم إنشاء ${created} تحضير، و${skipped} كان موجود قبل كده`,
+          : `تم إنشاء ${created} تحضير، و${skipped} كان موجودًا من قبل`,
       weekOf: toDateOnlyString(weekOf),
       created,
       skipped,
