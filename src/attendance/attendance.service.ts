@@ -243,8 +243,23 @@ export class AttendanceService {
    * on every excuse ever sent buries the three that need a decision today.
    */
   async listExcuses(filters: ListAbsenceExcusesDto, pagination: PaginationDto) {
-    const query: any = { excuse: { $ne: null } };
-    query.excuseStatus = filters.status ?? 'pending';
+    const query: any = {};
+
+    /*
+     * Four states, not three.
+     *
+     * 'missing' is an absence nobody explained at all — no excuse was ever
+     * sent. It is a different problem from one awaiting a ruling, and it is
+     * the one that otherwise cannot be seen anywhere: filtering on an excuse
+     * that does not exist returns nothing, so those absences sat outside
+     * every screen the school had.
+     */
+    if (filters.status === 'missing') {
+      query.excuse = null;
+    } else {
+      query.excuse = { $ne: null };
+      query.excuseStatus = filters.status ?? 'pending';
+    }
 
     if (filters.classId) {
       query.classId = new mongoose.Types.ObjectId(filters.classId);

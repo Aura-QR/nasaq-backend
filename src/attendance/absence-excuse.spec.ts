@@ -169,3 +169,67 @@ describe('Explaining an absence', () => {
     });
   });
 });
+
+/**
+ * The absence nobody answered.
+ *
+ * The three states a manager sees are all states of an excuse — and an
+ * absence with no excuse has none of them. Filtering on a field that was
+ * never written returns nothing, so until this existed those absences were
+ * outside every screen the school had: recorded, unexplained, and invisible
+ * to the person whose job is to notice.
+ */
+describe('Listing absences nobody explained', () => {
+  let attendanceModel: any;
+  let service: AttendanceService;
+  let lastQuery: any;
+
+  beforeEach(() => {
+    lastQuery = null;
+
+    attendanceModel = {
+      countDocuments: jest.fn().mockImplementation((query: any) => {
+        lastQuery = query;
+        return { exec: async () => 0 };
+      }),
+      find: jest.fn().mockReturnValue({
+        populate: () => ({
+          populate: () => ({
+            sort: () => ({
+              skip: () => ({
+                limit: () => ({ lean: () => ({ exec: async () => [] }) }),
+              }),
+            }),
+          }),
+        }),
+      }),
+    };
+
+    service = new AttendanceService(
+      attendanceModel, {} as any, {} as any, {} as any, {} as any, {} as any,
+      { notify: jest.fn() } as any,
+    );
+  });
+
+  it('asks for records with no excuse on them', async () => {
+    await service.listExcuses({ status: 'missing' } as any, {} as any);
+
+    expect(lastQuery.excuse).toBeNull();
+    // Not "pending with no excuse", which matches nothing at all.
+    expect(lastQuery.excuseStatus).toBeUndefined();
+  });
+
+  it('still requires an excuse for the other three states', async () => {
+    for (const status of ['pending', 'accepted', 'rejected']) {
+      await service.listExcuses({ status } as any, {} as any);
+      expect(lastQuery.excuse).toEqual({ $ne: null });
+      expect(lastQuery.excuseStatus).toBe(status);
+    }
+  });
+
+  it('opens on what is waiting when nothing is asked for', async () => {
+    // The queue exists to be emptied.
+    await service.listExcuses({} as any, {} as any);
+    expect(lastQuery.excuseStatus).toBe('pending');
+  });
+});

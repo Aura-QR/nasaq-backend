@@ -161,7 +161,7 @@ export class AttendanceController {
   @ApiOperation({
     summary: "The school's queue of excuses, pending by default",
   })
-  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'accepted', 'rejected'] })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'accepted', 'rejected', 'missing'] })
   @ApiQuery({ name: 'from', required: false, type: String })
   @ApiQuery({ name: 'to', required: false, type: String })
   @ApiQuery({ name: 'classId', required: false, type: String })

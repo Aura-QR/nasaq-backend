@@ -66,9 +66,15 @@ export class ReviewAbsenceExcuseDto {
 
 /** Filters for the manager's queue. */
 export class ListAbsenceExcusesDto {
-  @ApiPropertyOptional({ enum: ['pending', 'accepted', 'rejected'] })
+  @ApiPropertyOptional({
+    enum: ['pending', 'accepted', 'rejected', 'missing'],
+    description:
+      "'missing' is an absence nobody explained at all — a different problem " +
+      'from one awaiting a ruling, and the one the school would otherwise ' +
+      'never see.',
+  })
   @IsOptional()
-  @IsIn(['pending', 'accepted', 'rejected'])
+  @IsIn(['pending', 'accepted', 'rejected', 'missing'])
   status?: string;
 
   @ApiPropertyOptional({ example: '2026-09-01' })
