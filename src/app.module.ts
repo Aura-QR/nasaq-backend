@@ -37,6 +37,7 @@ import { EnrollmentsModule } from './enrollments/enrollments.module';
 import { SubjectOfferingsModule } from './subject-offerings/subject-offerings.module';
 import { TeacherAssignmentsModule } from './teacher-assignments/teacher-assignments.module';
 import { TeacherAttendanceModule } from './teacher-attendance/teacher-attendance.module';
+import { LessonObservationsModule } from './lesson-observations/lesson-observations.module';
 import { StaffAttendanceModule } from './staff-attendance/staff-attendance.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -88,6 +89,7 @@ import { MessagingModule } from './messaging/messaging.module';
     LibraryModule,
     AttendanceModule,
     TeacherAttendanceModule,
+    LessonObservationsModule,
     StaffAttendanceModule,
     GradesCriteriaModule,
     ExamsModule,

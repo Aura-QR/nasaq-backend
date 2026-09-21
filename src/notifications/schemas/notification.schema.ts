@@ -23,6 +23,12 @@ export const NOTIFICATION_TYPES = [
   'absence_excuse_reviewed',
   // The school's ruling on a teacher's account of a lateness.
   'late_reason_reviewed',
+  // What a supervisor saw in a classroom, the teacher's account of it, and
+  // the school's ruling. Period-level, unlike the three above, which are the
+  // day.
+  'lesson_observation_recorded',
+  'lesson_observation_explained',
+  'lesson_observation_reviewed',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
