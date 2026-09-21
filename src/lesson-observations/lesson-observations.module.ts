@@ -13,6 +13,10 @@ import {
   SubstitutionSchema,
 } from '../duty/schemas/substitution.schema';
 import { Admin, AdminSchema } from '../admin/schemas/admin.schema';
+import {
+  TeacherAttendance,
+  TeacherAttendanceSchema,
+} from '../teacher-attendance/schemas/teacher-attendance.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -24,6 +28,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Term.name, schema: TermSchema },
       { name: Substitution.name, schema: SubstitutionSchema },
       { name: Admin.name, schema: AdminSchema },
+      { name: TeacherAttendance.name, schema: TeacherAttendanceSchema },
     ]),
   ],
   controllers: [LessonObservationsController],

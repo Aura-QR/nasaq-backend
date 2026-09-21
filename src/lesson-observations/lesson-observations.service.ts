@@ -12,6 +12,7 @@ import { LessonObservation } from './schemas/lesson-observation.schema';
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { Term } from '../terms/schemas/term.schema';
 import { Substitution } from '../duty/schemas/substitution.schema';
+import { TeacherAttendance } from '../teacher-attendance/schemas/teacher-attendance.schema';
 import { Admin } from '../admin/schemas/admin.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
@@ -50,6 +51,8 @@ export class LessonObservationsService {
     @InjectModel(Term.name) private readonly termModel: Model<Term>,
     @InjectModel(Substitution.name)
     private readonly substitutionModel: Model<Substitution>,
+    @InjectModel(TeacherAttendance.name)
+    private readonly teacherAttendanceModel: Model<TeacherAttendance>,
     @InjectModel(Admin.name) private readonly adminModel: Model<Admin>,
     private readonly notifications: NotificationsService,
   ) {}
@@ -97,7 +100,7 @@ export class LessonObservationsService {
     const filter: any = { dayOfWeek: weekday };
     if (term) filter.termId = term._id;
 
-    const [lectures, observations, covers]: any[] = await Promise.all([
+    const [lectures, observations, covers, checkIns]: any[] = await Promise.all([
       this.lectureModel
         .find(filter)
         .populate('classId', 'name roomNumber')
@@ -110,6 +113,7 @@ export class LessonObservationsService {
         .exec(),
       this.observationModel.find({ date }).lean().exec(),
       this.substitutionModel.find({ date }).lean().exec(),
+      this.teacherAttendanceModel.find({ date }).select('teacherId').lean().exec(),
     ]);
 
     const seen = new Map<string, any>(
@@ -118,6 +122,26 @@ export class LessonObservationsService {
     const covered = new Map<string, any>(
       covers.map((row: any) => [String(row.lectureId), row]),
     );
+
+    /*
+     * Who has clocked in today.
+     *
+     * A supervisor walking a corridor cannot know this, and without it they
+     * write up a teacher for reaching the fourth period late when that
+     * teacher never came in at all — and the notice goes to someone at home.
+     *
+     * A signal, never a lock. The supervisor is standing in front of the
+     * room; a missing row in a table is weaker evidence than their eyes. A
+     * teacher who forgot to clock in, or whose GPS failed, is still teaching.
+     *
+     * On a morning nobody has clocked in yet — or in a school not using
+     * check-in at all — this would flag every teacher, which is noise. So it
+     * reports null and the clients show nothing.
+     */
+    const checkedInIds = new Set<string>(
+      checkIns.map((row: any) => String(row.teacherId)),
+    );
+    const checkInInUse = checkIns.length > 0;
 
     const items = lectures
       .map((lecture: any) => {
@@ -139,6 +163,11 @@ export class LessonObservationsService {
           // Who is actually expected in the room, which is not always the
           // teacher on the timetable.
           coveredBy: cover ? cover.substituteTeacherName : null,
+          // true, false, or null when the school is not using check-in today.
+          teacherCheckedIn:
+            !checkInInUse || !lecture.teacherId
+              ? null
+              : checkedInIds.has(String(lecture.teacherId._id)),
           observation: row
             ? {
                 id: String(row._id),
@@ -159,6 +188,7 @@ export class LessonObservationsService {
         date: label(date),
         dayOfWeek: weekday,
         termName: term?.name ?? null,
+        checkInInUse,
         total: items.length,
         visited: items.filter((item) => item.observation).length,
         late: items.filter((item) => item.observation?.status === 'late').length,

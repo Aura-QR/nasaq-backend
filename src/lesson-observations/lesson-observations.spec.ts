@@ -67,7 +67,7 @@ describe('Observing a lesson', () => {
     notifications = { notify: jest.fn().mockResolvedValue(undefined) };
 
     service = new LessonObservationsService(
-      observationModel, lectureModel, {} as any, {} as any,
+      observationModel, lectureModel, {} as any, {} as any, {} as any,
       { find: () => ({ select: () => ({ setOptions: () => ({ lean: () => ({ exec: async () => [{ _id: adminId }] }) }) }) }) } as any,
       notifications,
     );
