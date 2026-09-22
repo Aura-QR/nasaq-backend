@@ -261,6 +261,36 @@ export function findHoliday(settings: any, date: Date): { name: string } | null 
  * with no hours: exactly the behaviour it has today, so nothing changes for a
  * school that has not set this up.
  */
+/**
+ * The school's working days between two dates, inclusive.
+ *
+ * Absence cannot be aggregated out of an attendance collection — it is the
+ * days with no record at all — so it has to be counted against the school's
+ * own week. Both the teacher and the staff report need exactly this, and a
+ * second copy of it would be a second answer to "how long was September".
+ *
+ * Weekly days off and declared holidays only: `resolveDaySchedule` decides
+ * each day, so whatever closes a day for check-in closes it here too.
+ */
+export function workingDatesBetween(
+  settings: any,
+  from: Date,
+  to: Date,
+): Date[] {
+  const dates: Date[] = [];
+  if (!from || !to || from > to) return dates;
+
+  const cursor = new Date(from);
+  // A guard, not a rule: an accidental ten-year range should not spin here.
+  for (let guard = 0; cursor <= to && guard < 1000; guard++) {
+    if (resolveDaySchedule(settings, cursor).isWorkingDay) {
+      dates.push(new Date(cursor));
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
 export function resolveDaySchedule(settings: any, date: Date): DaySchedule {
   const schedule = settings?.workSchedule;
   const fallback: DaySchedule = {

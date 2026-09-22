@@ -83,7 +83,7 @@ export class DutyService {
       user?.role === 'TEACHER' ? String(user.userId) : (dto.teacherId ?? null);
 
     if (!teacherId) {
-      throw new BadRequestException('teacherId مطلوب لما الطلب يتعمل نيابة عن مدرس');
+      throw new BadRequestException('teacherId مطلوب عند تقديم الطلب نيابة عن معلم');
     }
 
     const teacher = await this.teacherModel.findById(teacherId).lean().exec();
@@ -97,7 +97,7 @@ export class DutyService {
     if (existing) {
       if (existing.status !== 'pending') {
         throw new BadRequestException(
-          `فيه استئذان لليوم ده تمت مراجعته بالفعل (${existing.status}).`,
+          `تمت مراجعة استئذان هذا اليوم بالفعل (${existing.status}).`,
         );
       }
       // A second request for the same day is an edit of the first, not a
@@ -222,7 +222,7 @@ export class DutyService {
       }
       if (request.status !== 'pending') {
         throw new BadRequestException(
-          'الطلب تمت مراجعته بالفعل — كلّم الإدارة لتعديله.',
+          'تمت مراجعة الطلب بالفعل — راجع الإدارة لتعديله.',
         );
       }
     }
@@ -364,7 +364,7 @@ export class DutyService {
     const weekday = WEEKDAY_NAMES[date.getUTCDay()];
     if (lecture.dayOfWeek !== weekday) {
       throw new BadRequestException(
-        `الحصة دي بتاعة يوم ${lecture.dayOfWeek}، والتاريخ المختار ${weekday}.`,
+        `هذه الحصة في يوم ${lecture.dayOfWeek}، والتاريخ المختار ${weekday}.`,
       );
     }
 
@@ -480,7 +480,7 @@ export class DutyService {
       })
       .lean()
       .exec();
-    if (ownLecture) reasons.push('عنده حصة في نفس الخانة');
+    if (ownLecture) reasons.push('لديه حصة في الخانة نفسها');
 
     const otherCover = await this.substitutionModel
       .findOne({

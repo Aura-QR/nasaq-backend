@@ -35,6 +35,7 @@ import {
   computeLateMinutes,
   computeEarlyLeaveMinutes,
   resolveDaySchedule,
+  workingDatesBetween,
   extractClientIp,
 } from '../attendance/attendance.utils';
 
@@ -1000,7 +1001,7 @@ export class TeacherAttendanceService {
      * missing from it.
      */
     const settings = await this.getSchoolSettings(user?.schoolId);
-    const workingDates = this.workingDatesBetween(
+    const workingDates = workingDatesBetween(
       settings,
       normalizeDate(query.dateFrom),
       normalizeDate(query.dateTo),
@@ -1074,27 +1075,6 @@ export class TeacherAttendanceService {
     };
   }
 
-  /**
-   * The school's working days in a period, read from its own weekly schedule.
-   *
-   * Weekly days off only: the schedule has no notion of a one-off holiday, so
-   * a mid-term break still counts as absence for everybody. Said out loud
-   * here rather than discovered from a report.
-   */
-  private workingDatesBetween(settings: any, from: Date, to: Date): Date[] {
-    const dates: Date[] = [];
-    if (!from || !to || from > to) return dates;
-
-    const cursor = new Date(from);
-    // A guard, not a rule: an accidental ten-year range should not spin here.
-    for (let guard = 0; cursor <= to && guard < 1000; guard++) {
-      if (resolveDaySchedule(settings, cursor).isWorkingDay) {
-        dates.push(new Date(cursor));
-      }
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
-    }
-    return dates;
-  }
 
   async update(id: string, dto: UpdateTeacherAttendanceDto, user: any) {
     const record = await this.teacherAttendanceModel.findById(id);

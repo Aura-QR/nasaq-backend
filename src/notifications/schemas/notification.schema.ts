@@ -30,6 +30,17 @@ export const NOTIFICATION_TYPES = [
   'lesson_observation_explained',
   'lesson_observation_reviewed',
   'lesson_observation_withdrawn',
+  // Staff latenesses are their own types rather than reusing the teacher
+  // ones: the bell routes by type, and a manager tapping a notice about a
+  // supervisor must not land on the teachers' queue with nothing in it.
+  'staff_late_reason_submitted',
+  'staff_late_reason_reviewed',
+  // Staff leave is its own request, not the teacher one with a different
+  // person on it: there are no lectures to cover, so the notice must not
+  // route a manager to the cover screen.
+  'staff_leave_requested',
+  'staff_leave_approved',
+  'staff_leave_rejected',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

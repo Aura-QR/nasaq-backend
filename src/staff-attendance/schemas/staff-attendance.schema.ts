@@ -65,8 +65,62 @@ export class StaffAttendance extends Document {
   @Prop({ type: Number, default: null })
   lateMinutes: number | null;
 
+  // ───────────────────────────────────── the lateness, and its account
+  //
+  // Minutes on their own are an accusation with no reply. The teacher record
+  // has had these since the lateness queue was built; a supervisor was late
+  // in exactly the same way and had nowhere to say why, so the office saw a
+  // number and the person saw nothing at all.
+
+  /** What they said about it. null while nothing has been said. */
+  @Prop({ type: String, default: null })
+  lateReason: string | null;
+
+  @Prop({ type: Date, default: null })
+  lateReasonAt: Date | null;
+
+  /**
+   * The school's ruling. null while there is no reason to rule on, and
+   * 'pending' from the moment one is written — a reason nobody rules on is a
+   * reason nobody reads.
+   */
+  @Prop({
+    type: String,
+    enum: ['pending', 'accepted', 'rejected'],
+    default: null,
+  })
+  lateReasonStatus: 'pending' | 'accepted' | 'rejected' | null;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, default: null })
+  lateReasonReviewedBy: Types.ObjectId | null;
+
+  @Prop({ type: String, default: '' })
+  lateReasonReviewedByName: string;
+
+  @Prop({ type: Date, default: null })
+  lateReasonReviewedAt: Date | null;
+
+  /** Why it was accepted or refused — the person is told this. */
+  @Prop({ type: String, default: '' })
+  lateReasonReviewNote: string;
+
   @Prop({ type: Number, default: null })
   earlyLeaveMinutes: number | null;
+
+  /**
+   * Whether an approved استئذان covers the early departure.
+   *
+   * `earlyLeaveMinutes` stays a truthful record of the clock; this is what
+   * says the school agreed to it. Without the pair, somebody who asked
+   * permission and got it reads in the monthly report exactly like somebody
+   * who walked out.
+   */
+  @Prop({ default: false })
+  earlyLeaveApproved: boolean;
+
+  /** The "HH:mm" that was approved, for the record. */
+  @Prop({ type: String, default: null })
+  approvedLeaveAt: string | null;
 
   @Prop({ type: Number, default: null })
   workMinutes: number | null;
@@ -88,3 +142,5 @@ StaffAttendanceSchema.index(
   { unique: true },
 );
 StaffAttendanceSchema.index({ schoolId: 1, date: 1 });
+// The review queue reads by verdict, newest first.
+StaffAttendanceSchema.index({ schoolId: 1, lateReasonStatus: 1, date: -1 });

@@ -9,8 +9,13 @@ import {
   StaffAttendance,
   StaffAttendanceSchema,
 } from './schemas/staff-attendance.schema';
+import {
+  StaffLeaveRequest,
+  StaffLeaveRequestSchema,
+} from './schemas/staff-leave-request.schema';
 import { StaffAttendanceController } from './staff-attendance.controller';
 import { StaffAttendanceService } from './staff-attendance.service';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -18,7 +23,9 @@ import { StaffAttendanceService } from './staff-attendance.service';
       { name: StaffAttendance.name, schema: StaffAttendanceSchema },
       { name: Admin.name, schema: AdminSchema },
       { name: School.name, schema: SchoolSchema },
+      { name: StaffLeaveRequest.name, schema: StaffLeaveRequestSchema },
     ]),
+    NotificationsModule,
   ],
   controllers: [StaffAttendanceController],
   providers: [StaffAttendanceService],
