@@ -3,6 +3,7 @@ import { DashboardsService } from './dashboards.service';
 import { SchoolSchema } from 'src/platform/schools/schemas/school.schema';
 import { StudentSchema } from 'src/students/schemas/student.schema';
 import { TeacherSchema } from 'src/teachers/schemas/teacher.schema';
+import { SubjectSchema } from 'src/subjects/schemas/subject.schema';
 import { ClassSchema } from 'src/classes/schemas/class.schema';
 import { AcademicYearSchema } from 'src/academic-years/schemas/academic-year.schema';
 import { AttendanceSchema } from 'src/attendance/schemas/attendance.schema';
@@ -23,6 +24,7 @@ describe('Dashboards Service Integration', () => {
   let studentModel: any;
   let teacherModel: any;
   let classModel: any;
+  let subjectModel: any;
   let academicYearModel: any;
   let attendanceModel: any;
   let expenseModel: any;
@@ -38,6 +40,7 @@ describe('Dashboards Service Integration', () => {
     try { studentModel = mongoose.model('TestStudentDash', StudentSchema); } catch { studentModel = mongoose.model('TestStudentDash'); }
     try { teacherModel = mongoose.model('TestTeacherDash', TeacherSchema); } catch { teacherModel = mongoose.model('TestTeacherDash'); }
     try { classModel = mongoose.model('TestClassDash', ClassSchema); } catch { classModel = mongoose.model('TestClassDash'); }
+    try { subjectModel = mongoose.model('TestSubjectDash', SubjectSchema); } catch { subjectModel = mongoose.model('TestSubjectDash'); }
     try { academicYearModel = mongoose.model('TestAcademicYearDash', AcademicYearSchema); } catch { academicYearModel = mongoose.model('TestAcademicYearDash'); }
     try { attendanceModel = mongoose.model('TestAttendanceDash', AttendanceSchema); } catch { attendanceModel = mongoose.model('TestAttendanceDash'); }
     try { expenseModel = mongoose.model('TestExpenseDash', ExpenseSchema); } catch { expenseModel = mongoose.model('TestExpenseDash'); }
@@ -49,6 +52,7 @@ describe('Dashboards Service Integration', () => {
       studentModel,
       teacherModel,
       classModel,
+      subjectModel,
       academicYearModel,
       attendanceModel,
       expenseModel,

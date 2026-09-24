@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { School } from 'src/platform/schools/schemas/school.schema';
 import { Student } from 'src/students/schemas/student.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
+import { Subject } from '../subjects/schemas/subject.schema';
 import { Class } from 'src/classes/schemas/class.schema';
 import { AcademicYear } from 'src/academic-years/schemas/academic-year.schema';
 import { Attendance } from 'src/attendance/schemas/attendance.schema';
@@ -18,6 +19,7 @@ export class DashboardsService {
     @InjectModel(Student.name) private studentModel: Model<Student>,
     @InjectModel(Teacher.name) private teacherModel: Model<Teacher>,
     @InjectModel(Class.name) private classModel: Model<Class>,
+    @InjectModel(Subject.name) private subjectModel: Model<Subject>,
     @InjectModel(AcademicYear.name)
     private academicYearModel: Model<AcademicYear>,
     @InjectModel(Attendance.name) private attendanceModel: Model<Attendance>,
@@ -82,6 +84,7 @@ export class DashboardsService {
       activeStudents,
       totalTeachers,
       totalClasses,
+      totalSubjects,
       school,
       expensesAggregate,
       financialRecords,
@@ -100,6 +103,10 @@ export class DashboardsService {
       activeYear
         ? this.classModel.countDocuments({ academicYearId: activeYear._id })
         : Promise.resolve(0),
+      // Subjects are not tied to a year — the school teaches them until it
+      // stops. The mobile dashboard has a card for this and the payload had
+      // no field to fill it, so it read zero on a school with twenty-one.
+      this.subjectModel.countDocuments(),
       this.schoolModel.findById(schoolId).setOptions({ skipTenantScope: true }).lean(),
       this.expenseModel.aggregate([
         { $group: { _id: null, totalAmount: { $sum: '$amount' } } },
@@ -135,6 +142,7 @@ export class DashboardsService {
         teachers: totalTeachers,
         // This year's classes, not every class the school has ever had.
         classes: totalClasses,
+        subjects: totalSubjects,
       },
       financialSummary: {
         totalRevenue: totalTuitionCollected,

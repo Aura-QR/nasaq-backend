@@ -4,6 +4,7 @@ import { School, SchoolSchema } from 'src/platform/schools/schemas/school.schema
 import { Student, StudentSchema } from 'src/students/schemas/student.schema';
 import { Teacher, TeacherSchema } from 'src/teachers/schemas/teacher.schema';
 import { Class, ClassSchema } from 'src/classes/schemas/class.schema';
+import { Subject, SubjectSchema } from 'src/subjects/schemas/subject.schema';
 import {
   AcademicYear,
   AcademicYearSchema,
@@ -25,6 +26,7 @@ import { DashboardsController } from './dashboards.controller';
       { name: Student.name, schema: StudentSchema },
       { name: Teacher.name, schema: TeacherSchema },
       { name: Class.name, schema: ClassSchema },
+      { name: Subject.name, schema: SubjectSchema },
       { name: AcademicYear.name, schema: AcademicYearSchema },
       { name: Attendance.name, schema: AttendanceSchema },
       { name: Expense.name, schema: ExpenseSchema },
