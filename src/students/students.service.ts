@@ -117,6 +117,7 @@ export class StudentsService {
     await student.save();
 
     let busEnrollmentWarning: string | null = null;
+    let financialRecordWarning: string | null = null;
 
     // Auto-create matching Enrollment record if classId is provided
     if (createStudentDto.classId && mongoose.Types.ObjectId.isValid(createStudentDto.classId)) {
@@ -139,7 +140,22 @@ export class StudentsService {
           { upsert: true, new: true, setDefaultsOnInsert: true },
         );
 
-        // Create/update the student's financial record for this academic year
+        /*
+         * Create/update the student's financial record for this academic year.
+         *
+         * A failure here used to hard-delete the student and the enrolment
+         * that had already been written, then rethrow. The office saw an
+         * error, re-entered the student, saw the error again — and the class
+         * stayed empty, because every attempt erased itself. There is no soft
+         * delete and no audit trail, so the record was simply gone, while the
+         * students_counter kept climbing and left a burnt number behind each
+         * time.
+         *
+         * A missing fee configuration is a finance setup gap, not a reason to
+         * refuse the enrolment. The student and the enrolment stand; the
+         * caller is told what is still owed, exactly as the bus enrolment
+         * below already does.
+         */
         try {
           await this.financialRecordService.createOrUpdateRecord(
             (student._id as any).toString(),
@@ -147,12 +163,8 @@ export class StudentsService {
             (targetClass as any).schoolId?.toString() ?? '',
           );
         } catch (error: any) {
-          await this.enrollmentModel.findOneAndDelete({
-            studentId: student._id,
-            academicYearId: targetClass.academicYearId,
-          }).exec();
-          await this.studentModel.findByIdAndDelete(student._id).exec();
-          throw error;
+          financialRecordWarning =
+            error?.message || 'تعذر إنشاء السجل المالي للطالب';
         }
 
         // Auto-enroll in bus plan if provided at creation
@@ -197,8 +209,14 @@ export class StudentsService {
       safeStudent.busEnrollmentWarning = busEnrollmentWarning;
     }
 
+    if (financialRecordWarning) {
+      safeStudent.financialRecordWarning = financialRecordWarning;
+    }
+
     return {
-      message: 'تم إضافة الطالب بنجاح',
+      message: financialRecordWarning
+        ? 'تم إضافة الطالب بنجاح، ولم يتم إنشاء السجل المالي'
+        : 'تم إضافة الطالب بنجاح',
       data: safeStudent,
     };
   }
