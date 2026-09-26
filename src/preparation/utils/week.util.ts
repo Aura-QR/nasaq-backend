@@ -70,9 +70,40 @@ export function startOfWeek(value: string | Date, field = 'weekOf'): Date {
   return anchor;
 }
 
-/** The week currently in progress. */
+/**
+ * The school's wall-clock timezone.
+ *
+ * Every school on the platform is in the Gulf, and `schools.settings.timezone`
+ * reads 'Asia/Riyadh'. It is a constant here rather than a lookup because the
+ * three callers of `currentWeekOf` resolve a default before they have loaded
+ * the school, and a week that changes with the reader is worse than one that
+ * is fixed.
+ */
+const SCHOOL_TIME_ZONE = 'Asia/Riyadh';
+
+/**
+ * Today's calendar date where the school is, not where the server is.
+ *
+ * The server runs on UTC and the school is three hours ahead, so between
+ * midnight and 03:00 Riyadh the two disagree about what day it is — and on a
+ * Saturday morning that disagreement crosses the week boundary. A teacher
+ * opening the app at 1am Saturday was handed `startOfWeek` of a date that was
+ * still Friday in UTC, which resolved to *last* week, so her screen showed the
+ * preparation she had finished the week before.
+ */
+function todayAtSchool(now: Date): string {
+  // en-CA formats as YYYY-MM-DD, which parseDateOnly accepts directly.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: SCHOOL_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+/** The week currently in progress, as the school reckons it. */
 export function currentWeekOf(now: Date = new Date()): Date {
-  return startOfWeek(now);
+  return startOfWeek(todayAtSchool(now));
 }
 
 /**
