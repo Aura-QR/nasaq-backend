@@ -44,3 +44,24 @@ export function completionGaps(preparation: any, resourceCount: number): string[
 
 export const isPreparationComplete = (preparation: any, resourceCount: number): boolean =>
   completionGaps(preparation, resourceCount).length === 0;
+
+/**
+ * The gaps as the teacher should read them.
+ *
+ * A supervisor reported teachers insisting they had prepared a week that the
+ * schedule kept marking as missing. They had: the row was saved, it opened,
+ * it was listed under «تحضيراتي» — and it was empty, because saving a
+ * preparation and finishing one are two different things and only `submit()`
+ * ever said so.
+ *
+ * `isComplete` alone cannot close that gap. A red mark with no reason reads
+ * as a broken system, not as an unfinished form, so the screens get the
+ * reasons and can name them.
+ */
+export const completionGapMessages = (
+  preparation: any,
+  resourceCount: number,
+): string[] =>
+  completionGaps(preparation, resourceCount).map(
+    (gap) => COMPLETION_GAP_MESSAGES[gap],
+  );

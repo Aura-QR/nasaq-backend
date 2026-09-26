@@ -18,7 +18,10 @@ import { getPagination } from 'src/pagination/common/paginationUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PreparationContentService } from './preparation-content.service';
-import { isPreparationComplete } from './preparation-completion';
+import {
+  isPreparationComplete,
+  completionGapMessages,
+} from './preparation-completion';
 import { STRUCTURED_FIELDS } from './constants/preparation-constants';
 import {
   currentWeekOf,
@@ -717,6 +720,9 @@ export class PreparationService {
         // was computed from, so it costs nothing to say it out loud.
         resourcesCount,
         isComplete: isPreparationComplete(preparation, resourcesCount),
+        // Not just "unfinished" but which of the four requirements is
+        // missing, so the list can say why rather than show a bare mark.
+        completionGaps: completionGapMessages(preparation, resourcesCount),
       };
     });
 
@@ -864,6 +870,10 @@ export class PreparationService {
                   ...this.addUrlsToFiles({ ...prep, lecture: l }, baseUrl),
                   resourcesCount: counts.get(String(prep._id)) ?? 0,
                   isComplete: isFinished(prep),
+                  completionGaps: completionGapMessages(
+                    prep,
+                    counts.get(String(prep._id)) ?? 0,
+                  ),
                 }
               : null,
           };
@@ -1238,8 +1248,27 @@ export class PreparationService {
     const baseUrl =
       req?.protocol && req?.host ? `${req.protocol}://${req.host}` : '';
     const preparationWithUrls = this.addUrlsToFiles(preparation, baseUrl);
+    const details = await this.content.details(id);
 
-    return { ...preparationWithUrls, ...await this.content.details(id) };
+    /*
+     * Why this row is not finished, in the teacher's words.
+     *
+     * Opening a preparation showed the form and nothing else, so a row that
+     * was saved but empty — no lesson picked, no objectives, no digital
+     * content — looked identical to a finished one. The schedule marked it
+     * missing, the teacher saw a saved preparation, and the disagreement read
+     * as a broken system rather than an unfinished form.
+     *
+     * The rule is the same one submit() enforces; this only says it out loud.
+     */
+    const resourcesCount = details.resourcesCount ?? 0;
+
+    return {
+      ...preparationWithUrls,
+      ...details,
+      isComplete: isPreparationComplete(preparationWithUrls, resourcesCount),
+      completionGaps: completionGapMessages(preparationWithUrls, resourcesCount),
+    };
   }
 
   async addFiles(
