@@ -269,19 +269,35 @@ export class PreparationContentService {
       .select('classId')
       .lean();
     const classes = enrollments.map((e) => e.classId);
-    // Legacy students without any enrollment rows still carry their class directly.
-    if (
-      !classes.length &&
-      !(await this.enrollments.exists({ studentId: user.userId }))
-    ) {
-      const student = await this.students
-        .findById(user.userId)
-        .select('classId')
-        .lean();
-      if (student?.classId) classes.push(student.classId);
-    }
+
+    /*
+     * `student.classId` counts too, always — not only when there are no
+     * enrollments.
+     *
+     * The timetable and this filter read the student's class from two
+     * different places: GET /lectures/student/me builds the schedule from
+     * `student.classId`, while this reads the enrolment rows. When the two
+     * disagree — and they do in production, where a student's classId was
+     * not among any of their four active enrolments — the schedule offers a
+     * lesson and opening it answers «التحضير غير موجود», because the
+     * preparation belongs to a class this filter never listed.
+     *
+     * Taking the union is the safe reading: both sources are the school's
+     * own record of where this student sits, and either one alone locks them
+     * out of work meant for them. The class still has to match, so this
+     * widens nothing beyond the student's own classes.
+     */
+    const student = await this.students
+      .findById(user.userId)
+      .select('classId')
+      .lean();
+    if (student?.classId) classes.push(student.classId);
+
+    // Two sources overlap for most students; a duplicate in $in is harmless
+    // but the dedupe keeps the query honest about how many classes there are.
+    const unique = [...new Map(classes.map((c) => [String(c), c])).values()];
     return {
-      classId: { $in: classes },
+      classId: { $in: unique },
       reviewStatus: { $in: ['pending', 'approved'] },
     };
   }
