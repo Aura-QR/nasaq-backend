@@ -325,7 +325,40 @@ export class PreparationContentService {
       this.id(prep.submittedBy) !== this.id(user.userId)
     )
       throw new ForbiddenException();
-    // IDs only: never populate exam answers, lesson suggestions or library metadata here.
-    return this.studentProjection(prep);
+
+    /*
+     * The homework and the quiz belong on the lesson page too.
+     *
+     * A teacher attaches «واجب» and «إثراء» to a period and the student opened
+     * the lesson to find objectives and a link and nothing else — the
+     * attachments were on the preparation all along, but STUDENT_FIELDS lists
+     * only the preparation's own text, so nothing carried them across. They
+     * did reach the student, on the separate «اختباراتي» and «واجباتي» pages,
+     * which is not where somebody reading the day's lesson looks for them.
+     *
+     * Only what a student may see: the title, the type, the dates and the
+     * grade, plus the id so the page can link through. Never the exam's
+     * questions or answers — those stay behind /exams, which checks the
+     * window before it hands anything over.
+     */
+    const resources = await this.resources
+      .find({ preparationId: id })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    return {
+      ...this.studentProjection(prep),
+      resources: resources.map((resource: any) => ({
+        _id: String(resource._id),
+        type: resource.type,
+        title: resource.title ?? '',
+        description: resource.description ?? '',
+        startAt: resource.startAt ?? null,
+        dueAt: resource.dueAt ?? null,
+        totalGrade: resource.totalGrade ?? null,
+        examId: resource.examId ? String(resource.examId) : null,
+        projectId: resource.projectId ? String(resource.projectId) : null,
+      })),
+    };
   }
 }
