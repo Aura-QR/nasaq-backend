@@ -189,8 +189,13 @@ export class LecturesController {
   async findMyStudentLectures(
     @CurrentUser() user: any,
     @Query('termId') termId?: string,
+    @Query('weekOf') weekOf?: string,
   ) {
-    return await this.lecturesService.findMyStudentLectures(user.userId, termId);
+    return await this.lecturesService.findMyStudentLectures(
+      user.userId,
+      termId,
+      weekOf,
+    );
   }
 
   @ApiOperation({ summary: 'Copy schedule from a previous term/year (Wizard Step 7)' })

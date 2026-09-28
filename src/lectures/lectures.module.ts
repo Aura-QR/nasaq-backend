@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { LecturesController } from './lectures.controller';
 import { LecturesService } from './lectures.service';
 import { Lecture, LectureSchema } from './schemas/lecture.schema';
+import { Preparation, PreparationSchema } from '../preparation/schemas/preparation.schema';
 import {
   TeacherConstraint,
   TeacherConstraintSchema,
@@ -22,6 +23,8 @@ import { TimetableService } from './timetable.service';
       // Read by the generator: a blocked cell is never offered.
       { name: TeacherConstraint.name, schema: TeacherConstraintSchema },
       { name: Lecture.name, schema: LectureSchema },
+      // Read to narrow a student's timetable to their own week's preparation.
+      { name: Preparation.name, schema: PreparationSchema },
       { name: Class.name, schema: ClassSchema },
       { name: Teacher.name, schema: TeacherSchema },
       { name: Student.name, schema: StudentSchema },

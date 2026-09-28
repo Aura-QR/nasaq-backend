@@ -10,6 +10,8 @@ import * as mongoose from 'mongoose';
 import { CreateLectureDto } from './dto/create-lecture.dto';
 import { UpdateLectureDto } from './dto/update-lecture.dto';
 import { Lecture } from './schemas/lecture.schema';
+import { Preparation } from '../preparation/schemas/preparation.schema';
+import { startOfWeek, currentWeekOf } from '../preparation/utils/week.util';
 import { Class } from '../classes/schemas/class.schema';
 import { Teacher } from '../teachers/schemas/teacher.schema';
 import { Student } from 'src/students/schemas/student.schema';
@@ -27,6 +29,8 @@ export class LecturesService {
     @InjectModel(SubjectOffering.name) private readonly subjectOfferingModel: Model<SubjectOffering>,
     @InjectModel(TeacherAssignment.name) private readonly teacherAssignmentModel: Model<TeacherAssignment>,
     @InjectModel(Term.name) private readonly termModel: Model<Term>,
+    @InjectModel(Preparation.name)
+    private readonly preparationModel: Model<Preparation>,
   ) {}
 
   async create(createLectureDto: CreateLectureDto) {
@@ -127,7 +131,11 @@ export class LecturesService {
    * A student's own timetable, resolved through their active enrollment:
    * student -> classId -> the lectures scheduled for that class.
    */
-  async findMyStudentLectures(studentId: string, termId?: string) {
+  async findMyStudentLectures(
+    studentId: string,
+    termId?: string,
+    weekOf?: string,
+  ) {
     const student = await this.studentModel
       .findById(studentId)
       .select('classId')
@@ -141,7 +149,58 @@ export class LecturesService {
     }
 
     const resolvedTermId = termId ?? (await this.getActiveTermId());
-    return this.findAll(resolvedTermId, student.classId.toString(), undefined);
+    const lectures = await this.findAll(
+      resolvedTermId,
+      student.classId.toString(),
+      undefined,
+    );
+
+    return this.withWeeksPreparation(lectures, weekOf);
+  }
+
+  /**
+   * Replaces each lecture's `preparation` with the one for the week asked for.
+   *
+   * `Lecture.preparation` accumulates: every preparation ever filed for that
+   * period, across every week, pushed in creation order. The clients read
+   * `preparation[0]` and open it, which is right only while a period has been
+   * prepared once.
+   *
+   * It stopped being right as soon as a teacher prepared a period for two
+   * weeks. A period carrying [3 Oct draft, 26 Sept submitted] handed the
+   * student the draft — and a draft is not visible to a student, so the
+   * lesson she could have read answered «التحضير غير موجود».
+   *
+   * Resolving it here rather than in each client keeps the web and the phone
+   * from each inventing their own rule, and keeps the array itself intact for
+   * the teacher and office views that legitimately want the history.
+   */
+  private async withWeeksPreparation(lectures: any[], weekOf?: string) {
+    const week = weekOf ? startOfWeek(weekOf) : currentWeekOf();
+
+    const ids = lectures.flatMap((lecture: any) =>
+      Array.isArray(lecture.preparation) ? lecture.preparation : [],
+    );
+    if (!ids.length) return lectures;
+
+    const forWeek = await this.preparationModel
+      .find({ _id: { $in: ids }, weekOf: week })
+      .select('_id')
+      .lean()
+      .exec();
+
+    const keep = new Set(forWeek.map((row: any) => String(row._id)));
+
+    return lectures.map((lecture: any) => {
+      const row =
+        typeof lecture.toObject === 'function' ? lecture.toObject() : lecture;
+      const mine = (Array.isArray(row.preparation) ? row.preparation : []).filter(
+        (id: any) => keep.has(String(id)),
+      );
+      // An empty array rather than a dropped field: the clients test for a
+      // first element, and a missing key reads the same as "not prepared".
+      return { ...row, preparation: mine };
+    });
   }
 
   /**
