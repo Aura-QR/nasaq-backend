@@ -378,18 +378,56 @@ the row component and hold the state in the container.
 
 ## Permissions
 
+Two separate questions, and the table below only answers the first.
+
+### 1. May you open the feature at all?
+
 | Role | read | create | update | delete |
 |---|---|---|---|---|
 | Teacher | ✅ | ✅ | ✅ | ❌ |
-| Owner / Supervisor | ✅ | ❌ | ✅ | ❌ |
-| Manager | ✅ | ✅* | ✅ | ❌ |
+| Owner | ✅ | ❌ | ✅ | ❌ |
+| Supervisor | ✅ | ❌ | ✅ | ❌ |
+| Manager | ✅ | ❌ | ✅ | ❌ |
 | Student | ❌ | ❌ | ❌ | ❌ |
 
-\* A manager's default is read+update. Recording is the teacher's job in her
-own lecture; the school reads the record and may correct it.
+`create` is the teacher's alone — filling a sheet is something you do in
+your own lecture. The school reads the record and may correct it, which is
+`update`.
 
-Nobody gets `delete`. Saving is an upsert, so correcting a tick is an update —
-deleting would erase an observation rather than fix it, and no endpoint does it.
+Nobody gets `delete`. Saving is an upsert, so correcting a tick is an
+update; deleting would erase an observation rather than fix it, and no
+endpoint does it.
+
+### 2. Whose data do you get?
+
+The permission above says you may read reports. It does not say *whose*.
+A second check answers that, and it is not configurable:
+
+| Role | Scope |
+|---|---|
+| Owner / Supervisor / Manager | **Every class in the school** |
+| Teacher | **Only classes she appears on the timetable for** |
+
+A teacher requesting any other class gets:
+
+```json
+{ "status": false, "message": "لا يمكنك عرض تقرير فصل لا تُدرّس له", "statusCode": 403 }
+```
+
+The check reads the timetable, not a stored list — so a teacher removed
+from a class loses the report for it immediately, with nothing to update
+by hand. Saving a sheet is scoped the same way (`هذه ليست حصتك`).
+
+**For the client:** do not offer a teacher a class picker built from
+`GET /classes`. Build it from her own timetable, or she will pick classes
+that return 403.
+
+### Supervisors cannot be restricted
+
+Owners and supervisors log in with `['*']`, which bypasses the permission
+table entirely — they do not get a `dailyTracking` row and the permissions
+screen cannot withhold it from them. This is how the whole platform treats
+those two roles; it is not specific to this feature.
 
 ### If you get `403 ليس لديك صلاحية للقيام بهذا الإجراء`
 
