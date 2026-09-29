@@ -5,7 +5,24 @@ Handoff notes for the Web (React) and Mobile (Flutter) developers.
 The teacher opens a period from her timetable and sees her class roster with
 four checkboxes per student. She unticks the exceptions and presses save once.
 
-**Two endpoints:** one GET that fills the whole screen, one POST that saves it.
+**Backend is done and deployed.** Nothing here is pending on our side.
+
+| # | Endpoint | Purpose |
+|---|---|---|
+| 1 | `GET /attendance/lecture/:id/sheet` | Fill the screen — roster + saved state |
+| 2 | `POST /daily-tracking/bulk` | Save the whole period in one call |
+| 3 | `GET /daily-tracking/reports/summary` | Monthly report per student |
+
+### The five things most likely to trip you up
+
+1. **Log out and back in** before testing, or every save returns `403`.
+   Permissions live in the JWT, not in a per-request lookup.
+2. **`alreadyRecorded` does not mean "saved."** It means someone is absent.
+   Use `trackingRecorded`.
+3. **`quiz` has three states.** `null` (no quiz) is not `false` (did not pass).
+4. **Report rates divide by days present**, not by the date range — and can
+   be `null`, which is not `0`.
+5. **This is never a grade.** No field here affects any mark.
 
 ---
 
@@ -178,6 +195,75 @@ Show a warning, not an error, and do not clear the form:
 
 ---
 
+## 3. Monthly report (Phase 2)
+
+```
+GET /daily-tracking/reports/summary?startDate=&endDate=&classId=&subjectOfferingId=
+```
+
+| | |
+|---|---|
+| Auth | Bearer token |
+| Permission | `school.dailyTracking.read` |
+| Manager / Owner | Any class |
+| Teacher | Only a class she appears on the timetable for, else `403` |
+
+| Param | Required | Notes |
+|---|---|---|
+| `startDate` | yes | `YYYY-MM-DD` |
+| `endDate` | yes | `YYYY-MM-DD`, **inclusive** |
+| `classId` | yes | Unscoped would return the whole school |
+| `subjectOfferingId` | no | Omitted = all subjects together |
+
+### Response `200`
+
+```json
+{
+  "status": true,
+  "message": "تم استرجاع تقرير المتابعة",
+  "data": {
+    "classId": "6ab0000000000000000000cc",
+    "subjectOfferingId": null,
+    "startDate": "2026-09-01",
+    "endDate": "2026-09-30",
+    "studentCount": 2,
+    "note": "رصد سلوكي — لا يؤثر في الدرجات",
+    "students": [
+      {
+        "studentId": "6ab000000000000000000001",
+        "studentName": "سارة الأحمد",
+        "totalLectures": 20,
+        "presentCount": 18,
+        "absentCount": 2,
+        "participationCount": 16,
+        "homeworkCount": 14,
+        "participationRate": 88.9,
+        "homeworkRate": 77.8,
+        "quizzes": { "passed": 3, "failed": 1, "noQuiz": 16 }
+      }
+    ]
+  }
+}
+```
+
+### Reading the numbers
+
+**Rates are out of `presentCount`, not `totalLectures`.** A student there 4
+days of 20 who participated on all 4 is at **100%**, not 20% — dividing by
+the whole range would report illness as disengagement.
+
+**`participationRate` can be `null`.** That means she was present on no
+tracked day. `null` is not `0` — show `—`, not a zero bar, or the report
+starts a conversation about a student who was simply away.
+
+**`quizzes.noQuiz`** counts periods with no quiz. `passed + failed + noQuiz`
+equals `totalLectures`.
+
+**Presence is joined from the attendance collection.** There is no `absent`
+field on a tracking row, deliberately, so "was she here?" has one answer.
+
+---
+
 ## Business Logic Notes
 
 ### 1. Unticking attendance unticks and disables the other three
@@ -290,75 +376,6 @@ the row component and hold the state in the container.
 
 ---
 
-## 3. Monthly report (Phase 2)
-
-```
-GET /daily-tracking/reports/summary?startDate=&endDate=&classId=&subjectOfferingId=
-```
-
-| | |
-|---|---|
-| Auth | Bearer token |
-| Permission | `school.dailyTracking.read` |
-| Manager / Owner | Any class |
-| Teacher | Only a class she appears on the timetable for, else `403` |
-
-| Param | Required | Notes |
-|---|---|---|
-| `startDate` | yes | `YYYY-MM-DD` |
-| `endDate` | yes | `YYYY-MM-DD`, **inclusive** |
-| `classId` | yes | Unscoped would return the whole school |
-| `subjectOfferingId` | no | Omitted = all subjects together |
-
-### Response `200`
-
-```json
-{
-  "status": true,
-  "message": "تم استرجاع تقرير المتابعة",
-  "data": {
-    "classId": "6ab0000000000000000000cc",
-    "subjectOfferingId": null,
-    "startDate": "2026-09-01",
-    "endDate": "2026-09-30",
-    "studentCount": 2,
-    "note": "رصد سلوكي — لا يؤثر في الدرجات",
-    "students": [
-      {
-        "studentId": "6ab000000000000000000001",
-        "studentName": "سارة الأحمد",
-        "totalLectures": 20,
-        "presentCount": 18,
-        "absentCount": 2,
-        "participationCount": 16,
-        "homeworkCount": 14,
-        "participationRate": 88.9,
-        "homeworkRate": 77.8,
-        "quizzes": { "passed": 3, "failed": 1, "noQuiz": 16 }
-      }
-    ]
-  }
-}
-```
-
-### Reading the numbers
-
-**Rates are out of `presentCount`, not `totalLectures`.** A student there 4
-days of 20 who participated on all 4 is at **100%**, not 20% — dividing by
-the whole range would report illness as disengagement.
-
-**`participationRate` can be `null`.** That means she was present on no
-tracked day. `null` is not `0` — show `—`, not a zero bar, or the report
-starts a conversation about a student who was simply away.
-
-**`quizzes.noQuiz`** counts periods with no quiz. `passed + failed + noQuiz`
-equals `totalLectures`.
-
-**Presence is joined from the attendance collection.** There is no `absent`
-field on a tracking row, deliberately, so "was she here?" has one answer.
-
----
-
 ## Permissions
 
 | Role | read | create | update | delete |
@@ -386,11 +403,31 @@ there before anything else.
 
 ---
 
+## For the web developer only
+
+One line, or the permissions screen shows a raw key instead of a name:
+
+```js
+// src/pages/SchoolPermissions/permissionLabels.js
+dailyTracking: "سجل المتابعة اليومي",
+```
+
+---
+
 ## Out of scope
 
-- **Monthly report** — deliberately not built yet. Two weeks of real data
-  first, so its shape is not guessed.
-- **Student-facing view** — not built. Whether a student sees "لم تُشارك
-  اليوم" is a pedagogical decision, not a technical one.
-- **Edit window** — nothing currently stops a teacher editing a record from
-  last month. `recordedBy` holds only the last author, not a history.
+- **Student-facing view** — not built. Whether a student sees «لم تُشارك
+  اليوم» is a pedagogical decision the school has not made yet. If it is
+  wanted later, note that students carry no `permissions` array at all, so
+  the route must use `@Roles`, not `@CheckAbilities`.
+- **Edit window** — nothing stops a teacher editing a record from last
+  month. `recordedBy` holds only the last author, not a history.
+- **Export** — the report returns JSON. No CSV or PDF endpoint exists.
+
+---
+
+## Questions
+
+Ask in the team channel. If something in this file does not match what the
+API actually returns, the API is right and this file is wrong — say so and
+it gets fixed.
