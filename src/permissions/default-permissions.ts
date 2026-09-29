@@ -31,6 +31,9 @@ export const OWNER_PERMISSIONS: RolePermissions = {
   lectures: ALL,
   library: ALL,
   attendance: ALL,
+  // Recording is the teacher's job, in her own lecture. The school reads the
+  // record and may correct it; it does not fill sheets.
+  dailyTracking: { read: true, add: false, edit: true, delete: false },
   gradesCriteria: ALL,
   exams: { read: true, add: false, edit: false, delete: true },
   projects: { read: true, add: false, edit: false, delete: true },
@@ -71,6 +74,7 @@ export const MANAGER_PERMISSIONS: RolePermissions = {
   lectures: ALL,
   library: ALL,
   attendance: ALL,
+  dailyTracking: { read: true, add: false, edit: true, delete: false },
   gradesCriteria: ALL,
   exams: { read: true, add: false, edit: false, delete: true },
   projects: { read: true, add: false, edit: false, delete: true },
@@ -132,6 +136,17 @@ export const TEACHER_PERMISSIONS: RolePermissions = {
   // like recording. Do not grant this without that check.
   attendance: { read: false, add: true, edit: true, delete: true },
 
+  // سجل المتابعة اليومي — the behavioural record for one period.
+  //
+  // read+add+edit, no delete. Saving is an upsert: re-saving a sheet
+  // rewrites the same rows, so correcting a tick needs `edit`, never
+  // `delete`. Nothing in the API deletes a tracking row, and a teacher who
+  // could would be erasing the observation rather than correcting it.
+  //
+  // Safe because DailyTrackingService checks the teacher owns the lecture
+  // and that every student is on its roster, the same way attendance does.
+  dailyTracking: { read: true, add: true, edit: true, delete: false },
+
   gradesCriteria: { read: true, add: false, edit: false, delete: false },
 
   // `add` is intentionally true, but exam creation is additionally restricted to
@@ -153,6 +168,9 @@ export const STUDENT_PERMISSIONS: RolePermissions = {
   lectures: NONE,
   library: { read: true, add: false, edit: false, delete: false },
   attendance: { read: true, add: false, edit: false, delete: false },
+  // Explicit deny, not an omission: whether a student sees "لم تُشارك اليوم"
+  // is a pedagogical decision the school has not made yet.
+  dailyTracking: NONE,
   gradesCriteria: NONE,
   exams: NONE,
   projects: NONE,

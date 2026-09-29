@@ -290,6 +290,33 @@ the row component and hold the state in the container.
 
 ---
 
+## Permissions
+
+| Role | read | create | update | delete |
+|---|---|---|---|---|
+| Teacher | ✅ | ✅ | ✅ | ❌ |
+| Owner / Supervisor | ✅ | ❌ | ✅ | ❌ |
+| Manager | ✅ | ✅* | ✅ | ❌ |
+| Student | ❌ | ❌ | ❌ | ❌ |
+
+\* A manager's default is read+update. Recording is the teacher's job in her
+own lecture; the school reads the record and may correct it.
+
+Nobody gets `delete`. Saving is an upsert, so correcting a tick is an update —
+deleting would erase an observation rather than fix it, and no endpoint does it.
+
+### If you get `403 ليس لديك صلاحية للقيام بهذا الإجراء`
+
+**Log out and log in again.** Permissions are baked into the JWT when the
+token is issued, not read from the database per request, so a teacher signed
+in before this release carries the old array until she signs in again.
+
+A school can also switch the area off deliberately, on the permissions screen
+under **سجل المتابعة**. If one teacher gets 403 and another does not, check
+there before anything else.
+
+---
+
 ## Out of scope
 
 - **Monthly report** — deliberately not built yet. Two weeks of real data
