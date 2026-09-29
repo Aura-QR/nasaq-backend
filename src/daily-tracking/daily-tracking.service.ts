@@ -11,6 +11,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import { DailyTracking } from './schemas/daily-tracking.schema';
 import { BulkDailyTrackingDto, DailyTrackingRecordDto } from './dto/bulk-daily-tracking.dto';
+import { TrackingSummaryQueryDto } from './dto/tracking-summary-query.dto';
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { Student } from '../students/schemas/student.schema';
 import { Attendance } from '../attendance/schemas/attendance.schema';
@@ -327,6 +328,189 @@ export class DailyTrackingService {
         },
       ]),
     );
+  }
+
+  /**
+   * Per-student totals for a class over a date range.
+   *
+   * Behavioural only — no grade appears here and none is derived. The rates
+   * are read against `presentDays`, not the whole range: a student cannot
+   * participate on a day she was not there, and dividing by days she missed
+   * would report her as disengaged for being ill.
+   */
+  async summary(query: TrackingSummaryQueryDto, user: any) {
+    const start = this.parseSchoolDate(query.startDate);
+    const end = this.parseSchoolDate(query.endDate);
+    if (start > end) {
+      throw new BadRequestException('startDate بعد endDate');
+    }
+
+    await this.assertMayReadClass(query.classId, user);
+
+    const schoolId = this.requireSchoolId();
+    const match: any = {
+      schoolId,
+      classId: new mongoose.Types.ObjectId(query.classId),
+      date: { $gte: start, $lte: end },
+    };
+    if (query.subjectOfferingId) {
+      match.subjectOfferingId = new mongoose.Types.ObjectId(query.subjectOfferingId);
+    }
+
+    // Absence lives in the attendance collection, not here — there is no
+    // `absent` field on a tracking row, deliberately, so that "was she here?"
+    // has one answer. Presence is resolved by looking for an absence record
+    // on the same student and day; no match means she was there.
+    const rows = await this.trackingModel.aggregate([
+      { $match: match },
+      {
+        $lookup: {
+          from: 'attendance',
+          let: { s: '$studentId', d: '$date' },
+          pipeline: [
+            {
+              $match: {
+                // schoolId inside the sub-pipeline too: $lookup runs raw and
+                // the tenant plugin does not reach into it.
+                $expr: {
+                  $and: [
+                    { $eq: ['$schoolId', schoolId] },
+                    { $eq: ['$studentId', '$$s'] },
+                    { $eq: ['$date', '$$d'] },
+                  ],
+                },
+              },
+            },
+            { $limit: 1 },
+            { $project: { _id: 1 } },
+          ],
+          as: 'absence',
+        },
+      },
+      { $addFields: { present: { $eq: [{ $size: '$absence' }, 0] } } },
+      {
+        $group: {
+          _id: '$studentId',
+          totalLectures: { $sum: 1 },
+          presentCount: { $sum: { $cond: ['$present', 1, 0] } },
+          // Counted only on days she was present, so the denominator below
+          // is the same population as the numerator.
+          participationCount: {
+            $sum: {
+              $cond: [{ $and: ['$present', { $eq: ['$participation', true] }] }, 1, 0],
+            },
+          },
+          homeworkCount: {
+            $sum: {
+              $cond: [{ $and: ['$present', { $eq: ['$homework', true] }] }, 1, 0],
+            },
+          },
+          quizPassed: { $sum: { $cond: [{ $eq: ['$quiz', true] }, 1, 0] } },
+          quizFailed: { $sum: { $cond: [{ $eq: ['$quiz', false] }, 1, 0] } },
+          // Everything that is neither true nor false: no quiz was held.
+          // Matching on null alone would miss a row where the field is absent.
+          quizNone: {
+            $sum: {
+              $cond: [{ $in: ['$quiz', [true, false]] }, 0, 1],
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: 'students',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'student',
+        },
+      },
+      { $unwind: { path: '$student', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 0,
+          studentId: '$_id',
+          studentName: { $ifNull: ['$student.name', ''] },
+          totalLectures: 1,
+          presentCount: 1,
+          absentCount: { $subtract: ['$totalLectures', '$presentCount'] },
+          participationCount: 1,
+          homeworkCount: 1,
+          // null rather than 0 when she was never present: "no data" is not
+          // "zero percent", and a report that cannot tell them apart invites
+          // a conversation about a student who was simply away.
+          participationRate: this.rateOf('$participationCount'),
+          homeworkRate: this.rateOf('$homeworkCount'),
+          quizzes: {
+            passed: '$quizPassed',
+            failed: '$quizFailed',
+            noQuiz: '$quizNone',
+          },
+        },
+      },
+      { $sort: { studentName: 1 } },
+    ]);
+
+    return {
+      status: true,
+      message: 'تم استرجاع تقرير المتابعة',
+      data: {
+        classId: query.classId,
+        subjectOfferingId: query.subjectOfferingId ?? null,
+        startDate: query.startDate,
+        endDate: query.endDate,
+        studentCount: rows.length,
+        // Says plainly what this report is, so nobody downstream reads the
+        // percentages as marks.
+        note: 'رصد سلوكي — لا يؤثر في الدرجات',
+        students: rows,
+      },
+    };
+  }
+
+  /** A percentage of the days she was present, or null when there were none. */
+  private rateOf(countField: string) {
+    return {
+      $cond: [
+        { $gt: ['$presentCount', 0] },
+        {
+          $round: [
+            { $multiply: [{ $divide: [countField, '$presentCount'] }, 100] },
+            1,
+          ],
+        },
+        null,
+      ],
+    };
+  }
+
+  /**
+   * Who may read a class's report.
+   *
+   * Managers and owners: any class. A teacher: only a class she actually
+   * teaches, which is checked against the timetable rather than a permission
+   * flag — the flag says she may read reports, not whose.
+   */
+  private async assertMayReadClass(classId: string, user: any) {
+    if (user?.role !== 'TEACHER') return;
+
+    // An id that will not cast can match no lecture, so it is a refusal —
+    // not a BSONError surfacing as a 500 from a report screen.
+    const teacherId = DailyTrackingService.toObjectId(user.userId);
+    if (!teacherId) {
+      throw new ForbiddenException('لا يمكنك عرض تقرير فصل لا تُدرّس له');
+    }
+
+    const lecture = await this.lectureModel
+      .findOne({
+        classId: new mongoose.Types.ObjectId(classId),
+        teacherId,
+      })
+      .select('_id')
+      .exec();
+
+    if (!lecture) {
+      throw new ForbiddenException('لا يمكنك عرض تقرير فصل لا تُدرّس له');
+    }
   }
 
   /**

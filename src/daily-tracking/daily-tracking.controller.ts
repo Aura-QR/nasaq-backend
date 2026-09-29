@@ -1,12 +1,14 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { DailyTrackingService } from './daily-tracking.service';
 import { BulkDailyTrackingDto } from './dto/bulk-daily-tracking.dto';
+import { TrackingSummaryQueryDto } from './dto/tracking-summary-query.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 
@@ -39,5 +41,33 @@ export class DailyTrackingController {
   @HttpCode(HttpStatus.OK)
   async bulk(@Body() dto: BulkDailyTrackingDto, @CurrentUser() user: any) {
     return this.dailyTrackingService.bulkUpsert(dto, user);
+  }
+
+  @Get('reports/summary')
+  @CheckAbilities({ action: 'read', subject: 'DailyTracking' })
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'تقرير المتابعة لفصل خلال مدة',
+    description:
+      'إجماليات لكل طالبة. النسب محسوبة من أيام حضورها لا من المدة كلها — ' +
+      'الطالبة لا تشارك في يوم لم تحضره. ' +
+      'رصد سلوكي لا يدخل في الدرجات.',
+  })
+  @ApiQuery({ name: 'startDate', required: true, example: '2026-09-01' })
+  @ApiQuery({ name: 'endDate', required: true, example: '2026-09-30' })
+  @ApiQuery({ name: 'classId', required: true })
+  @ApiQuery({ name: 'subjectOfferingId', required: false })
+  @ApiResponse({ status: 200, description: 'تم استرجاع تقرير المتابعة' })
+  @ApiResponse({ status: 400, description: 'مدة غير صالحة' })
+  @ApiResponse({
+    status: 403,
+    description: 'معلمة تطلب فصلًا لا تُدرّس له',
+  })
+  @HttpCode(HttpStatus.OK)
+  async summary(
+    @Query() query: TrackingSummaryQueryDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.dailyTrackingService.summary(query, user);
   }
 }

@@ -290,6 +290,75 @@ the row component and hold the state in the container.
 
 ---
 
+## 3. Monthly report (Phase 2)
+
+```
+GET /daily-tracking/reports/summary?startDate=&endDate=&classId=&subjectOfferingId=
+```
+
+| | |
+|---|---|
+| Auth | Bearer token |
+| Permission | `school.dailyTracking.read` |
+| Manager / Owner | Any class |
+| Teacher | Only a class she appears on the timetable for, else `403` |
+
+| Param | Required | Notes |
+|---|---|---|
+| `startDate` | yes | `YYYY-MM-DD` |
+| `endDate` | yes | `YYYY-MM-DD`, **inclusive** |
+| `classId` | yes | Unscoped would return the whole school |
+| `subjectOfferingId` | no | Omitted = all subjects together |
+
+### Response `200`
+
+```json
+{
+  "status": true,
+  "message": "تم استرجاع تقرير المتابعة",
+  "data": {
+    "classId": "6ab0000000000000000000cc",
+    "subjectOfferingId": null,
+    "startDate": "2026-09-01",
+    "endDate": "2026-09-30",
+    "studentCount": 2,
+    "note": "رصد سلوكي — لا يؤثر في الدرجات",
+    "students": [
+      {
+        "studentId": "6ab000000000000000000001",
+        "studentName": "سارة الأحمد",
+        "totalLectures": 20,
+        "presentCount": 18,
+        "absentCount": 2,
+        "participationCount": 16,
+        "homeworkCount": 14,
+        "participationRate": 88.9,
+        "homeworkRate": 77.8,
+        "quizzes": { "passed": 3, "failed": 1, "noQuiz": 16 }
+      }
+    ]
+  }
+}
+```
+
+### Reading the numbers
+
+**Rates are out of `presentCount`, not `totalLectures`.** A student there 4
+days of 20 who participated on all 4 is at **100%**, not 20% — dividing by
+the whole range would report illness as disengagement.
+
+**`participationRate` can be `null`.** That means she was present on no
+tracked day. `null` is not `0` — show `—`, not a zero bar, or the report
+starts a conversation about a student who was simply away.
+
+**`quizzes.noQuiz`** counts periods with no quiz. `passed + failed + noQuiz`
+equals `totalLectures`.
+
+**Presence is joined from the attendance collection.** There is no `absent`
+field on a tracking row, deliberately, so "was she here?" has one answer.
+
+---
+
 ## Permissions
 
 | Role | read | create | update | delete |
