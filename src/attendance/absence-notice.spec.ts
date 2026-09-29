@@ -48,6 +48,8 @@ describe('Recording an absence tells the family', () => {
       {} as any,
       {} as any,
       notifications,
+      // Daily tracking is only read by getLectureSheet, which these do not exercise.
+      { forLecture: jest.fn().mockResolvedValue(new Map()) } as any,
     );
   });
 

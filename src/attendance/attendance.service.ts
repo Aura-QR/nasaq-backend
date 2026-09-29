@@ -5,6 +5,8 @@ import {
   ConflictException,
   BadRequestException,
   ForbiddenException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -20,6 +22,7 @@ import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { transformAttendanceResponse } from './transforms/response.transform';
+import { DailyTrackingService } from '../daily-tracking/daily-tracking.service';
 import { Admin } from '../admin/schemas/admin.schema';
 import {
   ListAbsenceExcusesDto,
@@ -51,6 +54,11 @@ export class AttendanceService {
     @InjectModel(Admin.name)
     private readonly adminModel: Model<Admin>,
     private readonly notifications: NotificationsService,
+    // Circular by nature: daily tracking routes absences through this
+    // service, and this service reads tracking back onto the sheet. The
+    // forwardRef keeps both halves in one screen and one request.
+    @Inject(forwardRef(() => DailyTrackingService))
+    private readonly dailyTracking: DailyTrackingService,
   ) {}
 
   /**
@@ -484,18 +492,39 @@ export class AttendanceService {
 
     const absentIds = new Set(absences.map((a) => a.studentId.toString()));
 
+    // The behavioural record for the same period, if one has been saved.
+    // Injected rather than served from its own endpoint so the screen still
+    // answers in one call and the ownership check above covers both.
+    const tracking = await this.dailyTracking.forLecture(lectureId, date);
+
     return {
       message: 'تم استرجاع كشف الحضور بنجاح',
       data: {
         lecture,
         date,
         alreadyRecorded: absences.length > 0,
-        students: students.map((s: any) => ({
-          _id: s._id,
-          name: s.name,
-          schoolEmail: s.schoolEmail,
-          absent: absentIds.has(s._id.toString()),
-        })),
+        // Has anyone saved the behavioural sheet for this period today?
+        // Distinct from alreadyRecorded, which only means somebody was
+        // marked absent — a period where everyone attended records no
+        // absence at all.
+        trackingRecorded: tracking.size > 0,
+        students: students.map((s: any) => {
+          const id = s._id.toString();
+          // The server owns the defaults, so web and mobile cannot drift
+          // apart about what an unsaved row looks like.
+          const row = tracking.get(id) ?? {
+            participation: true,
+            homework: true,
+            quiz: null,
+          };
+          return {
+            _id: s._id,
+            name: s.name,
+            schoolEmail: s.schoolEmail,
+            absent: absentIds.has(id),
+            ...row,
+          };
+        }),
       },
     };
   }

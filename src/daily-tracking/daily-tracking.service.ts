@@ -1,0 +1,370 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  forwardRef,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import mongoose, { Model } from 'mongoose';
+import { DailyTracking } from './schemas/daily-tracking.schema';
+import { BulkDailyTrackingDto, DailyTrackingRecordDto } from './dto/bulk-daily-tracking.dto';
+import { Lecture } from '../lectures/schemas/lecture.schema';
+import { Student } from '../students/schemas/student.schema';
+import { Attendance } from '../attendance/schemas/attendance.schema';
+import { AttendanceService } from '../attendance/attendance.service';
+import { tenantLocalStorage } from '../tenancy/tenant-storage';
+
+/** What one student's row resolves to once defaults are applied. */
+export interface ResolvedTrackingRecord {
+  studentId: string;
+  absent: boolean;
+  participation: boolean;
+  homework: boolean;
+  quiz: boolean | null;
+}
+
+@Injectable()
+export class DailyTrackingService {
+  private readonly logger = new Logger(DailyTrackingService.name);
+
+  constructor(
+    @InjectModel(DailyTracking.name)
+    private readonly trackingModel: Model<DailyTracking>,
+    @InjectModel(Lecture.name)
+    private readonly lectureModel: Model<Lecture>,
+    @InjectModel(Student.name)
+    private readonly studentModel: Model<Student>,
+    @InjectModel(Attendance.name)
+    private readonly attendanceModel: Model<Attendance>,
+    // forwardRef on this side too: the two modules reference each other, so
+    // without it AttendanceService is undefined here at runtime and Nest
+    // fails to resolve the constructor.
+    @Inject(forwardRef(() => AttendanceService))
+    private readonly attendanceService: AttendanceService,
+  ) {}
+
+  /**
+   * Apply the defaults once, on the server.
+   *
+   * The sheet opens with attendance, participation and homework ticked, so a
+   * teacher only unticks. If each client invented that default for itself,
+   * web and mobile would eventually disagree about what an omitted field
+   * means — so the rule lives here and the clients send what they were shown.
+   */
+  static resolveRecord(record: DailyTrackingRecordDto): ResolvedTrackingRecord {
+    const absent = record.absent === true;
+
+    // A student who was not there did not participate and did not bring her
+    // work. Leaving those ticked because nobody unticked them writes a
+    // pleasant fiction into the monthly report.
+    if (absent) {
+      return {
+        studentId: String(record.studentId),
+        absent: true,
+        participation: false,
+        homework: false,
+        quiz: null,
+      };
+    }
+
+    return {
+      studentId: String(record.studentId),
+      absent: false,
+      participation: record.participation !== false,
+      homework: record.homework !== false,
+      // Only an explicit true/false is a quiz result; anything else is "no
+      // quiz today" and must stay null rather than collapsing to false.
+      quiz: typeof record.quiz === 'boolean' ? record.quiz : null,
+    };
+  }
+
+  /** An ObjectId, or null when the value is absent or malformed. */
+  private static toObjectId(value: unknown): mongoose.Types.ObjectId | null {
+    const raw = String(value ?? '');
+    return mongoose.Types.ObjectId.isValid(raw)
+      ? new mongoose.Types.ObjectId(raw)
+      : null;
+  }
+
+  /**
+   * The lecture, with the teacher's claim to it checked.
+   *
+   * Mirrors the rule `getLectureSheet` applies when reading. This endpoint
+   * writes, so the same check matters more here, not less.
+   */
+  private async loadLectureForTeacher(lectureId: string, user: any) {
+    if (!mongoose.Types.ObjectId.isValid(lectureId)) {
+      throw new BadRequestException('معرّف الحصة غير صالح');
+    }
+
+    const lecture = await this.lectureModel
+      .findById(lectureId)
+      .populate('classId', 'name')
+      .populate({
+        path: 'subjectOfferingId',
+        populate: [{ path: 'subjectId', select: 'subjectName' }],
+      })
+      .exec();
+
+    if (!lecture) throw new NotFoundException('الحصة غير موجودة');
+
+    const lectureTeacherId = (lecture as any).teacherId?._id ?? (lecture as any).teacherId;
+    if (
+      user?.role === 'TEACHER' &&
+      String(lectureTeacherId ?? '') !== String(user.userId)
+    ) {
+      throw new ForbiddenException('هذه ليست حصتك');
+    }
+
+    return lecture;
+  }
+
+  /**
+   * Every student who may appear on this lecture's sheet.
+   *
+   * Reads `student.classId`, which is what `getLectureSheet` reads. The rest
+   * of the platform resolves rosters through `enrollments`, and the mismatch
+   * has bitten before — but changing the source here would silently change
+   * who can be marked absent, so both callers stay on one source until that
+   * is unified deliberately.
+   */
+  private async rosterIds(classId: mongoose.Types.ObjectId | string): Promise<Set<string>> {
+    const students = await this.studentModel
+      .find({ classId, isActive: true })
+      .select('_id')
+      .exec();
+    return new Set(students.map((s: any) => String(s._id)));
+  }
+
+  /**
+   * Record a whole period in one call.
+   *
+   * The three behavioural fields are written here; attendance is routed to
+   * AttendanceService so the family notification and the excuse flow keep
+   * working. The client sends one payload because the teacher pressed save
+   * once — splitting it into two requests would let one half succeed.
+   */
+  async bulkUpsert(dto: BulkDailyTrackingDto, user: any) {
+    const lecture = await this.loadLectureForTeacher(dto.lectureId, user);
+
+    const classId = (lecture as any).classId?._id ?? (lecture as any).classId;
+    const offering = (lecture as any).subjectOfferingId;
+    const date = this.parseSchoolDate(dto.date);
+
+    const records = dto.records.map((r) => DailyTrackingService.resolveRecord(r));
+
+    // One student twice in one payload would make the bulkWrite order decide
+    // which wins — silently, and differently on a retry.
+    const seen = new Set<string>();
+    for (const r of records) {
+      if (seen.has(r.studentId)) {
+        throw new BadRequestException('تكرر معرّف طالبة أكثر من مرة في الطلب');
+      }
+      seen.add(r.studentId);
+    }
+
+    // Without this a teacher could edit the payload and write a record for
+    // any student in the school, including one she does not teach.
+    const roster = await this.rosterIds(classId);
+    const strangers = records.filter((r) => !roster.has(r.studentId));
+    if (strangers.length > 0) {
+      throw new BadRequestException(
+        `${strangers.length} من الطالبات لا ينتمين إلى فصل هذه الحصة`,
+      );
+    }
+
+    const schoolId = this.requireSchoolId();
+    const denormalised = {
+      classId: new mongoose.Types.ObjectId(String(classId)),
+      subjectOfferingId: offering?._id ?? offering ?? null,
+      teacherId: (lecture as any).teacherId?._id ?? (lecture as any).teacherId ?? null,
+      subjectName: offering?.subjectId?.subjectName ?? '',
+      className: (lecture as any).classId?.name ?? '',
+      // Tolerant on purpose: an id that will not cast is worth losing, and
+      // is not worth throwing a BSONError over a sheet the teacher just
+      // filled in. The row is the point; its author is a courtesy.
+      recordedBy: DailyTrackingService.toObjectId(user?.userId),
+    };
+
+    // bulkWrite is NOT covered by tenantScopedPlugin — its hooks are on the
+    // query and document paths only. Every filter and insert below therefore
+    // carries schoolId explicitly; omitting it would write rows that leak
+    // across schools and match another school's documents.
+    await this.trackingModel.bulkWrite(
+      records.map((r) => ({
+        updateOne: {
+          filter: {
+            schoolId,
+            studentId: new mongoose.Types.ObjectId(r.studentId),
+            lectureId: new mongoose.Types.ObjectId(String(dto.lectureId)),
+            date,
+          },
+          update: {
+            $set: {
+              participation: r.participation,
+              homework: r.homework,
+              quiz: r.quiz,
+              ...denormalised,
+            },
+            $setOnInsert: {
+              schoolId,
+              studentId: new mongoose.Types.ObjectId(r.studentId),
+              lectureId: new mongoose.Types.ObjectId(String(dto.lectureId)),
+              date,
+            },
+          },
+          upsert: true,
+        },
+      })),
+    );
+
+    const attendance = await this.syncAttendance(records, String(classId), dto.date, user);
+
+    return {
+      status: true,
+      message: 'تم حفظ سجل المتابعة',
+      data: {
+        lectureId: dto.lectureId,
+        date: dto.date,
+        saved: records.length,
+        attendance,
+      },
+    };
+  }
+
+  /**
+   * Bring the attendance collection in line with the sheet — by difference.
+   *
+   * Deliberately not "delete today's absences and re-insert": an absence
+   * carries the family's written excuse and the manager's review of it, and
+   * deleting the row to rewrite it destroys evidence nobody can recover.
+   * Only genuinely new absences are created, only lifted ones removed.
+   */
+  private async syncAttendance(
+    records: ResolvedTrackingRecord[],
+    classId: string,
+    date: string,
+    user: any,
+  ) {
+    const day = this.parseSchoolDate(date);
+    const shouldBeAbsent = new Set(
+      records.filter((r) => r.absent).map((r) => r.studentId),
+    );
+
+    const existing = await this.attendanceModel
+      .find({ classId: new mongoose.Types.ObjectId(classId), date: day })
+      .select('_id studentId')
+      .exec();
+    const alreadyAbsent = new Map(
+      existing.map((a: any) => [String(a.studentId), a]),
+    );
+
+    const toCreate = [...shouldBeAbsent].filter((id) => !alreadyAbsent.has(id));
+    const toLift = [...alreadyAbsent.keys()].filter(
+      // Only students on this sheet. A student the payload never mentioned
+      // keeps whatever another period already recorded.
+      (id) => !shouldBeAbsent.has(id) && records.some((r) => r.studentId === id),
+    );
+
+    let created = 0;
+    let lifted = 0;
+    const failures: string[] = [];
+
+    for (const studentId of toCreate) {
+      try {
+        // Through the service, not the model: this is what notifies the
+        // family and opens the excuse they are being asked for.
+        await this.attendanceService.create({ studentId, classId, date }, user);
+        created++;
+      } catch (error: any) {
+        // One student's notification failing must not discard the other
+        // twenty-nine rows the teacher just recorded.
+        this.logger.error(
+          `Could not record absence for ${studentId} on ${date}: ${error?.message}`,
+        );
+        failures.push(studentId);
+      }
+    }
+
+    for (const studentId of toLift) {
+      try {
+        await this.attendanceService.delete(String(alreadyAbsent.get(studentId)._id), user);
+        lifted++;
+      } catch (error: any) {
+        this.logger.error(
+          `Could not lift absence for ${studentId} on ${date}: ${error?.message}`,
+        );
+        failures.push(studentId);
+      }
+    }
+
+    return { created, lifted, failed: failures.length };
+  }
+
+  /**
+   * Today's tracking for one lecture, keyed by student id.
+   *
+   * Used by the attendance sheet so one call still answers the whole screen.
+   */
+  async forLecture(lectureId: string, date: string | Date) {
+    const day = this.parseSchoolDate(date);
+    const rows = await this.trackingModel
+      .find({ lectureId: new mongoose.Types.ObjectId(String(lectureId)), date: day })
+      .select('studentId participation homework quiz')
+      .lean()
+      .exec();
+
+    return new Map(
+      rows.map((row: any) => [
+        String(row.studentId),
+        {
+          participation: row.participation !== false,
+          homework: row.homework !== false,
+          quiz: typeof row.quiz === 'boolean' ? row.quiz : null,
+        },
+      ]),
+    );
+  }
+
+  /**
+   * A calendar day, parsed the way the rest of the platform parses one.
+   *
+   * `YYYY-MM-DD` at UTC midnight, matching how attendance already stores
+   * dates, so the two collections agree on what "the 29th" means.
+   */
+  private parseSchoolDate(value: string | Date): Date {
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) {
+        throw new BadRequestException('التاريخ غير صالح');
+      }
+      return value;
+    }
+
+    const raw = String(value ?? '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      throw new BadRequestException('التاريخ يجب أن يكون بصيغة YYYY-MM-DD');
+    }
+
+    const parsed = new Date(`${raw}T00:00:00.000Z`);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException('التاريخ غير صالح');
+    }
+    return parsed;
+  }
+
+  /**
+   * bulkWrite bypasses the tenant plugin, so the caller's school has to be
+   * read here. Failing loudly beats writing rows with no schoolId, which
+   * would be invisible to every scoped query afterwards.
+   */
+  private requireSchoolId(): mongoose.Types.ObjectId {
+    const schoolId = tenantLocalStorage.getStore()?.schoolId;
+    if (!schoolId) {
+      throw new ForbiddenException('لا يمكن تحديد المدرسة الحالية');
+    }
+    return new mongoose.Types.ObjectId(schoolId);
+  }
+}

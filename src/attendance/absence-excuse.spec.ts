@@ -57,6 +57,8 @@ describe('Explaining an absence', () => {
     service = new AttendanceService(
       attendanceModel, studentModel, {} as any, {} as any, {} as any,
       adminModel, notifications,
+      // Daily tracking is only read by getLectureSheet, which these do not exercise.
+      { forLecture: jest.fn().mockResolvedValue(new Map()) } as any,
     );
   });
 
@@ -208,6 +210,8 @@ describe('Listing absences nobody explained', () => {
     service = new AttendanceService(
       attendanceModel, {} as any, {} as any, {} as any, {} as any, {} as any,
       { notify: jest.fn() } as any,
+      // Daily tracking is only read by getLectureSheet, which these do not exercise.
+      { forLecture: jest.fn().mockResolvedValue(new Map()) } as any,
     );
   });
 

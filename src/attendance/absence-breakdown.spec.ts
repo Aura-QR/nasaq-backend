@@ -40,6 +40,8 @@ describe("A student's absences, split by verdict", () => {
       { findById: jest.fn().mockResolvedValue({ _id: studentId }) } as any,
       {} as any, {} as any, {} as any, {} as any,
       { notify: jest.fn() } as any,
+      // Daily tracking is only read by getLectureSheet, which these do not exercise.
+      { forLecture: jest.fn().mockResolvedValue(new Map()) } as any,
     );
   });
 

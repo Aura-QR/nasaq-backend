@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AttendanceController } from './attendance.controller';
 import { AttendanceService } from './attendance.service';
@@ -9,10 +9,13 @@ import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
 import { Term, TermSchema } from '../terms/schemas/term.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { Admin, AdminSchema } from 'src/admin/schemas/admin.schema';
+import { DailyTrackingModule } from '../daily-tracking/daily-tracking.module';
 
 @Module({
   imports: [
     NotificationsModule,
+    // See AttendanceService's constructor for why this is circular.
+    forwardRef(() => DailyTrackingModule),
     MongooseModule.forFeature([
       { name: Attendance.name, schema: AttendanceSchema },
       { name: Student.name, schema: StudentSchema },

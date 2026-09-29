@@ -19,6 +19,7 @@ import { LecturesModule } from './lectures/lectures.module';
 import { TeacherConstraintsModule } from './teacher-constraints/teacher-constraints.module';
 import { LibraryModule } from './library/library.module';
 import { AttendanceModule } from './attendance/attendance.module';
+import { DailyTrackingModule } from './daily-tracking/daily-tracking.module';
 import { GradesCriteriaModule } from './grades-criteria/grades-criteria.module';
 import { ExamsModule } from './exams/exams.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -88,6 +89,7 @@ import { MessagingModule } from './messaging/messaging.module';
     TeacherConstraintsModule,
     LibraryModule,
     AttendanceModule,
+    DailyTrackingModule,
     TeacherAttendanceModule,
     LessonObservationsModule,
     StaffAttendanceModule,
