@@ -10,6 +10,8 @@ import { Term } from '../terms/schemas/term.schema';
 import { Teacher } from '../teachers/schemas/teacher.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { TeacherConstraint } from '../teacher-constraints/schemas/teacher-constraint.schema';
+import { GradeLevel } from '../grade-levels/schemas/grade-level.schema';
+import { Stage } from '../stages/schemas/stage.schema';
 import { GenerateTimetableDto } from './dto/generate-timetable.dto';
 
 /** One class's need for one subject, and who is expected to teach it. */
@@ -80,6 +82,11 @@ export class TimetableService {
     @InjectModel(School.name) private readonly schoolModel: Model<School>,
     @InjectModel(TeacherConstraint.name)
     private readonly teacherConstraintModel: Model<TeacherConstraint>,
+    // A class knows its grade level, a grade level knows its stage, and the
+    // stage is where a kindergarten's fourteen-period day is written.
+    @InjectModel(GradeLevel.name)
+    private readonly gradeLevelModel: Model<GradeLevel>,
+    @InjectModel(Stage.name) private readonly stageModel: Model<Stage>,
   ) {}
 
   /**
@@ -133,15 +140,27 @@ export class TimetableService {
    * refuse, fall back to a five-day week — the same "assume every day works"
    * stance the attendance code already takes for an unconfigured school.
    */
-  async getCapacity(schoolId: any) {
+  async getCapacity(schoolId: any, stageId?: any) {
     const school: any = await this.schoolModel
       .findById(schoolId)
       .select('settings.workSchedule settings.periodsPerDay')
       .lean()
       .exec();
 
+    // A stage may run a day of its own — a kindergarten's fourteen half-hour
+    // periods against a primary's eight. Absent, or null, means this stage
+    // follows the school, which is every stage that existed before this.
+    const stage: any = stageId
+      ? await this.stageModel
+          .findById(stageId)
+          .select('periodsPerDay')
+          .lean()
+          .exec()
+      : null;
+
     const schedule = school?.settings?.workSchedule ?? [];
-    const periodsPerDay = school?.settings?.periodsPerDay ?? 7;
+    const periodsPerDay =
+      stage?.periodsPerDay ?? school?.settings?.periodsPerDay ?? 7;
 
     const workingDays =
       schedule.length > 0
@@ -153,10 +172,32 @@ export class TimetableService {
     // A day may run fewer periods than the rest of the week. Multiplying one
     // number by the day count would either waste the long days or schedule
     // lessons into periods the short day does not have.
+    // A day may run fewer periods than the rest of the week, and a stage may
+    // run a different day entirely. When a stage sets its own number, the
+    // school's per-day overrides are scaled rather than applied raw: a six-of-
+    // eight Thursday is three quarters of a day, and three quarters of a
+    // fourteen-period kindergarten day is ten and a half, floored to ten.
+    // Applying the raw 6 would have given the kindergarten a Thursday shorter
+    // than its own morning meeting schedule allows.
     const periodsByDay: Record<string, number> = {};
+    const schoolPeriodsPerDay = school?.settings?.periodsPerDay ?? 7;
     for (const day of workingDays) {
       const row = schedule.find((d: any) => d?.day === day);
-      periodsByDay[day] = row?.periodsPerDay ?? periodsPerDay;
+      const dayOverride = row?.periodsPerDay ?? null;
+
+      if (dayOverride === null) {
+        periodsByDay[day] = periodsPerDay;
+      } else if (!stage?.periodsPerDay || schoolPeriodsPerDay <= 0) {
+        periodsByDay[day] = dayOverride;
+      } else {
+        periodsByDay[day] = Math.max(
+          1,
+          Math.min(
+            periodsPerDay,
+            Math.floor((dayOverride / schoolPeriodsPerDay) * periodsPerDay),
+          ),
+        );
+      }
     }
 
     const slotsPerWeek = workingDays.reduce(
@@ -177,6 +218,84 @@ export class TimetableService {
   }
 
   /**
+   * The capacity that applies to each of these classes, keyed by class id.
+   *
+   * Classes in one generation run can belong to different stages, and a
+   * kindergarten's day is not a primary's. Resolving one capacity for the
+   * whole school — which is what happened before — either capped the
+   * kindergarten at the primary's eight periods or handed the primary the
+   * kindergarten's fourteen.
+   *
+   * One capacity is loaded per distinct stage, not per class, so a fifteen
+   * class school still makes three or four lookups.
+   */
+  async getCapacityByClass(schoolId: any, classIds: string[]) {
+    const unique = [...new Set(classIds.map(String))];
+
+    // An id that will not cast can match no document, so it is dropped from
+    // the query rather than thrown from it. A single malformed id must not
+    // take down a generation run for the whole school; the class simply
+    // falls through to the school's own capacity below.
+    const oids = (ids: string[]) =>
+      ids
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+
+    const classQueryIds = oids(unique);
+    const classes: any[] = classQueryIds.length
+      ? await this.classModel
+          .find({ _id: { $in: classQueryIds } })
+          .select('gradeLevelId')
+          .lean()
+          .exec()
+      : [];
+
+    const gradeLevelIds = [
+      ...new Set(
+        classes
+          .map((c) => c.gradeLevelId && String(c.gradeLevelId))
+          .filter(Boolean),
+      ),
+    ];
+
+    const gradeLevelQueryIds = oids(gradeLevelIds as string[]);
+    const gradeLevels: any[] = gradeLevelQueryIds.length
+      ? await this.gradeLevelModel
+          .find({ _id: { $in: gradeLevelQueryIds } })
+          .select('stageId')
+          .lean()
+          .exec()
+      : [];
+
+    const stageByGradeLevel = new Map(
+      gradeLevels.map((g) => [String(g._id), g.stageId && String(g.stageId)]),
+    );
+
+    // One lookup per stage, and one for "no stage at all", which is the
+    // school's own capacity and also the fallback for a class whose grade
+    // level or stage has been deleted.
+    const stageIds = [...new Set([...stageByGradeLevel.values()].filter(Boolean))];
+    const capacities = new Map<string, any>();
+    capacities.set('', await this.getCapacity(schoolId));
+    for (const stageId of stageIds) {
+      capacities.set(stageId, await this.getCapacity(schoolId, stageId));
+    }
+
+    const byClass = new Map<string, any>();
+    for (const cls of classes) {
+      const stageId = stageByGradeLevel.get(String(cls.gradeLevelId)) ?? '';
+      byClass.set(String(cls._id), capacities.get(stageId) ?? capacities.get(''));
+    }
+    // A class id that matched no document still needs an answer rather than
+    // an undefined the solver would read as a zero-length day.
+    for (const id of unique) {
+      if (!byClass.has(id)) byClass.set(id, capacities.get(''));
+    }
+
+    return { byClass, school: capacities.get('') };
+  }
+
+  /**
    * Compare every class's teaching plan with the real number of slots in its
    * week. Subject offerings are configured per grade, then expanded to every
    * class in that grade by buildRequirements(), so checking the expanded rows
@@ -190,8 +309,21 @@ export class TimetableService {
   private evaluateClassPlans(
     classes: any[],
     requirements: Requirement[],
+    /**
+     * The school's week, used for a class whose own stage says nothing.
+     */
     slotsPerWeek: number,
     reportEmptyPlans = true,
+    /**
+     * Each class's own week, where its stage runs a different day.
+     *
+     * Without this every class was measured against one number, so a
+     * kindergarten planning its real seventy periods was reported as
+     * overbooked against the primary's forty — and a school reading that
+     * message would have cut the plan to fit a day the kindergarten does
+     * not work.
+     */
+    slotsPerWeekByClass?: Map<string, number>,
   ) {
     const problems: Problem[] = [];
 
@@ -200,32 +332,35 @@ export class TimetableService {
         .filter((r) => r.classId === String(cls._id))
         .reduce((sum, r) => sum + Math.max(0, r.periodsPerWeek ?? 0), 0);
 
-      const missing = Math.max(0, slotsPerWeek - demand);
-      const excess = Math.max(0, demand - slotsPerWeek);
-      const ok = demand === slotsPerWeek;
+      const classSlots =
+        slotsPerWeekByClass?.get(String(cls._id)) ?? slotsPerWeek;
 
-      if (demand > slotsPerWeek) {
+      const missing = Math.max(0, classSlots - demand);
+      const excess = Math.max(0, demand - classSlots);
+      const ok = demand === classSlots;
+
+      if (demand > classSlots) {
         problems.push({
           type: 'class_overbooked',
-          message: `${cls.name} needs ${demand} periods a week but only has ${slotsPerWeek} slots.`,
+          message: `${cls.name} needs ${demand} periods a week but only has ${classSlots} slots.`,
           blocking: true,
           classId: String(cls._id),
           className: cls.name,
           gradeLevelId: String(cls.gradeLevelId),
           required: demand,
-          capacity: slotsPerWeek,
+          capacity: classSlots,
           excess,
         });
-      } else if (demand < slotsPerWeek && (reportEmptyPlans || demand > 0)) {
+      } else if (demand < classSlots && (reportEmptyPlans || demand > 0)) {
         problems.push({
           type: 'class_underfilled',
-          message: `${cls.name} has ${demand} planned periods but its week has ${slotsPerWeek} slots. Add ${missing} periods to the grade's teaching plan.`,
+          message: `${cls.name} has ${demand} planned periods but its week has ${classSlots} slots. Add ${missing} periods to the grade's teaching plan.`,
           blocking: true,
           classId: String(cls._id),
           className: cls.name,
           gradeLevelId: String(cls.gradeLevelId),
           required: demand,
-          capacity: slotsPerWeek,
+          capacity: classSlots,
           missing,
         });
       }
@@ -235,8 +370,10 @@ export class TimetableService {
         name: cls.name,
         gradeLevelId: String(cls.gradeLevelId),
         demand,
-        capacity: slotsPerWeek,
-        free: slotsPerWeek - demand,
+        // This class's own week, so the row and the message above cannot
+        // disagree about how many slots it has.
+        capacity: classSlots,
+        free: classSlots - demand,
         missing,
         excess,
         ok,
@@ -578,6 +715,15 @@ export class TimetableService {
     const { classes, requirements, sharedOfferings, conflictingPins, strayPins } =
       await this.buildRequirements(termId, classIds);
 
+    // Each class measured against its own stage's week, not the school's.
+    const { byClass: capacityByClass } = await this.getCapacityByClass(
+      schoolId,
+      classes.map((c: any) => String(c._id)),
+    );
+    const slotsPerWeekByClass = new Map(
+      [...capacityByClass.entries()].map(([id, cap]: any) => [id, cap.slotsPerWeek]),
+    );
+
     const problems: Problem[] = [];
 
     if (capacity.workingDays.length === 0) {
@@ -608,6 +754,7 @@ export class TimetableService {
       requirements,
       capacity.slotsPerWeek,
       planned.length > 0,
+      slotsPerWeekByClass,
     );
     const classRows = classPlan.rows;
     problems.push(...classPlan.problems);
@@ -776,6 +923,16 @@ export class TimetableService {
     const capacity = await this.getCapacity(schoolId);
     const { classes, requirements } = await this.buildRequirements(dto.termId, dto.classIds);
 
+    // Each class gets the capacity of its own stage. `capacity` above stays
+    // the school's, for the messages and the grid that speak about the week
+    // in general.
+    const { byClass: capacityByClass } = await this.getCapacityByClass(
+      schoolId,
+      classes.map((c: any) => String(c._id ?? c.classId)),
+    );
+    const capacityFor = (classId: string) =>
+      capacityByClass.get(String(classId)) ?? capacity;
+
     const problems: Problem[] = [];
 
     if (capacity.workingDays.length === 0) {
@@ -816,6 +973,9 @@ export class TimetableService {
       requirements,
       capacity.slotsPerWeek,
       requirements.some((requirement) => requirement.periodsPerWeek > 0),
+      new Map(
+        [...capacityByClass.entries()].map(([id, cap]: any) => [id, cap.slotsPerWeek]),
+      ),
     );
     problems.push(...classPlan.problems);
 
@@ -955,12 +1115,26 @@ export class TimetableService {
       for (let i = 0; i < requirement.periodsPerWeek; i++) units.push(requirement);
     }
 
-    const slots: { day: string; slot: number }[] = [];
-    for (const day of capacity.workingDays) {
-      for (let slot = 1; slot <= capacity.periodsByDay[day]; slot++) {
-        slots.push({ day, slot });
+    // One slot list per class, because a kindergarten class has fourteen
+    // periods in a day where a primary class in the same run has eight. A
+    // single shared list would have offered every class the longest day and
+    // let the solver place a primary lesson in period twelve.
+    const slotsByClass = new Map<string, { day: string; slot: number }[]>();
+    const slotsFor = (classId: string) => {
+      const key = String(classId);
+      const cached = slotsByClass.get(key);
+      if (cached) return cached;
+
+      const own = capacityFor(key);
+      const list: { day: string; slot: number }[] = [];
+      for (const day of own.workingDays) {
+        for (let slot = 1; slot <= own.periodsByDay[day]; slot++) {
+          list.push({ day, slot });
+        }
       }
-    }
+      slotsByClass.set(key, list);
+      return list;
+    };
     const teacherBlocks = await this.loadTeacherBlocks(dto.termId);
 
     const state = {
@@ -1079,7 +1253,10 @@ export class TimetableService {
       const preference = requirement.slotPreference ?? 'any';
       if (preference === 'early') score += slot * 3;
       else if (preference === 'late') {
-        score += ((capacity.periodsByDay[day] ?? capacity.periodsPerDay) - slot) * 3;
+        // Measured against this class's own day: the last period of a
+        // fourteen-period kindergarten day is 14, not the school's 8.
+        const own = capacityFor(requirement.classId);
+        score += ((own.periodsByDay[day] ?? own.periodsPerDay) - slot) * 3;
       }
       else score += slot;
 
@@ -1092,7 +1269,8 @@ export class TimetableService {
 
       const requirement = units[index];
 
-      const candidates = slots
+      // This requirement's own class decides how long its day is.
+      const candidates = slotsFor(requirement.classId)
         .filter((s) => isFree(requirement, s.day, s.slot))
         .map((s) => ({ ...s, score: penalty(requirement, s.day, s.slot) }))
         .sort(
@@ -1167,7 +1345,7 @@ export class TimetableService {
       });
     }
 
-    const grid = this.toGrid(placements, capacity);
+    const grid = this.toGrid(placements, capacity, capacityByClass);
 
     if (mode !== 'commit') {
       return {
@@ -1283,6 +1461,15 @@ export class TimetableService {
       periodsPerDay: number;
       periodsByDay?: Record<string, number>;
     },
+    /**
+     * Each class's own day, where its stage runs a different one.
+     *
+     * The same reason this function already renders a six-period Thursday
+     * as six cells: drawing a kindergarten's fourteen-period day onto the
+     * primary's eight-cell grid would hide six real periods, and drawing
+     * the primary onto fourteen would invent six that do not exist.
+     */
+    capacityByClass?: Map<string, { periodsPerDay: number; periodsByDay?: Record<string, number> }>,
   ) {
     const byClass = new Map<string, Placement[]>();
     for (const placement of placements) {
@@ -1291,7 +1478,9 @@ export class TimetableService {
     }
 
     return [...byClass.entries()]
-      .map(([classId, rows]) => ({
+      .map(([classId, rows]) => {
+        const own = capacityByClass?.get(String(classId)) ?? capacity;
+        return {
         classId,
         className: rows[0].className,
         periods: rows.length,
@@ -1300,7 +1489,7 @@ export class TimetableService {
           // Render this day's real length. Padding a six-period day out to
           // eight would show two empty periods that do not exist.
           slots: Array.from(
-            { length: capacity.periodsByDay?.[day] ?? capacity.periodsPerDay },
+            { length: own.periodsByDay?.[day] ?? own.periodsPerDay },
             (_, i) => {
             const slot = i + 1;
             const hit = rows.find((r) => r.dayOfWeek === day && r.slot === slot);
@@ -1316,7 +1505,8 @@ export class TimetableService {
             },
           ),
         })),
-      }))
+        };
+      })
       .sort((a, b) => a.className.localeCompare(b.className, 'ar'));
   }
 }

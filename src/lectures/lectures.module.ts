@@ -15,6 +15,8 @@ import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/sch
 import { TeacherAssignment, TeacherAssignmentSchema } from '../teacher-assignments/schemas/teacher-assignment.schema';
 import { Term, TermSchema } from '../terms/schemas/term.schema';
 import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
+import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-level.schema';
+import { Stage, StageSchema } from '../stages/schemas/stage.schema';
 import { TimetableService } from './timetable.service';
 
 @Module({
@@ -32,6 +34,10 @@ import { TimetableService } from './timetable.service';
       { name: TeacherAssignment.name, schema: TeacherAssignmentSchema },
       { name: Term.name, schema: TermSchema },
       { name: School.name, schema: SchoolSchema },
+      // A class knows its grade level, a grade level knows its stage, and the
+      // stage is where a kindergarten's own school day is written.
+      { name: GradeLevel.name, schema: GradeLevelSchema },
+      { name: Stage.name, schema: StageSchema },
     ]),
   ],
   controllers: [LecturesController],
