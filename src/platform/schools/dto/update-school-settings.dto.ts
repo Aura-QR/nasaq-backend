@@ -42,7 +42,7 @@ export class WorkDayDto {
   @ValidateIf((_, value) => value !== null)
   @IsInt()
   @Min(1)
-  @Max(10)
+  @Max(20)
   periodsPerDay?: number | null;
 }
 
@@ -85,7 +85,7 @@ export class UpdateSchoolSettingsDto {
   /** Teaching periods in a school day. Decides a week's timetable capacity. */
   @IsInt()
   @Min(1)
-  @Max(10)
+  @Max(20)
   @IsOptional()
   periodsPerDay?: number;
 

@@ -48,11 +48,21 @@ export class Lecture {
   })
   dayOfWeek: DayOfWeek;
 
+  /**
+   * Which period of the day, counting from 1.
+   *
+   * The ceiling is 20 rather than 10 because a kindergarten day is not a
+   * shorter version of a primary one — it runs twelve to fourteen periods of
+   * about half an hour, and the tenth period was a wall those schools hit
+   * before they could build a timetable at all. 20 leaves room above the
+   * fourteen مواهب needs, so the next school asking for sixteen is a setting
+   * and not a schema change.
+   */
   @Prop({
     type: Number,
     required: true,
     min: 1,
-    max: 10,
+    max: 20,
     index: true,
   })
   slot: number;

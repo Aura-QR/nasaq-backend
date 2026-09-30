@@ -35,7 +35,7 @@ export class WorkDay {
    * between under-using the long days and scheduling lessons into periods the
    * short day does not have. null means "use the school's number".
    */
-  @Prop({ type: Number, default: null, min: 1, max: 10 })
+  @Prop({ type: Number, default: null, min: 1, max: 20 })
   periodsPerDay: number | null;
 }
 
@@ -120,11 +120,15 @@ export class SchoolSettings {
   /**
    * Teaching periods in a school day.
    *
-   * `Lecture.slot` accepts 1–10, but nothing recorded how many the school
+   * `Lecture.slot` accepts 1–20, but nothing recorded how many the school
    * actually runs — so there was no way to know a week's capacity, which is
    * what decides whether a timetable can exist at all.
+   *
+   * This is the whole school's number. A stage that runs a different day —
+   * a kindergarten against a primary — carries its own on `Stage`, and this
+   * stays the fallback for every stage that does not.
    */
-  @Prop({ default: 7, min: 1, max: 10 })
+  @Prop({ default: 7, min: 1, max: 20 })
   periodsPerDay: number;
 
   /**

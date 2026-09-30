@@ -36,10 +36,11 @@ export class CreateLectureDto {
   @IsEnum(DayOfWeek)
   dayOfWeek: DayOfWeek;
 
-  @ApiProperty({ description: 'Time slot number (1-10)', minimum: 1, maximum: 10 })
+  // 20, matching Lecture.slot — see the note there on kindergarten days.
+  @ApiProperty({ description: 'Time slot number (1-20)', minimum: 1, maximum: 20 })
   @IsNotEmpty()
   @IsNumber()
   @Min(1)
-  @Max(10)
+  @Max(20)
   slot: number;
 }
