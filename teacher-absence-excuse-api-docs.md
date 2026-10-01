@@ -18,6 +18,7 @@ excuse and the teacher lateness flow on purpose: same shapes, same rules.
 | 3 | `POST /teacher-attendance/me/absence-excuse` | Teacher |
 | 4 | `GET /teacher-attendance/absence-excuses` | School |
 | 5 | `PATCH /teacher-attendance/absence-excuses/:id/review` | School |
+| 6 | `PATCH /teacher-attendance/absence-excuses/:id/mark-present` | School |
 
 ## Who builds what
 
@@ -26,7 +27,7 @@ Same API for both of you. The screens differ:
 | | Build |
 |---|---|
 | **Mobile (Flutter)** | The teacher's side (1–3) **and** the school's review queue (4–5) |
-| **Web (React)** | The school's review queue (4–5) first; the teacher's side if teachers use the web portal |
+| **Web (React)** | ✅ Done — review queue with "كانت حاضرة", teacher card, work days on the teacher form |
 
 Nothing needs configuring before you start — no new permission, no
 migration, no settings screen. Anyone who can already see teacher
@@ -107,6 +108,36 @@ which already has its own approval and its own cover screen.
 The server routes a teacher to the right flow when she picks wrong, via the
 `400` messages in section 3 below. **Pass those messages through verbatim**
 rather than writing your own — they are what tell her where to go.
+
+---
+
+## What changed after launch — read this even if you read the rest
+
+The first version asked nearly every teacher at مواهب المملكة to explain
+days she had not been absent: 27 of 27 about the national day (not entered
+as a holiday), and a teacher out on a school trip about a day she worked.
+The rules are fixed on the server. For you that means:
+
+**The pending list can be empty much more often.** It now leaves out:
+holidays and days off, weekdays the teacher does not work, days before she
+was hired or first used check-in, and **today until the school day ends**.
+At a school that does not use teacher check-in it is always empty. An empty
+list is the normal state — show nothing, not an error.
+
+**Don't compute or cache which days are pending.** The server decides; ask
+it each time the screen opens.
+
+**A new push after the school day ends** — `teacher_absence_excuse_required`,
+half an hour after the school's own end time, once per teacher per day,
+only if she recorded no attendance. Route it to wherever the pending list
+lives. Body is formal Arabic and safe to show as is.
+
+**A fourth status: `marked_present`.** The school's answer to "I was not
+absent" — attendance is recorded for that day and the excuse is closed. Show
+it as **«سُجّلت حاضرة»**. It is not counted as an excused absence.
+
+**Teachers can have work days** — see section 7. Nothing for the teacher's
+screens to do; it only changes which days appear.
 
 ---
 
@@ -216,6 +247,7 @@ POST /teacher-attendance/me/absence-excuse
 | Code | `message` | What happened |
 |---|---|---|
 | `400` | `هذا اليوم ليس يوم عمل` | A day off or a holiday |
+| `400` | `هذا اليوم ليس من أيام عملك` | A weekday outside her work days |
 | `400` | `لديك سجل حضور في هذا اليوم — عذر التأخير هو المناسب هنا` | She checked in; send her to the lateness flow |
 | `400` | `لا يمكن تقديم عذر عن يوم لم يأتِ بعد — استخدم طلب الاستئذان` | Future day |
 | `409` | `تم إرسال عذر عن هذا اليوم بالفعل` | Already explained |
@@ -242,7 +274,7 @@ GET /teacher-attendance/absence-excuses?status=pending
 
 | Param | Default | Values |
 |---|---|---|
-| `status` | `pending` | `pending` · `accepted` · `rejected` |
+| `status` | `pending` | `pending` · `accepted` · `rejected` · `marked_present` |
 | `from` / `to` | — | `YYYY-MM-DD` |
 | `teacherId` | — | ObjectId |
 
@@ -306,6 +338,59 @@ The teacher is notified either way.
 
 ---
 
+## 6. "She was not absent" — mark present
+
+```
+PATCH /teacher-attendance/absence-excuses/:id/mark-present
+```
+
+Same permission as review. For an excuse that says she was on a trip, or
+present without a check-in. Accepting it would record an excused absence
+for a day she worked; this records her attendance and closes the excuse.
+
+```json
+{ "checkInAt": "07:00", "note": "رحلة مدرسية مع الطالبات" }
+```
+
+Both optional. Without `checkInAt` the day's start time is used, so no
+lateness is recorded.
+
+```json
+{
+  "status": true,
+  "message": "سُجِّل حضور المعلم لهذا اليوم وأُغلق العذر",
+  "data": { "id": "...", "status": "marked_present", "date": "2026-09-30" }
+}
+```
+
+`409` if already ruled on. Pressing it twice is safe. The teacher gets a
+`teacher_absence_excuse_reviewed` push with `status: "marked_present"`.
+
+---
+
+## 7. Work days on a teacher
+
+`Teacher.workDays` — `string[] | null`, sent on the existing
+`POST /teachers` and `PATCH /teachers/:id`.
+
+| Value | Meaning |
+|---|---|
+| `null`, missing or `[]` | Every day the school works — **every existing teacher** |
+| `["sunday", "monday"]` | Only those weekdays |
+
+For a teacher who comes in on fewer days than the school. Days outside it
+are never counted as absences, never asked about, never notified.
+
+Deliberately set by hand, not derived from the timetable: a teacher with no
+lectures yet (a KG class whose timetable is not built) still comes in every
+day.
+
+If you add it to a form: leave every day unticked by default, send `null`
+when none are ticked, and compare the selected days as a set before deciding
+the field changed.
+
+---
+
 ## The monthly summary
 
 ```
@@ -335,7 +420,8 @@ a missing field.
 | Type | Goes to | When |
 |---|---|---|
 | `teacher_absence_excuse_submitted` | Owner, managers, supervisors | She explains |
-| `teacher_absence_excuse_reviewed` | The teacher | They rule |
+| `teacher_absence_excuse_reviewed` | The teacher | They rule — `status` may be `marked_present` |
+| `teacher_absence_excuse_required` | The teacher | After the school day ends, if she recorded no attendance |
 
 Both carry `excuseId`, `date` and `status` in `data`.
 
