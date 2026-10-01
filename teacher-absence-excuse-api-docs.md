@@ -19,13 +19,94 @@ excuse and the teacher lateness flow on purpose: same shapes, same rules.
 | 4 | `GET /teacher-attendance/absence-excuses` | School |
 | 5 | `PATCH /teacher-attendance/absence-excuses/:id/review` | School |
 
+## Who builds what
+
+Same API for both of you. The screens differ:
+
+| | Build |
+|---|---|
+| **Mobile (Flutter)** | The teacher's side (1–3) **and** the school's review queue (4–5) |
+| **Web (React)** | The school's review queue (4–5) first; the teacher's side if teachers use the web portal |
+
+Nothing needs configuring before you start — no new permission, no
+migration, no settings screen. Anyone who can already see teacher
+attendance can review excuses today.
+
+---
+
 ## The five things most likely to trip you up
 
-1. **An excused absence is still an absence.** `daysAbsent` does not change.
-2. **Upload the file first, then submit** — two calls, deliberately.
-3. **Written once.** A second excuse for the same day is `409`.
-4. **No new permission.** Anyone who can see teacher attendance can review.
-5. **It is not a leave request.** A future day is refused — that is استئذان.
+Read these before writing anything. Each one has cost someone an afternoon
+in a previous feature.
+
+### 1. An excused absence is still an absence
+
+`GET /teacher-attendance/summary` gained two fields. **`daysAbsent` itself
+does not move when an excuse is accepted.**
+
+```json
+{ "daysAbsent": 3, "daysAbsentExcused": 2, "daysAbsentUnexcused": 1 }
+```
+
+✅ Render: **"3 غياب · منها 2 بعذر"**
+❌ Never: **"1 غياب"**
+
+The school asked to *receive* the explanation, not for the number to
+change. A report that quietly edits an attendance figure is one nobody can
+audit later. Guaranteed: `excused + unexcused === daysAbsent`, and
+`excused` can never exceed `daysAbsent`.
+
+### 2. Upload the file, then submit — two calls, on purpose
+
+`POST .../attachment` returns a path. You send that path in `POST
+.../absence-excuse`.
+
+It is split so a teacher on a slow connection does not lose her typed
+reason when a photo fails. **If the upload fails, let her submit without
+it.** The reason is the part that matters; the medical note is a bonus.
+
+Do not block the submit button on a successful upload.
+
+### 3. Written once — `409` is not a failure to retry
+
+There is a unique index on `(teacher, date)`. A second excuse for the same
+day returns:
+
+```json
+{ "status": false, "message": "تم إرسال عذر عن هذا اليوم بالفعل", "statusCode": 409 }
+```
+
+That means **the day is done**, not that something went wrong. Refresh the
+pending list and it will have disappeared. Do not show a red error or offer
+a retry.
+
+The same applies to review: an excuse already accepted or rejected cannot
+be ruled on twice.
+
+### 4. No new permission — but log out and back in if you see 403
+
+The school side is guarded by `school.teacherAttendance.read` / `.update`,
+which owners, managers and supervisors already hold. **Nothing has to be
+granted.**
+
+If you do hit a `403` while testing, it is the usual cause: permissions
+live in the JWT, so an account signed in before the release carries the old
+array. Log out, log back in.
+
+### 5. It is not a leave request — three flows, don't merge them
+
+| Situation | Flow | Endpoint |
+|---|---|---|
+| Came in late | عذر تأخير | `me/late-reason` |
+| Missed a whole day | عذر غياب | `me/absence-excuse` ← **new** |
+| Leaving early today | استئذان | `duty` leave request |
+
+Submitting an excuse for a **future** day is refused — that is استئذان,
+which already has its own approval and its own cover screen.
+
+The server routes a teacher to the right flow when she picks wrong, via the
+`400` messages in section 3 below. **Pass those messages through verbatim**
+rather than writing your own — they are what tell her where to go.
 
 ---
 
@@ -225,13 +306,13 @@ The teacher is notified either way.
 
 ---
 
-## Business Logic Notes
+## The monthly summary
 
-### 1. An excused absence is still an absence
+```
+GET /teacher-attendance/summary?dateFrom=...&dateTo=...
+```
 
-This is the most important line in this document.
-
-`GET /teacher-attendance/summary` now returns two extra fields per teacher:
+Unchanged except for two fields per teacher:
 
 ```json
 {
@@ -243,52 +324,25 @@ This is the most important line in this document.
 }
 ```
 
-**`daysAbsent` does not change** when an excuse is accepted. The school
-asked to receive the explanation, not for the figure to move.
+See point 1 above for how to render this. If reading excuses fails on the
+server, the report still returns — `daysAbsentExcused` is simply `0`, never
+a missing field.
 
-Render it as **"3 غياب · منها 2 بعذر"**, never as "1 غياب". Guaranteed:
-`daysAbsentExcused + daysAbsentUnexcused === daysAbsent`, and the excused
-count can never exceed the absences.
+---
 
-### 2. Three different conversations, three different flows
-
-Do not merge these in the UI:
-
-| Situation | Flow | Endpoint |
-|---|---|---|
-| Came in late | عذر تأخير | `me/late-reason` |
-| Missed a whole day | عذر غياب | `me/absence-excuse` |
-| Leaving early today | استئذان | `duty` leave request |
-
-The server routes a teacher to the right one when she picks wrong — the
-`400` messages above say which. Pass them through verbatim.
-
-### 3. Written once
-
-There is a unique index on `(teacher, date)`. A second excuse is a `409`,
-not a second row. An explanation a manager already ruled on cannot be
-rewritten underneath them.
-
-The same applies to review: an excuse that is already accepted or rejected
-cannot be ruled on again.
-
-### 4. Notifications
+## Notifications
 
 | Type | Goes to | When |
 |---|---|---|
 | `teacher_absence_excuse_submitted` | Owner, managers, supervisors | She explains |
 | `teacher_absence_excuse_reviewed` | The teacher | They rule |
 
-Both carry `excuseId`, `date` and `status` in `data`. Route the bell on the
-type — these are distinct from the student `absence_excuse_*` types on
-purpose, so an admin tapping a teacher's excuse does not land on the
-families' queue.
+Both carry `excuseId`, `date` and `status` in `data`.
 
-### 5. No new permission
-
-The school side is guarded by `school.teacherAttendance.read` and
-`.update`, which owners, managers and supervisors already hold. Nothing has
-to be granted, and the permissions screen does not change.
+Route the bell on the **type**. These are deliberately distinct from the
+student `absence_excuse_submitted` / `absence_excuse_reviewed` types: an
+admin tapping a teacher's excuse must not land on the families' queue, and
+a teacher tapping hers must not land on a list she cannot read.
 
 ---
 
