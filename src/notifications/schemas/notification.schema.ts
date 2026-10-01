@@ -29,6 +29,9 @@ export const NOTIFICATION_TYPES = [
   // must not land on the families' queue or the latenesses list.
   'teacher_absence_excuse_submitted',
   'teacher_absence_excuse_reviewed',
+  // Sent to the teacher after the school day ends, when she recorded no
+  // attendance — the absence's equivalent of late_reason_required.
+  'teacher_absence_excuse_required',
   // What a supervisor saw in a classroom, the teacher's account of it, and
   // the school's ruling. Period-level, unlike the three above, which are the
   // day.

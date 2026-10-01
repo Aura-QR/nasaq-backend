@@ -214,6 +214,55 @@ describe('Absence in the monthly summary', () => {
   });
 
   /**
+   * A teacher who works fewer days than the school.
+   *
+   * مناير comes in Sunday and Monday. She was reported absent three days
+   * every week for days nobody expected her.
+   */
+  describe('a teacher with her own work days', () => {
+    it('is measured against her own days only', async () => {
+      teachers = [
+        { _id: teacherA, name: 'أ. سارة' },
+        { _id: teacherB, name: 'أ. مناير', workDays: ['sunday', 'monday'] },
+      ];
+      aggregateRows = [
+        {
+          teacherId: teacherB, teacherName: 'أ. مناير',
+          daysPresent: 1, daysPresentOnWorkingDays: 1,
+          presentDates: [new Date('2026-09-20T00:00:00.000Z')], // the Sunday
+        },
+      ];
+
+      const result: any = await summary();
+      const row = result.data.find((r: any) => r.teacherName === 'أ. مناير');
+
+      expect(row.workingDays).toBe(2); // Sunday and Monday of that week
+      expect(row.daysAbsent).toBe(1); // missed the Monday only
+      expect(row).not.toHaveProperty('presentDates');
+    });
+
+    it('leaves every other teacher\'s numbers exactly as they were', async () => {
+      teachers = [
+        { _id: teacherA, name: 'أ. سارة' },
+        { _id: teacherB, name: 'أ. مناير', workDays: ['sunday', 'monday'] },
+      ];
+      const result: any = await summary();
+      const sara = result.data.find((r: any) => r.teacherName === 'أ. سارة');
+      expect(sara.workingDays).toBe(5);
+      expect(sara.daysAbsent).toBe(5);
+      // The school's own denominator is unchanged too.
+      expect(result.workingDays).toBe(5);
+    });
+
+    it('counts all her days absent when she has no records at all', async () => {
+      teachers = [{ _id: teacherB, name: 'أ. مناير', workDays: ['sunday', 'monday'] }];
+      const result: any = await summary();
+      expect(result.data[0].workingDays).toBe(2);
+      expect(result.data[0].daysAbsent).toBe(2);
+    });
+  });
+
+  /**
    * An excused absence is still an absence.
    *
    * The school asked to receive the teacher's explanation, not for the

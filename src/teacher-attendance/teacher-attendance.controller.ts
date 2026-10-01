@@ -37,6 +37,7 @@ import {
 } from './dto/review-late-reason.dto';
 import {
   ListAbsenceExcusesDto,
+  MarkPresentDto,
   ReviewAbsenceExcuseDto,
   SubmitAbsenceExcuseDto,
 } from './dto/absence-excuse.dto';
@@ -142,6 +143,34 @@ export class TeacherAttendanceController {
     @Body() dto: ReviewAbsenceExcuseDto,
   ) {
     return this.absenceExcuses.review(id, user, dto);
+  }
+
+  @CheckAbilities({ action: 'update', subject: 'TeacherAttendance' })
+  @Patch('absence-excuses/:id/mark-present')
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'لم تكن غائبة — يُسجَّل حضورها لذلك اليوم ويُغلق العذر',
+    description:
+      'للمعلمة التي كانت في رحلة مدرسية أو حضرت ولم تسجّل. قبول عذرها كان ' +
+      'سيسجّل غيابًا بعذر عن يوم عملت فيه.',
+  })
+  @ApiResponse({ status: 409, description: 'روجع بالفعل' })
+  async markAbsenceExcusePresent(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: MarkPresentDto,
+  ) {
+    // Validate first, so a closed excuse does not leave a stray record.
+    const excuse = await this.absenceExcuses.findPending(id);
+    await this.teacherAttendanceService.ensurePresentFor(
+      user,
+      String(excuse.teacherId),
+      excuse.date.toISOString().slice(0, 10),
+      dto.checkInAt,
+      dto.note,
+    );
+    return this.absenceExcuses.markPresent(id, user, dto.note);
   }
 
   @Get('detect-ip')

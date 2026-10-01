@@ -14,6 +14,7 @@ import { School } from 'src/platform/schools/schemas/school.schema';
 import { Admin } from 'src/admin/schemas/admin.schema';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { TeacherAbsenceExcuseService } from './teacher-absence-excuse.service';
+import { dayLabel, weekdayOf, worksOn } from './teacher-presence.util';
 import { LeaveRequest } from '../duty/schemas/leave-request.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.dto';
@@ -475,6 +476,40 @@ export class TeacherAttendanceService {
     return attendance;
   }
 
+  /**
+   * Make sure a teacher has an attendance record for a past day.
+   *
+   * Used when the school agrees a teacher was present on a day the system
+   * thought she was absent — a school trip, a phone that would not check
+   * in. An existing record is left as it is; otherwise one is written by
+   * hand at the time given, or at the day's start so no lateness is invented
+   * for a day the school has just vouched for.
+   */
+  async ensurePresentFor(
+    user: any,
+    teacherId: string,
+    date: string,
+    checkInAt?: string,
+    note?: string,
+  ) {
+    const existing = await this.teacherAttendanceModel
+      .findOne({ teacherId: new Types.ObjectId(teacherId), date: normalizeDate(date) })
+      .select('_id')
+      .lean();
+    if (existing) return existing;
+
+    const settings = await this.getSchoolSettings(user.schoolId);
+    const day = resolveDaySchedule(settings, normalizeDate(date));
+    const time = checkInAt || day.startTime || '07:00';
+
+    return this.createManual(user, {
+      teacherId,
+      date,
+      checkInAt: time,
+      notes: note ? `من مراجعة عذر الغياب: ${note}` : 'سُجّل من مراجعة عذر الغياب',
+    } as CreateManualTeacherAttendanceDto);
+  }
+
   async getMyAttendance(user: any, query: QueryTeacherAttendanceDto) {
     const filter: any = {
       teacherId: new Types.ObjectId(user.userId),
@@ -734,7 +769,7 @@ export class TeacherAttendanceService {
 
     const activeTeachers = await this.teacherModel
       .find({ isActive: true })
-      .select('name email phoneNumber qualification specialization')
+      .select('name email phoneNumber qualification specialization workDays')
       .lean();
 
     const presentRecords = await this.teacherAttendanceModel
@@ -744,9 +779,12 @@ export class TeacherAttendanceService {
 
     const presentTeacherIds = new Set(presentRecords.map((r) => r.teacherId.toString()));
 
-    const absentTeachers = activeTeachers.filter(
-      (t) => !presentTeacherIds.has(t._id.toString()),
-    );
+    // A teacher who does not work this weekday is not absent from it. Without
+    // this a Sunday-and-Monday teacher appeared here every other day.
+    const absentTeachers = activeTeachers
+      .filter((t: any) => worksOn(t.workDays, targetDate))
+      .filter((t) => !presentTeacherIds.has(t._id.toString()))
+      .map(({ workDays, ...rest }: any) => rest);
 
     return {
       date: targetDate,
@@ -967,6 +1005,10 @@ export class TeacherAttendanceService {
             },
           },
           fallbackName: { $first: '$name' },
+          // Which days, not only how many — needed for a teacher who works
+          // fewer days than the school, whose absences are counted against
+          // her own days. Dropped from the response before it is returned.
+          presentDates: { $addToSet: '$date' },
         },
       },
       { $lookup: { from: 'teachers', localField: '_id', foreignField: '_id', as: 'teacher' } },
@@ -991,6 +1033,7 @@ export class TeacherAttendanceService {
           daysEarlyLeaveNotTracked: 1,
           daysOnDayOff: 1,
           daysPresentOnWorkingDays: 1,
+          presentDates: 1,
         },
       },
       { $sort: { teacherName: 1 } },
@@ -1019,8 +1062,16 @@ export class TeacherAttendanceService {
     }
     const activeTeachers = await this.teacherModel
       .find(teacherFilter)
-      .select('name')
+      .select('name workDays')
       .lean();
+
+    // Only teachers who work fewer days than the school. Everyone else keeps
+    // the existing calculation untouched, so this cannot move their numbers.
+    const workDaysByTeacher = new Map<string, string[]>(
+      (activeTeachers as any[])
+        .filter((t) => Array.isArray(t.workDays) && t.workDays.length > 0)
+        .map((t) => [String(t._id), t.workDays]),
+    );
 
     const byTeacher = new Map(
       rows.map((row: any) => [String(row.teacherId), row]),
@@ -1080,6 +1131,20 @@ export class TeacherAttendanceService {
         0,
         workingDays - (row.daysPresentOnWorkingDays ?? 0),
       );
+
+      // A teacher who works fewer days than the school is measured against
+      // her own days: the school days that fall on her weekdays, and of
+      // those, the ones with no record.
+      const ownDays = workDaysByTeacher.get(String(row.teacherId));
+      if (ownDays) {
+        const present = new Set(
+          (row.presentDates ?? []).map((d: Date) => dayLabel(new Date(d))),
+        );
+        const expected = workingDates.filter((d) => ownDays.includes(weekdayOf(d)));
+        row.workingDays = expected.length;
+        row.daysAbsent = expected.filter((d) => !present.has(dayLabel(d))).length;
+      }
+      delete row.presentDates;
 
       // Capped at daysAbsent: an excuse filed for a day she turned out to
       // have attended must not make the explained count exceed the absences.

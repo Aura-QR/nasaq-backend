@@ -58,10 +58,13 @@ export class ReviewAbsenceExcuseDto {
 }
 
 export class ListAbsenceExcusesDto {
-  @IsIn(['pending', 'accepted', 'rejected'])
+  @IsIn(['pending', 'accepted', 'rejected', 'marked_present'])
   @IsOptional()
-  @ApiPropertyOptional({ enum: ['pending', 'accepted', 'rejected'], default: 'pending' })
-  status?: 'pending' | 'accepted' | 'rejected';
+  @ApiPropertyOptional({
+    enum: ['pending', 'accepted', 'rejected', 'marked_present'],
+    default: 'pending',
+  })
+  status?: 'pending' | 'accepted' | 'rejected' | 'marked_present';
 
   @Matches(DATE_PATTERN, { message: 'from يجب أن يكون بصيغة YYYY-MM-DD' })
   @IsOptional()
@@ -93,4 +96,22 @@ export class PendingAbsenceDaysDto {
   @Max(60)
   @ApiPropertyOptional({ default: 14, maximum: 60 })
   days?: number;
+}
+
+export class MarkPresentDto {
+  /**
+   * When she actually arrived, if the school knows. Omitted, the day's start
+   * time is used, so no lateness is recorded for a day the school has just
+   * agreed she was present.
+   */
+  @IsOptional()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'checkInAt يجب أن يكون بصيغة HH:mm' })
+  @ApiPropertyOptional({ example: '07:00' })
+  checkInAt?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(1000)
+  @ApiPropertyOptional({ example: 'كانت في رحلة مدرسية مع الطالبات' })
+  note?: string;
 }

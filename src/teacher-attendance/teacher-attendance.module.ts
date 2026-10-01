@@ -8,6 +8,11 @@ import {
   TeacherAbsenceExcuseSchema,
 } from './schemas/teacher-absence-excuse.schema';
 import { TeacherAbsenceExcuseService } from './teacher-absence-excuse.service';
+import { TeacherAbsenceSweepService } from './teacher-absence-sweep.service';
+import {
+  TeacherAbsenceNotice,
+  TeacherAbsenceNoticeSchema,
+} from './schemas/teacher-absence-notice.schema';
 import { TeacherAttendanceController } from './teacher-attendance.controller';
 import { TeacherAttendanceService } from './teacher-attendance.service';
 import { LeaveRequest, LeaveRequestSchema } from '../duty/schemas/leave-request.schema';
@@ -21,6 +26,8 @@ import { NotificationsModule } from 'src/notifications/notifications.module';
       // A collection of its own: an absent teacher has no attendance row to
       // hang an excuse on — see the schema's own note.
       { name: TeacherAbsenceExcuse.name, schema: TeacherAbsenceExcuseSchema },
+      // So the end-of-day notice goes out once per teacher per day.
+      { name: TeacherAbsenceNotice.name, schema: TeacherAbsenceNoticeSchema },
       { name: Teacher.name, schema: TeacherSchema },
       { name: School.name, schema: SchoolSchema },
       { name: LeaveRequest.name, schema: LeaveRequestSchema },
@@ -30,7 +37,7 @@ import { NotificationsModule } from 'src/notifications/notifications.module';
     NotificationsModule,
   ],
   controllers: [TeacherAttendanceController],
-  providers: [TeacherAttendanceService, TeacherAbsenceExcuseService],
+  providers: [TeacherAttendanceService, TeacherAbsenceExcuseService, TeacherAbsenceSweepService],
   exports: [TeacherAttendanceService, TeacherAbsenceExcuseService],
 })
 export class TeacherAttendanceModule {}

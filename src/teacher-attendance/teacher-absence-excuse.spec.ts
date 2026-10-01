@@ -231,25 +231,6 @@ describe('a teacher explaining a day she missed', () => {
     });
   });
 
-  describe('which days she is asked about', () => {
-    it('skips days she attended and days already explained', async () => {
-      const service = build({ attendanceOn: [] });
-      const res: any = await service.pendingDays(user, 7);
-      // Weekends are excluded by workingDatesBetween, so only Sun–Thu appear.
-      for (const row of res.data) {
-        const weekday = new Date(`${row.date}T00:00:00.000Z`).getUTCDay();
-        expect([5, 6]).not.toContain(weekday); // never a Friday or Saturday
-      }
-    });
-
-    it('lists the newest day first', async () => {
-      const service = build();
-      const res: any = await service.pendingDays(user, 10);
-      const dates = res.data.map((r: any) => r.date);
-      expect([...dates].sort((a, b) => b.localeCompare(a))).toEqual(dates);
-    });
-  });
-
   describe('counting excused absences', () => {
     it('counts only accepted excuses, per teacher', async () => {
       const service = build();

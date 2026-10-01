@@ -13,7 +13,12 @@ import { Teacher } from '../teachers/schemas/teacher.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { Admin } from '../admin/schemas/admin.schema';
 import { NotificationsService } from '../notifications/notifications.service';
-import { normalizeDate, workingDatesBetween } from '../attendance/attendance.utils';
+import {
+  normalizeDate,
+  resolveDaySchedule,
+  workingDatesBetween,
+} from '../attendance/attendance.utils';
+import { schoolDayHasEnded, schoolNow, worksOn } from './teacher-presence.util';
 import {
   ListAbsenceExcusesDto,
   ReviewAbsenceExcuseDto,
@@ -89,31 +94,81 @@ export class TeacherAbsenceExcuseService {
    *
    * Recent rather than today only: somebody off sick for three days answers
    * once, when she is back, and the other two days have to still be there to
-   * answer. Days off and school holidays are excluded by
-   * `workingDatesBetween`, so a Friday never appears as something to explain.
+   * answer. What is left out matters as much as what is listed, because the
+   * first version of this asked every teacher at a school about the national
+   * day holiday nobody had entered, and about days she was out on a trip:
+   *
+   * - days off and school holidays (`workingDatesBetween`);
+   * - weekdays this teacher does not work (`Teacher.workDays`);
+   * - days before she was hired, or before she ever recorded attendance —
+   *   before that, a missing record means "not using the system yet", and
+   *   a school switching this on must not hand every teacher two weeks of
+   *   history to explain;
+   * - today, until the school day has ended. Before then she is not absent,
+   *   she is not here yet.
+   *
+   * A school that does not use teacher check-in gets an empty list: with no
+   * check-ins, every teacher reads as absent every day.
    */
-  async pendingDays(user: any, days = 14) {
+  async pendingDays(user: any, days = 14, nowAt: Date = new Date()) {
     const teacherId = TeacherAbsenceExcuseService.toObjectId(user?.userId);
     if (!teacherId) throw new BadRequestException('حساب غير صالح');
 
-    const to = normalizeDate(new Date());
-    const from = new Date(to);
-    from.setUTCDate(from.getUTCDate() - (days - 1));
-
     const settings = await this.settingsOf(user?.schoolId);
-    const workingDays = workingDatesBetween(settings, from, to);
+    if (settings?.teacherCheckInEnabled !== true) {
+      return { status: true, message: 'تسجيل حضور المعلمين غير مفعّل في المدرسة', data: [] };
+    }
+
+    const now = schoolNow(settings?.timezone, nowAt);
+    const today = now.date;
+
+    const [teacher, firstRecord] = await Promise.all([
+      this.teacherModel.findById(teacherId).select('hireDate workDays').lean().exec() as any,
+      this.attendanceModel
+        .findOne({ teacherId })
+        .sort({ date: 1 })
+        .select('date')
+        .lean()
+        .exec() as any,
+    ]);
+
+    if (!firstRecord) {
+      // She has never recorded attendance, so there is no day to call an
+      // absence yet.
+      return { status: true, message: 'لا توجد أيام غياب', data: [] };
+    }
+
+    const from = new Date(today);
+    from.setUTCDate(from.getUTCDate() - (days - 1));
+    const floors = [from, normalizeDate(firstRecord.date)];
+    if (teacher?.hireDate) floors.push(normalizeDate(teacher.hireDate));
+    const start = new Date(Math.max(...floors.map((d) => d.getTime())));
+
+    // Today counts only once it is over.
+    const todaySchedule = resolveDaySchedule(settings, today);
+    const todayEnded = schoolDayHasEnded(todaySchedule.endTime, now.minutes);
+    const end = new Date(today);
+    if (!todayEnded) end.setUTCDate(end.getUTCDate() - 1);
+
+    if (start > end) {
+      return { status: true, message: 'لا توجد أيام غياب', data: [] };
+    }
+
+    const workingDays = workingDatesBetween(settings, start, end).filter((d) =>
+      worksOn(teacher?.workDays, d),
+    );
     if (workingDays.length === 0) {
-      return { status: true, message: 'لا توجد أيام عمل في هذه المدة', data: [] };
+      return { status: true, message: 'لا توجد أيام غياب', data: [] };
     }
 
     const [present, explained] = await Promise.all([
       this.attendanceModel
-        .find({ teacherId, date: { $gte: from, $lte: to } })
+        .find({ teacherId, date: { $gte: start, $lte: end } })
         .select('date')
         .lean()
         .exec(),
       this.excuseModel
-        .find({ teacherId, date: { $gte: from, $lte: to } })
+        .find({ teacherId, date: { $gte: start, $lte: end } })
         .select('date')
         .lean()
         .exec(),
@@ -145,7 +200,9 @@ export class TeacherAbsenceExcuseService {
     if (!teacherId) throw new BadRequestException('حساب غير صالح');
 
     const date = normalizeDate(dto.date);
-    const today = normalizeDate(new Date());
+    const settings = await this.settingsOf(user?.schoolId);
+    // The school's today, not the server's: at 01:00 Riyadh they differ.
+    const today = schoolNow(settings?.timezone).date;
     if (date > today) {
       // An excuse is an account of something that happened. A future day has
       // not happened, and leaving before the day is استئذان, which already
@@ -155,9 +212,18 @@ export class TeacherAbsenceExcuseService {
       );
     }
 
-    const settings = await this.settingsOf(user?.schoolId);
     if (workingDatesBetween(settings, date, date).length === 0) {
       throw new BadRequestException('هذا اليوم ليس يوم عمل');
+    }
+
+    const teacher: any = await this.teacherModel
+      .findById(teacherId)
+      .select('name workDays')
+      .lean()
+      .exec();
+
+    if (!worksOn(teacher?.workDays, date)) {
+      throw new BadRequestException('هذا اليوم ليس من أيام عملك');
     }
 
     const attended = await this.attendanceModel
@@ -181,12 +247,6 @@ export class TeacherAbsenceExcuseService {
     if (existing) {
       throw new ConflictException('تم إرسال عذر عن هذا اليوم بالفعل');
     }
-
-    const teacher: any = await this.teacherModel
-      .findById(teacherId)
-      .select('name')
-      .lean()
-      .exec();
 
     const reason = dto.reason.trim();
     const excuse = await this.excuseModel.create({
@@ -341,6 +401,72 @@ export class TeacherAbsenceExcuseService {
       data: {
         id: String(excuse._id),
         status: excuse.status,
+        reviewNote: excuse.reviewNote,
+        reviewedAt: excuse.reviewedAt,
+      },
+    };
+  }
+
+  /** A pending excuse, or the reason it cannot be acted on. */
+  async findPending(id: string) {
+    const excuseId = TeacherAbsenceExcuseService.toObjectId(id);
+    if (!excuseId) throw new BadRequestException('معرّف العذر غير صالح');
+
+    const excuse = await this.excuseModel.findById(excuseId);
+    if (!excuse) throw new NotFoundException('العذر غير موجود');
+    if (excuse.status !== 'pending') {
+      throw new ConflictException('تمت مراجعة هذا العذر بالفعل');
+    }
+    return excuse;
+  }
+
+  /**
+   * Close an excuse by agreeing she was present.
+   *
+   * Called after the attendance record exists — the controller does both, so
+   * neither service has to reach into the other. If this step fails, the
+   * attendance is already written and the excuse is still pending; pressing
+   * the button again finds the record and only closes the excuse.
+   */
+  async markPresent(id: string, user: any, note?: string) {
+    const excuse = await this.findPending(id);
+
+    excuse.status = 'marked_present';
+    excuse.reviewedBy = TeacherAbsenceExcuseService.toObjectId(user?.userId);
+    excuse.reviewedByName = user?.name ?? '';
+    excuse.reviewedAt = new Date();
+    excuse.reviewNote = (note ?? '').trim();
+    await excuse.save();
+
+    const dateLabel = TeacherAbsenceExcuseService.dateLabel(excuse.date);
+    try {
+      await this.notifications.notify({
+        recipientId: excuse.teacherId,
+        type: 'teacher_absence_excuse_reviewed',
+        title: 'سُجِّل حضورك',
+        body: [`يوم ${dateLabel} مسجّل حضورًا لا غيابًا`, excuse.reviewNote]
+          .filter(Boolean)
+          .join(' — '),
+        data: {
+          excuseId: String(excuse._id),
+          date: dateLabel,
+          status: excuse.status,
+          note: excuse.reviewNote,
+        },
+      });
+    } catch (error: any) {
+      this.logger.error(
+        `Could not announce marked-present on ${excuse._id}: ${error?.message}`,
+      );
+    }
+
+    return {
+      status: true,
+      message: 'سُجِّل حضور المعلم لهذا اليوم وأُغلق العذر',
+      data: {
+        id: String(excuse._id),
+        status: excuse.status,
+        date: dateLabel,
         reviewNote: excuse.reviewNote,
         reviewedAt: excuse.reviewedAt,
       },

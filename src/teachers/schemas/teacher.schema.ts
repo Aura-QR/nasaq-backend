@@ -61,6 +61,23 @@ export class Teacher extends Document {
    */
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'JobTitle', default: null })
   jobTitleId: Types.ObjectId | null;
+
+  /**
+   * The weekdays this teacher works, when fewer than the school's.
+   *
+   * A teacher who comes in Sunday and Monday only was counted absent every
+   * Tuesday, Wednesday and Thursday, and once teachers could see their own
+   * absences she would have been asked to explain three days a week that
+   * nobody expected her for.
+   *
+   * null — the default — means every day the school works, which is every
+   * teacher who existed before this field. It is set by hand rather than
+   * derived from the timetable on purpose: a teacher with no lectures yet
+   * (a kindergarten class whose timetable is not built) still comes in every
+   * day, and deriving this would have made her impossible to mark absent.
+   */
+  @Prop({ type: [String], default: null })
+  workDays: string[] | null;
 }
 
 export const TeacherSchema = SchemaFactory.createForClass(Teacher);

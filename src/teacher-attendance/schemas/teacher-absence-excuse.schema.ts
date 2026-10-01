@@ -2,7 +2,13 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
-export const EXCUSE_STATUSES = ['pending', 'accepted', 'rejected'] as const;
+/**
+ * 'marked_present' is the school's answer to "I was not absent": she was on a
+ * trip with the students, or present and forgot to check in. Accepting that
+ * as an excuse would record an excused absence for a day she worked, so the
+ * school records her attendance instead and the excuse is closed this way.
+ */
+export const EXCUSE_STATUSES = ['pending', 'accepted', 'rejected', 'marked_present'] as const;
 export type ExcuseStatus = (typeof EXCUSE_STATUSES)[number];
 
 /**

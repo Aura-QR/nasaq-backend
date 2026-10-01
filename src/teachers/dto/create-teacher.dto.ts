@@ -1,4 +1,7 @@
 import {
+  ArrayMaxSize,
+  IsIn,
+  ValidateIf,
   IsString,
   IsEmail,
   IsNotEmpty,
@@ -127,4 +130,24 @@ export class CreateTeacherDto {
   @MinLength(6, { message: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' })
   @ApiProperty({ description: 'The password of the teacher', required: false })
   password?: string;
+
+  /**
+   * Weekdays this teacher works. Omit, null or [] — every day the school
+   * works. Only for a teacher who comes in on fewer days than the school.
+   */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsArray()
+  @ArrayMaxSize(7)
+  @IsIn(['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], {
+    each: true,
+    message: 'أيام العمل يجب أن تكون أسماء أيام بالإنجليزية بحروف صغيرة',
+  })
+  @ApiProperty({
+    description: 'أيام عمل المعلم إن كانت أقل من أيام المدرسة. فارغ = كل أيام المدرسة.',
+    required: false,
+    nullable: true,
+    example: ['sunday', 'monday'],
+  })
+  workDays?: string[] | null;
 }

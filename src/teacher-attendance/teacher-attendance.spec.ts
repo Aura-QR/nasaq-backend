@@ -458,6 +458,31 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
       expect(result.totalAbsent).toBe(2);
       expect(result.absentTeachers).toEqual([teacher1, teacher3]);
     });
+
+    it('does not list a teacher on a weekday she does not work', async () => {
+      // 2026-09-20 is a Sunday. A Monday-to-Wednesday teacher was listed
+      // absent every Sunday and Thursday.
+      const fullTime = { _id: { toString: () => 't1' }, name: 'معلم 1', isActive: true };
+      const partTime = {
+        _id: { toString: () => 't2' }, name: 'معلم 2', isActive: true,
+        workDays: ['monday', 'tuesday', 'wednesday'],
+      };
+      teacherModel.find.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue([fullTime, partTime]),
+        }),
+      });
+      teacherAttendanceModel.find.mockReturnValue({
+        select: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }),
+      });
+
+      const result: any = await service.findAbsent('2026-09-20');
+
+      expect(result.totalAbsent).toBe(1);
+      expect(result.absentTeachers[0].name).toBe('معلم 1');
+      // The field is an internal rule, not part of the list's shape.
+      expect(result.absentTeachers[0]).not.toHaveProperty('workDays');
+    });
   });
 
   describe('an approved استئذان and leaving early', () => {
