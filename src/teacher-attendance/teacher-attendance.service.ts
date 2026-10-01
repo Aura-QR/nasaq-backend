@@ -13,6 +13,7 @@ import { Model, Types } from 'mongoose';
 import { School } from 'src/platform/schools/schemas/school.schema';
 import { Admin } from 'src/admin/schemas/admin.schema';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { TeacherAbsenceExcuseService } from './teacher-absence-excuse.service';
 import { LeaveRequest } from '../duty/schemas/leave-request.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.dto';
@@ -63,6 +64,10 @@ export class TeacherAttendanceService {
     @InjectModel(Admin.name)
     private readonly adminModel: Model<Admin>,
     private readonly notifications: NotificationsService,
+    // Read by the monthly summary to mark which absences were explained.
+    // Both services live in this module, so this is a plain injection — but
+    // the summary never lets a failure here cost it the report.
+    private readonly absenceExcuses: TeacherAbsenceExcuseService,
   ) {}
 
   /** "HH:mm" in the school's timezone — what a person would have read on the clock. */
@@ -1047,6 +1052,25 @@ export class TeacherAttendanceService {
       byTeacher.set(id, blank);
     }
 
+    // Which absences the teacher explained and the school accepted.
+    //
+    // Added BESIDE daysAbsent, never subtracted from it. Three absences with
+    // accepted excuses stay three absences, marked as explained — the school
+    // asked to receive the explanation, not for the figure to change, and a
+    // feature that quietly edits an attendance number is one nobody can
+    // audit afterwards.
+    let excusedByTeacher = new Map<string, number>();
+    try {
+      excusedByTeacher = await this.absenceExcuses.excusedByTeacher(
+        normalizeDate(query.dateFrom),
+        normalizeDate(query.dateTo),
+      );
+    } catch (error: any) {
+      // The summary is the point. A failure to read excuses must not cost
+      // the school its attendance report.
+      this.logger.error(`Could not read absence excuses: ${error?.message}`);
+    }
+
     for (const row of rows as any[]) {
       // Never negative: a school that shortened its week mid-period can leave
       // more attended days on file than the current schedule has working days,
@@ -1056,6 +1080,12 @@ export class TeacherAttendanceService {
         0,
         workingDays - (row.daysPresentOnWorkingDays ?? 0),
       );
+
+      // Capped at daysAbsent: an excuse filed for a day she turned out to
+      // have attended must not make the explained count exceed the absences.
+      const excused = excusedByTeacher.get(String(row.teacherId)) ?? 0;
+      row.daysAbsentExcused = Math.min(excused, row.daysAbsent);
+      row.daysAbsentUnexcused = Math.max(0, row.daysAbsent - row.daysAbsentExcused);
     }
 
     rows.sort((a: any, b: any) =>

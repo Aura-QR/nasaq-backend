@@ -66,6 +66,9 @@ describe('Absence in the monthly summary', () => {
     service = new TeacherAttendanceService(
       attendanceModel as any, teacherModel as any, schoolModel as any,
       {} as any, {} as any, { notify: jest.fn() } as any,
+      // No excuses on file: daysAbsent must read exactly as it did before
+      // this feature existed, which is what these tests guard.
+      { excusedByTeacher: jest.fn().mockResolvedValue(new Map()) } as any,
     );
   });
 
@@ -208,5 +211,72 @@ describe('Absence in the monthly summary', () => {
   it('returns nothing measurable for a range that runs backwards', async () => {
     const result = await summary('2026-09-26', '2026-09-20');
     expect(result.workingDays).toBe(0);
+  });
+
+  /**
+   * An excused absence is still an absence.
+   *
+   * The school asked to receive the teacher's explanation, not for the
+   * figure to change. A feature that quietly edits an attendance number is
+   * one nobody can audit afterwards — so the excused count sits beside
+   * daysAbsent and never inside it.
+   */
+  describe('absences the teacher explained', () => {
+    const withExcuses = (counts: Map<string, number>) => {
+      (service as any).absenceExcuses = {
+        excusedByTeacher: jest.fn().mockResolvedValue(counts),
+      };
+    };
+
+    it('does not reduce daysAbsent', async () => {
+      const before: any = await summary();
+      const row0 = before.data.find((r: any) => r.daysAbsent > 0);
+      expect(row0).toBeDefined();
+
+      withExcuses(new Map([[String(row0.teacherId), row0.daysAbsent]]));
+      const after: any = await summary();
+      const row1 = after.data.find((r: any) => String(r.teacherId) === String(row0.teacherId));
+
+      expect(row1.daysAbsent).toBe(row0.daysAbsent);
+      expect(row1.daysAbsentExcused).toBe(row0.daysAbsent);
+      expect(row1.daysAbsentUnexcused).toBe(0);
+    });
+
+    it('splits the absences that were not explained', async () => {
+      const before: any = await summary();
+      const row0 = before.data.find((r: any) => r.daysAbsent >= 2);
+      if (!row0) return; // no teacher absent twice in this fixture
+
+      withExcuses(new Map([[String(row0.teacherId), 1]]));
+      const after: any = await summary();
+      const row1 = after.data.find((r: any) => String(r.teacherId) === String(row0.teacherId));
+
+      expect(row1.daysAbsentExcused).toBe(1);
+      expect(row1.daysAbsentUnexcused).toBe(row0.daysAbsent - 1);
+    });
+
+    it('never reports more excused days than absences', async () => {
+      // An excuse filed for a day she turned out to have attended must not
+      // make the explained count exceed the absences it explains.
+      const before: any = await summary();
+      const row0 = before.data[0];
+      withExcuses(new Map([[String(row0.teacherId), 99]]));
+      const after: any = await summary();
+      const row1 = after.data.find((r: any) => String(r.teacherId) === String(row0.teacherId));
+
+      expect(row1.daysAbsentExcused).toBeLessThanOrEqual(row1.daysAbsent);
+      expect(row1.daysAbsentUnexcused).toBeGreaterThanOrEqual(0);
+    });
+
+    it('still produces the report when excuses cannot be read', async () => {
+      // The summary is the point; a failure here must not cost the school
+      // its attendance report.
+      (service as any).absenceExcuses = {
+        excusedByTeacher: jest.fn().mockRejectedValue(new Error('db down')),
+      };
+      const result: any = await summary();
+      expect(result.status).toBe(true);
+      expect(result.data.length).toBeGreaterThan(0);
+    });
   });
 });

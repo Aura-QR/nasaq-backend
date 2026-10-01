@@ -3,6 +3,11 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { School, SchoolSchema } from 'src/platform/schools/schemas/school.schema';
 import { Teacher, TeacherSchema } from 'src/teachers/schemas/teacher.schema';
 import { TeacherAttendance, TeacherAttendanceSchema } from './schemas/teacher-attendance.schema';
+import {
+  TeacherAbsenceExcuse,
+  TeacherAbsenceExcuseSchema,
+} from './schemas/teacher-absence-excuse.schema';
+import { TeacherAbsenceExcuseService } from './teacher-absence-excuse.service';
 import { TeacherAttendanceController } from './teacher-attendance.controller';
 import { TeacherAttendanceService } from './teacher-attendance.service';
 import { LeaveRequest, LeaveRequestSchema } from '../duty/schemas/leave-request.schema';
@@ -13,6 +18,9 @@ import { NotificationsModule } from 'src/notifications/notifications.module';
   imports: [
     MongooseModule.forFeature([
       { name: TeacherAttendance.name, schema: TeacherAttendanceSchema },
+      // A collection of its own: an absent teacher has no attendance row to
+      // hang an excuse on — see the schema's own note.
+      { name: TeacherAbsenceExcuse.name, schema: TeacherAbsenceExcuseSchema },
       { name: Teacher.name, schema: TeacherSchema },
       { name: School.name, schema: SchoolSchema },
       { name: LeaveRequest.name, schema: LeaveRequestSchema },
@@ -22,7 +30,7 @@ import { NotificationsModule } from 'src/notifications/notifications.module';
     NotificationsModule,
   ],
   controllers: [TeacherAttendanceController],
-  providers: [TeacherAttendanceService],
-  exports: [TeacherAttendanceService],
+  providers: [TeacherAttendanceService, TeacherAbsenceExcuseService],
+  exports: [TeacherAttendanceService, TeacherAbsenceExcuseService],
 })
 export class TeacherAttendanceModule {}

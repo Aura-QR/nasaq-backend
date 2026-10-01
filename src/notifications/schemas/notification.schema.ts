@@ -23,6 +23,12 @@ export const NOTIFICATION_TYPES = [
   'absence_excuse_reviewed',
   // The school's ruling on a teacher's account of a lateness.
   'late_reason_reviewed',
+  // A teacher's account of a whole day she missed, and the school's ruling
+  // on it. Distinct from the student types above and from the lateness ones:
+  // the bell routes by type, and an admin tapping a teacher's absence excuse
+  // must not land on the families' queue or the latenesses list.
+  'teacher_absence_excuse_submitted',
+  'teacher_absence_excuse_reviewed',
   // What a supervisor saw in a classroom, the teacher's account of it, and
   // the school's ruling. Period-level, unlike the three above, which are the
   // day.

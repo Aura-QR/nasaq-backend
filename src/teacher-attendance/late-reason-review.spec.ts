@@ -27,6 +27,8 @@ describe('Ruling on a lateness', () => {
   const build = () =>
     new TeacherAttendanceService(
       model, {} as any, {} as any, {} as any, {} as any, notifications,
+      // Only the monthly summary reads excuses; these do not exercise it.
+      { excusedByTeacher: jest.fn().mockResolvedValue(new Map()) } as any,
     );
 
   beforeEach(() => {

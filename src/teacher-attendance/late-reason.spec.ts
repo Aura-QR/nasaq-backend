@@ -93,6 +93,8 @@ describe('Teacher lateness and its reason', () => {
       leaveRequestModel,
       adminModel,
       notifications,
+      // Only the monthly summary reads excuses; these do not exercise it.
+      { excusedByTeacher: jest.fn().mockResolvedValue(new Map()) } as any,
     );
   });
 

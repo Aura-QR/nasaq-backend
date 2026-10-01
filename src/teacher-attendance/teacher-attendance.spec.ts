@@ -103,6 +103,8 @@ describe('TeacherAttendanceService Unit & Integration Tests', () => {
       leaveRequestModel as any,
       adminModel as any,
       notifications as any,
+      // Only the monthly summary reads excuses.
+      { excusedByTeacher: jest.fn().mockResolvedValue(new Map()) } as any,
     );
   });
 

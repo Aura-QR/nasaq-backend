@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -10,8 +11,11 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { Roles } from 'src/auth/decorators/roles.decorator';
@@ -31,13 +35,114 @@ import {
   ListLateReasonsDto,
   ReviewLateReasonDto,
 } from './dto/review-late-reason.dto';
+import {
+  ListAbsenceExcusesDto,
+  ReviewAbsenceExcuseDto,
+  SubmitAbsenceExcuseDto,
+} from './dto/absence-excuse.dto';
+import { TeacherAbsenceExcuseService } from './teacher-absence-excuse.service';
+// The same uploader the student flow uses — one place decides what a medical
+// note may be and what it is renamed to.
+import { multerExcuseConfig } from '../attendance/config/multer-excuse.config';
 
 @Controller('teacher-attendance')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiTags('Teacher Attendance')
 @ApiBearerAuth()
 export class TeacherAttendanceController {
-  constructor(private readonly teacherAttendanceService: TeacherAttendanceService) {}
+  constructor(
+    private readonly teacherAttendanceService: TeacherAttendanceService,
+    private readonly absenceExcuses: TeacherAbsenceExcuseService,
+  ) {}
+
+  // ───────────────────────────────────── أعذار غياب المعلمين
+  //
+  // Declared here, above any ':id' route, for the same reason the late-reason
+  // routes are: 'absence-excuses' read as an id would 404 on a cast error.
+  //
+  // Guards mirror the lateness flow exactly — TeacherAttendance for the
+  // school side, @Roles(TEACHER) for the teacher's own. No new permission
+  // key, so nothing has to be granted before this works.
+
+  @Get('me/absence-excuse/pending')
+  @Roles(Role.TEACHER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'أيام غيابي التي لم أوضّح سببها بعد',
+    description:
+      'أسبوعان بشكل افتراضي لا اليوم وحده: المعلمة الغائبة ثلاثة أيام ' +
+      'تجيب مرة واحدة حين تعود. أيام العطل والإجازات مستثناة.',
+  })
+  @ApiQuery({ name: 'days', required: false, type: Number })
+  async myPendingAbsences(@CurrentUser() user: any, @Query('days') days?: string) {
+    const parsed = Number(days);
+    const window = Number.isInteger(parsed) && parsed >= 1 && parsed <= 60 ? parsed : 14;
+    return this.absenceExcuses.pendingDays(user, window);
+  }
+
+  @Post('me/absence-excuse/attachment')
+  @Roles(Role.TEACHER)
+  @UseInterceptors(FileInterceptor('file', multerExcuseConfig))
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'رفع تقرير طبي، ويعيد المسار ليُرسل مع العذر',
+    description: 'منفصل عن إرسال العذر حتى لا يضيع نص مكتوب إذا فشل رفع الصورة.',
+  })
+  async uploadAbsenceAttachment(@UploadedFile() file: any) {
+    if (!file) throw new BadRequestException('لم يُرفق ملف');
+    return {
+      status: true,
+      message: 'تم رفع المرفق',
+      data: { attachment: `/uploads/absence-excuses/${file.filename}` },
+    };
+  }
+
+  @Post('me/absence-excuse')
+  @Roles(Role.TEACHER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'سبب غيابي عن يوم كامل',
+    description: 'يُكتب مرة واحدة — عذر راجعته الإدارة لا يُعاد كتابته.',
+  })
+  @ApiResponse({ status: 400, description: 'يوم عطلة، أو يوم لديك فيه حضور، أو يوم لم يأتِ بعد' })
+  @ApiResponse({ status: 409, description: 'أُرسل عذر عن هذا اليوم بالفعل' })
+  async submitAbsenceExcuse(
+    @CurrentUser() user: any,
+    @Body() dto: SubmitAbsenceExcuseDto,
+  ) {
+    return this.absenceExcuses.submit(user, dto);
+  }
+
+  @CheckAbilities({ action: 'read', subject: 'TeacherAttendance' })
+  @Get('absence-excuses')
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'أعذار غياب المعلمين — المعلّقة افتراضيًا' })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'accepted', 'rejected'] })
+  @ApiQuery({ name: 'from', required: false, type: String })
+  @ApiQuery({ name: 'to', required: false, type: String })
+  @ApiQuery({ name: 'teacherId', required: false, type: String })
+  async listAbsenceExcuses(
+    @Query() query: ListAbsenceExcusesDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.absenceExcuses.list(query, user?.schoolId);
+  }
+
+  @CheckAbilities({ action: 'update', subject: 'TeacherAttendance' })
+  @Patch('absence-excuses/:id/review')
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'قبول عذر غياب أو رفضه — المعلم يُبلَّغ في الحالتين' })
+  @ApiResponse({ status: 400, description: 'رفض بلا سبب' })
+  @ApiResponse({ status: 409, description: 'روجع بالفعل' })
+  async reviewAbsenceExcuse(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() dto: ReviewAbsenceExcuseDto,
+  ) {
+    return this.absenceExcuses.review(id, user, dto);
+  }
 
   @Get('detect-ip')
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
