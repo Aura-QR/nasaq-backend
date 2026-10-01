@@ -1,0 +1,335 @@
+# Teacher Absence Excuses — API Notes
+
+Handoff notes for the Web (React) and Mobile (Flutter) developers.
+
+A teacher who arrives late can already explain herself and the school rules
+on it. A teacher who **missed a whole day** could not — the absence report
+showed a name and nothing else, so the school phoned to ask, or never asked.
+
+This gives that day the same conversation. It mirrors the student absence
+excuse and the teacher lateness flow on purpose: same shapes, same rules.
+
+**Backend is done and deployed.** Nothing here is pending on our side.
+
+| # | Endpoint | Who |
+|---|---|---|
+| 1 | `GET /teacher-attendance/me/absence-excuse/pending` | Teacher |
+| 2 | `POST /teacher-attendance/me/absence-excuse/attachment` | Teacher |
+| 3 | `POST /teacher-attendance/me/absence-excuse` | Teacher |
+| 4 | `GET /teacher-attendance/absence-excuses` | School |
+| 5 | `PATCH /teacher-attendance/absence-excuses/:id/review` | School |
+
+## The five things most likely to trip you up
+
+1. **An excused absence is still an absence.** `daysAbsent` does not change.
+2. **Upload the file first, then submit** — two calls, deliberately.
+3. **Written once.** A second excuse for the same day is `409`.
+4. **No new permission.** Anyone who can see teacher attendance can review.
+5. **It is not a leave request.** A future day is refused — that is استئذان.
+
+---
+
+## 1. Which days am I being asked about?
+
+```
+GET /teacher-attendance/me/absence-excuse/pending?days=14
+```
+
+| | |
+|---|---|
+| Role | `TEACHER` only |
+| `days` | Optional, 1–60, default **14** |
+
+Fourteen days and not just today: a teacher off sick for three days answers
+once, when she is back, and the other two days have to still be there.
+
+**Days off and school holidays never appear** — the server filters them, so
+nobody is asked to explain a Friday.
+
+### Response `200`
+
+```json
+{
+  "status": true,
+  "message": "أيام غياب بلا عذر",
+  "data": [
+    { "date": "2026-09-29" },
+    { "date": "2026-09-28" }
+  ]
+}
+```
+
+Newest first. An empty array means nothing to explain — show a calm empty
+state, not an error.
+
+---
+
+## 2. Attach a medical note (optional)
+
+```
+POST /teacher-attendance/me/absence-excuse/attachment
+Content-Type: multipart/form-data
+```
+
+Field name: `file`. PDF or image (jpg, png, heic, webp). Max **10 MB**.
+
+### Response `200`
+
+```json
+{
+  "status": true,
+  "message": "تم رفع المرفق",
+  "data": { "attachment": "/uploads/absence-excuses/1759-ab12cd34.jpg" }
+}
+```
+
+Keep that `attachment` string and send it with step 3.
+
+### Why this is a separate call
+
+So a teacher on a slow connection does not lose her typed reason when the
+photo fails. **Let her submit without the file if the upload fails** — the
+reason is the part that matters.
+
+### Errors
+
+| Code | When |
+|---|---|
+| `400` | No file sent, or not a PDF/image |
+| `413` | Over 10 MB |
+
+---
+
+## 3. Submit the excuse
+
+```
+POST /teacher-attendance/me/absence-excuse
+```
+
+```json
+{
+  "date": "2026-09-29",
+  "reason": "وعكة صحية",
+  "attachment": "/uploads/absence-excuses/1759-ab12cd34.jpg"
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `date` | yes | `YYYY-MM-DD`, must be a past or present working day |
+| `reason` | yes | Max 1000 chars, trimmed server-side |
+| `attachment` | no | The path from step 2 |
+
+### Response `200`
+
+```json
+{
+  "status": true,
+  "message": "تم إرسال عذر الغياب إلى إدارة المدرسة",
+  "data": { "id": "...", "date": "2026-09-29", "status": "pending" }
+}
+```
+
+### Errors — each one means something different, show the message
+
+| Code | `message` | What happened |
+|---|---|---|
+| `400` | `هذا اليوم ليس يوم عمل` | A day off or a holiday |
+| `400` | `لديك سجل حضور في هذا اليوم — عذر التأخير هو المناسب هنا` | She checked in; send her to the lateness flow |
+| `400` | `لا يمكن تقديم عذر عن يوم لم يأتِ بعد — استخدم طلب الاستئذان` | Future day |
+| `409` | `تم إرسال عذر عن هذا اليوم بالفعل` | Already explained |
+
+```json
+{ "status": false, "message": "تم إرسال عذر عن هذا اليوم بالفعل", "statusCode": 409 }
+```
+
+**The `409` is not a failure to retry.** It means the day is done — refresh
+the pending list and it will have gone.
+
+---
+
+## 4. The school's queue
+
+```
+GET /teacher-attendance/absence-excuses?status=pending
+```
+
+| | |
+|---|---|
+| Permission | `school.teacherAttendance.read` |
+| Roles | Owner, Supervisor, Manager |
+
+| Param | Default | Values |
+|---|---|---|
+| `status` | `pending` | `pending` · `accepted` · `rejected` |
+| `from` / `to` | — | `YYYY-MM-DD` |
+| `teacherId` | — | ObjectId |
+
+### Response `200`
+
+```json
+{
+  "status": true,
+  "data": [
+    {
+      "id": "...",
+      "teacherId": "...",
+      "teacherName": "أ. سارة",
+      "date": "2026-09-29",
+      "reason": "وعكة صحية",
+      "attachment": "/uploads/absence-excuses/1759-ab12.jpg",
+      "status": "pending",
+      "submittedAt": "2026-09-30T06:12:00.000Z",
+      "reviewedByName": "",
+      "reviewedAt": null,
+      "reviewNote": ""
+    }
+  ]
+}
+```
+
+Sorted newest first. `attachment` is `null` when none was sent — render a
+link only when it is present.
+
+---
+
+## 5. Accept or refuse
+
+```
+PATCH /teacher-attendance/absence-excuses/:id/review
+```
+
+```json
+{ "verdict": "rejected", "note": "لم يُرفق تقرير طبي" }
+```
+
+| Field | Required | |
+|---|---|---|
+| `verdict` | yes | `accepted` or `rejected` |
+| `note` | **on rejection** | Max 1000 chars |
+
+**A rejection with no note is `400`.** Make the field required in the UI
+when "refuse" is selected — a refusal a teacher cannot answer is the one
+thing this must not produce.
+
+### Errors
+
+| Code | `message` |
+|---|---|
+| `400` | `اذكر سبب رفض العذر` |
+| `400` | `معرّف العذر غير صالح` |
+| `404` | `العذر غير موجود` |
+| `409` | `تمت مراجعة هذا العذر بالفعل` |
+
+The teacher is notified either way.
+
+---
+
+## Business Logic Notes
+
+### 1. An excused absence is still an absence
+
+This is the most important line in this document.
+
+`GET /teacher-attendance/summary` now returns two extra fields per teacher:
+
+```json
+{
+  "teacherName": "أ. سارة",
+  "workingDays": 22,
+  "daysAbsent": 3,
+  "daysAbsentExcused": 2,
+  "daysAbsentUnexcused": 1
+}
+```
+
+**`daysAbsent` does not change** when an excuse is accepted. The school
+asked to receive the explanation, not for the figure to move.
+
+Render it as **"3 غياب · منها 2 بعذر"**, never as "1 غياب". Guaranteed:
+`daysAbsentExcused + daysAbsentUnexcused === daysAbsent`, and the excused
+count can never exceed the absences.
+
+### 2. Three different conversations, three different flows
+
+Do not merge these in the UI:
+
+| Situation | Flow | Endpoint |
+|---|---|---|
+| Came in late | عذر تأخير | `me/late-reason` |
+| Missed a whole day | عذر غياب | `me/absence-excuse` |
+| Leaving early today | استئذان | `duty` leave request |
+
+The server routes a teacher to the right one when she picks wrong — the
+`400` messages above say which. Pass them through verbatim.
+
+### 3. Written once
+
+There is a unique index on `(teacher, date)`. A second excuse is a `409`,
+not a second row. An explanation a manager already ruled on cannot be
+rewritten underneath them.
+
+The same applies to review: an excuse that is already accepted or rejected
+cannot be ruled on again.
+
+### 4. Notifications
+
+| Type | Goes to | When |
+|---|---|---|
+| `teacher_absence_excuse_submitted` | Owner, managers, supervisors | She explains |
+| `teacher_absence_excuse_reviewed` | The teacher | They rule |
+
+Both carry `excuseId`, `date` and `status` in `data`. Route the bell on the
+type — these are distinct from the student `absence_excuse_*` types on
+purpose, so an admin tapping a teacher's excuse does not land on the
+families' queue.
+
+### 5. No new permission
+
+The school side is guarded by `school.teacherAttendance.read` and
+`.update`, which owners, managers and supervisors already hold. Nothing has
+to be granted, and the permissions screen does not change.
+
+---
+
+## Suggested UI
+
+### Teacher
+
+A card on her attendance screen when the pending list is not empty:
+
+```
+┌────────────────────────────────────────┐
+│  لديك يومان بلا عذر                    │
+│                                        │
+│  الثلاثاء ٢٩ سبتمبر        [ وضّح ]    │
+│  الإثنين ٢٨ سبتمبر         [ وضّح ]    │
+└────────────────────────────────────────┘
+```
+
+Tapping «وضّح» opens a sheet with the reason field and an optional attach
+button. Keep the typed reason if the upload fails.
+
+### School
+
+Beside the existing lateness queue, with the same shape. Show the
+attachment as a thumbnail or a link, and make the note field appear and
+become required the moment "refuse" is chosen.
+
+---
+
+## Out of scope
+
+- **Editing an excuse** — written once by design. If a school needs a
+  correction path, that is a decision to make, not an oversight.
+- **Bulk review** — one at a time; each needs its own note.
+- **Excuses affecting payroll** — nothing here touches a salary figure.
+- **Staff (non-teaching) absence excuses** — `staff-attendance` is a
+  separate module and was not changed.
+
+---
+
+## Questions
+
+Ask in the team channel. If something here does not match what the API
+returns, the API is right and this file is wrong — say so and it gets fixed.
