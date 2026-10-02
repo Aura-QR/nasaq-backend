@@ -63,6 +63,11 @@ export function staffCalendarDate(
   }
 }
 
+/** The name a report shows: the full name when the school entered one. */
+function displayNameOf(person: any): string {
+  return String(person?.fullName || '').trim() || person?.username || '';
+}
+
 @Injectable()
 export class StaffAttendanceService {
   constructor(
@@ -127,7 +132,7 @@ export class StaffAttendanceService {
         _id: this.objectId(staffId),
         role: self ? user.role : { $in: ATTENDANCE_STAFF_ROLES },
       })
-      .select('username email role')
+      .select('username fullName jobLabel email role')
       .lean();
     if (!staff)
       throw new NotFoundException('المدير أو المشرف غير موجود في هذه المدرسة');
@@ -230,7 +235,7 @@ export class StaffAttendanceService {
     const schedule = resolveDaySchedule(settings, date);
     const record = await this.createRecord({
       ...key,
-      name: staff.username,
+      name: displayNameOf(staff),
       role: staff.role,
       checkInAt,
       method: 'location',
@@ -334,7 +339,7 @@ export class StaffAttendanceService {
     const record = await this.createRecord({
       ...this.scope(user),
       staffId: staff._id,
-      name: staff.username,
+      name: displayNameOf(staff),
       role: staff.role,
       date,
       checkInAt,
@@ -426,14 +431,15 @@ export class StaffAttendanceService {
         ...this.scope(user),
         role: query.role || { $in: ATTENDANCE_STAFF_ROLES },
       })
-      .select('username email role')
+      .select('username fullName jobLabel email role')
       .sort({ username: 1, _id: 1 })
       .lean();
     return {
       status: true,
       data: staff.map((s) => ({
         staffId: s._id,
-        name: s.username,
+        name: displayNameOf(s),
+        jobLabel: (s as any).jobLabel || '',
         email: s.email,
         role: s.role,
       })),
@@ -771,7 +777,9 @@ export class StaffAttendanceService {
     // behalf, which is how somebody phoning in at seven in the morning gets
     // recorded at all.
     const onBehalf = dto.staffId && String(dto.staffId) !== String(user.userId);
-    if (onBehalf && user?.role === Role.SUPERVISOR) {
+    // Service staff are held to the same rule as a supervisor: only for
+    // themselves. Without this a guard could file leave in a manager's name.
+    if (onBehalf && (user?.role === Role.SUPERVISOR || user?.role === Role.STAFF)) {
       throw new ForbiddenException('لا يمكنك تقديم استئذان نيابة عن غيرك');
     }
 
@@ -804,7 +812,7 @@ export class StaffAttendanceService {
     const created = await new this.leaves({
       ...this.scope(user),
       staffId: person._id,
-      staffName: person.username,
+      staffName: displayNameOf(person),
       role: person.role,
       date,
       leaveAt: dto.leaveAt,
@@ -826,14 +834,14 @@ export class StaffAttendanceService {
           this.notifications.notify({
             recipientId,
             type: 'staff_leave_requested',
-            title: `طلب استئذان — ${person.username}`,
+            title: `طلب استئذان — ${displayNameOf(person)}`,
             body: [`${dateLabel} · انصراف ${dto.leaveAt}`, dto.reason]
               .filter(Boolean)
               .join(' — '),
             data: {
               leaveRequestId: String(created._id),
               staffId: String(person._id),
-              staffName: person.username,
+              staffName: displayNameOf(person),
               date: dateLabel,
               leaveAt: dto.leaveAt,
             },
@@ -857,7 +865,9 @@ export class StaffAttendanceService {
   async listLeaves(user: any, query: ListStaffLeaveRequestsDto) {
     const filter: any = { ...this.scope(user) };
 
-    if (user?.role === Role.SUPERVISOR) {
+    // Supervisors and service staff see only their own requests; a guard
+    // must never read the administrators' leave requests.
+    if (user?.role === Role.SUPERVISOR || user?.role === Role.STAFF) {
       filter.staffId = this.objectId(String(user.userId));
     } else if (query.staffId) {
       filter.staffId = this.objectId(query.staffId);
@@ -971,7 +981,7 @@ export class StaffAttendanceService {
     if (!request) throw new NotFoundException('طلب الاستئذان غير موجود');
 
     const own = String(request.staffId) === String(user.userId);
-    if (!own && user?.role === Role.SUPERVISOR) {
+    if (!own && (user?.role === Role.SUPERVISOR || user?.role === Role.STAFF)) {
       throw new ForbiddenException('لا يمكنك حذف استئذان غيرك');
     }
     if (request.status !== 'pending') {

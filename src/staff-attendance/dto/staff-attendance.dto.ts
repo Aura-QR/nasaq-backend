@@ -16,7 +16,9 @@ import {
 } from 'class-validator';
 import { Role } from '../../auth/enums/role.enum';
 
-export const ATTENDANCE_STAFF_ROLES = [Role.MANAGER, Role.SUPERVISOR];
+// STAFF — service staff such as a guard — keep the school's hours and are
+// tracked exactly like the administrators here.
+export const ATTENDANCE_STAFF_ROLES = [Role.MANAGER, Role.SUPERVISOR, Role.STAFF];
 
 export class StaffLocationDto {
   @ApiProperty({ example: 24.7136 })

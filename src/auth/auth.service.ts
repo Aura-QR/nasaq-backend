@@ -200,6 +200,15 @@ export class AuthService {
                 user.schoolId?.toString(),
                 user.jobTitleId?.toString(),
             ));
+        } else if (role === Role.STAFF) {
+            // Service staff hold no school permission. They sign in to record
+            // their own attendance, which is guarded by role, not permission.
+            //
+            // Explicit rather than left to the final branch: that branch looks
+            // up a permission row for the role and creates one when none
+            // exists, and the Permission schema does not accept STAFF — so a
+            // guard's first sign-in would have failed with a validation error.
+            permissions = [];
         } else if (role === Role.TEACHER) {
             const basePerms = await this.permissionsService.getFlatPermissions(
                 Role.TEACHER,
@@ -316,7 +325,8 @@ export class AuthService {
             } else if (
                 role === 'OWNER' ||
                 role === 'MANAGER' ||
-                role === 'SUPERVISOR'
+                role === 'SUPERVISOR' ||
+                role === 'STAFF'
             ) {
                 const query: any = { email: cleanEmail };
                 if (filterSchoolId) query.schoolId = filterSchoolId;
@@ -406,7 +416,8 @@ export class AuthService {
         } else if (
             role === 'OWNER' ||
             role === 'MANAGER' ||
-            role === 'SUPERVISOR'
+            role === 'SUPERVISOR' ||
+            role === 'STAFF'
         ) {
             const query: any = { email: cleanEmail };
             if (filterSchoolId) query.schoolId = filterSchoolId;

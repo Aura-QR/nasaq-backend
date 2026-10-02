@@ -5,6 +5,8 @@ import { Teacher, TeacherSchema } from 'src/teachers/schemas/teacher.schema';
 import { JobTitle, JobTitleSchema } from 'src/permissions/job-titles/job-title.schema';
 import { ManagersService } from './managers.service';
 import { ManagersController } from './managers.controller';
+import { StaffMembersController } from './staff-members.controller';
+import { StaffMembersService } from './staff-members.service';
 
 @Module({
   imports: [
@@ -14,8 +16,8 @@ import { ManagersController } from './managers.controller';
       { name: JobTitle.name, schema: JobTitleSchema },
     ]),
   ],
-  controllers: [ManagersController],
-  providers: [ManagersService],
+  controllers: [ManagersController, StaffMembersController],
+  providers: [ManagersService, StaffMembersService],
   exports: [ManagersService],
 })
 export class ManagersModule {}

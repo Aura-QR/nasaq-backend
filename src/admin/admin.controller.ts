@@ -1,3 +1,5 @@
+import { Roles } from '../auth/decorators/roles.decorator';
+import { Role } from '../auth/enums/role.enum';
 import {
   Controller,
   Get,
@@ -44,6 +46,14 @@ export class AdminController {
     return await this.adminService.login(loginAdminDto)
   }
 
+  // Platform administration only. These had no guard beyond being signed
+  // in, so any account in a school — a teacher, a student, a guard — could
+  // list its administrators, delete them, or PATCH the owner's password and
+  // sign in as the owner. The body type is Partial<CreateAdminDto>, which
+  // erases at runtime, so validation checked nothing either. No client calls
+  // these routes; school-side admin management lives in /managers and
+  // /staff-members.
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all admins' })
   @ApiResponse({ status: 200, description: 'Admins fetched successfully' })
   @Get()
@@ -52,6 +62,7 @@ export class AdminController {
     return await this.adminService.findAll()
   }
 
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get an admin by ID' })
   @ApiResponse({ status: 200, description: 'Admin fetched successfully' })
   @ApiResponse({ status: 404, description: 'Admin not found' })
@@ -63,6 +74,7 @@ export class AdminController {
     return await this.adminService.findOne(id)
   }
 
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: 'Update an admin' })
   @ApiResponse({ status: 200, description: 'Admin updated successfully' })
   @ApiResponse({ status: 404, description: 'Admin not found' })
@@ -75,6 +87,7 @@ export class AdminController {
     return await this.adminService.update(id, updateAdminDto)
   }
 
+  @Roles(Role.SUPER_ADMIN)
   @ApiOperation({ summary: 'Delete an admin' })
   @ApiResponse({ status: 200, description: 'Admin deleted successfully' })
   @ApiResponse({ status: 404, description: 'Admin not found' })

@@ -8,11 +8,11 @@ export class ResetPasswordDto {
 
   @ApiProperty({
     description: 'دور المستخدم',
-    enum: ['TEACHER', 'STUDENT', 'OWNER', 'MANAGER', 'SUPERVISOR'],
+    enum: ['TEACHER', 'STUDENT', 'OWNER', 'MANAGER', 'SUPERVISOR', 'STAFF'],
     example: 'TEACHER',
   })
   @IsString()
-  @IsIn(['TEACHER', 'STUDENT', 'OWNER', 'MANAGER', 'SUPERVISOR'], {
+  @IsIn(['TEACHER', 'STUDENT', 'OWNER', 'MANAGER', 'SUPERVISOR', 'STAFF'], {
     message: 'دور المستخدم غير صالح',
   })
   role: string;

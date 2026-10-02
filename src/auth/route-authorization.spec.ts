@@ -20,11 +20,22 @@ const SRC = path.join(__dirname, '..');
 /** Public by design — authentication itself, and health. */
 const PUBLIC_FILES = [
   'auth/auth.controller.ts',
-  'admin/admin.controller.ts',
   'platform/platform-auth.controller.ts',
   'app.controller.ts',
   'common/nationalities.controller.ts',
 ];
+
+/**
+ * Single routes that are public inside a file that is otherwise guarded.
+ *
+ * admin.controller.ts used to sit in PUBLIC_FILES whole because of its login
+ * route — which exempted its PATCH and DELETE too. Those had no guard, and
+ * any signed-in account in a school could PATCH the owner's password. Only
+ * the login is exempt now; everything else in that file is checked.
+ */
+const PUBLIC_ROUTES = new Set([
+  'admin/admin.controller.ts::POST /login',
+]);
 
 /**
  * Writes that authorize inside the service instead, because the rule is about
@@ -132,7 +143,7 @@ describe('authorization coverage', () => {
       for (const route of routesOf(file)) {
         if (route.method === 'GET') continue;
         const key = `${rel}::${route.method} ${route.route}`;
-        if (SERVICE_AUTHORIZED.has(key)) continue;
+        if (SERVICE_AUTHORIZED.has(key) || PUBLIC_ROUTES.has(key)) continue;
         if (!route.guarded) unguarded.push(`${rel}:${route.line}  ${route.method} ${route.route}`);
       }
     }

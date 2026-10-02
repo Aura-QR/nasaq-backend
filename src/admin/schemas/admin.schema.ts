@@ -15,8 +15,24 @@ export class Admin extends Document {
   @Prop({ required: true, select: false })
   password: string;
 
-  @Prop({ default: 'OWNER', enum: ['OWNER', 'MANAGER', 'SUPERVISOR'] })
+  @Prop({ default: 'OWNER', enum: ['OWNER', 'MANAGER', 'SUPERVISOR', 'STAFF'] })
   role: string;
+
+  /**
+   * What a STAFF account does — حارس، بوّاب، عامل نظافة، سائق. Free text,
+   * shown beside the name; it grants nothing. Empty for other roles.
+   */
+  @Prop({ type: String, default: '' })
+  jobLabel: string;
+
+  /**
+   * A person's name as the school writes it — «محمد السيد». Administrators
+   * have managed with a username, but a guard is known by name, and an
+   * attendance report reading "guard01" is no use to anyone. Empty means
+   * "show the username", which is every account that existed before this.
+   */
+  @Prop({ type: String, default: '' })
+  fullName: string;
 
   @Prop({ type: [String], default: [] })
   permissions: string[];

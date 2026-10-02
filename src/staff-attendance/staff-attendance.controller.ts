@@ -45,7 +45,7 @@ import { extractClientIp } from '../attendance/attendance.utils';
 export class StaffAttendanceController {
   constructor(private readonly service: StaffAttendanceService) {}
 
-  @Roles(Role.MANAGER, Role.SUPERVISOR)
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Post('check-in')
   @HttpCode(200)
   @ApiOperation({ summary: 'Manager/supervisor self check-in' })
@@ -57,7 +57,7 @@ export class StaffAttendanceController {
     return this.service.checkIn(user, dto, req);
   }
 
-  @Roles(Role.MANAGER, Role.SUPERVISOR)
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Post('check-out')
   @HttpCode(200)
   @ApiOperation({ summary: 'Manager/supervisor self check-out' })
@@ -69,7 +69,7 @@ export class StaffAttendanceController {
     return this.service.checkOut(user, dto, req);
   }
 
-  @Roles(Role.MANAGER, Role.SUPERVISOR)
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Get('me')
   @ApiOperation({
     summary: 'Own attendance history; staffId and role filters are ignored',
@@ -85,14 +85,14 @@ export class StaffAttendanceController {
    * number and the person had nowhere to say why, which the teacher side has
    * had an answer to since the lateness queue was built.
    */
-  @Roles(Role.MANAGER, Role.SUPERVISOR)
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Get('me/late-reason/pending')
   @ApiOperation({ summary: "Today's unexplained lateness, if there is one" })
   pendingLateReason(@CurrentUser() user: any) {
     return this.service.pendingLateReason(user);
   }
 
-  @Roles(Role.MANAGER, Role.SUPERVISOR)
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Post('me/late-reason')
   @HttpCode(200)
   @ApiOperation({ summary: 'Explain your own lateness. Written once.' })
@@ -142,7 +142,7 @@ export class StaffAttendanceController {
   // none of the cover machinery applies and a notice about this must not send
   // a manager to a cover screen with nothing on it.
 
-  @Roles(Role.MANAGER, Role.SUPERVISOR)
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Post('leave-requests')
   @HttpCode(201)
   @ApiOperation({
@@ -157,7 +157,7 @@ export class StaffAttendanceController {
     return this.service.createLeave(user, dto);
   }
 
-  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR)
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Get('leave-requests')
   @ApiOperation({ summary: 'A SUPERVISOR caller always gets only their own' })
   listLeaves(
