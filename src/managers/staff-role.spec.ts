@@ -229,3 +229,58 @@ describe('the platform-only admin routes', () => {
     }
   });
 });
+
+describe('routes with no @Roles', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { RolesGuard } = require('../auth/guards/roles.guard');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { Reflector } = require('@nestjs/core');
+
+  class StudentsController {}
+  class NotificationsController {}
+  class AuthController {}
+
+  const ctx = (cls: any, user: any, roles?: string[]) => {
+    const handler = () => undefined;
+    if (roles) Reflect.defineMetadata('roles', roles, handler);
+    return {
+      getHandler: () => handler,
+      getClass: () => cls,
+      switchToHttp: () => ({ getRequest: () => ({ user }) }),
+    } as any;
+  };
+  const guard = new RolesGuard(new Reflector());
+  const staff = { role: 'STAFF' };
+
+  it('stay open to every other role, as before', () => {
+    // Teachers and students rely on unguarded reads for their dropdowns.
+    expect(guard.canActivate(ctx(StudentsController, { role: 'TEACHER' }))).toBe(true);
+    expect(guard.canActivate(ctx(StudentsController, { role: 'STUDENT' }))).toBe(true);
+  });
+
+  it('are closed to service staff', () => {
+    // A guard signing in found GET /students open — every family's phone
+    // number and address.
+    expect(guard.canActivate(ctx(StudentsController, staff))).toBe(false);
+  });
+
+  it('leave staff their own notices and account', () => {
+    expect(guard.canActivate(ctx(NotificationsController, staff))).toBe(true);
+    expect(guard.canActivate(ctx(AuthController, staff))).toBe(true);
+  });
+
+  it('still let staff through where @Roles names them', () => {
+    expect(guard.canActivate(ctx(StudentsController, staff, ['MANAGER', 'STAFF']))).toBe(true);
+    expect(guard.canActivate(ctx(StudentsController, staff, ['MANAGER']))).toBe(false);
+  });
+
+  it('keep public routes public when nobody is signed in', () => {
+    expect(guard.canActivate(ctx(AuthController, undefined))).toBe(true);
+  });
+
+  it('lets staff read the school settings their check-in screen needs', () => {
+    const text = fs.readFileSync(path.join(SRC, 'platform/schools/schools.controller.ts'), 'utf8');
+    const at = text.indexOf("@Get('schools/me/settings')");
+    expect(text.slice(Math.max(0, at - 250), at)).toContain('Role.STAFF');
+  });
+});

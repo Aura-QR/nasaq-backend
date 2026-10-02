@@ -59,6 +59,13 @@ export class SchoolsController {
     return this.schoolsService.update(id, { isActive: true, subscriptionStatus: 'active' });
   }
 
+  // Every school role reads this — check-in screens need the on/off switch
+  // and location. Listed by name so service staff, who reach only routes
+  // that name them, can still open their check-in screen.
+  @Roles(
+    Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.TEACHER,
+    Role.STUDENT, Role.STAFF, Role.SUPER_ADMIN,
+  )
   @Get('schools/me/settings')
   @UseGuards(JwtAuthGuard, TenantGuard)
   async getMySettings(@CurrentSchool() schoolId: string) {
