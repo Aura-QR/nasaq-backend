@@ -9,6 +9,11 @@ can reach.
 
 **Backend is done and deployed** — verified end to end on the QA school.
 
+**Web is done** (frontend `3626407`): the owner's «موظفو الخدمات» screen at
+`/school/staff-members`, and a STAFF login lands on `/staff-attendance` with a
+two-item sidebar. **Mobile is what remains** — section 3 below. The web pages
+are a working reference: `src/pages/StaffMembers/StaffMembers.jsx`.
+
 ## What exists now
 
 A new role, **`STAFF`** (موظف خدمات). It is an admin-type account with:
