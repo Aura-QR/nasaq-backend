@@ -256,6 +256,11 @@ export class AuthService {
                 role: role,
                 schoolId: user.schoolId,
                 jobTitle,
+                // So a client can greet a person by name. A guard's email is a
+                // generated placeholder, and its prefix is not a name.
+                username: user.username ?? undefined,
+                fullName: user.fullName || user.name || undefined,
+                jobLabel: user.jobLabel || undefined,
             },
             permissions
         };
