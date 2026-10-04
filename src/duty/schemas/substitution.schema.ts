@@ -6,6 +6,15 @@ export const COVER_REASONS = ['absent', 'leave', 'other'] as const;
 export type CoverReason = (typeof COVER_REASONS)[number];
 
 /**
+ * Who can be sent to cover. A teacher, or an administrator from the Admin
+ * collection — schools short of free teachers send a supervisor or a manager.
+ * STAFF (guards, cleaners) and the OWNER are never offered.
+ */
+export const SUBSTITUTE_TYPES = ['Teacher', 'Admin'] as const;
+export type SubstituteType = (typeof SUBSTITUTE_TYPES)[number];
+export const COVER_ADMIN_ROLES = ['MANAGER', 'SUPERVISOR'] as const;
+
+/**
  * One lecture, on one day, taught by somebody other than its usual teacher.
  *
  * Keyed on the lecture and the date rather than replacing the lecture itself:
@@ -35,13 +44,26 @@ export class Substitution extends Document {
   })
   absentTeacherId: Types.ObjectId | null;
 
+  /**
+   * Who is taking it. Despite the name, this holds an Admin id when
+   * `substituteType` is 'Admin'. The name is kept because both clients and
+   * every existing row already use it; `substituteType` says which collection.
+   */
   @Prop({
     type: MongooseSchema.Types.ObjectId,
-    ref: 'Teacher',
+    refPath: 'substituteType',
     required: true,
     index: true,
   })
   substituteTeacherId: Types.ObjectId;
+
+  /** Rows written before admins could cover have no value, and mean Teacher. */
+  @Prop({ type: String, enum: SUBSTITUTE_TYPES, default: 'Teacher' })
+  substituteType: SubstituteType;
+
+  /** TEACHER, MANAGER or SUPERVISOR, for labels («مشرفة»). */
+  @Prop({ type: String, default: 'TEACHER' })
+  substituteRole: string;
 
   @Prop({ type: String, default: '' })
   absentTeacherName: string;

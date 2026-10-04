@@ -20,6 +20,7 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 import { Substitution } from '../duty/schemas/substitution.schema';
 import { coversLecture } from '../duty/substitute-access.util';
+import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 
 /** What one student's row resolves to once defaults are applied. */
 export interface ResolvedTrackingRecord {
@@ -157,7 +158,28 @@ export class DailyTrackingService {
    * working. The client sends one payload because the teacher pressed save
    * once — splitting it into two requests would let one half succeed.
    */
+  /**
+   * The bulk route skips its permission guard for MANAGER and lands here: a
+   * manager records daily tracking if her permissions allow it, or for the
+   * period she is covering that day. Managers have dailyTracking.add off by
+   * default, and without this a manager sent to cover could take the
+   * register but not the tracking for the same period.
+   */
+  private async assertManagerMayRecord(dto: BulkDailyTrackingDto, user: any) {
+    if (user?.role !== 'MANAGER') return;
+
+    const ability = await new CaslAbilityFactory().defineAbilitiesFor(user);
+    if (ability.can('create', 'DailyTracking')) return;
+
+    if (await coversLecture(this.substitutionModel, user.userId, dto.lectureId, dto.date)) {
+      return;
+    }
+
+    throw new ForbiddenException('ليس لديك صلاحية للقيام بهذا الإجراء');
+  }
+
   async bulkUpsert(dto: BulkDailyTrackingDto, user: any) {
+    await this.assertManagerMayRecord(dto, user);
     const lecture = await this.loadLectureForTeacher(dto.lectureId, user, dto.date);
 
     const classId = (lecture as any).classId?._id ?? (lecture as any).classId;

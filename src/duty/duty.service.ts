@@ -9,7 +9,14 @@ import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { LeaveRequest } from './schemas/leave-request.schema';
 import { DutySupervisor } from './schemas/duty-supervisor.schema';
-import { Substitution } from './schemas/substitution.schema';
+import {
+  COVER_ADMIN_ROLES,
+  SubstituteType,
+  Substitution,
+} from './schemas/substitution.schema';
+import { Admin } from '../admin/schemas/admin.schema';
+import { StaffAttendance } from '../staff-attendance/schemas/staff-attendance.schema';
+import { StaffLeaveRequest } from '../staff-attendance/schemas/staff-leave-request.schema';
 import { Teacher } from '../teachers/schemas/teacher.schema';
 import { Lecture } from '../lectures/schemas/lecture.schema';
 import { TeacherAttendance } from '../teacher-attendance/schemas/teacher-attendance.schema';
@@ -57,6 +64,17 @@ function toDateOnly(value: Date | null | undefined): string | null {
   return value ? value.toISOString().slice(0, 10) : null;
 }
 
+/** An administrator is known by name when one was given, else by username. */
+const adminName = (admin: any): string =>
+  String(admin?.fullName || '').trim() || admin?.username || '';
+
+interface ResolvedSubstitute {
+  id: string;
+  name: string;
+  type: SubstituteType;
+  role: string;
+}
+
 @Injectable()
 export class DutyService {
   constructor(
@@ -72,6 +90,11 @@ export class DutyService {
     private readonly attendanceModel: Model<TeacherAttendance>,
     @InjectModel(Term.name) private readonly termModel: Model<Term>,
     @InjectModel(Class.name) private readonly classModel: Model<Class>,
+    @InjectModel(Admin.name) private readonly adminModel: Model<Admin>,
+    @InjectModel(StaffAttendance.name)
+    private readonly staffAttendanceModel: Model<StaffAttendance>,
+    @InjectModel(StaffLeaveRequest.name)
+    private readonly staffLeaveModel: Model<StaffLeaveRequest>,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -368,14 +391,10 @@ export class DutyService {
       );
     }
 
-    const substitute: any = await this.teacherModel
-      .findById(dto.substituteTeacherId)
-      .select('name')
-      .lean()
-      .exec();
+    const substitute = await this.resolveSubstitute(dto.substituteTeacherId);
     if (!substitute) {
       throw new NotFoundException(
-        `المدرس البديل ${dto.substituteTeacherId} غير موجود`,
+        `البديل ${dto.substituteTeacherId} غير موجود، أو ليس معلمًا أو مشرفًا أو مديرًا`,
       );
     }
 
@@ -418,7 +437,9 @@ export class DutyService {
           substituteTeacherId: new mongoose.Types.ObjectId(
             dto.substituteTeacherId,
           ),
-          substituteTeacherName: substitute.name ?? '',
+          substituteTeacherName: substitute.name,
+          substituteType: substitute.type,
+          substituteRole: substitute.role,
           reason: dto.reason ?? 'absent',
           notes: dto.notes ?? '',
           createdBy: user?.userId ?? null,
@@ -437,12 +458,12 @@ export class DutyService {
     await this.notifications.notify({
       recipientId: dto.substituteTeacherId,
       type: 'cover_assigned',
-      title: 'عندك حصة احتياطي',
+      title: 'لديك حصة احتياط',
       body: [
         toDateOnly(date),
         `الحصة ${lecture.slot}`,
         classInfo?.name,
-        absentTeacher?.name ? `بدل ${absentTeacher.name}` : null,
+        absentTeacher?.name ? `بدلًا من ${absentTeacher.name}` : null,
       ]
         .filter(Boolean)
         .join(' · '),
@@ -458,6 +479,35 @@ export class DutyService {
       message: `تم تكليف ${substitute.name} بالحصة`,
       data: { ...saved.toObject(), date: toDateOnly(saved.date) },
     };
+  }
+
+  /**
+   * A teacher, or failing that a supervisor or manager. Teachers are looked
+   * up first because nearly every cover is a teacher, and an id is unique
+   * across collections. STAFF and OWNER accounts are not substitutes.
+   */
+  private async resolveSubstitute(id: string): Promise<ResolvedSubstitute | null> {
+    if (!mongoose.Types.ObjectId.isValid(String(id))) return null;
+
+    const teacher: any = await this.teacherModel
+      .findById(id)
+      .select('name')
+      .lean()
+      .exec();
+    if (teacher) {
+      return { id: String(teacher._id), name: teacher.name ?? '', type: 'Teacher', role: 'TEACHER' };
+    }
+
+    const admin: any = await this.adminModel
+      .findOne({ _id: id, role: { $in: COVER_ADMIN_ROLES } })
+      .select('username fullName role')
+      .lean()
+      .exec();
+    if (admin) {
+      return { id: String(admin._id), name: adminName(admin), type: 'Admin', role: admin.role };
+    }
+
+    return null;
   }
 
   /**
@@ -497,7 +547,7 @@ export class DutyService {
         .lean()
         .exec();
       if (covered?.slot === lecture.slot) {
-        reasons.push('مكلّف باحتياطي تاني في نفس الخانة');
+        reasons.push('مكلّف بحصة احتياط أخرى في الخانة نفسها');
       }
     }
 
@@ -675,7 +725,7 @@ export class DutyService {
 
     const range = { $gte: start, $lte: end };
 
-    const [substitutions, leaves, attendance, teachers]: any[] =
+    const [substitutions, leaves, attendance, teachers, admins]: any[] =
       await Promise.all([
         this.substitutionModel.find({ date: range }).lean().exec(),
         this.leaveModel.find({ date: range, status: 'approved' }).lean().exec(),
@@ -685,12 +735,19 @@ export class DutyService {
           .select('name specialization')
           .lean()
           .exec(),
+        this.adminModel
+          .find({ role: { $in: COVER_ADMIN_ROLES } })
+          .select('username fullName role')
+          .lean()
+          .exec(),
       ]);
 
     const row = (teacher: any) => ({
       teacherId: String(teacher._id),
       name: teacher.name,
       specialization: teacher.specialization ?? null,
+      type: 'Teacher' as SubstituteType,
+      role: 'TEACHER',
       covered: 0,
       neededCover: 0,
       approvedLeaves: 0,
@@ -700,6 +757,15 @@ export class DutyService {
     const rows = new Map<string, any>(
       teachers.map((t: any) => [String(t._id), row(t)]),
     );
+    // Administrators only ever appear for cover they took: they have no
+    // timetable to need covering and no teacher attendance or leave.
+    for (const admin of admins) {
+      rows.set(String(admin._id), {
+        ...row({ _id: admin._id, name: adminName(admin) }),
+        type: 'Admin' as SubstituteType,
+        role: admin.role,
+      });
+    }
 
     for (const substitution of substitutions) {
       const cover = rows.get(String(substitution.substituteTeacherId));
@@ -811,14 +877,53 @@ export class DutyService {
       .lean()
       .exec();
 
-    const [teachers, attendance, leaves, existingCover]: any[] =
-      await Promise.all([
-        this.teacherModel.find({ isActive: { $ne: false } })
-          .select('name specialization').lean().exec(),
-        this.attendanceModel.find({ date }).select('teacherId').lean().exec(),
-        this.leaveModel.find({ date, status: 'approved' }).lean().exec(),
-        this.substitutionModel.find({ date }).lean().exec(),
-      ]);
+    const [
+      teachers,
+      attendance,
+      leaves,
+      existingCover,
+      admins,
+      staffAttendance,
+      staffLeaves,
+    ]: any[] = await Promise.all([
+      this.teacherModel.find({ isActive: { $ne: false } })
+        .select('name specialization').lean().exec(),
+      this.attendanceModel.find({ date }).select('teacherId').lean().exec(),
+      this.leaveModel.find({ date, status: 'approved' }).lean().exec(),
+      this.substitutionModel.find({ date }).lean().exec(),
+      this.adminModel
+        .find({ role: { $in: COVER_ADMIN_ROLES } })
+        .select('username fullName role')
+        .lean()
+        .exec(),
+      this.staffAttendanceModel
+        .find({ date, role: { $in: COVER_ADMIN_ROLES } })
+        .select('staffId')
+        .lean()
+        .exec(),
+      this.staffLeaveModel
+        .find({ date, status: 'approved' })
+        .select('staffId')
+        .lean()
+        .exec(),
+    ]);
+
+    // Supervisors and managers have no timetable, so every slot looks free;
+    // what decides is whether they are in. Same rule as for teachers: once
+    // anyone among them has checked in today, only those who did are offered.
+    // A staff leave carries a clock time, not a period, so an approved one
+    // takes them out for the day rather than guessing which periods it spares.
+    const staffPresent = new Set<string>(
+      staffAttendance.map((a: any) => String(a.staffId)),
+    );
+    const staffOnLeave = new Set<string>(
+      staffLeaves.map((l: any) => String(l.staffId)),
+    );
+    const availableAdmins = admins.filter((admin: any) => {
+      const id = String(admin._id);
+      if (staffOnLeave.has(id)) return false;
+      return staffPresent.size === 0 || staffPresent.has(id);
+    });
 
     const presentIds = new Set<string>(
       attendance.map((a: any) => String(a.teacherId)),
@@ -918,12 +1023,15 @@ export class DutyService {
           substitutionId: String(existing._id),
           substituteTeacherId: String(existing.substituteTeacherId),
           substituteTeacherName: existing.substituteTeacherName,
+          substituteType: existing.substituteType ?? 'Teacher',
+          substituteRole: existing.substituteRole ?? 'TEACHER',
         });
       } else {
         uncovered.push({
           ...entry,
           suggestions: this.suggestSubstitutes({
             teachers,
+            admins: availableAdmins,
             busyBySlot,
             slot: lecture.slot,
             excludeId: ownerId,
@@ -973,9 +1081,14 @@ export class DutyService {
     };
   }
 
-  /** Free teachers for one slot, best fit first. */
+  /**
+   * Who can take one slot, best fit first: free teachers (specialists ahead),
+   * then supervisors and managers. A teacher is a lesson; an administrator
+   * is supervision of the room, so they come after every free teacher.
+   */
   private suggestSubstitutes(input: {
     teachers: any[];
+    admins: any[];
     busyBySlot: Map<number, Set<string>>;
     slot: number;
     excludeId: string | null;
@@ -986,7 +1099,7 @@ export class DutyService {
   }) {
     const busy = input.busyBySlot.get(input.slot) ?? new Set<string>();
 
-    return input.teachers
+    const teachers = input.teachers
       .filter((teacher: any) => {
         const id = String(teacher._id);
         if (id === input.excludeId) return false;
@@ -1010,11 +1123,29 @@ export class DutyService {
           name: teacher.name,
           specialization: teacher.specialization ?? null,
           sameSubject: specialised,
+          type: 'Teacher' as SubstituteType,
+          role: 'TEACHER',
         };
       })
       .sort((a, b) => {
         if (a.sameSubject !== b.sameSubject) return a.sameSubject ? -1 : 1;
         return String(a.name).localeCompare(String(b.name), 'ar');
       });
+
+    const admins = input.admins
+      .filter((admin: any) => !busy.has(String(admin._id)))
+      .map((admin: any) => ({
+        // Same key as a teacher's, so a client posts it back unchanged as
+        // substituteTeacherId.
+        teacherId: String(admin._id),
+        name: adminName(admin),
+        specialization: null,
+        sameSubject: false,
+        type: 'Admin' as SubstituteType,
+        role: admin.role,
+      }))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar'));
+
+    return [...teachers, ...admins];
   }
 }

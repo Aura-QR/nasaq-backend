@@ -21,6 +21,15 @@ import {
   SubjectOffering,
   SubjectOfferingSchema,
 } from '../subject-offerings/schemas/subject-offering.schema';
+import { Admin, AdminSchema } from '../admin/schemas/admin.schema';
+import {
+  StaffAttendance,
+  StaffAttendanceSchema,
+} from '../staff-attendance/schemas/staff-attendance.schema';
+import {
+  StaffLeaveRequest,
+  StaffLeaveRequestSchema,
+} from '../staff-attendance/schemas/staff-leave-request.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -38,6 +47,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Class.name, schema: ClassSchema },
       { name: Subject.name, schema: SubjectSchema },
       { name: SubjectOffering.name, schema: SubjectOfferingSchema },
+      // Supervisors and managers in the cover pool: who they are, whether
+      // they checked in, and whether they are on leave.
+      { name: Admin.name, schema: AdminSchema },
+      { name: StaffAttendance.name, schema: StaffAttendanceSchema },
+      { name: StaffLeaveRequest.name, schema: StaffLeaveRequestSchema },
     ]),
     NotificationsModule,
   ],

@@ -30,6 +30,16 @@ import {
   DeviceTokenSchema,
 } from '../notifications/schemas/device-token.schema';
 
+import { Admin, AdminSchema } from '../admin/schemas/admin.schema';
+import {
+  StaffAttendance,
+  StaffAttendanceSchema,
+} from '../staff-attendance/schemas/staff-attendance.schema';
+import {
+  StaffLeaveRequest,
+  StaffLeaveRequestSchema,
+} from '../staff-attendance/schemas/staff-leave-request.schema';
+
 const URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/nasaq-test';
 
 /** A Sunday, so the weekday is fixed however the suite is run. */
@@ -80,6 +90,9 @@ describe('DutyService', () => {
           { name: SubjectOffering.name, schema: SubjectOfferingSchema },
           { name: Notification.name, schema: NotificationSchema },
           { name: DeviceToken.name, schema: DeviceTokenSchema },
+          { name: Admin.name, schema: AdminSchema },
+          { name: StaffAttendance.name, schema: StaffAttendanceSchema },
+          { name: StaffLeaveRequest.name, schema: StaffLeaveRequestSchema },
         ]),
       ],
       providers: [DutyService, NotificationsService, PushService],
@@ -90,6 +103,7 @@ describe('DutyService', () => {
       LeaveRequest.name, DutySupervisor.name, Substitution.name, Teacher.name,
       Lecture.name, TeacherAttendance.name, Term.name, Class.name,
       Subject.name, SubjectOffering.name, Notification.name,
+      Admin.name, StaffAttendance.name, StaffLeaveRequest.name,
     ]) {
       models[name] = moduleRef.get(getModelToken(name));
     }
@@ -1067,6 +1081,166 @@ describe('DutyService', () => {
       expect(result.totals.coverAssigned).toBe(0);
       expect(result.teachers).toEqual([]);
       expect(result.byDay).toEqual([]);
+    });
+  });
+
+  describe('supervisors and managers in the cover pool', () => {
+    let supervisor: any;
+    let manager: any;
+    let guard: any;
+    let owner: any;
+
+    const mkAdmin = (username: string, role: string, fullName = '') =>
+      mk(models[Admin.name], {
+        username, email: `${username}@x.com`, password: 'x', role, fullName,
+        permissions: [], schoolId,
+      });
+
+    const checkInStaff = (staffId: any, role: string) =>
+      mk(models[StaffAttendance.name], {
+        staffId, role, name: 'x',
+        date: new Date(`${DATE}T00:00:00.000Z`),
+        checkInAt: new Date(`${DATE}T07:00:00.000Z`),
+        method: 'manual', schoolId,
+      });
+
+    const slot1Suggestions = async () => {
+      const board: any = await coverage();
+      return board.uncovered.find((u: any) => u.slot === 1).suggestions;
+    };
+
+    const assign = (lectureId: any, substituteId: any) =>
+      asTenant(() =>
+        service.createSubstitution(
+          { date: DATE, lectureId: String(lectureId), substituteTeacherId: String(substituteId) },
+          OWNER,
+        ),
+      );
+
+    beforeEach(async () => {
+      supervisor = await mkAdmin('sup1', 'SUPERVISOR', 'أ. نورة');
+      manager = await mkAdmin('mgr1', 'MANAGER');
+      guard = await mkAdmin('guard1', 'STAFF', 'الحارس');
+      owner = await mkAdmin('owner1', 'OWNER', 'المالكة');
+      await checkInAllExcept(arabicTeacher);
+    });
+
+    it('offers supervisors and managers, after every free teacher', async () => {
+      const suggestions = await slot1Suggestions();
+      const types = suggestions.map((s: any) => s.type);
+
+      expect(types.indexOf('Admin')).toBeGreaterThan(types.lastIndexOf('Teacher'));
+      const admins = suggestions.filter((s: any) => s.type === 'Admin');
+      expect(admins.map((a: any) => a.teacherId).sort()).toEqual(
+        [String(supervisor), String(manager)].sort(),
+      );
+      expect(admins.find((a: any) => a.teacherId === String(supervisor))).toMatchObject({
+        name: 'أ. نورة', role: 'SUPERVISOR', sameSubject: false,
+      });
+      // No fullName: the username stands in.
+      expect(admins.find((a: any) => a.teacherId === String(manager)).name).toBe('mgr1');
+    });
+
+    it('never offers a guard or the owner', async () => {
+      const ids = (await slot1Suggestions()).map((s: any) => s.teacherId);
+
+      expect(ids).not.toContain(String(guard));
+      expect(ids).not.toContain(String(owner));
+    });
+
+    it('offers only the administrators who checked in, once any of them has', async () => {
+      await checkInStaff(supervisor, 'SUPERVISOR');
+
+      const admins = (await slot1Suggestions()).filter((s: any) => s.type === 'Admin');
+      expect(admins.map((a: any) => a.teacherId)).toEqual([String(supervisor)]);
+    });
+
+    it('leaves out an administrator on approved leave that day', async () => {
+      await mk(models[StaffLeaveRequest.name], {
+        staffId: supervisor, staffName: 'أ. نورة', role: 'SUPERVISOR',
+        date: new Date(`${DATE}T00:00:00.000Z`), leaveAt: '10:00',
+        status: 'approved', schoolId,
+      });
+      await mk(models[StaffLeaveRequest.name], {
+        staffId: manager, staffName: 'mgr1', role: 'MANAGER',
+        date: new Date(`${DATE}T00:00:00.000Z`), leaveAt: '10:00',
+        status: 'pending', schoolId,
+      });
+
+      const ids = (await slot1Suggestions()).map((s: any) => s.teacherId);
+      expect(ids).not.toContain(String(supervisor));
+      expect(ids).toContain(String(manager));
+    });
+
+    it('assigns a supervisor, records who she is, and tells her', async () => {
+      const result: any = await assign(L1, supervisor);
+
+      expect(result.data).toMatchObject({
+        substituteTeacherName: 'أ. نورة',
+        substituteType: 'Admin',
+        substituteRole: 'SUPERVISOR',
+      });
+
+      const notes = await models[Notification.name].collection
+        .find({ recipientId: supervisor, type: 'cover_assigned' }).toArray();
+      expect(notes).toHaveLength(1);
+      expect(notes[0].title).toBe('لديك حصة احتياط');
+    });
+
+    it('records a teacher substitute as a teacher', async () => {
+      const result: any = await assign(L1, freeTeacher);
+
+      expect(result.data).toMatchObject({ substituteType: 'Teacher', substituteRole: 'TEACHER' });
+    });
+
+    it('refuses a guard or the owner as substitute', async () => {
+      await expect(assign(L1, guard)).rejects.toThrow(/البديل/);
+      await expect(assign(L1, owner)).rejects.toThrow(/البديل/);
+    });
+
+    it('stops offering her for that slot once she is covering it', async () => {
+      await assign(L1, supervisor);
+
+      const board: any = await coverage();
+      const covered = board.covered.find((c: any) => c.slot === 1);
+      expect(covered).toMatchObject({
+        substituteTeacherId: String(supervisor),
+        substituteType: 'Admin',
+        substituteRole: 'SUPERVISOR',
+      });
+
+      // Maths in slot 1 still needs nobody, so check the other free slot-1
+      // lecture would not offer her: mark هيا absent too.
+      await models[TeacherAttendance.name].collection.deleteMany({ teacherId: mathsTeacher });
+      const again: any = await coverage();
+      const maths = again.uncovered.find((u: any) => String(u.lectureId) === String(L3));
+      expect(maths.suggestions.map((s: any) => s.teacherId)).not.toContain(String(supervisor));
+    });
+
+    it('refuses her a second room in the same slot', async () => {
+      await assign(L1, supervisor);
+
+      await expect(assign(L3, supervisor)).rejects.toThrow(/مشغول/);
+    });
+
+    it('shows the cover on her own day', async () => {
+      await assign(L1, supervisor);
+
+      const day: any = await asTenant(() => service.getMyDay(String(supervisor), DATE));
+      expect(day.stats).toMatchObject({ own: 0, cover: 1 });
+      expect(day.slots[0]).toMatchObject({
+        kind: 'cover', lectureId: String(L1), coveringFor: 'أ. أروى',
+      });
+    });
+
+    it('counts her in the cover report', async () => {
+      await assign(L1, supervisor);
+      await assign(L2, freeTeacher);
+
+      const result: any = await asTenant(() => service.getCoverReport(DATE, DATE));
+      const row = result.teachers.find((t: any) => t.teacherId === String(supervisor));
+      expect(row).toMatchObject({ name: 'أ. نورة', covered: 1, type: 'Admin', role: 'SUPERVISOR' });
+      expect(result.totals.teachersWhoCovered).toBe(2);
     });
   });
 

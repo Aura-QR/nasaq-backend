@@ -11,6 +11,12 @@ import { BulkDailyTrackingDto } from './dto/bulk-daily-tracking.dto';
 import { TrackingSummaryQueryDto } from './dto/tracking-summary-query.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
+import { Role } from '../auth/enums/role.enum';
+
+// MANAGER is checked in the service instead: a manager without
+// dailyTracking.add (the default) may still record the one period she was
+// sent to cover. Every other role is checked here as before.
+const BULK_GUARDED_ROLES = Object.values(Role).filter((role) => role !== Role.MANAGER);
 
 // No class-level @UseGuards(AbilitiesGuard), deliberately.
 //
@@ -25,7 +31,7 @@ export class DailyTrackingController {
   constructor(private readonly dailyTrackingService: DailyTrackingService) {}
 
   @Post('bulk')
-  @CheckAbilities({ action: 'create', subject: 'DailyTracking' })
+  @CheckAbilities({ action: 'create', subject: 'DailyTracking', roles: BULK_GUARDED_ROLES })
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'حفظ سجل المتابعة لحصة كاملة',

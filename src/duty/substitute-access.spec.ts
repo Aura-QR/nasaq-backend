@@ -91,13 +91,33 @@ describe('daily tracking on a covered period', () => {
       substitutions,
     );
   };
-  const save = (teacherId: string, date = DAY) =>
+  const save = (teacherId: string, date = DAY, extra: any = { role: 'TEACHER' }) =>
     tenantLocalStorage.run({ schoolId: SCHOOL, isAdminContext: false }, () =>
       build().bulkUpsert(
         { lectureId: LECTURE, date, records: [{ studentId: '6ab000000000000000000001', absent: false }] } as any,
-        { role: 'TEACHER', userId: teacherId },
+        { ...extra, userId: teacherId },
       ),
     );
+
+  // The bulk route lets MANAGER past its guard; the service decides. Managers
+  // have dailyTracking.add off by default.
+  const MANAGER_NO_ADD = { role: 'MANAGER', permissionsVersion: 2, permissions: ['school.dailyTracking.read'] };
+  const MANAGER_WITH_ADD = { role: 'MANAGER', permissionsVersion: 2, permissions: ['school.dailyTracking.create'] };
+
+  it('a manager covering the period can save it without the permission', async () => {
+    const res: any = await save(SARA, DAY, MANAGER_NO_ADD);
+    expect(res.status).toBe(true);
+  });
+
+  it('a manager without the permission is refused on a period she is not covering', async () => {
+    await expect(save(OTHER, DAY, MANAGER_NO_ADD)).rejects.toThrow('ليس لديك صلاحية');
+    await expect(save(SARA, '2026-10-05', MANAGER_NO_ADD)).rejects.toThrow('ليس لديك صلاحية');
+  });
+
+  it('a manager the school gave the permission still saves any period', async () => {
+    const res: any = await save(OTHER, DAY, MANAGER_WITH_ADD);
+    expect(res.status).toBe(true);
+  });
 
   it('the substitute can save it', async () => {
     const res: any = await save(SARA);

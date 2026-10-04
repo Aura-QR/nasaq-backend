@@ -19,7 +19,11 @@ export class CreateSubstitutionDto {
   @IsMongoId()
   lectureId: string;
 
-  @ApiProperty({ description: 'Who is taking it' })
+  @ApiProperty({
+    description:
+      'Who is taking it: a Teacher id, or an Admin id of a MANAGER or ' +
+      'SUPERVISOR. The server works out which.',
+  })
   @IsMongoId()
   substituteTeacherId: string;
 
