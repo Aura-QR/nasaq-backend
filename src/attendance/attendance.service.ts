@@ -6,6 +6,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Inject,
+  Optional,
   forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -23,6 +24,8 @@ import { getPagination } from 'src/pagination/common/paginationUtils';
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { transformAttendanceResponse } from './transforms/response.transform';
 import { DailyTrackingService } from '../daily-tracking/daily-tracking.service';
+import { Substitution } from '../duty/schemas/substitution.schema';
+import { coversClass, coversLecture } from '../duty/substitute-access.util';
 import { Admin } from '../admin/schemas/admin.schema';
 import {
   ListAbsenceExcusesDto,
@@ -59,6 +62,10 @@ export class AttendanceService {
     // forwardRef keeps both halves in one screen and one request.
     @Inject(forwardRef(() => DailyTrackingService))
     private readonly dailyTracking: DailyTrackingService,
+    // Who is covering which period today — a substitute may take the sheet.
+    @Optional()
+    @InjectModel(Substitution.name)
+    private readonly substitutionModel?: Model<Substitution>,
   ) {}
 
   /**
@@ -416,7 +423,10 @@ export class AttendanceService {
     if (term) filter.termId = term._id;
 
     const lecture = await this.lectureModel.findOne(filter).exec();
-    if (!lecture) {
+    if (
+      !lecture &&
+      !(await coversClass(this.substitutionModel, this.lectureModel, user.userId, classId, day))
+    ) {
       throw new ForbiddenException(
         'لا يمكنك تسجيل الغياب لهذا الفصل — ليس لديك حصة في جدول هذا اليوم',
       );
@@ -473,7 +483,9 @@ export class AttendanceService {
     if (
       user?.role === 'TEACHER' &&
       String((lecture as any).teacherId?._id ?? (lecture as any).teacherId) !==
-        String(user.userId)
+        String(user.userId) &&
+      // The substitute sent to cover this period today may take its sheet.
+      !(await coversLecture(this.substitutionModel, user.userId, lectureId, date))
     ) {
       throw new ForbiddenException('هذه ليست حصتك');
     }

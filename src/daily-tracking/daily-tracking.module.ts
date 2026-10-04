@@ -1,3 +1,4 @@
+import { Substitution, SubstitutionSchema } from '../duty/schemas/substitution.schema';
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { DailyTrackingController } from './daily-tracking.controller';
@@ -18,6 +19,8 @@ import { AttendanceModule } from '../attendance/attendance.module';
       { name: DailyTracking.name, schema: DailyTrackingSchema },
       { name: Lecture.name, schema: LectureSchema },
       { name: Student.name, schema: StudentSchema },
+      // Read to let a period's substitute act on it for the day.
+      { name: Substitution.name, schema: SubstitutionSchema },
     ]),
   ],
   controllers: [DailyTrackingController],

@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -17,6 +18,8 @@ import { Student } from '../students/schemas/student.schema';
 import { Attendance } from '../attendance/schemas/attendance.schema';
 import { AttendanceService } from '../attendance/attendance.service';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
+import { Substitution } from '../duty/schemas/substitution.schema';
+import { coversLecture } from '../duty/substitute-access.util';
 
 /** What one student's row resolves to once defaults are applied. */
 export interface ResolvedTrackingRecord {
@@ -45,6 +48,10 @@ export class DailyTrackingService {
     // fails to resolve the constructor.
     @Inject(forwardRef(() => AttendanceService))
     private readonly attendanceService: AttendanceService,
+    // A substitute covering the period today may record its tracking.
+    @Optional()
+    @InjectModel(Substitution.name)
+    private readonly substitutionModel?: Model<Substitution>,
   ) {}
 
   /**
@@ -96,7 +103,7 @@ export class DailyTrackingService {
    * Mirrors the rule `getLectureSheet` applies when reading. This endpoint
    * writes, so the same check matters more here, not less.
    */
-  private async loadLectureForTeacher(lectureId: string, user: any) {
+  private async loadLectureForTeacher(lectureId: string, user: any, date?: string) {
     if (!mongoose.Types.ObjectId.isValid(lectureId)) {
       throw new BadRequestException('معرّف الحصة غير صالح');
     }
@@ -115,7 +122,9 @@ export class DailyTrackingService {
     const lectureTeacherId = (lecture as any).teacherId?._id ?? (lecture as any).teacherId;
     if (
       user?.role === 'TEACHER' &&
-      String(lectureTeacherId ?? '') !== String(user.userId)
+      String(lectureTeacherId ?? '') !== String(user.userId) &&
+      // The substitute sent to cover this period on this day may record it.
+      !(date && (await coversLecture(this.substitutionModel, user.userId, lectureId, date)))
     ) {
       throw new ForbiddenException('هذه ليست حصتك');
     }
@@ -149,7 +158,7 @@ export class DailyTrackingService {
    * once — splitting it into two requests would let one half succeed.
    */
   async bulkUpsert(dto: BulkDailyTrackingDto, user: any) {
-    const lecture = await this.loadLectureForTeacher(dto.lectureId, user);
+    const lecture = await this.loadLectureForTeacher(dto.lectureId, user, dto.date);
 
     const classId = (lecture as any).classId?._id ?? (lecture as any).classId;
     const offering = (lecture as any).subjectOfferingId;
