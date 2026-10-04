@@ -114,7 +114,10 @@ given to a **SUPERVISOR** or **MANAGER** account. The **OWNER** and **STAFF**
      sure the register screen is reachable from the owner/admin navigation,
      not only from the teacher shell.
    - **Empty state:** «لا توجد حصص احتياط مكلّف بها في هذا اليوم».
-   - **Entry point:** add it to the admin home/menu for those two roles.
+   - **Entry point:** add it to `owner/presentation/models/sidebar_config.dart`
+     beside «الاحتياطي والمناوبة» (~line 237), shown only when the role is
+     SUPERVISOR or MANAGER. Not `PermissionHelper.can('read', 'duty')`,
+     because the owner has that too and is never a substitute.
 5. **Notification bell** (`core/widgets/notification_bell.dart`, owner map
    ~line 47): `cover_assigned` and `cover_removed` go to `Routes.ownerDuty`
    (the board). Only the substitute receives these, so send them to the new
