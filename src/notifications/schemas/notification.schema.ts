@@ -42,6 +42,9 @@ export const NOTIFICATION_TYPES = [
   // Staff latenesses are their own types rather than reusing the teacher
   // ones: the bell routes by type, and a manager tapping a notice about a
   // supervisor must not land on the teachers' queue with nothing in it.
+  'staff_absence_excuse_required',
+  'staff_absence_excuse_submitted',
+  'staff_absence_excuse_reviewed',
   'staff_late_reason_submitted',
   'staff_late_reason_reviewed',
   // Staff leave is its own request, not the teacher one with a different

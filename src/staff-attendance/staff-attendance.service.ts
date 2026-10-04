@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -38,6 +39,7 @@ import {
 } from './dto/staff-attendance.dto';
 import { StaffAttendance } from './schemas/staff-attendance.schema';
 import { StaffLeaveRequest } from './schemas/staff-leave-request.schema';
+import { StaffAbsenceExcuse } from './schemas/staff-absence-excuse.schema';
 import {
   CreateStaffLeaveRequestDto,
   ListStaffLeaveRequestsDto,
@@ -78,6 +80,9 @@ export class StaffAttendanceService {
     @InjectModel(StaffLeaveRequest.name)
     private readonly leaves: Model<StaffLeaveRequest>,
     private readonly notifications: NotificationsService,
+    @Optional()
+    @InjectModel(StaffAbsenceExcuse.name)
+    private readonly absenceExcuses?: Model<StaffAbsenceExcuse>,
   ) {}
 
   private readonly logger = new Logger(StaffAttendanceService.name);
@@ -1117,7 +1122,25 @@ export class StaffAttendanceService {
       byStaff.set(id, blank);
     }
 
+    // Absences the school accepted an excuse for. Shown beside the count,
+    // never subtracted from it — the same rule as the teacher report.
+    const excused = new Map<string, number>();
+    if (this.absenceExcuses) {
+      const rows = await this.absenceExcuses
+        .find({
+          ...this.scope(user),
+          status: 'accepted',
+          date: { $gte: normalizeDate(query.dateFrom), $lte: normalizeDate(query.dateTo) },
+        })
+        .select('staffId')
+        .lean();
+      for (const r of rows as any[]) {
+        excused.set(String(r.staffId), (excused.get(String(r.staffId)) ?? 0) + 1);
+      }
+    }
+
     for (const row of data as any[]) {
+      row.daysExcused = excused.get(String(row.staffId)) ?? 0;
       // Never negative: a school that shortened its week mid-period can leave
       // more attended days on file than the schedule now has working days,
       // and "-2 days absent" is a number nobody can act on.

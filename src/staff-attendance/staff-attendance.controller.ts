@@ -9,7 +9,20 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { multerExcuseConfig } from '../attendance/config/multer-excuse.config';
+import { StaffAbsenceExcuseService } from './staff-absence-excuse.service';
+import {
+  ListStaffAbsenceExcusesDto,
+  MarkStaffPresentDto,
+  RecordStaffAbsenceExcuseDto,
+  ReviewStaffAbsenceExcuseDto,
+  SubmitStaffAbsenceExcuseDto,
+} from './dto/staff-absence-excuse.dto';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -43,7 +56,10 @@ import { extractClientIp } from '../attendance/attendance.utils';
 @ApiTags('Staff Attendance')
 @ApiBearerAuth('school-jwt')
 export class StaffAttendanceController {
-  constructor(private readonly service: StaffAttendanceService) {}
+  constructor(
+    private readonly service: StaffAttendanceService,
+    private readonly absenceExcuses: StaffAbsenceExcuseService,
+  ) {}
 
   @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Post('check-in')
@@ -183,6 +199,90 @@ export class StaffAttendanceController {
   @ApiOperation({ summary: 'Withdraw a request that has not been decided yet' })
   cancelLeave(@CurrentUser() user: any, @Param('id') id: string) {
     return this.service.cancelLeave(user, id);
+  }
+
+  // ──────────────────────────────────────── أعذار الغياب
+  //
+  // The teacher feature's staff twin. The person's own routes are role-based
+  // (me/…); the school's are under the StaffAttendance permission, like the
+  // late-reason queue. Declared above every ':id' route.
+
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
+  @Get('me/absence-excuse/pending')
+  @ApiOperation({ summary: 'My absent days with no excuse yet (default 14 days back)' })
+  myPendingAbsences(@CurrentUser() user: any, @Query('days') days?: string) {
+    const parsed = Number(days);
+    const window = Number.isInteger(parsed) && parsed >= 1 && parsed <= 60 ? parsed : 14;
+    return this.absenceExcuses.pendingDays(user, window);
+  }
+
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
+  @Get('me/absence-excuses')
+  @ApiOperation({ summary: 'My excuses and what became of each, newest first' })
+  myAbsenceExcuses(@CurrentUser() user: any) {
+    return this.absenceExcuses.mine(user);
+  }
+
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
+  @Post('me/absence-excuse')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Explain a day I was absent — goes to the school for review' })
+  submitAbsenceExcuse(@CurrentUser() user: any, @Body() dto: SubmitStaffAbsenceExcuseDto) {
+    return this.absenceExcuses.submit(user, dto);
+  }
+
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
+  @Post('absence-excuse/attachment')
+  @UseInterceptors(FileInterceptor('file', multerExcuseConfig))
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Upload a medical note; returns the path to send with the excuse' })
+  uploadAbsenceAttachment(@UploadedFile() file: any) {
+    if (!file) throw new BadRequestException('لم يُرفق ملف');
+    return {
+      status: true,
+      message: 'تم رفع المرفق',
+      data: { attachment: `/uploads/absence-excuses/${file.filename}` },
+    };
+  }
+
+  @Post('absence-excuses')
+  @CheckAbilities({ action: 'create', subject: 'StaffAttendance' })
+  @HttpCode(201)
+  @ApiOperation({
+    summary: 'Enter an excuse on somebody\'s behalf (e.g. a cleaner with no phone)',
+    description: 'Recorded as accepted. Not for yourself.',
+  })
+  recordAbsenceExcuse(@CurrentUser() user: any, @Body() dto: RecordStaffAbsenceExcuseDto) {
+    return this.absenceExcuses.record(user, dto);
+  }
+
+  @Get('absence-excuses')
+  @CheckAbilities({ action: 'read', subject: 'StaffAttendance' })
+  @ApiOperation({ summary: 'Staff absence excuses — pending by default' })
+  listAbsenceExcuses(@CurrentUser() user: any, @Query() query: ListStaffAbsenceExcusesDto) {
+    return this.absenceExcuses.list(user, query);
+  }
+
+  @Patch('absence-excuses/:id/review')
+  @CheckAbilities({ action: 'update', subject: 'StaffAttendance' })
+  @ApiOperation({ summary: 'Accept or refuse — the person is told either way' })
+  reviewAbsenceExcuse(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: ReviewStaffAbsenceExcuseDto,
+  ) {
+    return this.absenceExcuses.review(user, id, dto);
+  }
+
+  @Patch('absence-excuses/:id/mark-present')
+  @CheckAbilities({ action: 'update', subject: 'StaffAttendance' })
+  @ApiOperation({ summary: 'They were not absent — record their attendance and close the excuse' })
+  markAbsenceExcusePresent(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+    @Body() dto: MarkStaffPresentDto,
+  ) {
+    return this.absenceExcuses.markPresent(user, id, dto.checkInAt, dto.note);
   }
 
   @Get('staff')

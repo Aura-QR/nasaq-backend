@@ -13,6 +13,14 @@ import {
   StaffLeaveRequest,
   StaffLeaveRequestSchema,
 } from './schemas/staff-leave-request.schema';
+import {
+  StaffAbsenceExcuse,
+  StaffAbsenceExcuseSchema,
+  StaffAbsenceNotice,
+  StaffAbsenceNoticeSchema,
+} from './schemas/staff-absence-excuse.schema';
+import { StaffAbsenceExcuseService } from './staff-absence-excuse.service';
+import { StaffAbsenceSweepService } from './staff-absence-sweep.service';
 import { StaffAttendanceController } from './staff-attendance.controller';
 import { StaffAttendanceService } from './staff-attendance.service';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -24,10 +32,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Admin.name, schema: AdminSchema },
       { name: School.name, schema: SchoolSchema },
       { name: StaffLeaveRequest.name, schema: StaffLeaveRequestSchema },
+      { name: StaffAbsenceExcuse.name, schema: StaffAbsenceExcuseSchema },
+      { name: StaffAbsenceNotice.name, schema: StaffAbsenceNoticeSchema },
     ]),
     NotificationsModule,
   ],
   controllers: [StaffAttendanceController],
-  providers: [StaffAttendanceService],
+  providers: [StaffAttendanceService, StaffAbsenceExcuseService, StaffAbsenceSweepService],
 })
 export class StaffAttendanceModule {}
