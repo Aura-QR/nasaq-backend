@@ -808,6 +808,19 @@ export class StaffAttendanceService {
     if (onBehalf && !(await this.managesStaff(user, 'create'))) {
       throw new ForbiddenException('لا يمكنك تقديم استئذان نيابة عن غيرك');
     }
+    // The owner is not staff and has no leave of their own; without a staffId
+    // there is nobody to file for.
+    if (!onBehalf && user?.role === Role.OWNER) {
+      throw new BadRequestException('اختر الموظف المطلوب تقديم الاستئذان عنه');
+    }
+
+    /*
+     * Filed by the school for somebody — they phoned in, or have no phone —
+     * by a person who could approve it anyway. Waiting for that same person
+     * to approve their own entry is a step with nobody on the other side, so
+     * it is recorded approved.
+     */
+    const approvesOnEntry = Boolean(onBehalf) && (await this.managesStaff(user, 'update'));
 
     const targetId = onBehalf ? String(dto.staffId) : String(user.userId);
     const person = await this.staffMember(user, targetId, !onBehalf);
@@ -827,10 +840,12 @@ export class StaffAttendanceService {
       }
       existing.leaveAt = dto.leaveAt;
       existing.reason = dto.reason ?? '';
+      if (approvesOnEntry) this.approveOnEntry(existing, user);
       await existing.save();
+      if (approvesOnEntry) await this.tellApprovedOnEntry(existing);
       return {
         status: true,
-        message: 'تم تحديث طلب الاستئذان',
+        message: approvesOnEntry ? 'تم تسجيل الاستئذان والموافقة عليه' : 'تم تحديث طلب الاستئذان',
         data: existing,
       };
     }
@@ -844,7 +859,17 @@ export class StaffAttendanceService {
       leaveAt: dto.leaveAt,
       reason: dto.reason ?? '',
       status: 'pending',
+      ...(approvesOnEntry ? this.approveOnEntry({}, user) : {}),
     }).save();
+
+    if (approvesOnEntry) {
+      await this.tellApprovedOnEntry(created);
+      return {
+        status: true,
+        message: 'تم تسجيل الاستئذان والموافقة عليه',
+        data: created,
+      };
+    }
 
     /*
      * Tell the people who decide.
@@ -885,6 +910,40 @@ export class StaffAttendanceService {
       message: 'تم إرسال طلب الاستئذان',
       data: created,
     };
+  }
+
+  /** Mark a request approved by the person entering it. Returns the target. */
+  private approveOnEntry(target: any, user: any) {
+    target.status = 'approved';
+    target.reviewedBy = this.objectId(String(user.userId));
+    target.reviewedByName = user?.name ?? user?.username ?? '';
+    target.reviewedAt = new Date();
+    target.reviewNote = '';
+    return target;
+  }
+
+  /** The person learns their leave is on file. Never throws. */
+  private async tellApprovedOnEntry(request: any) {
+    const dateLabel = new Date(request.date).toISOString().slice(0, 10);
+    try {
+      await this.notifications.notify({
+        recipientId: request.staffId,
+        type: 'staff_leave_approved',
+        title: 'سُجِّل استئذانك وتمت الموافقة عليه',
+        body: [dateLabel, `انصراف ${request.leaveAt}`].join(' · '),
+        data: {
+          leaveRequestId: String(request._id),
+          date: dateLabel,
+          leaveAt: request.leaveAt,
+          status: 'approved',
+          note: '',
+        },
+      });
+    } catch (error: any) {
+      this.logger.error(
+        `Could not announce staff leave ${request._id}: ${error?.message}`,
+      );
+    }
   }
 
   /** A supervisor caller always gets only their own. */

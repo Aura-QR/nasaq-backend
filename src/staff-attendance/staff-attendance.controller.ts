@@ -158,13 +158,17 @@ export class StaffAttendanceController {
   // none of the cover machinery applies and a notice about this must not send
   // a manager to a cover screen with nothing on it.
 
-  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
+  // OWNER was missing here, so the owner filing for somebody who phoned in
+  // got 403 «Forbidden resource» before the service could say anything.
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Post('leave-requests')
   @HttpCode(201)
   @ApiOperation({
     summary:
-      'Ask to leave before the end of the day. A manager may file on behalf ' +
-      'by sending staffId; a second request for the same day edits the first.',
+      'Ask to leave before the end of the day. The owner, or a manager with ' +
+      'the staff-attendance permission, may file on behalf by sending staffId ' +
+      '— that one is approved at once. A second request for the same day ' +
+      'edits the first.',
   })
   createLeave(
     @CurrentUser() user: any,

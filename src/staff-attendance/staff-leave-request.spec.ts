@@ -38,6 +38,7 @@ describe('Staff leave requests', () => {
   };
   // The default: a manager without it handles only their own leave.
   const plainManager = { ...manager, permissions: ['school.students.read'] };
+  const owner = { userId: '60d5ecb8b5c9c22b8c8b4300', schoolId, role: 'OWNER', name: 'المالك', permissions: ['*'] };
 
   beforeEach(() => {
     existing = null;
@@ -154,6 +155,40 @@ describe('Staff leave requests', () => {
       await expect(file({ staffId: otherStaff }, manager)).resolves.toMatchObject({
         status: true,
       });
+    });
+
+    it('approves at once what the school files for somebody', async () => {
+      // The person entering it is the one who would approve it; there is
+      // nobody on the other side to wait for.
+      const result = await file({ staffId: otherStaff }, owner);
+
+      expect(result.message).toBe('تم تسجيل الاستئذان والموافقة عليه');
+      expect(saved).toMatchObject({ status: 'approved', reviewedByName: 'المالك' });
+      expect(String(saved.reviewedBy)).toBe(owner.userId);
+
+      // The staff member is told it is approved; nobody is asked to decide.
+      const types = notifications.notify.mock.calls.map((c: any) => c[0].type);
+      expect(types).toEqual(['staff_leave_approved']);
+      expect(notifications.notify.mock.calls[0][0].recipientId).toBe(staffId);
+    });
+
+    it('approves a request the person had already sent, when the school files it', async () => {
+      existing = {
+        _id: 'leave1', staffId, date: new Date('2026-09-22T00:00:00Z'),
+        status: 'pending', leaveAt: '10:00', reason: 'قديم',
+        save: jest.fn().mockResolvedValue(undefined),
+      };
+      await file({ staffId: otherStaff, leaveAt: '12:00' }, manager);
+      expect(existing).toMatchObject({ status: 'approved', leaveAt: '12:00' });
+    });
+
+    it('keeps one\'s own request pending, for somebody else to decide', async () => {
+      await file({}, supervisor);
+      expect(saved.status).toBe('pending');
+    });
+
+    it('asks the owner to choose who the leave is for', async () => {
+      await expect(file({}, owner)).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('does not let a manager without the staff-attendance box file for somebody else', async () => {
