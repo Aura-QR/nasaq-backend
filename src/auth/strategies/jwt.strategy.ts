@@ -26,6 +26,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       schoolId: payload.schoolId,
       permissions: payload.permissions || [],
       permissionsVersion: payload.permissionsVersion ?? null,
+      // Absent on tokens signed before it was added; services fall back.
+      name: payload.name || undefined,
     };
   }
 }

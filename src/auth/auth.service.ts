@@ -37,6 +37,16 @@ export class AuthService {
         private emailService: EmailService,
     ){}
 
+    /**
+     * What a person is called: an admin's full name or username, a teacher's
+     * or student's name. Carried in the token so «reviewed by» is not blank.
+     */
+    static displayName(user: any): string | undefined {
+        const full = [user?.firstName, user?.familyName].filter(Boolean).join(' ');
+        const name = String(user?.fullName || user?.name || full || user?.username || '').trim();
+        return name || undefined;
+    }
+
     async login(loginDto: LoginUserDto) {
         const { identifier, password } = loginDto;
 
@@ -243,6 +253,7 @@ export class AuthService {
             schoolId: user.schoolId ? user.schoolId.toString() : null,
             permissions: permissions,
             permissionsVersion: PERMISSIONS_VERSION,
+            name: AuthService.displayName(user),
         };
 
         const accessToken = await this.jwtService.signAsync(payload);
