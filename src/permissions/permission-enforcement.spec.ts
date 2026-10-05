@@ -72,6 +72,18 @@ const NO_ABILITY_BY_DESIGN: Record<string, string> = {
   'StaffAttendanceController.checkOut': 'self check-out by location',
   'StaffAttendanceController.getMine': 'own history',
   'StaffAttendanceController.detectIp': 'reads the caller\'s own IP; changes nothing',
+  // One's own lateness, leave and absence. Acting on anybody else's is
+  // checked against StaffAttendance in the service (managesStaff, the
+  // absence-excuse service), so a manager without the box keeps their own.
+  'StaffAttendanceController.pendingLateReason': 'own lateness',
+  'StaffAttendanceController.submitLateReason': 'own lateness',
+  'StaffAttendanceController.createLeave': 'own leave; on behalf checked in the service',
+  'StaffAttendanceController.listLeaves': 'own leave; everyone\'s checked in the service',
+  'StaffAttendanceController.cancelLeave': 'own leave; another\'s checked in the service',
+  'StaffAttendanceController.myPendingAbsences': 'own absent days',
+  'StaffAttendanceController.myAbsenceExcuses': 'own excuses',
+  'StaffAttendanceController.submitAbsenceExcuse': 'own excuse',
+  'StaffAttendanceController.uploadAbsenceAttachment': 'uploads a file; grants nothing by itself',
 };
 
 describe('permission enforcement — route sweep', () => {
@@ -108,6 +120,9 @@ describe('permission enforcement — route sweep', () => {
       // Checked for every role before this change, on purpose.
       'AttendanceController', 'ExamsController', 'ProjectsController', 'PreparationController',
       'GradesCriteriaController', 'ExpenseController', 'ExpenseCategoryController',
+      // The class report is for teachers too: the TEACHER row grants
+      // dailyTracking.read and the STUDENT row denies it, both on purpose.
+      'DailyTrackingController',
     ]);
     const leaking = all
       .filter((r) => r.abilities?.length)

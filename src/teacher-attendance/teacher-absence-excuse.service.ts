@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -13,6 +14,8 @@ import { Teacher } from '../teachers/schemas/teacher.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { Admin } from '../admin/schemas/admin.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { adminsWhoCanRead } from '../notifications/admin-audience';
 import {
   normalizeDate,
   resolveDaySchedule,
@@ -54,6 +57,9 @@ export class TeacherAbsenceExcuseService {
     @InjectModel(Admin.name)
     private readonly adminModel: Model<Admin>,
     private readonly notifications: NotificationsService,
+    // Who among the managers may hear about this — the permissions screen
+    // decides. Optional so a hand-built service in a unit test still works.
+    @Optional() private readonly permissions?: PermissionsService,
   ) {}
 
   /** Everyone at the school who should see a teacher's explanation. */
@@ -64,10 +70,10 @@ export class TeacherAbsenceExcuseService {
         schoolId: new Types.ObjectId(String(schoolId)),
         role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] },
       })
-      .select('_id')
+      .select('_id role jobTitleId')
       .lean()
       .exec();
-    return admins.map((a: any) => String(a._id));
+    return adminsWhoCanRead(admins as any[], 'teacherAttendance', schoolId, this.permissions);
   }
 
   private async settingsOf(schoolId: any): Promise<any | null> {

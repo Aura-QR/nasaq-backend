@@ -22,6 +22,8 @@ import { Term } from '../terms/schemas/term.schema';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { getPagination } from 'src/pagination/common/paginationUtils';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { adminsWhoCanRead } from '../notifications/admin-audience';
 import { transformAttendanceResponse } from './transforms/response.transform';
 import { DailyTrackingService } from '../daily-tracking/daily-tracking.service';
 import { Substitution } from '../duty/schemas/substitution.schema';
@@ -66,6 +68,9 @@ export class AttendanceService {
     @Optional()
     @InjectModel(Substitution.name)
     private readonly substitutionModel?: Model<Substitution>,
+    // Who among the managers may hear about this — the permissions screen
+    // decides. Optional so a hand-built service in a unit test still works.
+    @Optional() private readonly permissions?: PermissionsService,
   ) {}
 
   /**
@@ -83,12 +88,12 @@ export class AttendanceService {
         schoolId: new mongoose.Types.ObjectId(String(schoolId)),
         role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] },
       })
-      .select('_id')
+      .select('_id role jobTitleId')
       .setOptions({ skipTenantScope: true })
       .lean()
       .exec();
 
-    return admins.map((admin: any) => String(admin._id));
+    return adminsWhoCanRead(admins as any[], 'attendance', schoolId, this.permissions);
   }
 
   /**

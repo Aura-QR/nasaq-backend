@@ -18,6 +18,7 @@ import { TeacherAttendanceService } from './teacher-attendance.service';
 import { LeaveRequest, LeaveRequestSchema } from '../duty/schemas/leave-request.schema';
 import { Admin, AdminSchema } from 'src/admin/schemas/admin.schema';
 import { NotificationsModule } from 'src/notifications/notifications.module';
+import { PermissionsModule } from 'src/permissions/permissions.module';
 
 @Module({
   imports: [
@@ -35,6 +36,8 @@ import { NotificationsModule } from 'src/notifications/notifications.module';
       { name: Admin.name, schema: AdminSchema },
     ]),
     NotificationsModule,
+    // Who among the managers hears about what: the permissions screen.
+    PermissionsModule,
   ],
   controllers: [TeacherAttendanceController],
   providers: [TeacherAttendanceService, TeacherAbsenceExcuseService, TeacherAbsenceSweepService],

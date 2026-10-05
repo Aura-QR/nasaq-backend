@@ -5,12 +5,15 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Admin } from '../admin/schemas/admin.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { adminsWhoCanRead } from '../notifications/admin-audience';
 import {
   normalizeDate,
   parseCheckInTime,
@@ -57,6 +60,9 @@ export class StaffAbsenceExcuseService {
     @InjectModel(School.name) private readonly schools: Model<School>,
     private readonly attendance: StaffAttendanceService,
     private readonly notifications: NotificationsService,
+    // Who among the managers may hear about this — the permissions screen
+    // decides. Optional so a hand-built service in a unit test still works.
+    @Optional() private readonly permissions?: PermissionsService,
   ) {}
 
   private static oid(value: unknown): Types.ObjectId | null {
@@ -98,9 +104,10 @@ export class StaffAbsenceExcuseService {
         schoolId: StaffAbsenceExcuseService.oid(schoolId),
         role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] },
       })
-      .select('_id')
+      .select('_id role jobTitleId')
       .lean();
-    return admins.map((a: any) => String(a._id)).filter((id) => id !== String(exclude));
+    const readers = await adminsWhoCanRead(admins as any[], 'staffAttendance', schoolId, this.permissions);
+    return readers.filter((id) => id !== String(exclude));
   }
 
   private assertNotOwn(user: any, staffId: unknown) {

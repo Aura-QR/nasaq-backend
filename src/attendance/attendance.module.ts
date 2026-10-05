@@ -9,12 +9,15 @@ import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
 import { Term, TermSchema } from '../terms/schemas/term.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 import { Admin, AdminSchema } from 'src/admin/schemas/admin.schema';
 import { DailyTrackingModule } from '../daily-tracking/daily-tracking.module';
 
 @Module({
   imports: [
     NotificationsModule,
+    // Who among the managers hears about what: the permissions screen.
+    PermissionsModule,
     // See AttendanceService's constructor for why this is circular.
     forwardRef(() => DailyTrackingModule),
     MongooseModule.forFeature([

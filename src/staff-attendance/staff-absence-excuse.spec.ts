@@ -28,6 +28,9 @@ import { PushService } from '../notifications/push.service';
 import { Notification, NotificationSchema } from '../notifications/schemas/notification.schema';
 import { DeviceToken, DeviceTokenSchema } from '../notifications/schemas/device-token.schema';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
+import { PermissionsService } from '../permissions/permissions.service';
+import { Permission, PermissionSchema } from '../permissions/schemas/permission.schema';
+import { JobTitle, JobTitleSchema } from '../permissions/job-titles/job-title.schema';
 
 // Its own database: suites run in parallel and others clear Admin, School and
 // Notification between tests.
@@ -101,9 +104,12 @@ describe('Staff absence excuses', () => {
           { name: StaffAbsenceNotice.name, schema: StaffAbsenceNoticeSchema },
           { name: Notification.name, schema: NotificationSchema },
           { name: DeviceToken.name, schema: DeviceTokenSchema },
+          { name: Permission.name, schema: PermissionSchema },
+          { name: JobTitle.name, schema: JobTitleSchema },
         ]),
       ],
       providers: [
+        PermissionsService,
         StaffAttendanceService,
         StaffAbsenceExcuseService,
         StaffAbsenceSweepService,
@@ -117,7 +123,7 @@ describe('Staff absence excuses', () => {
     attendance = moduleRef.get(StaffAttendanceService);
     for (const name of [
       Admin.name, School.name, StaffAttendance.name, StaffAbsenceExcuse.name,
-      StaffAbsenceNotice.name, Notification.name,
+      StaffAbsenceNotice.name, Notification.name, Permission.name,
     ]) {
       models[name] = moduleRef.get(getModelToken(name));
     }
@@ -164,8 +170,20 @@ describe('Staff absence excuses', () => {
       expect(res.data.status).toBe('pending');
 
       expect(await notices(ownerId, 'staff_absence_excuse_submitted')).toHaveLength(1);
-      expect(await notices(managerId, 'staff_absence_excuse_submitted')).toHaveLength(1);
       expect(await notices(supervisorId, 'staff_absence_excuse_submitted')).toHaveLength(0);
+    });
+
+    it('a manager hears only if the permissions screen lets her see staff attendance', async () => {
+      // The default MANAGER row denies staffAttendance.
+      await submit(SUPERVISOR);
+      expect(await notices(managerId, 'staff_absence_excuse_submitted')).toHaveLength(0);
+
+      await models[Permission.name].collection.insertOne({
+        role: 'MANAGER', schoolId, userId: null,
+        permissions: { staffAttendance: { read: true, add: false, edit: true, delete: false } },
+      });
+      await submit(CLEANER);
+      expect(await notices(managerId, 'staff_absence_excuse_submitted')).toHaveLength(1);
     });
 
     it('works for a guard or cleaner too', async () => {

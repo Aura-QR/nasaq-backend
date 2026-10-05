@@ -24,6 +24,7 @@ import { StaffAbsenceSweepService } from './staff-absence-sweep.service';
 import { StaffAttendanceController } from './staff-attendance.controller';
 import { StaffAttendanceService } from './staff-attendance.service';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
@@ -36,6 +37,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: StaffAbsenceNotice.name, schema: StaffAbsenceNoticeSchema },
     ]),
     NotificationsModule,
+    // Who among the managers hears about what: the permissions screen.
+    PermissionsModule,
   ],
   controllers: [StaffAttendanceController],
   providers: [StaffAttendanceService, StaffAbsenceExcuseService, StaffAbsenceSweepService],

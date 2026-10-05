@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -15,6 +16,8 @@ import { Substitution } from '../duty/schemas/substitution.schema';
 import { TeacherAttendance } from '../teacher-attendance/schemas/teacher-attendance.schema';
 import { Admin } from '../admin/schemas/admin.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { adminsWhoCanRead } from '../notifications/admin-audience';
 import {
   ExplainObservationDto,
   ListObservationsDto,
@@ -55,6 +58,9 @@ export class LessonObservationsService {
     private readonly teacherAttendanceModel: Model<TeacherAttendance>,
     @InjectModel(Admin.name) private readonly adminModel: Model<Admin>,
     private readonly notifications: NotificationsService,
+    // Who among the managers may hear about this — the permissions screen
+    // decides. Optional so a hand-built service in a unit test still works.
+    @Optional() private readonly permissions?: PermissionsService,
   ) {}
 
   private async schoolAdminIds(schoolId: any, exclude?: any): Promise<string[]> {
@@ -65,13 +71,14 @@ export class LessonObservationsService {
         schoolId: new Types.ObjectId(String(schoolId)),
         role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] },
       })
-      .select('_id')
+      .select('_id role jobTitleId')
       .setOptions({ skipTenantScope: true })
       .lean()
       .exec();
 
     const skip = exclude ? String(exclude) : null;
-    return admins.map((a: any) => String(a._id)).filter((id) => id !== skip);
+    const readers = await adminsWhoCanRead(admins as any[], 'duty', schoolId, this.permissions);
+    return readers.filter((id) => id !== skip);
   }
 
   // ───────────────────────────────────────────────────── the round

@@ -22,6 +22,8 @@ import {
   workingDatesBetween,
 } from '../attendance/attendance.utils';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { adminsWhoCanRead } from '../notifications/admin-audience';
 import {
   ListStaffLateReasonsDto,
   ReviewStaffLateReasonDto,
@@ -40,6 +42,7 @@ import {
 import { StaffAttendance } from './schemas/staff-attendance.schema';
 import { StaffLeaveRequest } from './schemas/staff-leave-request.schema';
 import { StaffAbsenceExcuse } from './schemas/staff-absence-excuse.schema';
+import { Actions, CaslAbilityFactory } from '../casl/casl-ability.factory';
 import {
   CreateStaffLeaveRequestDto,
   ListStaffLeaveRequestsDto,
@@ -83,6 +86,9 @@ export class StaffAttendanceService {
     @Optional()
     @InjectModel(StaffAbsenceExcuse.name)
     private readonly absenceExcuses?: Model<StaffAbsenceExcuse>,
+    // Who among the managers may hear about this — the permissions screen
+    // decides. Optional so a hand-built service in a unit test still works.
+    @Optional() private readonly permissions?: PermissionsService,
   ) {}
 
   private readonly logger = new Logger(StaffAttendanceService.name);
@@ -505,15 +511,14 @@ export class StaffAttendanceService {
         schoolId: this.objectId(String(schoolId)),
         role: { $in: ['OWNER', 'MANAGER'] },
       })
-      .select('_id')
+      .select('_id role jobTitleId')
       .setOptions({ skipTenantScope: true })
       .lean()
       .exec();
 
     const skip = exclude ? String(exclude) : null;
-    return admins
-      .map((admin: any) => String(admin._id))
-      .filter((id) => id !== skip);
+    const readers = await adminsWhoCanRead(admins as any[], 'staffAttendance', schoolId, this.permissions);
+    return readers.filter((id) => id !== skip);
   }
 
   /** Today's lateness, if this person has one nobody has explained. */
@@ -771,6 +776,22 @@ export class StaffAttendanceService {
   // ──────────────────────────────────────────────── الاستئذان
 
   /**
+   * May this caller act on other people's leave, not only their own?
+   *
+   * Leave routes are open to every staff role by design — anyone files and
+   * reads their own. Acting on somebody else's (reading everyone's, filing on
+   * behalf, withdrawing another's) is staff-attendance management, so a
+   * MANAGER needs the «حضور الإداريين والمشرفين» box for it. Owners and
+   * supervisors hold every permission.
+   */
+  private async managesStaff(user: any, action: Actions): Promise<boolean> {
+    if (user?.role === Role.SUPERVISOR || user?.role === Role.STAFF) return false;
+    if (user?.role !== Role.MANAGER) return true;
+    const ability = await new CaslAbilityFactory().defineAbilitiesFor(user);
+    return ability.can(action, 'StaffAttendance');
+  }
+
+  /**
    * Ask to leave before the end of the day.
    *
    * A second request for the same day edits the first rather than adding one:
@@ -784,7 +805,7 @@ export class StaffAttendanceService {
     const onBehalf = dto.staffId && String(dto.staffId) !== String(user.userId);
     // Service staff are held to the same rule as a supervisor: only for
     // themselves. Without this a guard could file leave in a manager's name.
-    if (onBehalf && (user?.role === Role.SUPERVISOR || user?.role === Role.STAFF)) {
+    if (onBehalf && !(await this.managesStaff(user, 'create'))) {
       throw new ForbiddenException('لا يمكنك تقديم استئذان نيابة عن غيرك');
     }
 
@@ -872,7 +893,8 @@ export class StaffAttendanceService {
 
     // Supervisors and service staff see only their own requests; a guard
     // must never read the administrators' leave requests.
-    if (user?.role === Role.SUPERVISOR || user?.role === Role.STAFF) {
+    // A manager without the staff-attendance permission is in the same place.
+    if (!(await this.managesStaff(user, 'read'))) {
       filter.staffId = this.objectId(String(user.userId));
     } else if (query.staffId) {
       filter.staffId = this.objectId(query.staffId);
@@ -986,7 +1008,7 @@ export class StaffAttendanceService {
     if (!request) throw new NotFoundException('طلب الاستئذان غير موجود');
 
     const own = String(request.staffId) === String(user.userId);
-    if (!own && (user?.role === Role.SUPERVISOR || user?.role === Role.STAFF)) {
+    if (!own && !(await this.managesStaff(user, 'update'))) {
       throw new ForbiddenException('لا يمكنك حذف استئذان غيرك');
     }
     if (request.status !== 'pending') {

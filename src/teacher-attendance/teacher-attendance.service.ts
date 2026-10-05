@@ -7,12 +7,15 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { School } from 'src/platform/schools/schemas/school.schema';
 import { Admin } from 'src/admin/schemas/admin.schema';
 import { NotificationsService } from 'src/notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { adminsWhoCanRead } from '../notifications/admin-audience';
 import { TeacherAbsenceExcuseService } from './teacher-absence-excuse.service';
 import { dayLabel, weekdayOf, worksOn } from './teacher-presence.util';
 import { LeaveRequest } from '../duty/schemas/leave-request.schema';
@@ -69,6 +72,9 @@ export class TeacherAttendanceService {
     // Both services live in this module, so this is a plain injection — but
     // the summary never lets a failure here cost it the report.
     private readonly absenceExcuses: TeacherAbsenceExcuseService,
+    // Who among the managers may hear about this — the permissions screen
+    // decides. Optional so a hand-built service in a unit test still works.
+    @Optional() private readonly permissions?: PermissionsService,
   ) {}
 
   /** "HH:mm" in the school's timezone — what a person would have read on the clock. */
@@ -106,15 +112,14 @@ export class TeacherAttendanceService {
         schoolId: new Types.ObjectId(String(schoolId)),
         role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] },
       })
-      .select('_id')
+      .select('_id role jobTitleId')
       .setOptions({ skipTenantScope: true })
       .lean()
       .exec();
 
     const skip = exclude ? String(exclude) : null;
-    return admins
-      .map((admin: any) => String(admin._id))
-      .filter((id) => id !== skip);
+    const readers = await adminsWhoCanRead(admins as any[], 'teacherAttendance', schoolId, this.permissions);
+    return readers.filter((id) => id !== skip);
   }
 
   /**

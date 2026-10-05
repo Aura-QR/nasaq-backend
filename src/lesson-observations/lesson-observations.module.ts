@@ -18,10 +18,13 @@ import {
   TeacherAttendanceSchema,
 } from '../teacher-attendance/schemas/teacher-attendance.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
     NotificationsModule,
+    // Who among the managers hears about what: the permissions screen.
+    PermissionsModule,
     MongooseModule.forFeature([
       { name: LessonObservation.name, schema: LessonObservationSchema },
       { name: Lecture.name, schema: LectureSchema },

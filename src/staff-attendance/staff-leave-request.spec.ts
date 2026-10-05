@@ -31,7 +31,13 @@ describe('Staff leave requests', () => {
   let service: StaffAttendanceService;
 
   const supervisor = { userId: staffId, schoolId, role: 'SUPERVISOR', name: 'أ. بشاير' };
-  const manager = { userId: managerId, schoolId, role: 'MANAGER', name: 'أ. هدى' };
+  // A manager the school gave «حضور الإداريين والمشرفين» to.
+  const manager = {
+    userId: managerId, schoolId, role: 'MANAGER', name: 'أ. هدى', permissionsVersion: 2,
+    permissions: ['school.staffAttendance.read', 'school.staffAttendance.create', 'school.staffAttendance.update'],
+  };
+  // The default: a manager without it handles only their own leave.
+  const plainManager = { ...manager, permissions: ['school.students.read'] };
 
   beforeEach(() => {
     existing = null;
@@ -94,7 +100,7 @@ describe('Staff leave requests', () => {
     );
   });
 
-  const file = (dto: any = {}, user = supervisor) =>
+  const file = (dto: any = {}, user: any = supervisor) =>
     service.createLeave(user, {
       date: '2026-09-22',
       leaveAt: '11:30',
@@ -150,6 +156,12 @@ describe('Staff leave requests', () => {
       });
     });
 
+    it('does not let a manager without the staff-attendance box file for somebody else', async () => {
+      await expect(file({ staffId: otherStaff }, plainManager)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
+
     it('does not let a supervisor file for anybody else', async () => {
       await expect(file({ staffId: otherStaff })).rejects.toBeInstanceOf(
         ForbiddenException,
@@ -175,7 +187,7 @@ describe('Staff leave requests', () => {
       };
     });
 
-    const review = (dto: any, user = manager) =>
+    const review = (dto: any, user: any = manager) =>
       service.reviewLeave(user, requestId, dto);
 
     it('records the decision and who took it', async () => {
@@ -255,6 +267,13 @@ describe('Staff leave requests', () => {
         service.cancelLeave(manager, requestId),
       ).resolves.toMatchObject({ status: true });
     });
+
+    it('does not let a manager without the box withdraw somebody else\'s', async () => {
+      existing.staffId = otherStaff;
+      await expect(service.cancelLeave(plainManager, requestId)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
+    });
   });
 
   describe('who sees what', () => {
@@ -273,6 +292,11 @@ describe('Staff leave requests', () => {
     it('lets a manager see the whole school', async () => {
       await service.listLeaves(manager, {} as any);
       expect(filterOf().staffId).toBeUndefined();
+    });
+
+    it('shows a manager without the box only their own', async () => {
+      await service.listLeaves(plainManager, { staffId: otherStaff } as any);
+      expect(String(filterOf().staffId)).toBe(managerId);
     });
   });
 });
