@@ -1084,9 +1084,10 @@ describe('DutyService', () => {
     });
   });
 
-  describe('supervisors and managers in the cover pool', () => {
-    let supervisor: any;
-    let manager: any;
+  describe('administrative assistants in the cover pool', () => {
+    let assistant: any;   // MANAGER — مساعدة إدارية
+    let assistant2: any;  // MANAGER without a full name
+    let principal: any;   // SUPERVISOR — مدير المدرسة, never a substitute
     let guard: any;
     let owner: any;
 
@@ -1118,71 +1119,73 @@ describe('DutyService', () => {
       );
 
     beforeEach(async () => {
-      supervisor = await mkAdmin('sup1', 'SUPERVISOR', 'أ. نورة');
-      manager = await mkAdmin('mgr1', 'MANAGER');
+      assistant = await mkAdmin('mgr1', 'MANAGER', 'أ. نورة');
+      assistant2 = await mkAdmin('mgr2', 'MANAGER');
+      principal = await mkAdmin('sup1', 'SUPERVISOR', 'مدير المدرسة');
       guard = await mkAdmin('guard1', 'STAFF', 'الحارس');
       owner = await mkAdmin('owner1', 'OWNER', 'المالكة');
       await checkInAllExcept(arabicTeacher);
     });
 
-    it('offers supervisors and managers, after every free teacher', async () => {
+    it('offers administrative assistants, after every free teacher', async () => {
       const suggestions = await slot1Suggestions();
       const types = suggestions.map((s: any) => s.type);
 
       expect(types.indexOf('Admin')).toBeGreaterThan(types.lastIndexOf('Teacher'));
       const admins = suggestions.filter((s: any) => s.type === 'Admin');
       expect(admins.map((a: any) => a.teacherId).sort()).toEqual(
-        [String(supervisor), String(manager)].sort(),
+        [String(assistant), String(assistant2)].sort(),
       );
-      expect(admins.find((a: any) => a.teacherId === String(supervisor))).toMatchObject({
-        name: 'أ. نورة', role: 'SUPERVISOR', sameSubject: false,
+      expect(admins.find((a: any) => a.teacherId === String(assistant))).toMatchObject({
+        name: 'أ. نورة', role: 'MANAGER', sameSubject: false,
       });
       // No fullName: the username stands in.
-      expect(admins.find((a: any) => a.teacherId === String(manager)).name).toBe('mgr1');
+      expect(admins.find((a: any) => a.teacherId === String(assistant2)).name).toBe('mgr2');
     });
 
-    it('never offers a guard or the owner', async () => {
+    it('never offers the principal, the owner or a guard', async () => {
       const ids = (await slot1Suggestions()).map((s: any) => s.teacherId);
 
-      expect(ids).not.toContain(String(guard));
+      expect(ids).not.toContain(String(principal));
       expect(ids).not.toContain(String(owner));
+      expect(ids).not.toContain(String(guard));
     });
 
-    it('offers only the administrators who checked in, once any of them has', async () => {
-      await checkInStaff(supervisor, 'SUPERVISOR');
+    it('offers only the assistants who checked in, once any of them has', async () => {
+      await checkInStaff(assistant, 'MANAGER');
 
       const admins = (await slot1Suggestions()).filter((s: any) => s.type === 'Admin');
-      expect(admins.map((a: any) => a.teacherId)).toEqual([String(supervisor)]);
+      expect(admins.map((a: any) => a.teacherId)).toEqual([String(assistant)]);
     });
 
-    it('leaves out an administrator on approved leave that day', async () => {
+    it('leaves out an assistant on approved leave that day', async () => {
       await mk(models[StaffLeaveRequest.name], {
-        staffId: supervisor, staffName: 'أ. نورة', role: 'SUPERVISOR',
+        staffId: assistant, staffName: 'أ. نورة', role: 'MANAGER',
         date: new Date(`${DATE}T00:00:00.000Z`), leaveAt: '10:00',
         status: 'approved', schoolId,
       });
       await mk(models[StaffLeaveRequest.name], {
-        staffId: manager, staffName: 'mgr1', role: 'MANAGER',
+        staffId: assistant2, staffName: 'mgr2', role: 'MANAGER',
         date: new Date(`${DATE}T00:00:00.000Z`), leaveAt: '10:00',
         status: 'pending', schoolId,
       });
 
       const ids = (await slot1Suggestions()).map((s: any) => s.teacherId);
-      expect(ids).not.toContain(String(supervisor));
-      expect(ids).toContain(String(manager));
+      expect(ids).not.toContain(String(assistant));
+      expect(ids).toContain(String(assistant2));
     });
 
-    it('assigns a supervisor, records who she is, and tells her', async () => {
-      const result: any = await assign(L1, supervisor);
+    it('assigns an assistant, records who she is, and tells her', async () => {
+      const result: any = await assign(L1, assistant);
 
       expect(result.data).toMatchObject({
         substituteTeacherName: 'أ. نورة',
         substituteType: 'Admin',
-        substituteRole: 'SUPERVISOR',
+        substituteRole: 'MANAGER',
       });
 
       const notes = await models[Notification.name].collection
-        .find({ recipientId: supervisor, type: 'cover_assigned' }).toArray();
+        .find({ recipientId: assistant, type: 'cover_assigned' }).toArray();
       expect(notes).toHaveLength(1);
       expect(notes[0].title).toBe('لديك حصة احتياط');
     });
@@ -1193,40 +1196,40 @@ describe('DutyService', () => {
       expect(result.data).toMatchObject({ substituteType: 'Teacher', substituteRole: 'TEACHER' });
     });
 
-    it('refuses a guard or the owner as substitute', async () => {
-      await expect(assign(L1, guard)).rejects.toThrow(/البديل/);
+    it('refuses the principal, the owner or a guard as substitute', async () => {
+      await expect(assign(L1, principal)).rejects.toThrow(/البديل/);
       await expect(assign(L1, owner)).rejects.toThrow(/البديل/);
+      await expect(assign(L1, guard)).rejects.toThrow(/البديل/);
     });
 
     it('stops offering her for that slot once she is covering it', async () => {
-      await assign(L1, supervisor);
+      await assign(L1, assistant);
 
       const board: any = await coverage();
       const covered = board.covered.find((c: any) => c.slot === 1);
       expect(covered).toMatchObject({
-        substituteTeacherId: String(supervisor),
+        substituteTeacherId: String(assistant),
         substituteType: 'Admin',
-        substituteRole: 'SUPERVISOR',
+        substituteRole: 'MANAGER',
       });
 
-      // Maths in slot 1 still needs nobody, so check the other free slot-1
-      // lecture would not offer her: mark هيا absent too.
+      // Mark هيا absent too, so maths in slot 1 needs cover as well.
       await models[TeacherAttendance.name].collection.deleteMany({ teacherId: mathsTeacher });
       const again: any = await coverage();
       const maths = again.uncovered.find((u: any) => String(u.lectureId) === String(L3));
-      expect(maths.suggestions.map((s: any) => s.teacherId)).not.toContain(String(supervisor));
+      expect(maths.suggestions.map((s: any) => s.teacherId)).not.toContain(String(assistant));
     });
 
     it('refuses her a second room in the same slot', async () => {
-      await assign(L1, supervisor);
+      await assign(L1, assistant);
 
-      await expect(assign(L3, supervisor)).rejects.toThrow(/مشغول/);
+      await expect(assign(L3, assistant)).rejects.toThrow(/مشغول/);
     });
 
     it('shows the cover on her own day', async () => {
-      await assign(L1, supervisor);
+      await assign(L1, assistant);
 
-      const day: any = await asTenant(() => service.getMyDay(String(supervisor), DATE));
+      const day: any = await asTenant(() => service.getMyDay(String(assistant), DATE));
       expect(day.stats).toMatchObject({ own: 0, cover: 1 });
       expect(day.slots[0]).toMatchObject({
         kind: 'cover', lectureId: String(L1), coveringFor: 'أ. أروى',
@@ -1234,12 +1237,12 @@ describe('DutyService', () => {
     });
 
     it('counts her in the cover report', async () => {
-      await assign(L1, supervisor);
+      await assign(L1, assistant);
       await assign(L2, freeTeacher);
 
       const result: any = await asTenant(() => service.getCoverReport(DATE, DATE));
-      const row = result.teachers.find((t: any) => t.teacherId === String(supervisor));
-      expect(row).toMatchObject({ name: 'أ. نورة', covered: 1, type: 'Admin', role: 'SUPERVISOR' });
+      const row = result.teachers.find((t: any) => t.teacherId === String(assistant));
+      expect(row).toMatchObject({ name: 'أ. نورة', covered: 1, type: 'Admin', role: 'MANAGER' });
       expect(result.totals.teachersWhoCovered).toBe(2);
     });
   });

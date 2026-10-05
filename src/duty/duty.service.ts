@@ -394,7 +394,7 @@ export class DutyService {
     const substitute = await this.resolveSubstitute(dto.substituteTeacherId);
     if (!substitute) {
       throw new NotFoundException(
-        `البديل ${dto.substituteTeacherId} غير موجود، أو ليس معلمًا أو مشرفًا أو مديرًا`,
+        `البديل ${dto.substituteTeacherId} غير موجود، أو ليس معلمًا أو مساعدًا إداريًا`,
       );
     }
 
@@ -482,9 +482,10 @@ export class DutyService {
   }
 
   /**
-   * A teacher, or failing that a supervisor or manager. Teachers are looked
-   * up first because nearly every cover is a teacher, and an id is unique
-   * across collections. STAFF and OWNER accounts are not substitutes.
+   * A teacher, or failing that an administrative assistant (MANAGER).
+   * Teachers are looked up first because nearly every cover is a teacher, and
+   * an id is unique across collections. The owner, the principal
+   * (SUPERVISOR) and STAFF are not substitutes.
    */
   private async resolveSubstitute(id: string): Promise<ResolvedSubstitute | null> {
     if (!mongoose.Types.ObjectId.isValid(String(id))) return null;
@@ -908,7 +909,7 @@ export class DutyService {
         .exec(),
     ]);
 
-    // Supervisors and managers have no timetable, so every slot looks free;
+    // Administrative assistants have no timetable, so every slot looks free;
     // what decides is whether they are in. Same rule as for teachers: once
     // anyone among them has checked in today, only those who did are offered.
     // A staff leave carries a clock time, not a period, so an approved one
@@ -1083,8 +1084,8 @@ export class DutyService {
 
   /**
    * Who can take one slot, best fit first: free teachers (specialists ahead),
-   * then supervisors and managers. A teacher is a lesson; an administrator
-   * is supervision of the room, so they come after every free teacher.
+   * then administrative assistants. A teacher is a lesson; an assistant is
+   * supervision of the room, so they come after every free teacher.
    */
   private suggestSubstitutes(input: {
     teachers: any[];

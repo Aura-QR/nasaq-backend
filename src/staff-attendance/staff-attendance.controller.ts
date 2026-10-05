@@ -179,7 +179,9 @@ export class StaffAttendanceController {
 
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Get('leave-requests')
-  @ApiOperation({ summary: 'A SUPERVISOR caller always gets only their own' })
+  @ApiOperation({
+    summary: 'Staff and managers without the staff-attendance permission get only their own',
+  })
   listLeaves(
     @CurrentUser() user: any,
     @Query() query: ListStaffLeaveRequestsDto,

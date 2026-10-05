@@ -6,13 +6,15 @@ export const COVER_REASONS = ['absent', 'leave', 'other'] as const;
 export type CoverReason = (typeof COVER_REASONS)[number];
 
 /**
- * Who can be sent to cover. A teacher, or an administrator from the Admin
- * collection — schools short of free teachers send a supervisor or a manager.
- * STAFF (guards, cleaners) and the OWNER are never offered.
+ * Who can be sent to cover. A teacher, or an administrative assistant
+ * (MANAGER) — schools short of free teachers send one of them.
+ *
+ * Never the principal (SUPERVISOR, مدير المدرسة) or the owner, who run the
+ * school rather than take a class, and never STAFF (guards, cleaners).
  */
 export const SUBSTITUTE_TYPES = ['Teacher', 'Admin'] as const;
 export type SubstituteType = (typeof SUBSTITUTE_TYPES)[number];
-export const COVER_ADMIN_ROLES = ['MANAGER', 'SUPERVISOR'] as const;
+export const COVER_ADMIN_ROLES = ['MANAGER'] as const;
 
 /**
  * One lecture, on one day, taught by somebody other than its usual teacher.

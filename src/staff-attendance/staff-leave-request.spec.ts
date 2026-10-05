@@ -30,7 +30,10 @@ describe('Staff leave requests', () => {
   let notifications: any;
   let service: StaffAttendanceService;
 
+  // SUPERVISOR is the principal (مدير المدرسة): they run staff leave as the
+  // owner does, and their own leave goes to somebody else.
   const supervisor = { userId: staffId, schoolId, role: 'SUPERVISOR', name: 'أ. بشاير' };
+  const guard = { userId: '60d5ecb8b5c9c22b8c8b4009', schoolId, role: 'STAFF', name: 'الحارس' };
   // A manager the school gave «حضور الإداريين والمشرفين» to.
   const manager = {
     userId: managerId, schoolId, role: 'MANAGER', name: 'أ. هدى', permissionsVersion: 2,
@@ -197,8 +200,14 @@ describe('Staff leave requests', () => {
       );
     });
 
-    it('does not let a supervisor file for anybody else', async () => {
-      await expect(file({ staffId: otherStaff })).rejects.toBeInstanceOf(
+    it('lets the principal file for somebody, approved at once', async () => {
+      const result = await file({ staffId: otherStaff }, supervisor);
+      expect(result.message).toBe('تم تسجيل الاستئذان والموافقة عليه');
+      expect(saved.status).toBe('approved');
+    });
+
+    it('does not let a guard file for anybody else', async () => {
+      await expect(file({ staffId: otherStaff }, guard)).rejects.toBeInstanceOf(
         ForbiddenException,
       );
     });
@@ -289,11 +298,18 @@ describe('Staff leave requests', () => {
       expect(deleted).toHaveLength(0);
     });
 
-    it('does not let a supervisor withdraw somebody else’s', async () => {
+    it('lets the principal withdraw one they are handling', async () => {
       existing.staffId = otherStaff;
-      await expect(
-        service.cancelLeave(supervisor, requestId),
-      ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(service.cancelLeave(supervisor, requestId)).resolves.toMatchObject({
+        status: true,
+      });
+    });
+
+    it('does not let a guard withdraw somebody else’s', async () => {
+      existing.staffId = otherStaff;
+      await expect(service.cancelLeave(guard, requestId)).rejects.toBeInstanceOf(
+        ForbiddenException,
+      );
     });
 
     it('lets a manager withdraw one they are handling', async () => {
@@ -314,9 +330,14 @@ describe('Staff leave requests', () => {
   describe('who sees what', () => {
     const filterOf = () => leaves.find.mock.calls.at(-1)[0];
 
-    it('shows a supervisor only their own, whatever they ask for', async () => {
-      await service.listLeaves(supervisor, { staffId: otherStaff } as any);
-      expect(String(filterOf().staffId)).toBe(staffId);
+    it('lets the principal see everyone\'s', async () => {
+      await service.listLeaves(supervisor, {} as any);
+      expect(filterOf().staffId).toBeUndefined();
+    });
+
+    it('shows a guard only their own, whatever they ask for', async () => {
+      await service.listLeaves(guard, { staffId: otherStaff } as any);
+      expect(String(filterOf().staffId)).toBe(guard.userId);
     });
 
     it('lets a manager narrow to one person', async () => {

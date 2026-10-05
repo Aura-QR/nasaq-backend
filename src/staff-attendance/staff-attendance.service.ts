@@ -509,7 +509,9 @@ export class StaffAttendanceService {
     const admins = await this.admins
       .find({
         schoolId: this.objectId(String(schoolId)),
-        role: { $in: ['OWNER', 'MANAGER'] },
+        // The principal (SUPERVISOR) decides staff lateness and leave as the
+        // owner does; their own is excluded below.
+        role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] },
       })
       .select('_id role jobTitleId')
       .setOptions({ skipTenantScope: true })
@@ -781,11 +783,16 @@ export class StaffAttendanceService {
    * Leave routes are open to every staff role by design — anyone files and
    * reads their own. Acting on somebody else's (reading everyone's, filing on
    * behalf, withdrawing another's) is staff-attendance management, so a
-   * MANAGER needs the «حضور الإداريين والمشرفين» box for it. Owners and
-   * supervisors hold every permission.
+   * MANAGER needs the «حضور الإداريين والمشرفين» box for it.
+   *
+   * SUPERVISOR is the school's principal (مدير المدرسة in every client) and
+   * runs the school like the owner, so they manage staff leave too. It was
+   * treated as one more staff member here, which left the principal unable
+   * to file for somebody who phoned in. Their own leave still goes to
+   * somebody else: nobody approves their own.
    */
   private async managesStaff(user: any, action: Actions): Promise<boolean> {
-    if (user?.role === Role.SUPERVISOR || user?.role === Role.STAFF) return false;
+    if (user?.role === Role.STAFF) return false;
     if (user?.role !== Role.MANAGER) return true;
     const ability = await new CaslAbilityFactory().defineAbilitiesFor(user);
     return ability.can(action, 'StaffAttendance');
@@ -799,9 +806,9 @@ export class StaffAttendanceService {
    * today?" unanswerable.
    */
   async createLeave(user: any, dto: CreateStaffLeaveRequestDto) {
-    // A supervisor files only for themselves. A manager or owner may file on
-    // behalf, which is how somebody phoning in at seven in the morning gets
-    // recorded at all.
+    // The owner, the principal, or a manager with the staff-attendance box may
+    // file on behalf, which is how somebody phoning in at seven in the morning
+    // gets recorded at all. Anyone else files only for themselves.
     const onBehalf = dto.staffId && String(dto.staffId) !== String(user.userId);
     // Service staff are held to the same rule as a supervisor: only for
     // themselves. Without this a guard could file leave in a manager's name.
@@ -950,9 +957,9 @@ export class StaffAttendanceService {
   async listLeaves(user: any, query: ListStaffLeaveRequestsDto) {
     const filter: any = { ...this.scope(user) };
 
-    // Supervisors and service staff see only their own requests; a guard
-    // must never read the administrators' leave requests.
-    // A manager without the staff-attendance permission is in the same place.
+    // Service staff see only their own requests — a guard must never read the
+    // administrators' leave — and so does a manager without the
+    // staff-attendance permission.
     if (!(await this.managesStaff(user, 'read'))) {
       filter.staffId = this.objectId(String(user.userId));
     } else if (query.staffId) {
