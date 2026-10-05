@@ -7,6 +7,12 @@ Keep all UI copy in formal Arabic.
 There are two parts. **Part A is a bug that affects teachers today**, so do it
 first.
 
+> **Update, 5 Oct 2026:** only **administrative assistants (MANAGER)** join
+> the cover pool. **SUPERVISOR is the principal (مدير المدرسة) and is never a
+> substitute** — the backend no longer offers or accepts them. Labels:
+> `MANAGER` → «إداري/ة», `SUPERVISOR` (old rows only) → «مدير المدرسة». The
+> picker heading is «المساعدون الإداريون».
+
 ---
 
 ## Part A. A teacher covering a period cannot open its register
@@ -52,11 +58,11 @@ On any other day she gets `403 «هذه ليست حصتك»`.
 ## Part B. Supervisors and managers can be assigned as cover
 
 The school is short of free teachers, so an absent teacher's period can now be
-given to a **SUPERVISOR** or **MANAGER** account. The **OWNER** and **STAFF**
-(guards) never can.
+given to a **MANAGER** (administrative assistant) account. The **OWNER**,
+the **principal (SUPERVISOR)** and **STAFF** (guards) never can.
 
 - **Order:** free teachers come first (specialists at the top), then
-  supervisors and managers in name order.
+  administrative assistants in name order.
 - **Availability:** an administrator is not offered if she has an approved
   staff leave that day. Once any administrator has checked in today, only
   those who checked in are offered.
@@ -74,7 +80,7 @@ given to a **SUPERVISOR** or **MANAGER** account. The **OWNER** and **STAFF**
 { "teacherId": "…", "name": "أ. نورة", "specialization": null,
   "sameSubject": false,
   "type": "Admin",          // NEW: "Teacher" | "Admin"
-  "role": "SUPERVISOR" }    // NEW: "TEACHER" | "SUPERVISOR" | "MANAGER"
+  "role": "MANAGER" }       // NEW: "TEACHER" | "MANAGER"
 ```
 
 - `teacherId` may be an **Admin id**. Post it back unchanged as
@@ -85,7 +91,7 @@ given to a **SUPERVISOR** or **MANAGER** account. The **OWNER** and **STAFF**
 - `GET /duty/cover-report` rows (`CoverReportRow`, ~line 408) have `type` and
   `role`. For an administrator, `neededCover`, `approvedLeaves` and
   `daysPresent` are always `0`.
-- `GET /duty/my-day` works for a SUPERVISOR/MANAGER login. All of its slots
+- `GET /duty/my-day` works for a MANAGER login. All of its slots
   are `kind: "cover"`.
 
 ### Tasks
@@ -94,16 +100,16 @@ given to a **SUPERVISOR** or **MANAGER** account. The **OWNER** and **STAFF**
    `CoverReportRow`, and `substituteType` and `substituteRole` to
    `CoverEntry`. All are nullable, and missing means Teacher.
 2. **Picker** (`owner/presentation/screens/duty_screen.dart`, ~line 681):
-   - Show teachers first. Then a heading **«المشرفون والإداريون»** with the
+   - Show teachers first. Then a heading **«المساعدون الإداريون»** with the
      `type == "Admin"` suggestions.
    - For an administrator, show the role in place of the specialization:
-     `SUPERVISOR` → **«مشرف/ة»**, `MANAGER` → **«إداري/ة»**.
+     `MANAGER` → **«إداري/ة»** (and `SUPERVISOR` → «مدير المدرسة» on old rows).
    - In the covered card (~line 600), add the same role label next to the
      substitute's name.
 3. **Cover report screen:** add the role label for admin rows, and show
    «—» in place of their three zero columns.
-4. **«حصص الاحتياط» screen for SUPERVISOR and MANAGER logins** (not
-   OWNER):
+4. **«حصص الاحتياط» screen for MANAGER logins** (not the principal or the
+   owner):
    - **Data:** `GET /duty/my-day?date=`, with a date picker defaulting to
      today.
    - **Each card:** «الحصة {slot} · {className}», the subject and room, and
@@ -116,7 +122,7 @@ given to a **SUPERVISOR** or **MANAGER** account. The **OWNER** and **STAFF**
    - **Empty state:** «لا توجد حصص احتياط مكلّف بها في هذا اليوم».
    - **Entry point:** add it to `owner/presentation/models/sidebar_config.dart`
      beside «الاحتياطي والمناوبة» (~line 237), shown only when the role is
-     SUPERVISOR or MANAGER. Not `PermissionHelper.can('read', 'duty')`,
+     MANAGER. Not `PermissionHelper.can('read', 'duty')`,
      because the owner has that too and is never a substitute.
 5. **Notification bell** (`core/widgets/notification_bell.dart`, owner map
    ~line 47): `cover_assigned` and `cover_removed` go to `Routes.ownerDuty`
@@ -139,8 +145,8 @@ given to a **SUPERVISOR** or **MANAGER** account. The **OWNER** and **STAFF**
 
 **Part B**
 
-1. On the cover board, the supervisor appears after every free teacher, with
-   «مشرف/ة».
+1. On the cover board, the assistant appears after every free teacher, with
+   «إداري/ة».
 2. Assign her. Log in as her. The notification opens «حصص الاحتياط», and the
    period is there.
 3. Open the register from it. Attendance and daily tracking both save.

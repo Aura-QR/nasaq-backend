@@ -4,17 +4,23 @@ For the web (React) developer. **Backend is done and deployed.** Nothing
 below needs a backend change. Arabic labels below are the ones to use; keep
 all UI copy in formal Arabic.
 
+> **Update, 5 Oct 2026:** only **administrative assistants (MANAGER)** join
+> the cover pool. **SUPERVISOR is the principal (مدير المدرسة) and is never a
+> substitute** — the backend no longer offers or accepts them. Labels:
+> `MANAGER` → «إداري/ة», `SUPERVISOR` (old rows only) → «مدير المدرسة». The
+> picker heading is «المساعدون الإداريون».
+
 ## What changed
 
 The school is short of free teachers, so an absent teacher's period can now be
-given to a **supervisor (SUPERVISOR)** or a **manager (MANAGER)** from the
-Admin accounts, as well as to a teacher.
+given to an **administrative assistant (MANAGER)** from the Admin accounts,
+as well as to a teacher.
 
-- **Who can be chosen:** teachers, SUPERVISOR and MANAGER accounts.
-  The **OWNER** and **STAFF** (guards, cleaners) are never offered, and the
-  backend refuses them.
+- **Who can be chosen:** teachers and MANAGER accounts. The **OWNER**, the
+  **principal (SUPERVISOR)** and **STAFF** (guards, cleaners) are never
+  offered, and the backend refuses them.
 - **Order:** every free teacher first (subject specialists at the top), then
-  supervisors and managers in name order. A teacher teaches the lesson; an
+  administrative assistants in name order. A teacher teaches the lesson; an
   administrator supervises the room.
 - **Who counts as available:** an administrator is offered unless
   1. she has an **approved staff leave** that day, or
@@ -40,7 +46,7 @@ Admin accounts, as well as to a teacher.
   "specialization": null,       // always null for an administrator
   "sameSubject": false,         // always false for an administrator
   "type": "Admin",              // NEW: "Teacher" | "Admin"
-  "role": "SUPERVISOR"          // NEW: "TEACHER" | "SUPERVISOR" | "MANAGER"
+  "role": "MANAGER"             // NEW: "TEACHER" | "MANAGER"
 }
 ```
 
@@ -60,7 +66,7 @@ describe teachers.
 
 ### `GET /duty/my-day?date=YYYY-MM-DD`
 
-Already works for a SUPERVISOR or MANAGER. They have no timetable, so every
+Already works for a MANAGER. They have no timetable, so every
 slot is `kind: "cover"`:
 
 ```json
@@ -73,9 +79,9 @@ slot is `kind: "cover"`:
 ### 1. Cover board picker: `src/pages/School/Duty/CoverageBoard.jsx` (~line 745)
 
 - Split the list into two groups. Teachers first, as today. Then a heading
-  **«المشرفون والإداريون»** with the `type === "Admin"` suggestions.
+  **«المساعدون الإداريون»** with the `type === "Admin"` suggestions.
 - For an administrator, show the role in place of «بدون تخصص»:
-  `SUPERVISOR` → **«مشرف/ة»**, `MANAGER` → **«إداري/ة»**.
+  `MANAGER` → **«إداري/ة»** (and `SUPERVISOR` → «مدير المدرسة» on old rows).
 - The `onPick(suggestion.teacherId)` call stays as it is.
 - In the covered list (~line 710), add the same role chip next to
   `substituteTeacherName` when `substituteType === "Admin"`.
@@ -88,8 +94,8 @@ slot is `kind: "cover"`:
 
 ### 3. New page for the covering administrator: «حصص الاحتياط»
 
-- **Route:** `/school/my-cover`, for **SUPERVISOR and MANAGER** only (not
-  OWNER, who is never a substitute).
+- **Route:** `/school/my-cover`, for **MANAGER** only (the owner and the
+  principal are never substitutes).
 - **Sidebar:** add «حصص الاحتياط» for those two roles.
 - **Data:** `GET /duty/my-day?date=` with a date picker defaulting to today
   (`fetchMyDay` in `src/APIs/school/notifications.js` already does this).
@@ -108,7 +114,7 @@ period: it lists that date's cover periods from `/duty/my-day`, labelled
 empty list, so only her cover periods show.
 
 - Mount the same component on an admin route, e.g. `/school/cover-register`,
-  for SUPERVISOR and MANAGER.
+  for MANAGER.
 - Point the button from task 3 at
   `/school/cover-register?lectureId=<lectureId>&date=<YYYY-MM-DD>`.
 - On that route, change the two header buttons that assume a teacher:
@@ -128,13 +134,13 @@ them to **`/school/my-cover`**.
 ## How to test (QA school)
 
 1. As the owner, open the cover board on a day with an absent teacher. The
-   supervisor appears **after** all free teachers, with «مشرف/ة».
+   assistant appears **after** all free teachers, with «إداري/ة».
 2. Assign her. The period moves to «covered» with her name and role.
-3. Log in as that supervisor. The bell shows «لديك حصة احتياط». It opens
+3. Log in as that assistant. The bell shows «لديك حصة احتياط». It opens
    `/school/my-cover`, and the period is listed.
 4. Press «رصد الحضور والمتابعة». The register opens on that period and
    date. Save attendance and daily tracking, and both succeed.
 5. Change the date to the next day. The period is gone from the list.
-   (A supervisor can open any period's sheet anyway; only a MANAGER without
-   `dailyTracking.add` gets 403 saving tracking on a day she is not covering.)
+   (A MANAGER without `dailyTracking.add` gets 403 saving tracking on a day
+   she is not covering.)
 6. The cover report for that day shows her with 1 covered.
