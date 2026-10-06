@@ -197,6 +197,18 @@ describe('managing service staff', () => {
     expect(created.jobLabel).toBe('حارس');
   });
 
+  it('keeps a phone number, so the school can reach someone with no email or app', async () => {
+    const service = build();
+    const res: any = await service.create(SCHOOL, {
+      fullName: 'أم محمد', username: 'cleaner01', password: 'secret1', phoneNumber: ' 0501234567 ',
+    });
+    expect(created.phoneNumber).toBe('0501234567');
+    expect(res.data.phoneNumber).toBe('0501234567');
+
+    await service.create(SCHOOL, { fullName: 'م', username: 'guard02', password: 'secret1' });
+    expect(created.phoneNumber).toBe('');
+  });
+
   it('gives a guard with no email a placeholder that cannot collide', async () => {
     const service = build();
     await service.create(SCHOOL, { fullName: 'م', username: 'Guard01', password: 'secret1' });

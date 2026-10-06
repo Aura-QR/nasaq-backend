@@ -34,6 +34,13 @@ export class Admin extends Document {
   @Prop({ type: String, default: '' })
   fullName: string;
 
+  /**
+   * How the school reaches a service worker who may have no email and no
+   * app. Same name as Teacher.phoneNumber. Empty when not given.
+   */
+  @Prop({ type: String, default: '' })
+  phoneNumber: string;
+
   @Prop({ type: [String], default: [] })
   permissions: string[];
 

@@ -30,6 +30,7 @@ export class StaffMembersService {
       username: a.username,
       email: a.email,
       jobLabel: a.jobLabel || '',
+      phoneNumber: a.phoneNumber || '',
       // A placeholder address cannot receive a reset code.
       hasEmail: !String(a.email || '').endsWith('.staff.local'),
       createdAt: a.createdAt,
@@ -44,7 +45,7 @@ export class StaffMembersService {
   async list() {
     const rows = await this.adminModel
       .find({ role: StaffMembersService.ROLE })
-      .select('fullName username email jobLabel createdAt')
+      .select('fullName username email jobLabel phoneNumber createdAt')
       .sort({ fullName: 1, username: 1 })
       .lean()
       .exec();
@@ -70,6 +71,7 @@ export class StaffMembersService {
       email,
       fullName: dto.fullName.trim(),
       jobLabel: (dto.jobLabel ?? '').trim(),
+      phoneNumber: (dto.phoneNumber ?? '').trim(),
       password: await PasswordUtil.hash(dto.password),
       role: StaffMembersService.ROLE,
       // Nothing. Their one action — their own attendance — is guarded by role.
@@ -97,6 +99,7 @@ export class StaffMembersService {
     }
     if (dto.fullName !== undefined) staff.fullName = dto.fullName.trim();
     if (dto.jobLabel !== undefined) staff.jobLabel = dto.jobLabel.trim();
+    if (dto.phoneNumber !== undefined) staff.phoneNumber = dto.phoneNumber.trim();
     if (dto.password) staff.password = await PasswordUtil.hash(dto.password);
 
     await staff.save();

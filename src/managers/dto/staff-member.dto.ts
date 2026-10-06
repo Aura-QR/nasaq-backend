@@ -28,6 +28,15 @@ export class CreateStaffMemberDto {
   @ApiPropertyOptional({ example: 'حارس' })
   jobLabel?: string;
 
+  /** How the school reaches them — a guard often has neither email nor app. */
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  // Same shape as a teacher's number; an empty string clears it.
+  @Matches(/^$|^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/, { message: 'رقم الهاتف غير صحيح' })
+  @ApiPropertyOptional({ example: '0501234567' })
+  phoneNumber?: string;
+
   /**
    * Optional. Without one, "forgot password" cannot reach them and the owner
    * resets it instead (PATCH with a new password).
@@ -51,6 +60,15 @@ export class UpdateStaffMemberDto {
   @MaxLength(60)
   @ApiPropertyOptional()
   jobLabel?: string;
+
+  /** How the school reaches them — a guard often has neither email nor app. */
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  // Same shape as a teacher's number; an empty string clears it.
+  @Matches(/^$|^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/, { message: 'رقم الهاتف غير صحيح' })
+  @ApiPropertyOptional({ example: '0501234567' })
+  phoneNumber?: string;
 
   @IsEmail()
   @IsOptional()
