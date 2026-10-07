@@ -34,6 +34,7 @@ import {
   ReviewAbsenceExcuseDto,
   SubmitAbsenceExcuseDto,
 } from './dto/absence-excuse.dto';
+import { isActivityLecture } from '../subjects/activity.util';
 
 @Injectable()
 export class AttendanceService {
@@ -476,7 +477,7 @@ export class AttendanceService {
       .populate('classId', 'name roomNumber gender')
       .populate({
         path: 'subjectOfferingId',
-        populate: [{ path: 'subjectId', select: 'subjectName subjectCode' }],
+        populate: [{ path: 'subjectId', select: 'subjectName subjectCode isActivity' }],
       })
       .populate('teacherId', 'name')
       .exec();
@@ -519,6 +520,9 @@ export class AttendanceService {
       data: {
         lecture,
         date,
+        // Breakfast, play: nothing to record here. Daily tracking refuses a
+        // save on it; the screens say so instead of showing an empty sheet.
+        isActivity: isActivityLecture(lecture),
         alreadyRecorded: absences.length > 0,
         // Has anyone saved the behavioural sheet for this period today?
         // Distinct from alreadyRecorded, which only means somebody was

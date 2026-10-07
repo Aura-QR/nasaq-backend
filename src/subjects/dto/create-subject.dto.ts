@@ -34,6 +34,15 @@ export class CreateSubjectDto {
   @ApiProperty({ description: 'Whether the subject is required for promotion', default: true })
   isRequiredForPromotion?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  @ApiProperty({
+    description:
+      'Non-academic activity (breakfast, play): on the timetable, never prepared, tracked or graded',
+    default: false,
+  })
+  isActivity?: boolean;
+
   // @IsNumber()
   // @IsNotEmpty()
   // @Min(1)

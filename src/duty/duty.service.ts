@@ -29,6 +29,7 @@ import {
 import { SetDutySupervisorsDto } from './dto/duty-supervisor.dto';
 import { CreateSubstitutionDto } from './dto/substitution.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { isActivityLecture } from '../subjects/activity.util';
 
 const WEEKDAY_NAMES = [
   'sunday',
@@ -662,6 +663,7 @@ export class DutyService {
         className: lecture.classId?.name ?? null,
         roomNumber: lecture.classId?.roomNumber ?? null,
         subjectName: lecture.subjectOfferingId?.subjectId?.subjectName ?? null,
+        isActivity: isActivityLecture(lecture),
         excusedByLeave: excused,
       };
     });
@@ -678,6 +680,8 @@ export class DutyService {
         subjectName:
           row.lectureId.subjectOfferingId?.subjectId?.subjectName ?? null,
         coveringFor: row.absentTeacherName || null,
+        // A covered breakfast or play period has no register to open.
+        isActivity: isActivityLecture(row.lectureId),
         excusedByLeave: false,
       }));
 

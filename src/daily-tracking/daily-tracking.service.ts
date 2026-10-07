@@ -21,6 +21,7 @@ import { tenantLocalStorage } from '../tenancy/tenant-storage';
 import { Substitution } from '../duty/schemas/substitution.schema';
 import { coversLecture } from '../duty/substitute-access.util';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
+import { ACTIVITY_NOT_TRACKED, isActivityLecture } from '../subjects/activity.util';
 
 /** What one student's row resolves to once defaults are applied. */
 export interface ResolvedTrackingRecord {
@@ -114,11 +115,13 @@ export class DailyTrackingService {
       .populate('classId', 'name')
       .populate({
         path: 'subjectOfferingId',
-        populate: [{ path: 'subjectId', select: 'subjectName' }],
+        populate: [{ path: 'subjectId', select: 'subjectName isActivity' }],
       })
       .exec();
 
     if (!lecture) throw new NotFoundException('الحصة غير موجودة');
+    // Breakfast, play: on the timetable, never tracked.
+    if (isActivityLecture(lecture)) throw new BadRequestException(ACTIVITY_NOT_TRACKED);
 
     const lectureTeacherId = (lecture as any).teacherId?._id ?? (lecture as any).teacherId;
     if (

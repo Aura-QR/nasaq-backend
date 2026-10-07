@@ -90,7 +90,8 @@ export class SubjectsService {
     }
 
     const subjects = await this.subjectModel
-      .find({ _id: { $in: subjectIds } })
+      // Activities (breakfast, play) have nothing to grade or examine.
+      .find({ _id: { $in: subjectIds }, isActivity: { $ne: true } })
       .select('subjectName subjectCode')
       .exec();
 
@@ -132,7 +133,8 @@ export class SubjectsService {
     }
 
     const subjects = await this.subjectModel
-      .find({ _id: { $in: subjectIds } })
+      // Activities (breakfast, play) have nothing to grade or examine.
+      .find({ _id: { $in: subjectIds }, isActivity: { $ne: true } })
       .select('subjectName subjectCode')
       .exec();
 
@@ -156,6 +158,9 @@ export class SubjectsService {
       }
       createSubjectDto.subjectCode = normalizedSubjectCode;
     }
+
+    // An activity never counts towards passing a year, whatever was sent.
+    if (createSubjectDto.isActivity === true) createSubjectDto.isRequiredForPromotion = false;
 
     const subject = new this.subjectModel(createSubjectDto);
     await subject.save();
@@ -196,6 +201,8 @@ export class SubjectsService {
       }
       updateSubjectDto.subjectCode = normalizedSubjectCode;
     }
+
+    if (updateSubjectDto.isActivity === true) updateSubjectDto.isRequiredForPromotion = false;
 
     const updatedSubject = await this.subjectModel
       .findByIdAndUpdate(id, updateSubjectDto, { new: true })

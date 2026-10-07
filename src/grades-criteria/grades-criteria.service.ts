@@ -23,6 +23,7 @@ import { Term } from '../terms/schemas/term.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { TenantContextService } from '../tenancy/tenant-context.service';
 import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
+import { isActivitySubject } from '../subjects/activity.util';
 
 @Injectable()
 export class GradesCriteriaService {
@@ -238,9 +239,11 @@ export class GradesCriteriaService {
       Array.from(new Set(offerings.map((o) => o.termId?.toString()).filter(Boolean))),
     );
 
+    // Activities (breakfast, play) are on the timetable, not in the grade book.
+    const graded = offerings.filter((o) => !isActivitySubject(o.subjectId));
     const data = currentTermId
-      ? offerings.filter((o) => o.termId?.toString() === currentTermId)
-      : offerings;
+      ? graded.filter((o) => o.termId?.toString() === currentTermId)
+      : graded;
 
     return {
       message: 'تم استرجاع المواد بنجاح',
@@ -517,6 +520,8 @@ export class GradesCriteriaService {
     for (const [subjectIdStr, subjectOfferingItems] of offeringsBySubject.entries()) {
       const firstOfferingDoc = subjectOfferingItems[0].offering;
       const subjectDoc = firstOfferingDoc.subjectId as any;
+      // An activity is never graded, so it has no result and no say in passing.
+      if (isActivitySubject(subjectDoc)) continue;
       const subjectName = subjectDoc?.subjectName ?? 'Unknown Subject';
       const isRequiredForPromotion = subjectDoc?.isRequiredForPromotion !== false;
 

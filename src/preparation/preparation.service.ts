@@ -30,6 +30,7 @@ import {
   toDateOnlyString,
   WEEK_DAYS,
 } from './utils/week.util';
+import { ACTIVITY_NOT_PREPARED, isActivityLecture } from '../subjects/activity.util';
 
 /**
  * Query keys `GET /preparation` understands. Anything else is a client bug,
@@ -88,6 +89,9 @@ export class PreparationService {
       throw new NotFoundException(
         `المحاضرة ذات المعرف ${createPreparationDto.lecture} غير موجودة`,
       );
+    }
+    if ((await this.activityLectureIds([String(lecture._id)])).size > 0) {
+      throw new BadRequestException(ACTIVITY_NOT_PREPARED);
     }
 
     let teacherId: string;
@@ -303,6 +307,9 @@ export class PreparationService {
       throw new NotFoundException(
         `محاضرات غير موجودة: ${missing.join(', ')}`,
       );
+    }
+    if ((await this.activityLectureIds(lectureIds)).size > 0) {
+      throw new BadRequestException(ACTIVITY_NOT_PREPARED);
     }
 
     if (user?.role === 'TEACHER') {
@@ -780,7 +787,10 @@ export class PreparationService {
       })
       .populate('teacherId', 'name email')
       .lean()
-      .exec();
+      .exec()
+      // Breakfast and play are on the timetable but never prepared: counting
+      // them would mark every kindergarten teacher's week as unfinished.
+      .then((rows: any[]) => rows.filter((l) => !isActivityLecture(l)));
 
     const preparations = await this.preparationModel
       .find({
@@ -913,6 +923,22 @@ export class PreparationService {
       },
       days,
     };
+  }
+
+  /** Which of these lectures are activity periods (no preparation). */
+  private async activityLectureIds(ids: string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows: any[] = await this.lectureModel
+      .find({ _id: { $in: ids } })
+      .select('subjectOfferingId')
+      .populate({
+        path: 'subjectOfferingId',
+        select: 'subjectId',
+        populate: { path: 'subjectId', select: 'isActivity' },
+      })
+      .lean()
+      .exec();
+    return new Set(rows.filter(isActivityLecture).map((l) => String(l._id)));
   }
 
   /**
