@@ -149,13 +149,20 @@ export class ClassesService {
     const classes = await this.classModel
       .find(filter)
       .select('name gradeLevelId academicYearId gender roomNumber maxCapacity isActive')
+      // Only for the stage: the timetable sizes a class's grid from its
+      // stage (a KG day of 10 periods), and with a bare grade id it could not
+      // tell, so every KG class showed the school's 8.
+      .populate('gradeLevelId', 'stageId')
       .sort({ name: 1 })
+      .lean()
       .exec();
 
-    return classes.map((cls) => ({
+    return classes.map((cls: any) => ({
       id: cls._id,
       name: cls.name,
-      gradeLevelId: cls.gradeLevelId,
+      // Still the bare id, as every client already reads it.
+      gradeLevelId: cls.gradeLevelId?._id ?? cls.gradeLevelId ?? null,
+      stageId: cls.gradeLevelId?.stageId ?? null,
       academicYearId: cls.academicYearId,
       gender: cls.gender,
       roomNumber: cls.roomNumber,
