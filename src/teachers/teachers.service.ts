@@ -113,7 +113,7 @@ export class TeachersService {
       .populate({
         path: 'subjectOfferingId',
         populate: [
-          { path: 'subjectId', select: 'subjectName subjectCode' },
+          { path: 'subjectId', select: 'subjectName subjectCode isActivity' },
           { path: 'gradeLevelId', select: 'name order' },
           { path: 'termId', select: 'name order status' },
         ],

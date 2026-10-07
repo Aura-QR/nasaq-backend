@@ -17,6 +17,7 @@ import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
 import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
 import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
 import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-level.schema';
+import { Stage, StageSchema } from '../stages/schemas/stage.schema';
 import {
   TeacherConstraint,
   TeacherConstraintSchema,
@@ -64,6 +65,8 @@ describe('TimetableService', () => {
           // traceAssignments populates the grade level. The real app has every
           // model registered on the connection; an isolated test module does not.
           { name: GradeLevel.name, schema: GradeLevelSchema },
+          // A stage may carry its own day (KG), so capacity reads it.
+          { name: Stage.name, schema: StageSchema },
           { name: TeacherConstraint.name, schema: TeacherConstraintSchema },
         ]),
       ],

@@ -618,7 +618,7 @@ export class TimetableService {
       .populate({
         path: 'subjectOfferingId',
         populate: [
-          { path: 'subjectId', select: 'subjectName' },
+          { path: 'subjectId', select: 'subjectName isActivity' },
           { path: 'gradeLevelId', select: 'name' },
           { path: 'termId', select: 'name order' },
         ],

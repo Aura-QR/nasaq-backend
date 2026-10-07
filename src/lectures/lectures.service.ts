@@ -108,7 +108,7 @@ export class LecturesService {
       .populate({
         path: 'subjectOfferingId',
         populate: [
-          { path: 'subjectId', select: 'subjectName subjectCode' },
+          { path: 'subjectId', select: 'subjectName subjectCode isActivity' },
           { path: 'gradeLevelId', select: 'name order' },
         ],
       })
@@ -223,7 +223,7 @@ export class LecturesService {
       .populate({
         path: 'subjectOfferingId',
         populate: [
-          { path: 'subjectId', select: 'subjectName subjectCode' },
+          { path: 'subjectId', select: 'subjectName subjectCode isActivity' },
           { path: 'gradeLevelId', select: 'name order' },
         ],
       })
@@ -244,7 +244,7 @@ export class LecturesService {
       .populate({
         path: 'subjectOfferingId',
         populate: [
-          { path: 'subjectId', select: 'subjectName subjectCode' },
+          { path: 'subjectId', select: 'subjectName subjectCode isActivity' },
           { path: 'gradeLevelId', select: 'name order' },
         ],
       })
@@ -280,7 +280,7 @@ export class LecturesService {
       .populate({
         path: 'subjectOfferingId',
         populate: [
-          { path: 'subjectId', select: 'subjectName' },
+          { path: 'subjectId', select: 'subjectName isActivity' },
           { path: 'gradeLevelId', select: 'name' },
         ],
       })
