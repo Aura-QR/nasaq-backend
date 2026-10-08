@@ -156,14 +156,6 @@ export class ExamsController {
     return await this.examsService.editStudentGrade(examId, studentId, achievedGrade, user);
   }
 
-  @ApiOperation({ summary: 'Delete all exams (Admin only)' })
-  @ApiResponse({ status: 200, description: 'All exams deleted successfully' })
-  @Delete('deleteAll')
-  @HttpCode(HttpStatus.OK)
-  async deleteAll() {
-    return await this.examsService.deleteAll();
-  }
-
   @ApiOperation({ summary: 'Get exam by ID' })
   @ApiResponse({ status: 200, description: 'Exam fetched successfully' })
   @ApiResponse({ status: 400, description: 'Bad request' })
@@ -207,8 +199,9 @@ export class ExamsController {
   async addQuestion(
     @Param('examId') examId: string,
     @Body() questionDto: QuestionDto,
+    @CurrentUser() user: any,
   ) {
-    return await this.examsService.addQuestion(examId, questionDto);
+    return await this.examsService.addQuestion(examId, questionDto, user);
   }
 
   @ApiOperation({ summary: 'Update a question in an exam' })
@@ -222,8 +215,9 @@ export class ExamsController {
     @Param('examId') examId: string,
     @Param('questionId') questionId: string,
     @Body() updateQuestionDto: UpdateQuestionDto,
+    @CurrentUser() user: any,
   ) {
-    return await this.examsService.updateQuestion(examId, questionId, updateQuestionDto);
+    return await this.examsService.updateQuestion(examId, questionId, updateQuestionDto, user);
   }
 
   @ApiOperation({ summary: 'Delete a question from an exam' })
@@ -236,8 +230,9 @@ export class ExamsController {
   async deleteQuestion(
     @Param('examId') examId: string,
     @Param('questionId') questionId: string,
+    @CurrentUser() user: any,
   ) {
-    return await this.examsService.deleteQuestion(examId, questionId);
+    return await this.examsService.deleteQuestion(examId, questionId, user);
   }
 
 

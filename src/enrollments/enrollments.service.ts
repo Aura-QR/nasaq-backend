@@ -279,6 +279,8 @@ export class EnrollmentsService {
           student._id.toString(),
           gradeLevelId.toString(),
           sourceYearId,
+          // The class she sat this year in, not whichever she is in now.
+          [String(currentClass._id)],
         );
 
         const requiredSubjects = subjectResults.filter((s) => s.isRequiredForPromotion !== false);

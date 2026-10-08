@@ -251,6 +251,78 @@ export class GradesCriteriaService {
     };
   }
 
+  /**
+   * The exams and projects that count toward one student's term grade.
+   *
+   * Only those set for the student's own class, plus any she has a result
+   * for. A subject taught by two teachers has two sets of quizzes and
+   * finals; taking them in creation order across the whole grade handed a
+   * student the other class's final, which she never sat, and scored it 0.
+   * A result she holds is kept even when her class no longer matches — a
+   * student moved between sections mid-term keeps what she already sat.
+   */
+  private async termItemsForStudent(
+    studentId: string,
+    targetOfferingId: string,
+    criteria: GradesCriteria,
+    classIds?: string[],
+  ) {
+    const sid = new mongoose.Types.ObjectId(studentId);
+    const classes = (classIds ?? (await this.studentClassResolver.resolveClassIds(studentId)))
+      .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+      .map((id) => new mongoose.Types.ObjectId(String(id)));
+    const forOffering = {
+      $or: [
+        { subjectOfferingId: new mongoose.Types.ObjectId(targetOfferingId) },
+        { gradesCriteriaId: criteria._id },
+      ],
+    };
+
+    const allExams = await this.examModel
+      .find(forOffering)
+      .sort({ createdAt: 1 })
+      .select('_id examType classIds')
+      .exec();
+    const results = await this.examResultModel
+      .find({ studentId: sid, examId: { $in: allExams.map((e) => e._id) } })
+      .select('examId achievedGrade')
+      .exec();
+    const resultMap = new Map(results.map((r) => [r.examId.toString(), r.achievedGrade]));
+
+    const inClass = (ids: any[] | undefined) =>
+      (ids ?? []).some((c) => classes.some((k) => k.equals(c)));
+    const exams = allExams.filter((e) => inClass(e.classIds) || resultMap.has(e._id.toString()));
+
+    const byType: Record<string, string[]> = { quiz: [], assignment: [], activity: [], final: [] };
+    exams.forEach((e) => {
+      if (byType[e.examType]) byType[e.examType].push(e._id.toString());
+    });
+
+    const allProjects = await this.projectModel
+      .find(forOffering)
+      .sort({ createdAt: 1 })
+      .select('_id classIds')
+      .exec();
+    const submissions = await this.submissionModel
+      .find({ studentId: sid, projectId: { $in: allProjects.map((p) => p._id) } })
+      .select('projectId achievedGrade')
+      .exec();
+    const projectResultMap = new Map(
+      submissions.map((s) => [s.projectId.toString(), s.achievedGrade]),
+    );
+    const projects = allProjects.filter(
+      (p) => inClass((p as any).classIds) || projectResultMap.has(p._id.toString()),
+    );
+
+    return {
+      byType,
+      projects,
+      gradeFor: (examId: string) => resultMap.get(examId) ?? 0,
+      projectGradeFor: (projectId: string) => projectResultMap.get(projectId) ?? 0,
+      hasGrade: results.length > 0 || submissions.length > 0,
+    };
+  }
+
   async getMyGrades(
     studentId: string,
     subjectOfferingId?: string,
@@ -295,56 +367,11 @@ export class GradesCriteriaService {
     const gradePerQuiz = criteria.quizzes / quizzesCount;
     const gradePerProject = criteria.projects / projectsCount;
 
-    const offeringObj = criteria.subjectOfferingId as any;
-    const sId = offeringObj?.subjectId?._id ?? offeringObj?.subjectId;
-
-    const exams = await this.examModel
-      .find({
-        $or: [
-          { subjectOfferingId: new mongoose.Types.ObjectId(targetOfferingId) },
-          { gradesCriteriaId: criteria._id },
-          ...(sId ? [{ subjectId: sId }] : []),
-        ],
-      })
-      .sort({ createdAt: 1 })
-      .select('_id examType')
-      .exec();
-
-    const examIds = exams.map((e) => e._id);
-    const results = await this.examResultModel
-      .find({ studentId: new mongoose.Types.ObjectId(studentId), examId: { $in: examIds } })
-      .select('examId achievedGrade')
-      .exec();
-
-    const resultMap = new Map(results.map((r) => [r.examId.toString(), r.achievedGrade]));
-    const byType: Record<string, string[]> = { quiz: [], assignment: [], activity: [], final: [] };
-    exams.forEach((e) => {
-      if (byType[e.examType]) byType[e.examType].push(e._id.toString());
-    });
-
-    const gradeFor = (examId: string) => resultMap.get(examId) ?? 0;
-
-    const projects = await this.projectModel
-      .find({
-        $or: [
-          { subjectOfferingId: new mongoose.Types.ObjectId(targetOfferingId) },
-          { gradesCriteriaId: criteria._id },
-        ],
-      })
-      .sort({ createdAt: 1 })
-      .select('_id')
-      .exec();
-
-    const projectIds = projects.map((p) => p._id);
-    const projectSubmissions = await this.submissionModel
-      .find({ studentId: new mongoose.Types.ObjectId(studentId), projectId: { $in: projectIds } })
-      .select('projectId achievedGrade')
-      .exec();
-
-    const projectResultMap = new Map(
-      projectSubmissions.map((s) => [s.projectId.toString(), s.achievedGrade]),
+    const { byType, projects, gradeFor, projectGradeFor } = await this.termItemsForStudent(
+      studentId,
+      targetOfferingId,
+      criteria,
     );
-    const projectGradeFor = (projectId: string) => projectResultMap.get(projectId) ?? 0;
 
     return {
       message: 'تم استرجاع درجات الطالب بنجاح',
@@ -379,7 +406,7 @@ export class GradesCriteriaService {
     };
   }
 
-  async calculateStudentTermGrade(studentId: string, targetOfferingId: string) {
+  async calculateStudentTermGrade(studentId: string, targetOfferingId: string, classIds?: string[]) {
     const criteria = await this.gradesCriteriaModel
       .findOne({ subjectOfferingId: new mongoose.Types.ObjectId(targetOfferingId) })
       .exec();
@@ -392,58 +419,8 @@ export class GradesCriteriaService {
     const quizzesCount = criteria.quizzesCount ?? 0;
     const projectsCount = criteria.projectsCount ?? 0;
 
-    const offeringObj = criteria.subjectOfferingId as any;
-    const sId = offeringObj?.subjectId?._id ?? offeringObj?.subjectId;
-
-    const exams = await this.examModel
-      .find({
-        $or: [
-          { subjectOfferingId: new mongoose.Types.ObjectId(targetOfferingId) },
-          { gradesCriteriaId: criteria._id },
-          ...(sId ? [{ subjectId: sId }] : []),
-        ],
-      })
-      .sort({ createdAt: 1 })
-      .select('_id examType')
-      .exec();
-
-    const examIds = exams.map((e) => e._id);
-    const results = await this.examResultModel
-      .find({ studentId: new mongoose.Types.ObjectId(studentId), examId: { $in: examIds } })
-      .select('examId achievedGrade')
-      .exec();
-
-    const resultMap = new Map(results.map((r) => [r.examId.toString(), r.achievedGrade]));
-    const byType: Record<string, string[]> = { quiz: [], assignment: [], activity: [], final: [] };
-    exams.forEach((e) => {
-      if (byType[e.examType]) byType[e.examType].push(e._id.toString());
-    });
-
-    const gradeFor = (examId: string) => resultMap.get(examId) ?? 0;
-
-    const projects = await this.projectModel
-      .find({
-        $or: [
-          { subjectOfferingId: new mongoose.Types.ObjectId(targetOfferingId) },
-          { gradesCriteriaId: criteria._id },
-        ],
-      })
-      .sort({ createdAt: 1 })
-      .select('_id')
-      .exec();
-
-    const projectIds = projects.map((p) => p._id);
-    const projectSubmissions = await this.submissionModel
-      .find({ studentId: new mongoose.Types.ObjectId(studentId), projectId: { $in: projectIds } })
-      .select('projectId achievedGrade')
-      .exec();
-
-    const projectResultMap = new Map(
-      projectSubmissions.map((s) => [s.projectId.toString(), s.achievedGrade]),
-    );
-    const projectGradeFor = (projectId: string) => projectResultMap.get(projectId) ?? 0;
-
-    const hasGrade = results.length > 0 || projectSubmissions.length > 0;
+    const { byType, projects, gradeFor, projectGradeFor, hasGrade } =
+      await this.termItemsForStudent(studentId, targetOfferingId, criteria, classIds);
 
     const finalScore = byType.final[0] ? gradeFor(byType.final[0]) : 0;
     const activityScore = byType.activity[0] ? gradeFor(byType.activity[0]) : 0;
@@ -478,6 +455,8 @@ export class GradesCriteriaService {
     studentId: string,
     gradeLevelId: string,
     academicYearId: string,
+    // The class she sat the year in. Omitted, her current class is used.
+    classIds?: string[],
   ) {
     const terms = await this.termModel
       .find({ academicYearId: new mongoose.Types.ObjectId(academicYearId) })
@@ -537,6 +516,7 @@ export class GradesCriteriaService {
         const { finalGrade, passingGrade, hasGrade } = await this.calculateStudentTermGrade(
           studentId,
           item.offering._id.toString(),
+          classIds,
         );
 
         if (resolvedPassingGrade === undefined && passingGrade !== undefined && passingGrade !== null) {

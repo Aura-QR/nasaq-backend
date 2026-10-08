@@ -762,12 +762,6 @@ export class ProjectsService {
       data: transformedProject,
     };
   }
-  async deleteAll(){
-    this.projectModel.deleteMany().exec();
-    return {
-      message : 'تم حذف جميع المشاريع بنجاح',
-    }
-  }
 
   async listSubmissionsBySubjectAndClass(teacherId: string, subjectOfferingId: string, classId: string, req: any) {
     if (!mongoose.Types.ObjectId.isValid(subjectOfferingId)) throw new BadRequestException('صيغة معرف عرض المادة غير صحيحة');

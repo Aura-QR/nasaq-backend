@@ -124,12 +124,6 @@ export class ProjectsController {
     return this.projectsService.getMyProjects(user.userId, filters, { page, limit });
   }
 
-  @Delete('deleteAll')
-  @ApiOperation({ summary: 'Delete all projects (Admin only)' })
-  deleteAll(){
-    return this.projectsService.deleteAll();
-  }
-
   // Literal paths MUST stay above @Get(':id') — Nest matches in declaration
   // order, so a literal declared after it is swallowed by the wildcard and the
   // segment is parsed as an ObjectId. This route lived below :id and every call

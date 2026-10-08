@@ -88,9 +88,65 @@ export class ExamsService {
     }
   }
 
+  /**
+   * The classes a final is set for: every class of the grade, that year.
+   *
+   * One final per subject, per grade, per term — the same paper for every
+   * section, or the marks that decide promotion are not comparable. Any
+   * teacher who teaches the subject in that grade may set it; it is not
+   * hers alone, and it reaches the classes of the other teachers too.
+   */
+  private async finalExamClassIds(teacherId: string, subjectOfferingId: string): Promise<string[]> {
+    const offering = await this.subjectOfferingModel
+      .findById(subjectOfferingId)
+      .populate('termId', 'academicYearId')
+      .exec();
+    if (!offering) {
+      throw new NotFoundException('المادة غير موجودة في هذا الصف والفصل الدراسي');
+    }
+    if (!(await this.teachesOffering(teacherId, offering._id))) {
+      throw new ForbiddenException('يمكن إعداد الامتحان النهائي لمادة تدرّسها في هذا الصف فقط');
+    }
+    const yearId = (offering.termId as any)?.academicYearId;
+    const classes = await this.classModel
+      .find({
+        gradeLevelId: offering.gradeLevelId,
+        ...(yearId ? { academicYearId: yearId } : {}),
+        isActive: { $ne: false },
+      })
+      .select('_id')
+      .exec();
+    if (!classes.length) {
+      throw new BadRequestException('لا توجد فصول في هذا الصف');
+    }
+    return classes.map((c) => String(c._id));
+  }
+
+  private async teachesOffering(teacherId: string, subjectOfferingId: any): Promise<boolean> {
+    return !!(await this.lectureModel.exists({
+      teacherId: new mongoose.Types.ObjectId(String(teacherId)),
+      subjectOfferingId: new mongoose.Types.ObjectId(String(subjectOfferingId)),
+    }));
+  }
+
+  /**
+   * A teacher changes an exam she set — or the grade's final, which belongs
+   * to every teacher of the subject in that grade. Other roles keep what
+   * their permissions grant.
+   */
+  private async assertTeacherMayManage(exam: Exam, user: any): Promise<void> {
+    if (user?.role !== 'TEACHER') return;
+    if (String(exam.createdBy) === String(user.userId)) return;
+    if (exam.examType === 'final' && (await this.teachesOffering(user.userId, exam.subjectOfferingId))) {
+      return;
+    }
+    throw new ForbiddenException('يمكنك تعديل الامتحانات التي أعددتها فقط');
+  }
+
   async create(createExamDto: CreateExamDto, user: any, generatedFromPreparation?: string) {
 
-    const { subjectOfferingId, classIds, examType, questions, startDate, endDate, duration } = createExamDto;
+    const { subjectOfferingId, examType, questions, startDate, endDate, duration } = createExamDto;
+    let { classIds } = createExamDto;
 
     if (new Date(endDate) <= new Date(startDate)) {
       throw new BadRequestException('تاريخ انتهاء الامتحان يجب أن يكون بعد تاريخ البداية');
@@ -126,12 +182,17 @@ export class ExamsService {
       );
     }
 
-    // Verify the teacher actually teaches these classes with this subject offering
-    await this.verifyTeacherClassAccess(
-      user.userId,
-      classIds,
-      subjectOfferingId,
-    );
+    if (examType === 'final') {
+      // Whatever classes were picked, the final is the whole grade's.
+      classIds = await this.finalExamClassIds(user.userId, subjectOfferingId);
+    } else {
+      // Verify the teacher actually teaches these classes with this subject offering
+      await this.verifyTeacherClassAccess(
+        user.userId,
+        classIds,
+        subjectOfferingId,
+      );
+    }
 
     if (generatedFromPreparation) {
       this.validateObjectId(generatedFromPreparation, 'preparation');
@@ -209,14 +270,16 @@ export class ExamsService {
 
     if (examType === 'final') {
       const existingExam = await this.examModel.findOne({
-        gradesCriteriaId: gradesCriteria._id,
         examType: 'final',
-        classIds: { $in: classIds },
+        $or: [
+          { subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId) },
+          { gradesCriteriaId: gradesCriteria._id },
+        ],
       });
 
       if (existingExam) {
         throw new BadRequestException(
-          `فصل واحد أو أكثر من هذه الفصول لديه بالفعل امتحان نهائي لهذه المادة والعام الدراسي`
+          'يوجد امتحان نهائي لهذه المادة في هذا الصف لهذا الفصل الدراسي، ويمكن لمعلمات المادة تعديله',
         );
       }
     }
@@ -397,8 +460,17 @@ export class ExamsService {
         query[key] = stringValue;
       }
     }
- if(user.role === 'TEACHER')
-   query['createdBy'] = user.userId;
+    if (user.role === 'TEACHER') {
+      // Her own exams, and the final of every subject she teaches — it is
+      // shared with the other teachers of that subject in the grade.
+      const offerings = await this.lectureModel
+        .distinct('subjectOfferingId', { teacherId: new mongoose.Types.ObjectId(String(user.userId)) })
+        .exec();
+      query.$or = [
+        { createdBy: new mongoose.Types.ObjectId(String(user.userId)) },
+        { examType: 'final', subjectOfferingId: { $in: offerings } },
+      ];
+    }
 
 
     const total = await this.examModel.countDocuments(query).exec();
@@ -459,13 +531,17 @@ export class ExamsService {
       throw new NotFoundException(`الامتحان ذو المعرف ${id} غير موجود`);
     }
 
-    // If user is a teacher, verify they created this exam
-    if (user?.role === 'TEACHER') {
-      if (existingExam.createdBy?.toString() !== user.userId) {
-        throw new ForbiddenException(
-          'ليس لديك صلاحية لتحديث هذا الامتحان. يمكنك فقط تحديث الامتحانات التي قمت بإنشائها.',
-        );
+    await this.assertTeacherMayManage(existingExam, user);
+
+    // A final stays the whole grade's, for the subject it was set for. Its
+    // type cannot be changed into or out of «final» either: that would
+    // silently re-scope it to one teacher's classes, or to everybody's.
+    if (existingExam.examType === 'final' || updateExamDto.examType === 'final') {
+      if (updateExamDto.examType && updateExamDto.examType !== existingExam.examType) {
+        throw new BadRequestException('لا يمكن تغيير نوع الامتحان من نهائي أو إليه؛ احذفه وأنشئ امتحانًا جديدًا');
       }
+      delete updateExamDto.classIds;
+      delete updateExamDto.subjectOfferingId;
     }
 
     if (updateExamDto.classIds) {
@@ -510,14 +586,7 @@ export class ExamsService {
       throw new NotFoundException(`الامتحان ذو المعرف ${id} غير موجود`);
     }
 
-    // If user is a teacher, verify they created this exam
-    if (user?.role === 'TEACHER') {
-      if (exam.createdBy?.toString() !== user.userId) {
-        throw new ForbiddenException(
-          'ليس لديك صلاحية لحذف هذا الامتحان. يمكنك فقط حذف الامتحانات التي قمت بإنشائها.',
-        );
-      }
-    }
+    await this.assertTeacherMayManage(exam, user);
 
     await this.examModel.findByIdAndDelete(id);
 
@@ -527,9 +596,19 @@ export class ExamsService {
     };
   }
 
-  async updateQuestion(examId: string, questionId: string, updateQuestionDto: UpdateQuestionDto) {
+  /** The question routes answer to the same owner rule as the exam itself. */
+  private async assertMayEditQuestions(examId: string, user: any): Promise<void> {
+    const exam = await this.examModel.findById(examId).select('createdBy examType subjectOfferingId').exec();
+    if (!exam) {
+      throw new NotFoundException('الامتحان غير موجود');
+    }
+    await this.assertTeacherMayManage(exam, user);
+  }
+
+  async updateQuestion(examId: string, questionId: string, updateQuestionDto: UpdateQuestionDto, user?: any) {
     this.validateObjectId(examId, 'exam');
     this.validateObjectId(questionId, 'question');
+    await this.assertMayEditQuestions(examId, user);
 
     const updateFields = {};
 
@@ -559,9 +638,10 @@ export class ExamsService {
     return transformExamResponse(exam);
   }
 
-  async deleteQuestion(examId: string, questionId: string) {
+  async deleteQuestion(examId: string, questionId: string, user?: any) {
     this.validateObjectId(examId, 'exam');
     this.validateObjectId(questionId, 'question');
+    await this.assertMayEditQuestions(examId, user);
 
     const result = await this.examModel.updateOne(
       { _id: examId },
@@ -579,8 +659,9 @@ export class ExamsService {
     return transformExamResponse(exam);
   }
 
-  async addQuestion(examId: string, questionDto: QuestionDto) {
+  async addQuestion(examId: string, questionDto: QuestionDto, user?: any) {
     this.validateObjectId(examId, 'exam');
+    await this.assertMayEditQuestions(examId, user);
 
     if (!questionDto.options.includes(questionDto.correctAnswer)) {
       throw new BadRequestException(
@@ -924,12 +1005,18 @@ export class ExamsService {
     const student = await this.studentModel.findById(studentId).exec();
     if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
-    // Verify teacher teaches this subject offering
-    const lecture = await this.lectureModel.findOne({
-      teacherId: new mongoose.Types.ObjectId(String(teacher.userId)),
-      subjectOfferingId: exam.subjectOfferingId,
-    });
-    if (!lecture) {
+    // She teaches this subject to this student's class. Teaching it to
+    // another section is not enough — that student has her own teacher.
+    const teacherClassIds = (
+      await this.lectureModel
+        .distinct('classId', {
+          teacherId: new mongoose.Types.ObjectId(String(teacher.userId)),
+          subjectOfferingId: exam.subjectOfferingId,
+        })
+        .exec()
+    ).map(String);
+    const studentClassIds = await this.studentClassResolver.resolveClassIds(studentId);
+    if (!studentClassIds.some((id) => teacherClassIds.includes(String(id)))) {
       throw new ForbiddenException('ليس لديك صلاحية لتعديل درجات هذا الطالب في هذه المادة');
     }
 
@@ -962,10 +1049,4 @@ export class ExamsService {
     };
   }
 
-  async deleteAll() {
-    await this.examModel.deleteMany().exec();
-    return {
-      message: 'تم حذف جميع الامتحانات بنجاح',
-    };
-  }
 }
