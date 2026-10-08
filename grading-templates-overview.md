@@ -41,8 +41,8 @@ A new school setting, **«نظام الدرجات»** (grading system):
   and it works out of the box.
 - **Only the owner** marks each subject as continuous or final exam.
   Teachers never touch the split.
-- **Proposed:** the template can be changed only before any mark is
-  recorded in the year. After that it is locked, so the system never
+- The template can be changed only before any mark is recorded in the
+  active year, and only by the owner or the principal. After that it is locked, so the system never
   switches mid-term.
 
 ## 3. The Ministry template: two kinds of subject
@@ -178,13 +178,13 @@ Sara, maths, **continuous** subject (40 + 60), over one term:
 ## 7. Decisions taken (built this way, easy to change)
 
 1. **Do quizzes count toward written assessments, not the 40?**
-   *Proposed: yes.* A quiz is written work; the 40 is "participation and
+   **Yes.** A quiz is written work; the 40 is "participation and
    interaction".
-2. **How is the 40 split?** *Proposed: 20 participation + 20 homework.*
+2. **How is the 40 split?** **20 participation + 20 homework** when the class had no task all term.
 3. **Can the teacher add a manual written mark** (a worksheet or a research
-   task) besides quizzes? *Proposed: yes, as a simple extra column.*
+   task) besides quizzes? **Yes:** extra written items with their own out-of.
 4. **Do electronic assignments and projects** (المهام الأدائية) **count
-   toward the 40?** *Proposed: yes.* The split then becomes 15
+   toward the 40?** **Yes.** The split then becomes 15
    participation + 15 homework + 10 tasks and projects.
 
 ## 8. What stays the same
