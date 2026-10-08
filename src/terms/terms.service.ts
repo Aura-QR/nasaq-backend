@@ -1,3 +1,4 @@
+import { offeringIdsOfTerms, refuseIfWork, removeSkeleton } from '../common/school-structure.util';
 import { ConflictException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -107,11 +108,17 @@ export class TermsService {
   }
 
   async remove(id: string) {
-    const deletedTerm = await this.termModel.findByIdAndDelete(id).exec();
-    if (!deletedTerm) {
+    const term = await this.termModel.findById(id).exec();
+    if (!term) {
       throw new NotFoundException(`Term with ID ${id} not found`);
     }
-    return deletedTerm;
+    // The term's subject offerings, timetable, teacher assignments and
+    // distributions go with it; marks, plans and tracking refuse the delete.
+    const offeringIds = await offeringIdsOfTerms(this.termModel.db, [term._id as any]);
+    const scope = { termIds: [term._id as any], offeringIds };
+    await refuseIfWork(this.termModel.db, scope, 'الفصل الدراسي');
+    await removeSkeleton(this.termModel.db, scope);
+    return term;
   }
 
   async copyFromYear(

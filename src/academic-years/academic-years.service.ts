@@ -1,3 +1,4 @@
+import { cleanupLeftovers, offeringIdsOfTerms, refuseIfWork, removeSkeleton } from '../common/school-structure.util';
 import {
   BadRequestException,
   ConflictException,
@@ -5,7 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
+import { tenantLocalStorage } from '../tenancy/tenant-storage';
 import { AcademicYear } from './schemas/academic-year.schema';
 import { Enrollment } from '../enrollments/schemas/enrollment.schema';
 import { Class } from '../classes/schemas/class.schema';
@@ -82,16 +84,17 @@ export class AcademicYearsService {
       );
     }
 
+    // Everything the year holds, not only its classes and terms: its subject
+    // offerings, their timetable, teacher assignments and grade
+    // distributions went on pointing at a year that no longer existed.
     const classIds = (classes as any[]).map((c) => c._id);
-    const lectures = classIds.length
-      ? await this.lectureModel.deleteMany({ classId: { $in: classIds } }).exec()
-      : { deletedCount: 0 };
-    const removedClasses = classIds.length
-      ? await this.classModel.deleteMany({ _id: { $in: classIds } }).exec()
-      : { deletedCount: 0 };
-    const removedTerms = await this.termModel
-      .deleteMany({ academicYearId: year._id })
-      .exec();
+    const termIds = (
+      await this.termModel.find({ academicYearId: year._id }).select('_id').lean().exec()
+    ).map((t: any) => t._id);
+    const offeringIds = await offeringIdsOfTerms(this.academicYearModel.db, termIds);
+    const scope = { yearId: year._id as any, termIds, offeringIds, classIds };
+    await refuseIfWork(this.academicYearModel.db, scope, 'السنة الدراسية');
+    const removed = await removeSkeleton(this.academicYearModel.db, scope);
 
     await this.academicYearModel.deleteOne({ _id: year._id }).exec();
 
@@ -108,14 +111,28 @@ export class AcademicYearsService {
       message: `تم حذف السنة الدراسية "${year.name}"`,
       deleted: {
         academicYear: year.name,
-        classes: removedClasses.deletedCount ?? 0,
-        lectures: lectures.deletedCount ?? 0,
-        terms: removedTerms.deletedCount ?? 0,
+        classes: removed.Class ?? 0,
+        lectures: removed.Lecture ?? 0,
+        terms: removed.Term ?? 0,
+        subjectOfferings: removed.SubjectOffering ?? 0,
+        teacherAssignments: removed.TeacherAssignment ?? 0,
       },
       activeYear: promoted
         ? { _id: promoted._id, name: promoted.name, note: 'أصبحت السنة النشطة' }
         : null,
     };
+  }
+
+  /**
+   * Leftovers of deletes made before they cascaded — see cleanupLeftovers.
+   * A dry run unless `commit`.
+   */
+  async cleanupLeftovers(commit: boolean) {
+    const schoolId = tenantLocalStorage.getStore()?.schoolId;
+    if (!schoolId) {
+      throw new BadRequestException('لا توجد مدرسة محددة');
+    }
+    return cleanupLeftovers(this.academicYearModel.db, new Types.ObjectId(String(schoolId)), commit);
   }
 
   async create(createAcademicYearDto: CreateAcademicYearDto) {

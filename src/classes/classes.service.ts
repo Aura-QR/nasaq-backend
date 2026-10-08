@@ -1,3 +1,4 @@
+import { refuseIfWork, removeSkeleton } from '../common/school-structure.util';
 import {
   Injectable,
   NotFoundException,
@@ -234,11 +235,16 @@ export class ClassesService {
   async remove(id: string) {
     this.validateObjectId(id, 'class');
 
-    const deletedClass = await this.classModel.findByIdAndDelete(id).exec();
-    if (!deletedClass) {
+    const klass = await this.classModel.findById(id).exec();
+    if (!klass) {
       throw new NotFoundException(`الفصل بمعرف ${id} غير موجود`);
     }
-    return deletedClass;
+    // Its timetable and teacher assignments go with it; students, marks,
+    // attendance and plans refuse the delete.
+    const scope = { classIds: [klass._id as any] };
+    await refuseIfWork(this.classModel.db, scope, 'الفصل');
+    await removeSkeleton(this.classModel.db, scope);
+    return klass;
   }
 
   /**

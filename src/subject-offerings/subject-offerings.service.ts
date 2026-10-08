@@ -1,3 +1,4 @@
+import { refuseIfWork, removeSkeleton } from '../common/school-structure.util';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -290,11 +291,16 @@ export class SubjectOfferingsService {
   }
 
   async remove(id: string) {
-    const deleted = await this.subjectOfferingModel.findByIdAndDelete(id).exec();
-    if (!deleted) {
+    const offering = await this.subjectOfferingModel.findById(id).exec();
+    if (!offering) {
       throw new NotFoundException(`Subject offering with ID ${id} not found`);
     }
-    return deleted;
+    // Its periods, teacher assignments and grade distribution go with it;
+    // exams, projects, plans and tracking refuse the delete.
+    const scope = { offeringIds: [offering._id as any] };
+    await refuseIfWork(this.subjectOfferingModel.db, scope, 'المادة من هذا الصف');
+    await removeSkeleton(this.subjectOfferingModel.db, scope);
+    return offering;
   }
 
   /**

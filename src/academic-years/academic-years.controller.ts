@@ -72,6 +72,20 @@ export class AcademicYearsController {
     return this.academicYearsService.updateSetupStep(id, step);
   }
 
+  @Roles(Role.OWNER, Role.SUPERVISOR)
+  @Post('leftovers/cleanup')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Remove what earlier deletes left behind (dry run unless commit: true)',
+    description:
+      'Terms and classes of a deleted year, offerings of a deleted term, and the ' +
+      'timetable, teacher assignments and distributions under them. Anything ' +
+      'still holding marks, attendance, plans or students is kept and listed.',
+  })
+  cleanupLeftovers(@Body('commit') commit?: boolean) {
+    return this.academicYearsService.cleanupLeftovers(commit === true);
+  }
+
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @Delete(':id')
   @HttpCode(HttpStatus.OK)

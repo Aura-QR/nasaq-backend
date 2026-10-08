@@ -72,6 +72,7 @@ describe('AcademicYearsService.remove', () => {
 
     expect(res.deleted).toEqual({
       academicYear: 'Aura 2027', classes: 1, lectures: 2, terms: 1,
+      subjectOfferings: 0, teacherAssignments: 0,
     });
     expect(await m[AcademicYear.name].collection.countDocuments({ _id: doomed })).toBe(0);
     expect(await m[Lecture.name].collection.countDocuments({})).toBe(0);
