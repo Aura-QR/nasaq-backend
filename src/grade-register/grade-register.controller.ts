@@ -19,6 +19,14 @@ import { SaveRegisterMarksDto } from './dto/save-register-marks.dto';
 export class GradeRegisterController {
   constructor(private readonly service: GradeRegisterService) {}
 
+  @Get('options')
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.TEACHER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'read', subject: 'GradeRegister', roles: ['MANAGER'] })
+  @ApiOperation({ summary: 'The classes and subjects the caller can open, for the pickers' })
+  options(@CurrentUser() user: any) {
+    return this.service.options(user);
+  }
+
   @Get('sheet')
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.TEACHER, Role.SUPER_ADMIN)
   @CheckAbilities({ action: 'read', subject: 'GradeRegister', roles: ['MANAGER'] })

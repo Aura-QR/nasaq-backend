@@ -41,7 +41,9 @@ Show these fields on the subject add and edit forms **only when the system is
 | `passingGrade` | number «درجة النجاح» (optional) | 0–100. Empty (`null`) uses the school's default |
 
 They are sent with the usual `POST /subjects` and `PATCH /subjects/:id`, and
-come back on `GET /subjects`.
+come back on `GET /subjects`. The teacher's assignments and lectures now
+also carry `subjectId.assessmentType`, so the exam form can tell whether a
+final is allowed.
 
 - **Optional, a different type for one grade.** For example, a subject
   continuous in the lower grades and with a final later:
@@ -147,6 +149,23 @@ In a ministry school, «معايير الدرجات» is not needed. These chang
 
 Every route returns 400 «السجل السنوي متاح للمدارس التي تعمل بنظام درجات
 الوزارة» on a flexible school.
+
+### `GET /grade-register/options` — fill the class and subject pickers from this
+
+This returns what the caller can open, for the current term, registered
+subjects only:
+- a teacher gets her own classes and subjects;
+- admins get every class of the active year.
+
+Use it instead of listing all classes and all offerings. Those mix grades and
+terms, and most pairs return 400.
+
+```jsonc
+{ "data": { "classes": [
+  { "classId": "…", "className": "م1/أ",
+    "subjects": [ { "subjectOfferingId": "…", "subjectName": "العلوم", "assessmentType": "final_exam", "term": { "_id": "…", "name": "…" } } ] }
+] } }
+```
 
 ### `GET /grade-register/sheet?classId=&subjectOfferingId=`
 
@@ -259,6 +278,7 @@ optional; the default is the current term. For printing.
 ```jsonc
 { "data": { "className": "م1/أ", "subjects": [
   { "subjectOfferingId": "…", "subjectName": "العلوم", "term": { "_id": "…", "name": "…" },
+    "subjectId": "…",            // the subject itself, as well as the offering
     "assessmentType": "final_exam", "maxScores": { "performance": 40, "written": 20, "final": 40 },
     "status": "approved",        // "pending" = not approved yet: all marks null; show «لم يُعتمد بعد»
     "performance": 25.75, "written": 14.4, "final": 36, "total": 76.15 }

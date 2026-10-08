@@ -264,7 +264,7 @@ export class TeacherAssignmentsService {
       .populate({
         path: 'subjectOfferingId',
         populate: [
-          { path: 'subjectId', select: 'subjectName subjectCode' },
+          { path: 'subjectId', select: 'subjectName subjectCode isActivity assessmentType' },
           { path: 'gradeLevelId', select: 'name order' },
           { path: 'termId', select: 'name order status' },
         ],
@@ -302,7 +302,7 @@ export class TeacherAssignmentsService {
       .populate({
         path: 'subjectOfferingId',
         populate: [
-          { path: 'subjectId', select: 'subjectName subjectCode' },
+          { path: 'subjectId', select: 'subjectName subjectCode isActivity assessmentType' },
           { path: 'gradeLevelId', select: 'name order' },
           { path: 'termId', select: 'name order status' },
         ],

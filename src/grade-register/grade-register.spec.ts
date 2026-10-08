@@ -321,6 +321,22 @@ describe('annual register (ministry template)', () => {
     expect(resolve({ studentId: 'a', absent: true, quizScore: 7 } as any).quizScore).toBeNull();
   });
 
+  it('offers a teacher only her own classes and subjects, current and registered', async () => {
+    const other = (await m.Subject.collection.insertOne({ subjectName: 'فنية', assessmentType: null, schoolId })).insertedId;
+    const unregistered = (await m.SubjectOffering.collection.insertOne({ subjectId: other, gradeLevelId: gradeId, termId, schoolId })).insertedId;
+    await m.Lecture.collection.insertOne({ teacherId, classId, subjectOfferingId: unregistered, termId, dayOfWeek: 'monday', slot: 1, schoolId });
+
+    const forTeacher: any = await asSchool(() => register.options(teacher));
+    expect(forTeacher.data.classes).toHaveLength(1);
+    expect(forTeacher.data.classes[0].subjects.map((s: any) => s.subjectName).sort()).toEqual(['رياضيات', 'علوم']);
+
+    const stranger: any = await asSchool(() => register.options({ role: 'TEACHER', userId: String(new Types.ObjectId()) }));
+    expect(stranger.data.classes).toEqual([]);
+
+    const forOwner: any = await asSchool(() => register.options(owner));
+    expect(forOwner.data.classes[0].className).toBe('م1/أ');
+  });
+
   it('the student sees only approved subjects', async () => {
     await saraInMaths();
     const mine: any = await asSchool(() => register.myRegister({ role: 'STUDENT', userId: String(sara) }));

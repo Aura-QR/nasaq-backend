@@ -489,6 +489,64 @@ export class GradeRegisterService {
     );
   }
 
+  /**
+   * What the caller can open, as class → subjects, for the register's
+   * pickers: a teacher's own classes and subjects; for admins, every class of
+   * the active year. Current term only, registered subjects only — a class
+   * and a subject from another grade never pair up.
+   */
+  async options(user: any) {
+    await this.assertMinistry();
+    let classes: any[];
+    let mine: Map<string, Set<string>> | null = null;
+    if (user?.role === 'TEACHER') {
+      const lectures: any[] = await this.lectureModel
+        .find({ teacherId: oid(user.userId) })
+        .select('classId subjectOfferingId')
+        .lean()
+        .exec();
+      mine = new Map();
+      for (const l of lectures) {
+        const set = mine.get(String(l.classId)) ?? new Set<string>();
+        set.add(String(l.subjectOfferingId));
+        mine.set(String(l.classId), set);
+      }
+      classes = await this.classModel.find({ _id: { $in: [...mine.keys()].map(oid) } }).select('name gradeLevelId').lean().exec();
+    } else if (ADMIN_ROLES.includes(user?.role)) {
+      const AcademicYear = this.classModel.db.models['AcademicYear'];
+      const year: any = AcademicYear
+        ? await AcademicYear.findOne({ status: 'active' }).select('_id').lean().exec()
+        : null;
+      classes = await this.classModel
+        .find({ isActive: { $ne: false }, ...(year ? { academicYearId: year._id } : {}) })
+        .select('name gradeLevelId')
+        .sort({ name: 1 })
+        .lean()
+        .exec();
+    } else {
+      throw new ForbiddenException('ليس لديك صلاحية على السجل السنوي');
+    }
+
+    const out = [];
+    for (const klass of classes) {
+      const offerings = (await this.registerOfferings(klass)).filter(
+        (o) => !mine || mine.get(String(klass._id))?.has(String(o._id)),
+      );
+      if (!offerings.length) continue;
+      out.push({
+        classId: String(klass._id),
+        className: klass.name,
+        subjects: offerings.map((o) => ({
+          subjectOfferingId: String(o._id),
+          subjectName: o.subjectId?.subjectName ?? '',
+          assessmentType: resolveAssessmentType(o),
+          term: o.termId ? { _id: String(o.termId._id), name: o.termId.name } : null,
+        })),
+      });
+    }
+    return { status: true, message: 'تم استرجاع خيارات السجل', data: { classes: out } };
+  }
+
   /** Every subject's total for one class — the class sheet admins print. */
   async classReport(classId: string, termId: string | undefined, user: any) {
     await this.assertMinistry();
@@ -556,6 +614,7 @@ export class GradeRegisterService {
       const row = approved ? (sheet.snapshot ?? []).find((r: any) => String(r.studentId) === String(user.userId)) : null;
       subjects.push({
         subjectOfferingId: String(offering._id),
+        subjectId: String(offering.subjectId?._id ?? offering.subjectId ?? ''),
         subjectName: offering.subjectId?.subjectName ?? '',
         term: offering.termId ? { _id: String(offering.termId._id), name: offering.termId.name } : null,
         assessmentType: type,
