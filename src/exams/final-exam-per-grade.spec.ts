@@ -442,6 +442,26 @@ describe('exams — the final is the grade\'s, grades count the student\'s own c
       expect((await stored(id)).achievedGrade).toBe(5);
     });
 
+    it('on reopening, counts the time from when she first opened it', async () => {
+      const { id } = await sit();
+      await backdate(id, 10); // 30-minute paper opened 10 minutes ago
+
+      const again: any = await asSchool(() => exams.startExam(id, student(studentA)));
+
+      // About 20 minutes left, not the full 30.
+      expect(again.data.remainingSeconds).toBeGreaterThan(19 * 60);
+      expect(again.data.remainingSeconds).toBeLessThanOrEqual(20 * 60);
+    });
+
+    it('never counts past the exam\'s own end', async () => {
+      const { id } = await sit();
+      await m.Exam.collection.updateOne({ _id: new Types.ObjectId(id) }, { $set: { endDate: new Date(Date.now() + 5 * 60000) } });
+
+      const again: any = await asSchool(() => exams.startExam(id, student(studentA)));
+
+      expect(again.data.remainingSeconds).toBeLessThanOrEqual(5 * 60);
+    });
+
     it('gives back the saved answers when she reopens the paper in time', async () => {
       const { id, q1 } = await sit();
       await asSchool(() => exams.saveAnswers(id, { answers: [{ questionId: q1, answer: 'ب' }] } as any, student(studentA)));

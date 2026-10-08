@@ -996,37 +996,38 @@ export class ExamsService {
     if (now < (exam as any).startDate) {
       throw new BadRequestException('لم يبدأ وقت الامتحان بعد');
     }
-    if (now > (exam as any).endDate) {
-      throw new BadRequestException('انتهى وقت الامتحان');
-    }
 
     const existing = await this.examResultModel.findOne({ examId, studentId: user.userId });
     if (existing?.submitted) {
       throw new BadRequestException('لقد أديت هذا الامتحان من قبل');
     }
 
-    let startedAt: Date;
-    let remainingSeconds: number;
-
+    // Reopened after her time or the window ran out: what she saved is
+    // marked now, rather than leaving the paper open until the sweep.
     if (existing && ExamsService.expired(existing, exam, now.getTime())) {
       await this.finalizeSession(existing, exam);
       throw new BadRequestException('انتهى وقت الامتحان، وسُلّمت إجاباتك المحفوظة');
     }
+    if (now > (exam as any).endDate) {
+      throw new BadRequestException('انتهى وقت الامتحان');
+    }
 
-    if (existing) {
-      const elapsedMinutes = (now.getTime() - existing.startedAt.getTime()) / 60000;
-      remainingSeconds = Math.floor(Math.max(0, ((exam as any).duration - elapsedMinutes) * 60));
-      startedAt = existing.startedAt;
-    } else {
-      const session = await this.examResultModel.create({
+    const session =
+      existing ??
+      (await this.examResultModel.create({
         examId,
         studentId: user.userId,
         startedAt: now,
         submitted: false,
-      });
-      startedAt = session.startedAt;
-      remainingSeconds = (exam as any).duration * 60;
-    }
+      }));
+    const startedAt: Date = session.startedAt;
+    // Counted from when she first opened it, not from now, and never past
+    // the exam's own end: a paper reopened after the app closed shows the
+    // time actually left, not the whole duration again.
+    const remainingSeconds = Math.max(
+      0,
+      Math.floor((ExamsService.deadline(session, exam) - now.getTime()) / 1000),
+    );
 
     const questions = exam.questions.map((q: any) => ({
       _id: q._id,
