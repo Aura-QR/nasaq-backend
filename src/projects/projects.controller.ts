@@ -297,7 +297,7 @@ export class ProjectsController {
     @Req() req: any,
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    return this.projectsService.submitFiles(projectId, user.userId, files, req);
+    return this.projectsService.submitFiles(projectId, user, files, req);
   }
 
   @Delete(':projectId/submit/files/:filename')
@@ -311,7 +311,7 @@ export class ProjectsController {
     @Param('filename') filename: string,
     @CurrentUser() user: any,
   ) {
-    return this.projectsService.deleteSubmissionFile(projectId, user.userId, filename);
+    return this.projectsService.deleteSubmissionFile(projectId, user, filename);
   }
 
   @Get(':projectId/my-submission')
@@ -328,7 +328,8 @@ export class ProjectsController {
   }
 
   @Get(':projectId/submissions')
-  @UseGuards(JwtAuthGuard)
+  // Every student's work: never for students (their own is my-submission).
+  @CheckAbilities({ action: 'read', subject: 'Project' })
   @ApiOperation({ summary: 'Teacher/admin lists all student submissions for a project' })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
   @HttpCode(HttpStatus.OK)
@@ -341,7 +342,8 @@ export class ProjectsController {
   }
 
   @Get(':projectId/submissions/:studentId/download')
-  @UseGuards(JwtAuthGuard)
+  // Every student's work: never for students (their own is my-submission).
+  @CheckAbilities({ action: 'read', subject: 'Project' })
   @ApiOperation({ summary: "Teacher downloads a student's submission as ZIP" })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
   @ApiParam({ name: 'studentId', description: 'Student ID' })

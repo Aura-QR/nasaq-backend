@@ -601,6 +601,12 @@ export class ExamsService {
 
     await this.assertTeacherMayManage(exam, user);
 
+    // Its results are the students' marks. Deleting the exam took them out
+    // of the term grade without a word, and nothing could bring them back.
+    if (await this.examResultModel.exists({ examId: exam._id })) {
+      throw new BadRequestException('لا يمكن حذف امتحان بدأه الطلاب؛ درجاتهم محفوظة عليه');
+    }
+
     await this.examModel.findByIdAndDelete(id);
 
     return {

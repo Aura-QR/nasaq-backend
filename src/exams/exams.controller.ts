@@ -114,7 +114,9 @@ export class ExamsController {
   @ApiResponse({ status: 403, description: 'Teacher does not teach this subject' })
   @ApiResponse({ status: 404, description: 'Exam not found' })
   @Get(':examId/results')
-  @UseGuards(JwtAuthGuard)
+  // Every student's mark: never for students. The TEACHER row grants read,
+  // and the service still checks she teaches the subject.
+  @CheckAbilities({ action: 'read', subject: 'Exam' })
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   async listResults(@Param('examId') examId: string, @CurrentUser() user: any) {

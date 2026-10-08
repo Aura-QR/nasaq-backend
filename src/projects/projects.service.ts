@@ -627,6 +627,11 @@ export class ProjectsService {
       }
     }
 
+    // Its submissions are the students' work and marks. Deleting the project
+    // took them out of the term grade and left the files orphaned.
+    if (await this.submissionModel.exists({ projectId: project._id })) {
+      throw new BadRequestException('لا يمكن حذف مشروع سلّمه الطلاب؛ تسليماتهم ودرجاتهم محفوظة عليه');
+    }
 
     const projectFolder = path.join('./uploads/projects', id);
     if (fs.existsSync(projectFolder)) {
@@ -826,18 +831,43 @@ export class ProjectsService {
     };
   }
 
-  async submitFiles(projectId: string, studentId: string, files: Express.Multer.File[], req: any) {
-    const project = await this.projectModel.findById(projectId);
-    if (!project) throw new NotFoundException(`المشروع غير موجود`);
+  /**
+   * A student hands in work only for a project set for her class. Without
+   * this, any signed-in account could upload a submission to any project.
+   */
+  private async assertStudentOfProject(project: any, user: any): Promise<string> {
+    if (user?.role !== 'STUDENT') {
+      throw new ForbiddenException('تسليم المشاريع متاح للطلاب فقط');
+    }
+    const classIds = await this.studentClassResolver.resolveClassIds(user.userId);
+    if (!(project.classIds ?? []).some((c: any) => classIds.includes(String(c)))) {
+      throw new ForbiddenException('هذا المشروع غير مخصص لفصلك');
+    }
+    return String(user.userId);
+  }
 
-    const student = await this.studentModel.findById(studentId);
-    if (!student) throw new NotFoundException(`الطالب غير موجود`);
-
-
-
+  /**
+   * After the due date, or once marked, the files are what was marked. A
+   * student changing them afterwards leaves a mark for work nobody saw.
+   */
+  private assertSubmissionOpen(project: any, submission: any): void {
     if (new Date() > (project as any).dueDate) {
       throw new BadRequestException('انتهى الوقت المحدد لتسليم هذا المشروع');
     }
+    if (submission?.achievedGrade !== undefined && submission?.achievedGrade !== null) {
+      throw new BadRequestException('قُيّم هذا التسليم؛ لا يمكن تعديله');
+    }
+  }
+
+  async submitFiles(projectId: string, user: any, files: Express.Multer.File[], req: any) {
+    const project = await this.projectModel.findById(projectId);
+    if (!project) throw new NotFoundException(`المشروع غير موجود`);
+
+    const studentId = await this.assertStudentOfProject(project, user);
+    const student = await this.studentModel.findById(studentId);
+    if (!student) throw new NotFoundException(`الطالب غير موجود`);
+
+    this.assertSubmissionOpen(project, await this.submissionModel.findOne({ projectId, studentId }));
 
     if (!files || files.length === 0) throw new BadRequestException('لم يتم توفير ملفات');
 
@@ -866,9 +896,14 @@ export class ProjectsService {
     return { message: 'تم رفع الملفات بنجاح', data: this.formatSubmission(submission, baseUrl) };
   }
 
-  async deleteSubmissionFile(projectId: string, studentId: string, filename: string) {
+  async deleteSubmissionFile(projectId: string, user: any, filename: string) {
+    const project = await this.projectModel.findById(projectId);
+    if (!project) throw new NotFoundException(`المشروع غير موجود`);
+    const studentId = await this.assertStudentOfProject(project, user);
+
     const submission = await this.submissionModel.findOne({ projectId, studentId });
     if (!submission) throw new NotFoundException('لا يوجد تقديم لهذا الطالب');
+    this.assertSubmissionOpen(project, submission);
 
     const idx = submission.files.findIndex(f => f.filename === filename);
     if (idx === -1) throw new NotFoundException(`الملف ${filename} غير موجود`);
@@ -949,11 +984,20 @@ export class ProjectsService {
     const student = await this.studentModel.findById(studentId);
     if (!student) throw new NotFoundException(`الطالب غير موجود`);
 
-    const lecture = await this.lectureModel.findOne({
-      teacherId: new mongoose.Types.ObjectId(teacher.userId),
-      subjectOfferingId: project.subjectOfferingId,
-    });
-    if (!lecture) throw new ForbiddenException('ليس لديك صلاحية لتقييم هذا الطالب في هذه المادة');
+    // She teaches this subject to this student's class — teaching it to
+    // another section is not enough.
+    const teacherClassIds = (
+      await this.lectureModel
+        .distinct('classId', {
+          teacherId: new mongoose.Types.ObjectId(String(teacher.userId)),
+          subjectOfferingId: project.subjectOfferingId,
+        })
+        .exec()
+    ).map(String);
+    const studentClassIds = await this.studentClassResolver.resolveClassIds(studentId);
+    if (!studentClassIds.some((id) => teacherClassIds.includes(String(id)))) {
+      throw new ForbiddenException('ليس لديك صلاحية لتقييم هذا الطالب في هذه المادة');
+    }
 
     if (achievedGrade < 0 || achievedGrade > project.grade) {
       throw new BadRequestException(`الدرجة يجب أن تكون بين 0 و ${project.grade}`);

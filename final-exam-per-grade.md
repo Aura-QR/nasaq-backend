@@ -87,6 +87,22 @@ Show each message as it comes, the way other errors are shown.
 | Admin changes the weight or count of a type that already has exams or projects | 400 | «لا يمكن تعديل درجة أو عدد الاختبارات القصيرة بعد إنشاء الاختبارات القصيرة لهذه المادة؛ احذفها أولًا ثم عدّل التوزيع». Passing grade, and types with nothing yet, can still change |
 | A student opens an exam not set for her class; any non-student opens an exam | 403 | «هذا الامتحان غير مخصص لفصلك» / «أداء الامتحانات متاح للطلاب فقط» |
 
+| Teacher or admin deletes an exam any student has started | 400 | «لا يمكن حذف امتحان بدأه الطلاب؛ درجاتهم محفوظة عليه» |
+| Teacher or admin deletes a project any student has handed in | 400 | «لا يمكن حذف مشروع سلّمه الطلاب؛ تسليماتهم ودرجاتهم محفوظة عليه» |
+| A student uploads to, or deletes files from, a project not set for her class; any non-student does | 403 | «هذا المشروع غير مخصص لفصلك» / «تسليم المشاريع متاح للطلاب فقط» |
+| A student changes her submission after it is marked, or deletes a file after the due date | 400 | «قُيّم هذا التسليم؛ لا يمكن تعديله» / «انتهى الوقت المحدد لتسليم هذا المشروع» |
+| A teacher marks a project for a student outside her own sections | 403 | «ليس لديك صلاحية لتقييم هذا الطالب في هذه المادة» |
+
+**Now closed to students:** `GET /exams/:examId/results`,
+`GET /projects/:projectId/submissions` and
+`.../submissions/:studentId/download`. These are other students' marks and
+work. Students keep `my-result` and `my-submission`. No student screen calls
+the closed routes.
+
+**Hide the delete button** on an exam with `startedCount > 0`, and on a
+project with submissions. The student app should hide «تعديل التسليم» once the
+submission has a mark.
+
 **Behaviour changes**
 - **Two minutes' grace on submission.** The automatic submit when the
   timer hits zero is no longer refused for arriving a moment late. **Keep

@@ -5,6 +5,10 @@ import { Types } from 'mongoose';
 import { Exam, ExamSchema } from './schemas/exam.schema';
 import { ExamResult, ExamResultSchema } from './schemas/exam-result.schema';
 import { ExamsService } from './exams.service';
+import { ExamsController } from './exams.controller';
+import { ProjectsService } from '../projects/projects.service';
+import { ProjectsController } from '../projects/projects.controller';
+import { CHECK_ABILITY } from '../casl/decorators/check-abilities.decorator';
 import { GradesCriteria, GradesCriteriaSchema } from '../grades-criteria/schemas/grades-criteria.schema';
 import { GradesCriteriaService } from '../grades-criteria/grades-criteria.service';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
@@ -351,5 +355,78 @@ describe('exams — the final is the grade\'s, grades count the student\'s own c
     await asSchool(() => grades.update(String(criteriaId), { final: 30, activities: 20, passingGrade: 60 } as any));
     const stored = await m.GradesCriteria.collection.findOne({ _id: criteriaId });
     expect([stored.final, stored.activities, stored.passingGrade]).toEqual([30, 20, 60]);
+  });
+
+  it('will not delete an exam students have opened', async () => {
+    const { id } = await sit();
+
+    await expect(asSchool(() => exams.remove(id, teacher(teacherA))))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(await m.Exam.collection.countDocuments({})).toBe(1);
+  });
+
+  it('keeps every student\'s results and submissions away from students', () => {
+    const ability = (cls: any, name: string) => Reflect.getMetadata(CHECK_ABILITY, cls.prototype[name]);
+    expect(ability(ExamsController, 'listResults')).toEqual([{ action: 'read', subject: 'Exam' }]);
+    expect(ability(ProjectsController, 'listSubmissions')).toEqual([{ action: 'read', subject: 'Project' }]);
+    expect(ability(ProjectsController, 'downloadSubmission')).toEqual([{ action: 'read', subject: 'Project' }]);
+  });
+
+  describe('projects', () => {
+    let projects: ProjectsService;
+    const studentModel = { findById: async (id: any) => ({ _id: id }) };
+
+    const project = async (classIds: Types.ObjectId[], dueInDays = 3) =>
+      (await m.Project.collection.insertOne({
+        gradesCriteriaId: criteriaId, subjectOfferingId: offeringId, classIds, grade: 10,
+        title: 'مشروع', description: '', dueDate: new Date(Date.now() + dueInDays * 86400000),
+        createdBy: teacherA, files: [], schoolId,
+      })).insertedId;
+    const submission = (projectId: Types.ObjectId, studentId: Types.ObjectId, extra: any = {}) =>
+      m.ProjectSubmission.collection.insertOne({ projectId, studentId, files: [], maxGrade: 10, schoolId, ...extra });
+
+    beforeAll(() => {
+      projects = new ProjectsService(
+        m.Project, m.ProjectSubmission, m.GradesCriteria, m.Lecture, studentModel as any,
+        {} as any, m.SubjectOffering, resolver as any,
+      );
+    });
+
+    it('takes a submission only from a student of the project\'s classes', async () => {
+      const id = String(await project([classA]));
+      const files = [{ filename: 'x.pdf', path: '/nonexistent', originalname: 'x.pdf', size: 1 }] as any;
+
+      await expect(asSchool(() => projects.submitFiles(id, student(studentB), files, {})))
+        .rejects.toBeInstanceOf(ForbiddenException);
+      await expect(asSchool(() => projects.submitFiles(id, teacher(teacherA), files, {})))
+        .rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('freezes a submission once it is marked', async () => {
+      const pid = await project([classA]);
+      await submission(pid, studentA, { files: [{ filename: 'x.pdf', path: '/nonexistent' }], achievedGrade: 8 });
+
+      await expect(asSchool(() => projects.deleteSubmissionFile(String(pid), student(studentA), 'x.pdf')))
+        .rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('lets a teacher mark only her own section\'s students', async () => {
+      const pid = await project([classA, classB]);
+      await submission(pid, studentB);
+
+      await expect(asSchool(() => projects.gradeSubmission(String(pid), String(studentB), 7, teacher(teacherA))))
+        .rejects.toBeInstanceOf(ForbiddenException);
+      const ok: any = await asSchool(() => projects.gradeSubmission(String(pid), String(studentB), 7, teacher(teacherB)));
+      expect(ok.data.achievedGrade).toBe(7);
+    });
+
+    it('will not delete a project students have handed in', async () => {
+      const pid = await project([classA]);
+      await submission(pid, studentA);
+
+      await expect(asSchool(() => projects.delete(String(pid), teacher(teacherA))))
+        .rejects.toBeInstanceOf(BadRequestException);
+      expect(await m.Project.collection.countDocuments({})).toBe(1);
+    });
   });
 });
