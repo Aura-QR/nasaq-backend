@@ -72,6 +72,36 @@ On the results screen of a shared final, a teacher sees every student of
 the grade. Only her own students' marks can be corrected. Either disable the
 edit button on the other rows, or show the 403 message.
 
+## Update: exam and grade safeguards (second backend change, same day)
+
+**There is nothing new to build.** These are new refusals from the server.
+Show each message as it comes, the way other errors are shown.
+
+| Where | Status | Message |
+|---|---|---|
+| Creating a quiz, assignment or activity when the class already has as many as «معايير الدرجات» allows | 400 | «اكتمل عدد الاختبارات القصيرة المحدد لهذه المادة (3) في أحد الفصول المختارة». Same for الواجبات and اختبارات الأنشطة (one per class) |
+| Creating a project in the same situation | 400 | «اكتمل عدد المشاريع المحدد لهذه المادة (1) في أحد الفصول المختارة» |
+| Creating a project before the school has set «معايير الدرجات» (it used to invent a distribution) | 400 | «لا يوجد توزيع درجات لهذه المادة. يجب على إدارة المدرسة تحديد توزيع الدرجات قبل إنشاء المشاريع.» |
+| Adding, editing or deleting questions (including `PATCH /exams/:id` with `questions`) after any student has started the exam | 400 | «لا يمكن تعديل الأسئلة بعد أن بدأ الطلاب الامتحان». Duration and dates can still change |
+| Admin deletes «معايير الدرجات» that has exams or projects (it used to delete all of them and every mark, silently) | 400 | «لا يمكن حذف توزيع الدرجات لارتباطه بـ N اختبار وM مشروع؛ احذفها أولًا» |
+| Admin changes the weight or count of a type that already has exams or projects | 400 | «لا يمكن تعديل درجة أو عدد الاختبارات القصيرة بعد إنشاء الاختبارات القصيرة لهذه المادة؛ احذفها أولًا ثم عدّل التوزيع». Passing grade, and types with nothing yet, can still change |
+| A student opens an exam not set for her class; any non-student opens an exam | 403 | «هذا الامتحان غير مخصص لفصلك» / «أداء الامتحانات متاح للطلاب فقط» |
+
+**Behaviour changes**
+- **Two minutes' grace on submission.** The automatic submit when the
+  timer hits zero is no longer refused for arriving a moment late. **Keep
+  the auto-submit at zero.**
+- **Each question is counted once,** whatever the client sends.
+  `answeredQuestions` in the response now counts distinct questions.
+- **A paper is accepted once,** even if two submissions race each other.
+
+**Optional UI improvements**
+- **Teacher's exam editor:** if the exam already has results
+  (`GET /exams/:id/results`, `startedCount > 0`), make the questions
+  read-only and show «بدأ الطلاب الامتحان؛ لا يمكن تعديل الأسئلة».
+- **Teacher's create form:** after she picks the subject and type, show how
+  many are left. For example, «المتبقي: 1 من 3» from her exam list.
+
 ## What does not change
 
 - How students take an exam, and how it is marked.

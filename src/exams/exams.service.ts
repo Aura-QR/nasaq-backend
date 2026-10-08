@@ -20,6 +20,14 @@ import { PaginationDto } from '../pagination/dto/pagination.dto';
 import { getPagination } from '../pagination/common/paginationUtils';
 import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
 
+/**
+ * Minutes a submission may arrive after the student's time or the exam's
+ * window ran out. The app submits on its own when the timer reaches zero, and
+ * that request lands a second or two late; refusing it handed the student a
+ * zero for a paper she finished on time.
+ */
+const SUBMIT_GRACE_MINUTES = 2;
+
 @Injectable()
 export class ExamsService {
    private static readonly CLASS_FIELDS_GENDER = 'roomNumber academicYear gender';
@@ -286,6 +294,8 @@ export class ExamsService {
 
 
 
+    await this.assertWithinCount(gradesCriteria, subjectOfferingId, examType, classIds);
+
     const fields = {
        gradesCriteriaId: gradesCriteria._id,
        subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
@@ -532,6 +542,9 @@ export class ExamsService {
     }
 
     await this.assertTeacherMayManage(existingExam, user);
+    if (updateExamDto.questions) {
+      await this.assertQuestionsOpen(existingExam._id);
+    }
 
     // A final stays the whole grade's, for the subject it was set for. Its
     // type cannot be changed into or out of «final» either: that would
@@ -596,6 +609,69 @@ export class ExamsService {
     };
   }
 
+  /**
+   * Only a student of a class the exam is set for sits it. Without this, any
+   * signed-in account — another class's student, or a teacher — could open
+   * any exam by id, read its questions and leave a result behind.
+   */
+  private async assertStudentMaySit(exam: Exam, user: any): Promise<void> {
+    if (user?.role !== 'STUDENT') {
+      throw new ForbiddenException('أداء الامتحانات متاح للطلاب فقط');
+    }
+    const classIds = await this.studentClassResolver.resolveClassIds(user.userId);
+    if (!(exam.classIds ?? []).some((c) => classIds.includes(String(c)))) {
+      throw new ForbiddenException('هذا الامتحان غير مخصص لفصلك');
+    }
+  }
+
+  /**
+   * Questions are fixed once a student has opened the paper. A changed
+   * question or answer key is not re-marked against the papers already
+   * handed in, so those students would keep a mark for a different exam.
+   */
+  private async assertQuestionsOpen(examId: any): Promise<void> {
+    if (await this.examResultModel.exists({ examId: new mongoose.Types.ObjectId(String(examId)) })) {
+      throw new BadRequestException('لا يمكن تعديل الأسئلة بعد أن بدأ الطلاب الامتحان');
+    }
+  }
+
+  /**
+   * Only as many exams of a type count toward the term as the subject's grade
+   * distribution allows — the fourth quiz of three is sat and then silently
+   * ignored. Counted per class: two teachers of a subject each give their
+   * own sections the full number.
+   */
+  private async assertWithinCount(
+    gradesCriteria: GradesCriteria,
+    subjectOfferingId: string,
+    examType: string,
+    classIds: string[],
+  ): Promise<void> {
+    const limits: Record<string, { count: number; label: string }> = {
+      quiz: { count: gradesCriteria.quizzesCount ?? 0, label: 'الاختبارات القصيرة' },
+      assignment: { count: gradesCriteria.assignmentsCount ?? 0, label: 'الواجبات' },
+      // The term grade reads one activity exam.
+      activity: { count: 1, label: 'اختبارات الأنشطة' },
+    };
+    const limit = limits[examType];
+    if (!limit) return;
+    for (const classId of classIds) {
+      const existing = await this.examModel.countDocuments({
+        examType,
+        classIds: new mongoose.Types.ObjectId(classId),
+        $or: [
+          { subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId) },
+          { gradesCriteriaId: gradesCriteria._id },
+        ],
+      });
+      if (existing >= limit.count) {
+        throw new BadRequestException(
+          `اكتمل عدد ${limit.label} المحدد لهذه المادة (${limit.count}) في أحد الفصول المختارة`,
+        );
+      }
+    }
+  }
+
   /** The question routes answer to the same owner rule as the exam itself. */
   private async assertMayEditQuestions(examId: string, user: any): Promise<void> {
     const exam = await this.examModel.findById(examId).select('createdBy examType subjectOfferingId').exec();
@@ -603,6 +679,7 @@ export class ExamsService {
       throw new NotFoundException('الامتحان غير موجود');
     }
     await this.assertTeacherMayManage(exam, user);
+    await this.assertQuestionsOpen(exam._id);
   }
 
   async updateQuestion(examId: string, questionId: string, updateQuestionDto: UpdateQuestionDto, user?: any) {
@@ -692,6 +769,7 @@ export class ExamsService {
     if (!exam) {
       throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
     }
+    await this.assertStudentMaySit(exam, user);
 
     const now = new Date();
     if (now < (exam as any).startDate) {
@@ -757,12 +835,14 @@ export class ExamsService {
     if (!exam) {
       throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
     }
+    await this.assertStudentMaySit(exam, user);
 
     const now = new Date();
+    const grace = SUBMIT_GRACE_MINUTES * 60000;
     if (now < (exam as any).startDate) {
       throw new BadRequestException('لم يبدأ وقت الامتحان بعد');
     }
-    if (now > (exam as any).endDate) {
+    if (now.getTime() > new Date((exam as any).endDate).getTime() + grace) {
       throw new BadRequestException('انتهى وقت الامتحان');
     }
 
@@ -777,7 +857,7 @@ export class ExamsService {
 
     // Duration check: now - startedAt must be within the allowed duration
     const elapsedMinutes = (now.getTime() - session.startedAt.getTime()) / 60000;
-    if (elapsedMinutes > (exam as any).duration) {
+    if (elapsedMinutes > (exam as any).duration + SUBMIT_GRACE_MINUTES) {
       throw new BadRequestException('انتهى وقت الامتحان المخصص لك');
     }
 
@@ -793,7 +873,18 @@ export class ExamsService {
       questionMap.set(question._id.toString(), question.correctAnswer);
     });
 
-    const results = answers.map((answer) => {
+    // One answer per question, the first one sent. Counted as sent, the same
+    // correct answer repeated scored past 100% — 20 copies on a five-question
+    // paper was 400%.
+    const seen = new Set<string>();
+    const uniqueAnswers = answers.filter((answer) => {
+      const id = String(answer.questionId);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+
+    const results = uniqueAnswers.map((answer) => {
       const correctAnswer = questionMap.get(answer.questionId);
 
       if (correctAnswer === undefined) {
@@ -828,25 +919,30 @@ export class ExamsService {
 
     const maxGrade = exam.grade;
 
-    console.log(maxGrade)
-
     const finalGrade = parseFloat(((percentage / 100) * maxGrade).toFixed(2));
     const passed = percentage >= 50;
 
-  
-    await this.examResultModel.findByIdAndUpdate(session._id, {
-      submitted: true,
-      achievedGrade: finalGrade,
-      percentage: parseFloat(percentage.toFixed(2)),
-      passed,
-      answers: results,
-    });
+    // Conditional on submitted: false, so two submissions racing each other
+    // cannot both be accepted, the second overwriting the first.
+    const saved = await this.examResultModel.findOneAndUpdate(
+      { _id: session._id, submitted: { $ne: true } },
+      {
+        submitted: true,
+        achievedGrade: finalGrade,
+        percentage: parseFloat(percentage.toFixed(2)),
+        passed,
+        answers: results,
+      },
+    );
+    if (!saved) {
+      throw new BadRequestException('لقد أديت هذا الامتحان من قبل');
+    }
 
     return {
       examId: exam._id,
       examType: exam.examType,
       totalQuestions: totalQuestions,
-      answeredQuestions: answers.length,
+      answeredQuestions: uniqueAnswers.length,
       correctAnswers: correctAnswersCount,
       incorrectAnswers: totalQuestions - correctAnswersCount,
       percentage: parseFloat(percentage.toFixed(2)),

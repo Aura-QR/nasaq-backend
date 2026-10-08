@@ -717,12 +717,49 @@ export class GradesCriteriaService {
     };
 
     this.validateGradesSum(mergedData);
+    await this.assertWeightsUnchangedWhileInUse(existingGradesCriteria, updatePayload);
 
     const updatedGradesCriteria = await this.gradesCriteriaModel
       .findByIdAndUpdate(id, updatePayload, { new: true, runValidators: true })
       .populate(this.getPopulateOptions());
 
     return transformGradesCriteriaResponse(updatedGradesCriteria);
+  }
+
+  /**
+   * A weight or count cannot change under exams already set.
+   *
+   * Each exam stores its mark when it is created (the quizzes' weight over
+   * their count). Changing the weight afterwards left the old papers on the
+   * old scale, so the term total no longer added up to the distribution;
+   * lowering a count silently dropped papers the students had already sat.
+   * The passing grade is free to change: nothing is stored against it.
+   */
+  private async assertWeightsUnchangedWhileInUse(existing: GradesCriteria, update: any): Promise<void> {
+    const parts: { fields: string[]; examType?: string; label: string }[] = [
+      { fields: ['final'], examType: 'final', label: 'الاختبار النهائي' },
+      { fields: ['quizzes', 'quizzesCount'], examType: 'quiz', label: 'الاختبارات القصيرة' },
+      { fields: ['assignments', 'assignmentsCount'], examType: 'assignment', label: 'الواجبات' },
+      { fields: ['activities'], examType: 'activity', label: 'الأنشطة' },
+      { fields: ['projects', 'projectsCount'], label: 'المشاريع' },
+    ];
+    const forCriteria = {
+      $or: [{ gradesCriteriaId: existing._id }, { subjectOfferingId: existing.subjectOfferingId }],
+    };
+    for (const part of parts) {
+      const changed = part.fields.some(
+        (f) => update[f] !== undefined && Number(update[f]) !== Number((existing as any)[f]),
+      );
+      if (!changed) continue;
+      const inUse = part.examType
+        ? await this.examModel.exists({ ...forCriteria, examType: part.examType })
+        : await this.projectModel.exists(forCriteria);
+      if (inUse) {
+        throw new BadRequestException(
+          `لا يمكن تعديل درجة أو عدد ${part.label} بعد إنشاء ${part.label} لهذه المادة؛ احذفها أولًا ثم عدّل التوزيع`,
+        );
+      }
+    }
   }
 
   async remove(id: string) {
@@ -733,21 +770,22 @@ export class GradesCriteriaService {
       throw new NotFoundException(`معايير التقييم ذات المعرف ${id} غير موجودة`);
     }
 
-    const exams = await this.examModel.find({ gradesCriteriaId: id }).select('_id').exec();
-    const projects = await this.projectModel.find({ gradesCriteriaId: id }).select('_id').exec();
-
-    const examIds = exams.map((e) => e._id);
-    const projectIds = projects.map((p) => p._id);
-
-    if (examIds.length > 0) {
-      await this.examResultModel.deleteMany({ examId: { $in: examIds } });
+    // This used to delete every exam and project of the subject, with every
+    // student's result and submission, in one click and without a word. The
+    // marks are the record; the distribution goes only once nothing hangs
+    // off it.
+    const forCriteria = {
+      $or: [{ gradesCriteriaId: result._id }, { subjectOfferingId: result.subjectOfferingId }],
+    };
+    const [examCount, projectCount] = await Promise.all([
+      this.examModel.countDocuments(forCriteria).exec(),
+      this.projectModel.countDocuments(forCriteria).exec(),
+    ]);
+    if (examCount || projectCount) {
+      throw new BadRequestException(
+        `لا يمكن حذف توزيع الدرجات لارتباطه بـ ${examCount} اختبار و${projectCount} مشروع؛ احذفها أولًا`,
+      );
     }
-    if (projectIds.length > 0) {
-      await this.submissionModel.deleteMany({ projectId: { $in: projectIds } });
-    }
-
-    await this.examModel.deleteMany({ gradesCriteriaId: id });
-    await this.projectModel.deleteMany({ gradesCriteriaId: id });
 
     await this.gradesCriteriaModel.findByIdAndDelete(id);
 

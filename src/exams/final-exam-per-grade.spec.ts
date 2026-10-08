@@ -237,4 +237,119 @@ describe('exams — the final is the grade\'s, grades count the student\'s own c
     const ok: any = await asSchool(() => exams.editStudentGrade(String(id), String(studentB), 25, teacher(teacherB)));
     expect(ok.data.achievedGrade).toBe(25);
   });
+
+  // ───────────────────────────── sitting, marking, and the distribution
+
+  const student = (id: Types.ObjectId) => ({ role: 'STUDENT', userId: String(id) });
+  const twoQuestions = () => ({
+    ...paper('quiz', [String(classA)]),
+    questions: [
+      { question: 'س١', options: ['أ', 'ب'], correctAnswer: 'أ' },
+      { question: 'س٢', options: ['أ', 'ب'], correctAnswer: 'ب' },
+    ],
+  });
+  const sit = async () => {
+    const quiz: any = await asSchool(() => exams.create(twoQuestions(), teacher(teacherA)));
+    const id = String(quiz._id ?? quiz.id);
+    const started: any = await asSchool(() => exams.startExam(id, student(studentA)));
+    const [q1] = started.data.exam.questions.map((q: any) => String(q._id));
+    return { id, q1 };
+  };
+
+  it('counts each question once, however often its answer is sent', async () => {
+    const { id, q1 } = await sit();
+    const answers = Array.from({ length: 20 }, () => ({ questionId: q1, answer: 'أ' }));
+
+    const marked: any = await asSchool(() => exams.gradeExam(id, { answers } as any, student(studentA)));
+
+    // One of two right: half of the quiz's 10, never 20 × 10.
+    expect(marked.percentage).toBe(50);
+    expect(marked.achievedGrade).toBe(5);
+  });
+
+  it('lets only a student of the exam\'s classes open it', async () => {
+    const quiz: any = await asSchool(() => exams.create(twoQuestions(), teacher(teacherA)));
+    const id = String(quiz._id ?? quiz.id);
+
+    await expect(asSchool(() => exams.startExam(id, student(studentB))))
+      .rejects.toBeInstanceOf(ForbiddenException);
+    await expect(asSchool(() => exams.startExam(id, teacher(teacherA))))
+      .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('accepts a paper that lands just after the timer, and refuses one long after', async () => {
+    const { id, q1 } = await sit();
+    const answers = [{ questionId: q1, answer: 'أ' }];
+    const backdate = (minutes: number) =>
+      m.ExamResult.collection.updateOne(
+        { examId: new Types.ObjectId(id) },
+        { $set: { startedAt: new Date(Date.now() - minutes * 60000), submitted: false } },
+      );
+
+    await backdate(30 + 4); // 30-minute paper, 4 minutes over
+    await expect(asSchool(() => exams.gradeExam(id, { answers } as any, student(studentA))))
+      .rejects.toBeInstanceOf(BadRequestException);
+
+    await backdate(30.5); // the auto-submit, half a minute late
+    const marked: any = await asSchool(() => exams.gradeExam(id, { answers } as any, student(studentA)));
+    expect(marked.achievedGrade).toBe(5);
+  });
+
+  it('accepts a paper once', async () => {
+    const { id, q1 } = await sit();
+    const answers = [{ questionId: q1, answer: 'أ' }];
+    await asSchool(() => exams.gradeExam(id, { answers } as any, student(studentA)));
+
+    await expect(asSchool(() => exams.gradeExam(id, { answers } as any, student(studentA))))
+      .rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('freezes the questions once a student has opened the paper', async () => {
+    const { id, q1 } = await sit();
+
+    await expect(asSchool(() =>
+      exams.updateQuestion(id, q1, { correctAnswer: 'ب' } as any, teacher(teacherA)),
+    )).rejects.toBeInstanceOf(BadRequestException);
+    await expect(asSchool(() =>
+      exams.addQuestion(id, { question: 'س٣', options: ['أ'], correctAnswer: 'أ' }, teacher(teacherA)),
+    )).rejects.toBeInstanceOf(BadRequestException);
+    await expect(asSchool(() =>
+      exams.update(id, { questions: [] } as any, teacher(teacherA)),
+    )).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('stops at the number of quizzes the distribution counts, per class', async () => {
+    await asSchool(() => exams.create(paper('quiz', [String(classA)]), teacher(teacherA)));
+    await asSchool(() => exams.create(paper('quiz', [String(classA)]), teacher(teacherA)));
+
+    await expect(asSchool(() => exams.create(paper('quiz', [String(classA)]), teacher(teacherA))))
+      .rejects.toBeInstanceOf(BadRequestException);
+    // The other section has its own two.
+    await asSchool(() => exams.create(paper('quiz', [String(classB)]), teacher(teacherB)));
+  });
+
+  it('will not delete a distribution with exams set against it', async () => {
+    await asSchool(() => exams.create(paper('quiz', [String(classA)]), teacher(teacherA)));
+
+    await expect(asSchool(() => grades.remove(String(criteriaId))))
+      .rejects.toBeInstanceOf(BadRequestException);
+    expect(await m.Exam.collection.countDocuments({})).toBe(1);
+    expect(await m.GradesCriteria.collection.countDocuments({})).toBe(1);
+  });
+
+  it('will not change a weight or count under exams already set, and changes the rest', async () => {
+    await asSchool(() => exams.create(paper('quiz', [String(classA)]), teacher(teacherA)));
+
+    await expect(asSchool(() =>
+      grades.update(String(criteriaId), { quizzes: 10, final: 50 } as any),
+    )).rejects.toBeInstanceOf(BadRequestException);
+    await expect(asSchool(() =>
+      grades.update(String(criteriaId), { quizzesCount: 1 } as any),
+    )).rejects.toBeInstanceOf(BadRequestException);
+
+    // No final or activity exam yet, so those two may trade weight.
+    await asSchool(() => grades.update(String(criteriaId), { final: 30, activities: 20, passingGrade: 60 } as any));
+    const stored = await m.GradesCriteria.collection.findOne({ _id: criteriaId });
+    expect([stored.final, stored.activities, stored.passingGrade]).toEqual([30, 20, 60]);
+  });
 });

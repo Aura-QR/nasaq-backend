@@ -106,28 +106,41 @@ export class ProjectsService {
       );
     }
 
-    let gradesCriteria = await this.gradesCriteriaModel.findOne({
+    const gradesCriteria = await this.gradesCriteriaModel.findOne({
       subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId),
     });
 
+    // This used to invent a distribution (40/20/10/15/15) and save it as the
+    // subject's official one whenever a teacher set the first project — the
+    // side door exams.service closed for exams. The school sets it.
     if (!gradesCriteria) {
-      gradesCriteria = await new this.gradesCriteriaModel({
-        subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId),
-        final: 40,
-        assignments: 20,
-        assignmentsCount: 4,
-        activities: 10,
-        projects: 15,
-        projectsCount: 1,
-        quizzes: 15,
-        quizzesCount: 3,
-      }).save();
+      throw new BadRequestException(
+        'لا يوجد توزيع درجات لهذه المادة. يجب على إدارة المدرسة تحديد توزيع الدرجات قبل إنشاء المشاريع.',
+      );
     }
 
     if (!gradesCriteria.projects) {
       throw new BadRequestException(
         `هذه المادة غير مكونة للمشاريع في معايير التقييم لهذا العام الدراسي`
       );
+    }
+
+    // Only the first projectsCount projects of a class count toward the term;
+    // a further one is set, handed in, marked and then ignored.
+    const projectLimit = gradesCriteria.projectsCount ?? 0;
+    for (const classId of createProjectDto.classIds ?? []) {
+      const existing = await this.projectModel.countDocuments({
+        classIds: new mongoose.Types.ObjectId(String(classId)),
+        $or: [
+          { subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId) },
+          { gradesCriteriaId: gradesCriteria._id },
+        ],
+      });
+      if (existing >= projectLimit) {
+        throw new BadRequestException(
+          `اكتمل عدد المشاريع المحدد لهذه المادة (${projectLimit}) في أحد الفصول المختارة`,
+        );
+      }
     }
 
     const projectsCount = (gradesCriteria as any).projectsCount || 1;
