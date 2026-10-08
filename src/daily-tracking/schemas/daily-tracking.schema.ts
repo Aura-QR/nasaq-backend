@@ -5,11 +5,12 @@ import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 /**
  * سجل المتابعة اليومي — what a teacher observed in one period.
  *
- * Behavioural only. These three booleans never reach `gradesCriteria` and
- * never touch the 100-point term grade; that separation is enforced here by
- * the absence of any score field rather than by documentation, because a
- * separation that rests on discipline is broken by the first extension
- * request and one with nowhere to put a number is not.
+ * Under the flexible grading system this is behavioural only and never
+ * reaches the term grade. Under the ministry template it feeds the annual
+ * register: participation and homework make the 40 for performance and
+ * interaction, and the paper quiz score counts toward written assessments
+ * (grade-register). Once that register is approved, the subject's tracking
+ * for the class is locked.
  *
  * Attendance is deliberately NOT here. It already lives in the `attendance`
  * collection, where recording an absence notifies the family and opens an
@@ -62,6 +63,18 @@ export class DailyTracking extends Document {
    */
   @Prop({ type: Boolean, default: null })
   quiz: boolean | null;
+
+  /**
+   * A paper quiz's mark, typed by the teacher; null — no quiz, or not sat.
+   * `quiz` above is kept for app builds that still send a tick: it is
+   * derived from the score (half or more) whenever a score is written.
+   */
+  @Prop({ type: Number, default: null, min: 0 })
+  quizScore: number | null;
+
+  /** What `quizScore` is out of — the same for the whole sheet. */
+  @Prop({ type: Number, default: null, min: 1 })
+  quizMaxScore: number | null;
 
   // ───────────────────────────────────── denormalised on purpose
   //

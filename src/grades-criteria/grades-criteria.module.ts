@@ -1,3 +1,4 @@
+import { GradeRegisterModule } from '../grade-register/grade-register.module';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { GradesCriteriaService } from './grades-criteria.service';
@@ -22,6 +23,7 @@ import { StudentClassResolverModule } from '../enrollments/student-class-resolve
 
 @Module({
   imports: [
+    GradeRegisterModule,
     StudentClassResolverModule,
     MongooseModule.forFeature([
       { name: GradesCriteria.name, schema: GradesCriteriaSchema },

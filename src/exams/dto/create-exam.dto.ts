@@ -1,6 +1,6 @@
-import { IsEnum, IsArray, IsString, IsMongoId, ValidateNested, IsDate, IsInt, Min, IsOptional } from 'class-validator';
+import { IsEnum, IsArray, IsString, IsMongoId, ValidateNested, IsDate, IsInt, Min, Max, IsNumber, IsOptional } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ExamType } from '../enums/exam-type.enum';
 
 export class QuestionDto {
@@ -40,6 +40,17 @@ export class CreateExamDto {
     description: 'Array of class IDs that will take this exam',
   })
   classIds: string[];
+
+  /**
+   * Ministry grading template only: what the exam is out of (default 40 for
+   * a final, 10 otherwise). Under «معايير الدرجات» it is derived and ignored.
+   */
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'Ministry template: the exam is out of this', example: 10 })
+  grade?: number;
 
   @IsEnum(ExamType)
   @ApiProperty({

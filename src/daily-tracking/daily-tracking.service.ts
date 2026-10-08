@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Optional,
   forwardRef,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
@@ -22,6 +23,8 @@ import { Substitution } from '../duty/schemas/substitution.schema';
 import { coversLecture } from '../duty/substitute-access.util';
 import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { ACTIVITY_NOT_TRACKED, isActivityLecture } from '../subjects/activity.util';
+import { GradeRegisterSheet } from '../grade-register/schemas/grade-register-sheet.schema';
+import { gradingSystemOf } from '../grade-register/grading-system.util';
 
 /** What one student's row resolves to once defaults are applied. */
 export interface ResolvedTrackingRecord {
@@ -30,6 +33,8 @@ export interface ResolvedTrackingRecord {
   participation: boolean;
   homework: boolean;
   quiz: boolean | null;
+  /** undefined — keep the stored mark (an older app build sent no score). */
+  quizScore?: number | null;
 }
 
 @Injectable()
@@ -54,6 +59,9 @@ export class DailyTrackingService {
     @Optional()
     @InjectModel(Substitution.name)
     private readonly substitutionModel?: Model<Substitution>,
+    @Optional()
+    @InjectModel(GradeRegisterSheet.name)
+    private readonly registerModel?: Model<GradeRegisterSheet>,
   ) {}
 
   /**
@@ -77,6 +85,7 @@ export class DailyTrackingService {
         participation: false,
         homework: false,
         quiz: null,
+        quizScore: null,
       };
     }
 
@@ -88,7 +97,37 @@ export class DailyTrackingService {
       // Only an explicit true/false is a quiz result; anything else is "no
       // quiz today" and must stay null rather than collapsing to false.
       quiz: typeof record.quiz === 'boolean' ? record.quiz : null,
+      quizScore: Object.prototype.hasOwnProperty.call(record, 'quizScore')
+        ? (typeof record.quizScore === 'number' ? record.quizScore : null)
+        : undefined,
     };
+  }
+
+  /**
+   * Under the ministry template the tracking is the register's 40. Once the
+   * register for this class and subject is approved, editing a past day
+   * would move marks that were signed off.
+   */
+  private async assertRegisterOpen(classId: any, offeringId: any): Promise<void> {
+    if (!this.registerModel || !classId || !offeringId) return;
+    const approved = await this.registerModel.exists({
+      classId: new mongoose.Types.ObjectId(String(classId)),
+      subjectOfferingId: new mongoose.Types.ObjectId(String(offeringId)),
+      status: 'approved',
+    });
+    if (approved) {
+      throw new ConflictException('اعتُمد السجل السنوي لهذه المادة؛ لا يمكن تعديل المتابعة');
+    }
+  }
+
+  /** Is this class and subject's annual register approved? For the sheet. */
+  async registerLocked(classId: any, offeringId: any): Promise<boolean> {
+    if (!this.registerModel || !classId || !offeringId) return false;
+    return !!(await this.registerModel.exists({
+      classId: new mongoose.Types.ObjectId(String(classId)),
+      subjectOfferingId: new mongoose.Types.ObjectId(String(offeringId)),
+      status: 'approved',
+    }));
   }
 
   /** An ObjectId, or null when the value is absent or malformed. */
@@ -191,6 +230,19 @@ export class DailyTrackingService {
 
     const records = dto.records.map((r) => DailyTrackingService.resolveRecord(r));
 
+    // A mark needs its out-of, and cannot be above it.
+    const scored = records.filter((r) => typeof r.quizScore === 'number');
+    if (scored.length) {
+      if (!dto.quizMaxScore) {
+        throw new BadRequestException('حدّد الدرجة العظمى للاختبار');
+      }
+      if (scored.some((r) => (r.quizScore as number) > (dto.quizMaxScore as number))) {
+        throw new BadRequestException('درجة الاختبار يجب أن تكون بين 0 والدرجة العظمى');
+      }
+    }
+
+    await this.assertRegisterOpen(classId, offering?._id ?? offering);
+
     // One student twice in one payload would make the bulkWrite order decide
     // which wins — silently, and differently on a retry.
     const seen = new Set<string>();
@@ -241,7 +293,19 @@ export class DailyTrackingService {
             $set: {
               participation: r.participation,
               homework: r.homework,
-              quiz: r.quiz,
+              // With a mark, the tick older builds read is derived from it.
+              quiz:
+                typeof r.quizScore === 'number'
+                  ? r.quizScore * 2 >= (dto.quizMaxScore as number)
+                  : r.quizScore === null
+                    ? null
+                    : r.quiz,
+              ...(r.quizScore !== undefined
+                ? {
+                    quizScore: r.quizScore,
+                    quizMaxScore: typeof r.quizScore === 'number' ? dto.quizMaxScore : null,
+                  }
+                : {}),
               ...denormalised,
             },
             $setOnInsert: {
@@ -348,7 +412,7 @@ export class DailyTrackingService {
     const day = this.parseSchoolDate(date);
     const rows = await this.trackingModel
       .find({ lectureId: new mongoose.Types.ObjectId(String(lectureId)), date: day })
-      .select('studentId participation homework quiz')
+      .select('studentId participation homework quiz quizScore quizMaxScore')
       .lean()
       .exec();
 
@@ -359,6 +423,8 @@ export class DailyTrackingService {
           participation: row.participation !== false,
           homework: row.homework !== false,
           quiz: typeof row.quiz === 'boolean' ? row.quiz : null,
+          quizScore: typeof row.quizScore === 'number' ? row.quizScore : null,
+          quizMaxScore: typeof row.quizMaxScore === 'number' ? row.quizMaxScore : null,
         },
       ]),
     );
@@ -439,6 +505,13 @@ export class DailyTrackingService {
               $cond: [{ $and: ['$present', { $eq: ['$homework', true] }] }, 1, 0],
             },
           },
+          // Paper quiz marks, on days present.
+          quizScoreSum: {
+            $sum: { $cond: [{ $and: ['$present', { $isNumber: '$quizScore' }] }, '$quizScore', 0] },
+          },
+          quizMaxSum: {
+            $sum: { $cond: [{ $and: ['$present', { $isNumber: '$quizScore' }] }, '$quizMaxScore', 0] },
+          },
           quizPassed: { $sum: { $cond: [{ $eq: ['$quiz', true] }, 1, 0] } },
           quizFailed: { $sum: { $cond: [{ $eq: ['$quiz', false] }, 1, 0] } },
           // Everything that is neither true nor false: no quiz was held.
@@ -474,6 +547,14 @@ export class DailyTrackingService {
           // a conversation about a student who was simply away.
           participationRate: this.rateOf('$participationCount'),
           homeworkRate: this.rateOf('$homeworkCount'),
+          // Percentage of quiz marks earned; null when she sat none.
+          quizAverage: {
+            $cond: [
+              { $gt: ['$quizMaxSum', 0] },
+              { $round: [{ $multiply: [{ $divide: ['$quizScoreSum', '$quizMaxSum'] }, 100] }, 1] },
+              null,
+            ],
+          },
           quizzes: {
             passed: '$quizPassed',
             failed: '$quizFailed',
@@ -495,7 +576,11 @@ export class DailyTrackingService {
         studentCount: rows.length,
         // Says plainly what this report is, so nobody downstream reads the
         // percentages as marks.
-        note: 'رصد سلوكي — لا يؤثر في الدرجات',
+        // Under the ministry template it is the annual register's source.
+        note:
+          (await gradingSystemOf(this.trackingModel.db)) === 'ministry'
+            ? 'يدخل في السجل السنوي: المشاركة والواجب في درجة المهام والمشاركة، والاختبارات القصيرة في التقويمات التحريرية'
+            : 'رصد سلوكي — لا يؤثر في الدرجات',
         students: rows,
       },
     };

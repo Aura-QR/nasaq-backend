@@ -1,3 +1,4 @@
+import { assertGradingSystemMayChange, gradingSystemOf } from '../../grade-register/grading-system.util';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Connection } from 'mongoose';
@@ -212,6 +213,13 @@ export class SchoolsService {
   }
 
   async updateMySettings(schoolId: string, settingsDto: Partial<Record<string, any>>) {
+    if (settingsDto.gradingSystem !== undefined) {
+      const current = await gradingSystemOf(this.schoolModel.db, schoolId);
+      if (settingsDto.gradingSystem !== current) {
+        await assertGradingSystemMayChange(this.schoolModel.db, schoolId);
+      }
+    }
+
     if (settingsDto.teacherCheckInEnabled === true || settingsDto.staffCheckInEnabled === true) {
       const school = await this.schoolModel
         .findById(schoolId, { settings: 1 })

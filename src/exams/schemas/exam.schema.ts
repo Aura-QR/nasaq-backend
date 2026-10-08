@@ -22,13 +22,15 @@ export class Exam extends Document {
   // Internal retry key for an exam generated from a preparation. Not accepted by the public DTO.
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Preparation' })
   generatedFromPreparation?: mongoose.Types.ObjectId;
+  // null under the ministry template, which has no «معايير الدرجات».
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
-    required: true,
+    required: false,
+    default: null,
     ref: 'GradesCriteria',
     index: true,
   })
-  gradesCriteriaId: mongoose.Types.ObjectId;
+  gradesCriteriaId: mongoose.Types.ObjectId | null;
 
   @Prop({
     type: mongoose.Schema.Types.ObjectId,

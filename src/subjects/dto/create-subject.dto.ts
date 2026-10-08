@@ -9,8 +9,11 @@ import {
   Min,
   IsArray,
   IsBoolean,
+  IsIn,
+  IsInt,
+  Max,
 } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 // export enum AcademicLevel {
 //   ELEMENTARY = 'elementary',
 //   MIDDLE_SCHOOL = 'middle_school',
@@ -42,6 +45,22 @@ export class CreateSubjectDto {
     default: false,
   })
   isActivity?: boolean;
+
+  @IsIn(['continuous', 'final_exam', null])
+  @IsOptional()
+  @ApiPropertyOptional({
+    description: 'Ministry template: continuous (40 + 60) or final_exam (40 + 20 + 40); null — not in the register',
+    enum: ['continuous', 'final_exam'],
+    nullable: true,
+  })
+  assessmentType?: 'continuous' | 'final_exam' | null;
+
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  @ApiPropertyOptional({ description: "Ministry template: pass mark out of 100; null — the school's", nullable: true })
+  passingGrade?: number | null;
 
   // @IsNumber()
   // @IsNotEmpty()

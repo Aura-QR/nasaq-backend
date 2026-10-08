@@ -168,7 +168,11 @@ export class SubjectsService {
     }
 
     // An activity never counts towards passing a year, whatever was sent.
-    if (createSubjectDto.isActivity === true) createSubjectDto.isRequiredForPromotion = false;
+    if (createSubjectDto.isActivity === true) {
+      createSubjectDto.isRequiredForPromotion = false;
+      // Nor is it ever in the annual register.
+      createSubjectDto.assessmentType = null;
+    }
 
     const subject = new this.subjectModel(createSubjectDto);
     await subject.save();
@@ -210,7 +214,11 @@ export class SubjectsService {
       updateSubjectDto.subjectCode = normalizedSubjectCode;
     }
 
-    if (updateSubjectDto.isActivity === true) updateSubjectDto.isRequiredForPromotion = false;
+    if (updateSubjectDto.isActivity === true) {
+      updateSubjectDto.isRequiredForPromotion = false;
+      // Nor is it ever in the annual register.
+      updateSubjectDto.assessmentType = null;
+    }
 
     const updatedSubject = await this.subjectModel
       .findByIdAndUpdate(id, updateSubjectDto, { new: true })

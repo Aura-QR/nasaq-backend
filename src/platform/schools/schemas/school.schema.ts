@@ -84,6 +84,15 @@ export class SchoolSettings {
   @Prop({ default: 50, min: 0, max: 100 })
   defaultPassingGrade: number;
 
+  /**
+   * How marks are put together. 'flexible' — each subject's split set in
+   * «معايير الدرجات» (the default, and every school before this). 'ministry' —
+   * the fixed Saudi template and the annual register; see
+   * grade-register/ministry-template.ts. Locked once marks exist.
+   */
+  @Prop({ type: String, enum: ['flexible', 'ministry'], default: 'flexible' })
+  gradingSystem: 'flexible' | 'ministry';
+
   @Prop({ type: [String], default: [] })
   localNationalityCodes: string[];
 

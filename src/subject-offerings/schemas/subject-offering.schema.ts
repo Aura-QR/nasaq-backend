@@ -38,6 +38,14 @@ export class SubjectOffering extends Document {
    */
   @Prop({ type: String, enum: SLOT_PREFERENCES, default: 'any' })
   slotPreference: SlotPreference;
+
+  /**
+   * Ministry template: this grade's assessment type when it differs from the
+   * subject's (a subject continuous in the lower grades, with a final later).
+   * null — the subject's.
+   */
+  @Prop({ type: String, enum: ['continuous', 'final_exam', null], default: null })
+  assessmentType: 'continuous' | 'final_exam' | null;
 }
 
 export const SubjectOfferingSchema = SchemaFactory.createForClass(SubjectOffering);

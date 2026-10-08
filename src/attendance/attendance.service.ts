@@ -514,6 +514,11 @@ export class AttendanceService {
     // Injected rather than served from its own endpoint so the screen still
     // answers in one call and the ownership check above covers both.
     const tracking = await this.dailyTracking.forLecture(lectureId, date);
+    const quizMaxScore =
+      [...tracking.values()].map((row: any) => row.quizMaxScore).find((v) => typeof v === 'number') ?? null;
+    const offeringId =
+      (lecture as any).subjectOfferingId?._id ?? (lecture as any).subjectOfferingId ?? null;
+    const registerLocked = await this.dailyTracking.registerLocked(classId, offeringId);
 
     return {
       message: 'تم استرجاع كشف الحضور بنجاح',
@@ -529,14 +534,19 @@ export class AttendanceService {
         // marked absent — a period where everyone attended records no
         // absence at all.
         trackingRecorded: tracking.size > 0,
+        // What this period's quiz marks are out of; null — no quiz saved.
+        quizMaxScore,
+        // The annual register for this subject is approved: read only.
+        registerLocked,
         students: students.map((s: any) => {
           const id = s._id.toString();
           // The server owns the defaults, so web and mobile cannot drift
           // apart about what an unsaved row looks like.
-          const row = tracking.get(id) ?? {
+          const { quizMaxScore: _max, ...row }: any = tracking.get(id) ?? {
             participation: true,
             homework: true,
             quiz: null,
+            quizScore: null,
           };
           return {
             _id: s._id,

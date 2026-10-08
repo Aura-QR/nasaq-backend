@@ -30,6 +30,8 @@ import { transformProjectResponse } from './transforms/response.transform';
 import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
 import { AcademicYear } from '../academic-years/schemas/academic-year.schema';
 import { loadCurrentOffering } from '../subject-offerings/current-offering.util';
+import { gradingSystemOf } from '../grade-register/grading-system.util';
+import { DEFAULT_EXAM_GRADE } from '../grade-register/ministry-template';
 
 @Injectable()
 export class ProjectsService {
@@ -113,50 +115,59 @@ export class ProjectsService {
 
     await loadCurrentOffering(this.subjectOfferingModel, this.academicYearModel, createProjectDto.subjectOfferingId);
 
-    const gradesCriteria = await this.gradesCriteriaModel.findOne({
-      subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId),
-    });
-
-    // This used to invent a distribution (40/20/10/15/15) and save it as the
-    // subject's official one whenever a teacher set the first project — the
-    // side door exams.service closed for exams. The school sets it.
-    if (!gradesCriteria) {
-      throw new BadRequestException(
-        'لا يوجد توزيع درجات لهذه المادة. يجب على إدارة المدرسة تحديد توزيع الدرجات قبل إنشاء المشاريع.',
-      );
-    }
-
-    if (!gradesCriteria.projects) {
-      throw new BadRequestException(
-        `هذه المادة غير مكونة للمشاريع في معايير التقييم لهذا العام الدراسي`
-      );
-    }
-
-    // Only the first projectsCount projects of a class count toward the term;
-    // a further one is set, handed in, marked and then ignored.
-    const projectLimit = gradesCriteria.projectsCount ?? 0;
-    for (const classId of createProjectDto.classIds ?? []) {
-      const existing = await this.projectModel.countDocuments({
-        classIds: new mongoose.Types.ObjectId(String(classId)),
-        $or: [
-          { subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId) },
-          { gradesCriteriaId: gradesCriteria._id },
-        ],
+    let gradesCriteria: any = null;
+    let calculatedGrade: number;
+    if ((await gradingSystemOf(this.projectModel.db)) === 'ministry') {
+      // No «معايير الدرجات» under the ministry template: the project is out
+      // of what the teacher sets (default 10) and counts toward the tasks
+      // share of the annual register's 40.
+      calculatedGrade = (createProjectDto as any).grade ?? DEFAULT_EXAM_GRADE.other;
+    } else {
+      gradesCriteria = await this.gradesCriteriaModel.findOne({
+        subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId),
       });
-      if (existing >= projectLimit) {
+
+      // This used to invent a distribution (40/20/10/15/15) and save it as the
+      // subject's official one whenever a teacher set the first project — the
+      // side door exams.service closed for exams. The school sets it.
+      if (!gradesCriteria) {
         throw new BadRequestException(
-          `اكتمل عدد المشاريع المحدد لهذه المادة (${projectLimit}) في أحد الفصول المختارة`,
+          'لا يوجد توزيع درجات لهذه المادة. يجب على إدارة المدرسة تحديد توزيع الدرجات قبل إنشاء المشاريع.',
         );
       }
-    }
 
-    const projectsCount = (gradesCriteria as any).projectsCount || 1;
-    const calculatedGrade = gradesCriteria.projects / projectsCount;
+      if (!gradesCriteria.projects) {
+        throw new BadRequestException(
+          `هذه المادة غير مكونة للمشاريع في معايير التقييم لهذا العام الدراسي`
+        );
+      }
+
+      // Only the first projectsCount projects of a class count toward the term;
+      // a further one is set, handed in, marked and then ignored.
+      const projectLimit = gradesCriteria.projectsCount ?? 0;
+      for (const classId of createProjectDto.classIds ?? []) {
+        const existing = await this.projectModel.countDocuments({
+          classIds: new mongoose.Types.ObjectId(String(classId)),
+          $or: [
+            { subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId) },
+            { gradesCriteriaId: gradesCriteria._id },
+          ],
+        });
+        if (existing >= projectLimit) {
+          throw new BadRequestException(
+            `اكتمل عدد المشاريع المحدد لهذه المادة (${projectLimit}) في أحد الفصول المختارة`,
+          );
+        }
+      }
+
+      const projectsCount = (gradesCriteria as any).projectsCount || 1;
+      calculatedGrade = gradesCriteria.projects / projectsCount;
+    }
 
     const savedProject = await new this.projectModel({
       ...createProjectDto,
       subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId),
-      gradesCriteriaId: gradesCriteria._id,
+      gradesCriteriaId: gradesCriteria?._id ?? null,
       grade: calculatedGrade,
       createdBy: user?.userId
     }).save();

@@ -20,6 +20,7 @@ import { TeacherConstraintsModule } from './teacher-constraints/teacher-constrai
 import { LibraryModule } from './library/library.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { DailyTrackingModule } from './daily-tracking/daily-tracking.module';
+import { GradeRegisterModule } from './grade-register/grade-register.module';
 import { GradesCriteriaModule } from './grades-criteria/grades-criteria.module';
 import { ExamsModule } from './exams/exams.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -90,6 +91,7 @@ import { MessagingModule } from './messaging/messaging.module';
     LibraryModule,
     AttendanceModule,
     DailyTrackingModule,
+    GradeRegisterModule,
     TeacherAttendanceModule,
     LessonObservationsModule,
     StaffAttendanceModule,

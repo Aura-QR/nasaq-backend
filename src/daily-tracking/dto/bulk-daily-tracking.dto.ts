@@ -6,8 +6,11 @@ import {
   IsBoolean,
   IsMongoId,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
   Matches,
+  Max,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -52,6 +55,17 @@ export class DailyTrackingRecordDto {
     default: null,
   })
   quiz?: boolean | null;
+
+  /**
+   * The quiz mark, out of the sheet's `quizMaxScore`; null clears it. Left
+   * out, the stored mark is kept — older app builds send only `quiz`, and a
+   * save from one of them must not wipe a mark another teacher typed.
+   */
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'درجة الاختبار القصير؛ null = لا اختبار', nullable: true })
+  quizScore?: number | null;
 }
 
 export class BulkDailyTrackingDto {
@@ -76,4 +90,12 @@ export class BulkDailyTrackingDto {
   @Type(() => DailyTrackingRecordDto)
   @ApiProperty({ type: [DailyTrackingRecordDto] })
   records: DailyTrackingRecordDto[];
+
+  /** What every quizScore on this sheet is out of. Required when any is set. */
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  @ApiPropertyOptional({ description: 'الدرجة العظمى للاختبار القصير', example: 10 })
+  quizMaxScore?: number;
 }

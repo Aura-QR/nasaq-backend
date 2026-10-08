@@ -5,6 +5,9 @@ import {
   IsArray,
   IsDateString,
   IsOptional,
+  IsNumber,
+  Min,
+  Max,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
@@ -56,4 +59,16 @@ export class CreateProjectDto {
   @IsArray()
   @IsString({ each: true })
   filePaths?: string[];
+
+  /**
+   * Ministry grading template only: what the project is out of (default 10).
+   * Sent as form data, so it arrives as text.
+   */
+  @ApiProperty({ description: 'Ministry template: the project is out of this', required: false, example: 10 })
+  @IsOptional()
+  @Transform(({ value }) => (value === '' || value === undefined || value === null ? undefined : Number(value)))
+  @IsNumber()
+  @Min(1)
+  @Max(100)
+  grade?: number;
 }

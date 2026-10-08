@@ -19,6 +19,18 @@ export class Subject extends Document {
    */
   @Prop({ type: Boolean, default: false })
   isActivity: boolean;
+
+  /**
+   * Ministry template only: «تقويم مستمر» (40 + 60) or «تقويم ختامي»
+   * (40 + 20 + 40). null — not in the annual register. A subject offering may
+   * override it for one grade. Ignored by the flexible system.
+   */
+  @Prop({ type: String, enum: ['continuous', 'final_exam', null], default: null })
+  assessmentType: 'continuous' | 'final_exam' | null;
+
+  /** Ministry template: this subject's pass mark out of 100; null — the school's. */
+  @Prop({ type: Number, min: 0, max: 100, default: null })
+  passingGrade: number | null;
 }
 
 export const SubjectSchema = SchemaFactory.createForClass(Subject);

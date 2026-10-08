@@ -22,6 +22,8 @@ import { getPagination } from '../pagination/common/paginationUtils';
 import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
 import { AcademicYear } from '../academic-years/schemas/academic-year.schema';
 import { loadCurrentOffering } from '../subject-offerings/current-offering.util';
+import { gradingSystemOf } from '../grade-register/grading-system.util';
+import { DEFAULT_EXAM_GRADE, EXAM_PART, resolveAssessmentType } from '../grade-register/ministry-template';
 
 /**
  * Minutes a submission may arrive after the student's time or the exam's
@@ -231,65 +233,91 @@ export class ExamsService {
       }
     }
 
-    const gradesCriteria = await this.gradesCriteriaModel.findOne({
-      subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
-    }).exec();
+    const offering: any = await this.subjectOfferingModel
+      .findById(subjectOfferingId)
+      .populate('subjectId', 'assessmentType')
+      .lean()
+      .exec();
+    const ministry = (await gradingSystemOf(this.examModel.db)) === 'ministry';
 
-    // This used to invent a criteria (40/20/10/15/15) and persist it whenever a
-    // teacher created the first exam for a subject that had none. That silently
-    // handed the weight distribution — school policy — to whichever teacher
-    // happened to act first, and it stayed the subject's official distribution
-    // for the rest of the year with the admin never asked and never told.
-    //
-    // It also reopened the hole that @CheckAbilities on POST /gradesCriteria
-    // closes: locking the front door means nothing while this writes the same
-    // document through a side one. Refuse, and name what is missing.
-    if (!gradesCriteria) {
-      throw new BadRequestException(
-        'لا يوجد توزيع درجات لهذه المادة. يجب على إدارة المدرسة تحديد توزيع الدرجات قبل إنشاء الامتحانات.',
-      );
-    }
-
-    const validExamTypes = {
-      final: gradesCriteria.final,
-      assignment: gradesCriteria.assignments,
-      project: gradesCriteria.projects,
-      activity: gradesCriteria.activities,
-      quiz: gradesCriteria.quizzes,
-    };
-
-    if (!validExamTypes[examType] || validExamTypes[examType] === 0) {
-      throw new BadRequestException(
-        `نوع الامتحان '${examType}' غير مكون في معايير التقييم (الوزن 0 أو غير محدد)`
-      );
-    }
-
-    // Auto-calculate grade based on count
+    let gradesCriteria: GradesCriteria | null = null;
     let calculatedGrade: number;
-    switch (examType) {
-      case 'quiz':
-        calculatedGrade = gradesCriteria.quizzes / ((gradesCriteria as any).quizzesCount || 1);
-        break;
-      case 'assignment':
-        calculatedGrade = gradesCriteria.assignments / ((gradesCriteria as any).assignmentsCount || 1);
-        break;
-      case 'activity':
-        calculatedGrade = gradesCriteria.activities;
-        break;
-      case 'final':
-        calculatedGrade = gradesCriteria.final;
-        break;
-      default:
-        calculatedGrade = 0;
-    }
+    if (ministry) {
+      // The ministry template has no «معايير الدرجات»: an exam is out of what
+      // the teacher sets (or a default), and the annual register turns it
+      // into its part. No count limit — every quiz counts.
+      const assessment = resolveAssessmentType(offering);
+      if (examType === 'final' && assessment !== 'final_exam') {
+        throw new BadRequestException(
+          assessment === 'continuous'
+            ? 'هذه المادة تقويم مستمر ولا يوجد لها اختبار نهاية فترة'
+            : 'لم يُحدَّد نوع التقويم لهذه المادة؛ يحدده مالك المدرسة (مستمر أو ختامي)',
+        );
+      }
+      if (!EXAM_PART[examType]) {
+        throw new BadRequestException(`نوع الامتحان '${examType}' غير مستخدم في نظام درجات الوزارة`);
+      }
+      calculatedGrade =
+        createExamDto.grade ?? (examType === 'final' ? DEFAULT_EXAM_GRADE.final : DEFAULT_EXAM_GRADE.other);
+    } else {
+      gradesCriteria = await this.gradesCriteriaModel.findOne({
+        subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
+      }).exec();
 
+      // This used to invent a criteria (40/20/10/15/15) and persist it whenever a
+      // teacher created the first exam for a subject that had none. That silently
+      // handed the weight distribution — school policy — to whichever teacher
+      // happened to act first, and it stayed the subject's official distribution
+      // for the rest of the year with the admin never asked and never told.
+      //
+      // It also reopened the hole that @CheckAbilities on POST /gradesCriteria
+      // closes: locking the front door means nothing while this writes the same
+      // document through a side one. Refuse, and name what is missing.
+      if (!gradesCriteria) {
+        throw new BadRequestException(
+          'لا يوجد توزيع درجات لهذه المادة. يجب على إدارة المدرسة تحديد توزيع الدرجات قبل إنشاء الامتحانات.',
+        );
+      }
+
+      const validExamTypes = {
+        final: gradesCriteria.final,
+        assignment: gradesCriteria.assignments,
+        project: gradesCriteria.projects,
+        activity: gradesCriteria.activities,
+        quiz: gradesCriteria.quizzes,
+      };
+
+      if (!validExamTypes[examType] || validExamTypes[examType] === 0) {
+        throw new BadRequestException(
+          `نوع الامتحان '${examType}' غير مكون في معايير التقييم (الوزن 0 أو غير محدد)`
+        );
+      }
+
+      // Auto-calculate grade based on count
+      switch (examType) {
+        case 'quiz':
+          calculatedGrade = gradesCriteria.quizzes / ((gradesCriteria as any).quizzesCount || 1);
+          break;
+        case 'assignment':
+          calculatedGrade = gradesCriteria.assignments / ((gradesCriteria as any).assignmentsCount || 1);
+          break;
+        case 'activity':
+          calculatedGrade = gradesCriteria.activities;
+          break;
+        case 'final':
+          calculatedGrade = gradesCriteria.final;
+          break;
+        default:
+          calculatedGrade = 0;
+      }
+    }
 
     if (examType === 'final') {
       const existingExam = await this.examModel.findOne({
         examType: 'final',
         $or: [
           { subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId) },
-          { gradesCriteriaId: gradesCriteria._id },
+          ...(gradesCriteria ? [{ gradesCriteriaId: gradesCriteria._id }] : []),
         ],
       });
 
@@ -300,12 +328,12 @@ export class ExamsService {
       }
     }
 
-
-
-    await this.assertWithinCount(gradesCriteria, subjectOfferingId, examType, classIds);
+    if (gradesCriteria) {
+      await this.assertWithinCount(gradesCriteria, subjectOfferingId, examType, classIds);
+    }
 
     const fields = {
-       gradesCriteriaId: gradesCriteria._id,
+       gradesCriteriaId: gradesCriteria?._id ?? null,
        subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId),
        classIds,
        examType,

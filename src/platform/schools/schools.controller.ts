@@ -99,6 +99,11 @@ export class SchoolsController {
       'staffCheckInEnabled', 'teacherCheckInEnabled', 'timezone',
       'workSchedule', 'workStartTime',
     ];
+    // Decides how every mark in the school is put together.
+    if (![Role.OWNER, Role.SUPERVISOR].includes(user.role) &&
+        Object.prototype.hasOwnProperty.call(updateSettingsDto, 'gradingSystem')) {
+      throw new ForbiddenException('تغيير نظام الدرجات متاح للمالك ومدير المدرسة فقط');
+    }
     if (![Role.OWNER, Role.SUPERVISOR].includes(user.role) &&
         attendanceSettings.some(key => Object.prototype.hasOwnProperty.call(updateSettingsDto, key))) {
       throw new ForbiddenException('تعديل إعدادات التحقق من الحضور والدوام متاح للمالك والمشرف فقط');

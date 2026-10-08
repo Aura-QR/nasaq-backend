@@ -34,6 +34,8 @@ export const OWNER_PERMISSIONS: RolePermissions = {
   // Recording is the teacher's job, in her own lecture. The school reads the
   // record and may correct it; it does not fill sheets.
   dailyTracking: { read: true, add: false, edit: true, delete: false },
+  // السجل السنوي (ministry template): edit = save marks and approve.
+  gradeRegister: { read: true, add: false, edit: true, delete: false },
   gradesCriteria: ALL,
   exams: { read: true, add: false, edit: false, delete: true },
   projects: { read: true, add: false, edit: false, delete: true },
@@ -75,6 +77,8 @@ export const MANAGER_PERMISSIONS: RolePermissions = {
   library: ALL,
   attendance: ALL,
   dailyTracking: { read: true, add: false, edit: true, delete: false },
+  // السجل السنوي (ministry template): edit = save marks and approve.
+  gradeRegister: { read: true, add: false, edit: true, delete: false },
   gradesCriteria: ALL,
   exams: { read: true, add: false, edit: false, delete: true },
   projects: { read: true, add: false, edit: false, delete: true },
@@ -146,6 +150,8 @@ export const TEACHER_PERMISSIONS: RolePermissions = {
   // Safe because DailyTrackingService checks the teacher owns the lecture
   // and that every student is on its roster, the same way attendance does.
   dailyTracking: { read: true, add: true, edit: true, delete: false },
+  // Scoped in GradeRegisterService to the classes she teaches the subject to.
+  gradeRegister: { read: true, add: true, edit: true, delete: false },
 
   gradesCriteria: { read: true, add: false, edit: false, delete: false },
 
@@ -171,6 +177,7 @@ export const STUDENT_PERMISSIONS: RolePermissions = {
   // Explicit deny, not an omission: whether a student sees "لم تُشارك اليوم"
   // is a pedagogical decision the school has not made yet.
   dailyTracking: NONE,
+  gradeRegister: NONE,
   gradesCriteria: NONE,
   exams: NONE,
   projects: NONE,

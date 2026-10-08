@@ -1,4 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
+import { GradeRegisterService } from '../grade-register/grade-register.service';
+import { gradingSystemOf } from '../grade-register/grading-system.util';
+import { resolveAssessmentType } from '../grade-register/ministry-template';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
@@ -44,6 +47,8 @@ export class GradesCriteriaService {
     @InjectModel(School.name) private schoolModel: Model<School>,
     private tenantContext: TenantContextService,
     private readonly studentClassResolver: StudentClassResolverService,
+    // The ministry template's annual register, for promotion.
+    @Optional() private readonly gradeRegister?: GradeRegisterService,
   ) {}
 
   private validateObjectId(id: string, entityName: string): void {
@@ -479,6 +484,16 @@ export class GradesCriteriaService {
     };
   }
 
+  /** A term's mark from the approved annual register (ministry template). */
+  private async registerTermGrade(studentId: string, offering: any, classIds: string[]) {
+    const subject = offering?.subjectId ?? {};
+    const passingGrade = typeof subject.passingGrade === 'number' ? subject.passingGrade : undefined;
+    if (!resolveAssessmentType(offering)) return { finalGrade: 0, passingGrade, hasGrade: false };
+    const row = await this.gradeRegister!.approvedRow(studentId, offering._id, classIds);
+    const total = typeof row?.total === 'number' ? row.total : null;
+    return { finalGrade: total ?? 0, passingGrade, hasGrade: total !== null };
+  }
+
   async calculateStudentYearlySubjectResults(
     studentId: string,
     gradeLevelId: string,
@@ -524,6 +539,15 @@ export class GradesCriteriaService {
 
     const subjectResults = [];
 
+    // Under the ministry template a term's mark is the approved annual
+    // register's total, and a subject outside the register (no assessment
+    // type) has no say in passing. The class is the one she sat the year in.
+    const ministry =
+      !!this.gradeRegister && (await gradingSystemOf(this.gradesCriteriaModel.db, schoolId)) === 'ministry';
+    const registerClassIds = ministry
+      ? (classIds ?? (await this.studentClassResolver.resolveClassIds(studentId)))
+      : [];
+
     for (const [subjectIdStr, subjectOfferingItems] of offeringsBySubject.entries()) {
       const firstOfferingDoc = subjectOfferingItems[0].offering;
       const subjectDoc = firstOfferingDoc.subjectId as any;
@@ -540,12 +564,12 @@ export class GradesCriteriaService {
       let resolvedPassingGrade: number | undefined = undefined;
       let resolvedPassingGradeSource: string = 'إعدادات المدرسة الافتراضية';
 
+      if (ministry && !subjectOfferingItems.some((i) => resolveAssessmentType(i.offering))) continue;
+
       for (const item of subjectOfferingItems) {
-        const { finalGrade, passingGrade, hasGrade } = await this.calculateStudentTermGrade(
-          studentId,
-          item.offering._id.toString(),
-          classIds,
-        );
+        const { finalGrade, passingGrade, hasGrade } = ministry
+          ? await this.registerTermGrade(studentId, item.offering, registerClassIds)
+          : await this.calculateStudentTermGrade(studentId, item.offering._id.toString(), classIds);
 
         if (resolvedPassingGrade === undefined && passingGrade !== undefined && passingGrade !== null) {
           resolvedPassingGrade = passingGrade;

@@ -4,13 +4,15 @@ import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ timestamps: true })
 export class Project extends Document {
+  // null under the ministry template, which has no «معايير الدرجات».
   @Prop({
     type: mongoose.Schema.Types.ObjectId,
-    required: true,
+    required: false,
+    default: null,
     ref: 'GradesCriteria',
     index: true,
   })
-  gradesCriteriaId: mongoose.Types.ObjectId;
+  gradesCriteriaId: mongoose.Types.ObjectId | null;
 
   @Prop({ required: true })
   grade: number;

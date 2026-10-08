@@ -1,3 +1,4 @@
+import { GradeRegisterSheet, GradeRegisterSheetSchema } from '../grade-register/schemas/grade-register-sheet.schema';
 import { Substitution, SubstitutionSchema } from '../duty/schemas/substitution.schema';
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -21,6 +22,8 @@ import { AttendanceModule } from '../attendance/attendance.module';
       { name: Student.name, schema: StudentSchema },
       // Read to let a period's substitute act on it for the day.
       { name: Substitution.name, schema: SubstitutionSchema },
+      // An approved annual register locks its subject's tracking.
+      { name: GradeRegisterSheet.name, schema: GradeRegisterSheetSchema },
     ]),
   ],
   controllers: [DailyTrackingController],

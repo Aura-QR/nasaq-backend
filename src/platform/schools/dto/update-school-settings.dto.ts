@@ -95,6 +95,11 @@ export class UpdateSchoolSettingsDto {
   @IsOptional()
   defaultPassingGrade?: number;
 
+  /** 'flexible' («معايير الدرجات») or 'ministry' (the annual register). */
+  @IsIn(['flexible', 'ministry'])
+  @IsOptional()
+  gradingSystem?: 'flexible' | 'ministry';
+
   @IsArray()
   @IsString({ each: true })
   @IsIn(NATIONALITY_CODES, { each: true })
