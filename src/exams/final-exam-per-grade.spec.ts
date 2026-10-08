@@ -372,6 +372,82 @@ describe('exams — the final is the grade\'s, grades count the student\'s own c
     expect(ability(ProjectsController, 'downloadSubmission')).toEqual([{ action: 'read', subject: 'Project' }]);
   });
 
+  describe('a paper never handed in', () => {
+    const backdate = (id: string, minutes: number) =>
+      m.ExamResult.collection.updateOne(
+        { examId: new Types.ObjectId(id) },
+        { $set: { startedAt: new Date(Date.now() - minutes * 60000) } },
+      );
+    const stored = (id: string) => m.ExamResult.collection.findOne({ examId: new Types.ObjectId(id) });
+
+    it('is marked from the answers she saved once her time runs out', async () => {
+      const { id, q1 } = await sit();
+      await asSchool(() => exams.saveAnswers(id, { answers: [{ questionId: q1, answer: 'أ' }] } as any, student(studentA)));
+      await backdate(id, 40); // 30-minute paper; the app closed and never came back
+
+      const closed = await asSchool(() => exams.sweepExpiredSessions());
+
+      expect(closed).toBe(1);
+      const row = await stored(id);
+      expect(row.submitted).toBe(true);
+      expect(row.autoSubmitted).toBe(true);
+      expect(row.achievedGrade).toBe(5); // one of two right
+    });
+
+    it('leaves a paper still in time alone', async () => {
+      const { id, q1 } = await sit();
+      await asSchool(() => exams.saveAnswers(id, { answers: [{ questionId: q1, answer: 'أ' }] } as any, student(studentA)));
+
+      expect(await asSchool(() => exams.sweepExpiredSessions())).toBe(0);
+      expect((await stored(id)).submitted).toBe(false);
+    });
+
+    it('marks what was saved when the submission itself comes too late', async () => {
+      const { id, q1 } = await sit();
+      await asSchool(() => exams.saveAnswers(id, { answers: [{ questionId: q1, answer: 'أ' }] } as any, student(studentA)));
+      await backdate(id, 40);
+
+      await expect(asSchool(() => exams.gradeExam(id, { answers: [] } as any, student(studentA))))
+        .rejects.toBeInstanceOf(BadRequestException);
+      expect((await stored(id)).achievedGrade).toBe(5);
+    });
+
+    it('gives back the saved answers when she reopens the paper in time', async () => {
+      const { id, q1 } = await sit();
+      await asSchool(() => exams.saveAnswers(id, { answers: [{ questionId: q1, answer: 'ب' }] } as any, student(studentA)));
+
+      const again: any = await asSchool(() => exams.startExam(id, student(studentA)));
+      expect(again.data.savedAnswers).toEqual([{ questionId: q1, answer: 'ب' }]);
+    });
+  });
+
+  it('shows a teacher her own exams and her subjects\', not another subject\'s by id', async () => {
+    const quiz: any = await asSchool(() => exams.create(paper('quiz', [String(classA)]), teacher(teacherA)));
+    const id = String(quiz._id ?? quiz.id);
+
+    await asSchool(() => exams.findOne(id, teacher(teacherB))); // teaches the subject in section B
+    await expect(asSchool(() => exams.findOne(id, teacher(new Types.ObjectId()))))
+      .rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('says on the student\'s grades whether a 0 is a mark, a miss, or not held yet', async () => {
+    const quiz1 = await legacyExam('quiz', classA, teacherA, 10);
+    await result(quiz1, studentA, 0);
+    await m.Exam.collection.insertOne({
+      gradesCriteriaId: criteriaId, subjectOfferingId: offeringId, classIds: [classA], examType: 'quiz',
+      grade: 10, createdBy: teacherA, startDate: new Date(), endDate: new Date(Date.now() + 86400000),
+      duration: 30, questions: [], schoolId, createdAt: new Date(), updatedAt: new Date(),
+    });
+    await legacyExam('assignment', classA, teacherA, 20); // closed, never sat
+
+    const { data }: any = await asSchool(() => grades.getMyGrades(String(studentA), String(offeringId)));
+
+    expect(data.grades.quizzes.map((q: any) => q.status)).toEqual(['graded', 'upcoming']);
+    expect(data.grades.assignments[0].status).toBe('missed');
+    expect(data.grades.final.status).toBe('not_set');
+    expect(data.grades.quizzes[1].grade).toBe(0); // still a number for the clients
+  });
+
   describe('projects', () => {
     let projects: ProjectsService;
     const studentModel = { findById: async (id: any) => ({ _id: id }) };

@@ -281,12 +281,13 @@ export class GradesCriteriaService {
     const allExams = await this.examModel
       .find(forOffering)
       .sort({ createdAt: 1 })
-      .select('_id examType classIds')
+      .select('_id examType classIds endDate')
       .exec();
     const results = await this.examResultModel
       .find({ studentId: sid, examId: { $in: allExams.map((e) => e._id) } })
       .select('examId achievedGrade')
       .exec();
+    const examEnd = new Map(allExams.map((e: any) => [e._id.toString(), e.endDate]));
     const resultMap = new Map(results.map((r) => [r.examId.toString(), r.achievedGrade]));
 
     const inClass = (ids: any[] | undefined) =>
@@ -301,12 +302,13 @@ export class GradesCriteriaService {
     const allProjects = await this.projectModel
       .find(forOffering)
       .sort({ createdAt: 1 })
-      .select('_id classIds')
+      .select('_id classIds dueDate')
       .exec();
     const submissions = await this.submissionModel
       .find({ studentId: sid, projectId: { $in: allProjects.map((p) => p._id) } })
       .select('projectId achievedGrade')
       .exec();
+    const projectDue = new Map(allProjects.map((p: any) => [p._id.toString(), p.dueDate]));
     const projectResultMap = new Map(
       submissions.map((s) => [s.projectId.toString(), s.achievedGrade]),
     );
@@ -314,9 +316,30 @@ export class GradesCriteriaService {
       (p) => inClass((p as any).classIds) || projectResultMap.has(p._id.toString()),
     );
 
+    /*
+     * Why a slot reads what it reads. The grade stays a number (0 where there
+     * is none) for the clients that sum it; this says whether that 0 is a
+     * mark, a paper missed, or one not held yet.
+     */
+    const now = Date.now();
+    const statusOf = (
+      id: string | undefined,
+      grades: Map<string, any>,
+      closes: Map<string, any>,
+    ): 'graded' | 'upcoming' | 'missed' | 'awaiting_grade' | 'not_set' => {
+      if (!id) return 'not_set';
+      const grade = grades.get(id);
+      if (grade !== undefined && grade !== null) return 'graded';
+      if (grades.has(id)) return 'awaiting_grade';
+      const close = closes.get(id);
+      return close && new Date(close).getTime() > now ? 'upcoming' : 'missed';
+    };
+
     return {
       byType,
       projects,
+      examStatus: (examId: string | undefined) => statusOf(examId, resultMap, examEnd),
+      projectStatus: (projectId: string | undefined) => statusOf(projectId, projectResultMap, projectDue),
       gradeFor: (examId: string) => resultMap.get(examId) ?? 0,
       projectGradeFor: (projectId: string) => projectResultMap.get(projectId) ?? 0,
       hasGrade: results.length > 0 || submissions.length > 0,
@@ -367,7 +390,7 @@ export class GradesCriteriaService {
     const gradePerQuiz = criteria.quizzes / quizzesCount;
     const gradePerProject = criteria.projects / projectsCount;
 
-    const { byType, projects, gradeFor, projectGradeFor } = await this.termItemsForStudent(
+    const { byType, projects, gradeFor, projectGradeFor, examStatus, projectStatus } = await this.termItemsForStudent(
       studentId,
       targetOfferingId,
       criteria,
@@ -381,25 +404,30 @@ export class GradesCriteriaService {
           final: {
             grade: byType.final[0] ? gradeFor(byType.final[0]) : 0,
             total: criteria.final,
+            status: examStatus(byType.final[0]),
           },
           assignments: Array.from({ length: assignmentsCount }, (_, i) => ({
             number: i + 1,
             grade: gradeFor(byType.assignment[i] ?? ''),
             total: gradePerAssignment,
+            status: examStatus(byType.assignment[i]),
           })),
           quizzes: Array.from({ length: quizzesCount }, (_, i) => ({
             number: i + 1,
             grade: gradeFor(byType.quiz[i] ?? ''),
             total: gradePerQuiz,
+            status: examStatus(byType.quiz[i]),
           })),
           projects: Array.from({ length: projectsCount }, (_, i) => ({
             number: i + 1,
             grade: projects[i] ? projectGradeFor(projects[i]._id.toString()) : 0,
             total: gradePerProject,
+            status: projectStatus(projects[i]?._id.toString()),
           })),
           activities: {
             grade: byType.activity[0] ? gradeFor(byType.activity[0]) : 0,
             total: criteria.activities,
+            status: examStatus(byType.activity[0]),
           },
         },
       },

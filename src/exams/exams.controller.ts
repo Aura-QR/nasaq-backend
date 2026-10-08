@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Patch,
+  Put,
   Param,
   Delete,
   Query,
@@ -165,8 +166,8 @@ export class ExamsController {
   @Get(':id')
   @CheckAbilities({ action: 'read', subject: 'Exam' })
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string) {
-    return await this.examsService.findOne(id);
+  async findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return await this.examsService.findOne(id, user);
   }
 
   @ApiOperation({ summary: 'Update exam' })
@@ -249,6 +250,19 @@ export class ExamsController {
     @CurrentUser() user: any,
   ) {
     return await this.examsService.startExam(examId, user);
+  }
+
+  @ApiOperation({ summary: 'Save answers so far — marked automatically if time runs out before submitting' })
+  @ApiResponse({ status: 200, description: 'Answers saved' })
+  @Put(':examId/answers')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async saveAnswers(
+    @Param('examId') examId: string,
+    @Body() submitAnswersDto: SubmitAnswersDto,
+    @CurrentUser() user: any,
+  ) {
+    return await this.examsService.saveAnswers(examId, submitAnswersDto, user);
   }
 
   @ApiOperation({ summary: 'Grade an exam by submitting answers' })

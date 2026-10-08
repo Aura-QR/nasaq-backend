@@ -86,7 +86,6 @@ Show each message as it comes, the way other errors are shown.
 | Admin deletes «معايير الدرجات» that has exams or projects (it used to delete all of them and every mark, silently) | 400 | «لا يمكن حذف توزيع الدرجات لارتباطه بـ N اختبار وM مشروع؛ احذفها أولًا» |
 | Admin changes the weight or count of a type that already has exams or projects | 400 | «لا يمكن تعديل درجة أو عدد الاختبارات القصيرة بعد إنشاء الاختبارات القصيرة لهذه المادة؛ احذفها أولًا ثم عدّل التوزيع». Passing grade, and types with nothing yet, can still change |
 | A student opens an exam not set for her class; any non-student opens an exam | 403 | «هذا الامتحان غير مخصص لفصلك» / «أداء الامتحانات متاح للطلاب فقط» |
-
 | Teacher or admin deletes an exam any student has started | 400 | «لا يمكن حذف امتحان بدأه الطلاب؛ درجاتهم محفوظة عليه» |
 | Teacher or admin deletes a project any student has handed in | 400 | «لا يمكن حذف مشروع سلّمه الطلاب؛ تسليماتهم ودرجاتهم محفوظة عليه» |
 | A student uploads to, or deletes files from, a project not set for her class; any non-student does | 403 | «هذا المشروع غير مخصص لفصلك» / «تسليم المشاريع متاح للطلاب فقط» |
@@ -117,6 +116,43 @@ submission has a mark.
   read-only and show «بدأ الطلاب الامتحان؛ لا يمكن تعديل الأسئلة».
 - **Teacher's create form:** after she picks the subject and type, show how
   many are left. For example, «المتبقي: 1 من 3» from her exam list.
+
+## Update 3: optional, and the backend is ready now
+
+Nothing breaks if these wait. Each one improves the experience.
+
+**1. Saving answers as she goes (mobile student exam screen).** Today a
+student whose app closes, or whose connection drops, mid-exam gets 0,
+because nothing was saved.
+- `PUT /exams/:examId/answers` with the **same body as submit**
+  (`{ answers: [{ questionId, answer }] }`) saves her answers so far.
+  - Call it whenever she picks an answer, debounced to about 3 seconds.
+  - Each call replaces what was saved before.
+  - The response is `{ savedAnswers, remainingSeconds }`.
+- When her time runs out without a submit, **the server marks what was
+  saved**: within 5 minutes, or at once when anyone opens the results.
+  The result then has `autoSubmitted: true`.
+- `POST /exams/:examId/start` on an exam she already opened now returns
+  `savedAnswers: [{ questionId, answer }]`. Put those back on screen.
+- A submit that arrives after the 2-minute grace returns 400
+  «انتهى وقت الامتحان، وسُلّمت إجاباتك المحفوظة», and her saved answers are
+  marked. Show the message, then open her result.
+
+**2. «درجاتي» (`GET /grades-criteria/student/me/grades`).** Every slot
+(`final`, `activities`, each item of `quizzes`, `assignments` and
+`projects`) now has a `status`. `grade` stays a number, so nothing breaks:
+
+| status | Show |
+|---|---|
+| `graded` | the grade |
+| `upcoming` | «لم يُعقد بعد» instead of 0 |
+| `missed` | «لم تؤدِّه» (0) |
+| `awaiting_grade` | «بانتظار التصحيح» (started, or handed in and not yet marked) |
+| `not_set` | «لم يُحدَّد بعد» (the teacher has not created it) |
+
+**3. A teacher opening an exam by id (`GET /exams/:id`)** gets 403
+«ليس لديك صلاحية لعرض هذا الامتحان» unless she created it or teaches its
+subject. Her own screens are not affected.
 
 ## What does not change
 

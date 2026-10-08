@@ -60,6 +60,20 @@ export class ExamResult extends Document {
     correctAnswer: string;
     isCorrect: boolean;
   }[];
+
+  /**
+   * Answers saved while the paper is still open (PUT /exams/:id/answers).
+   *
+   * A student whose app closed, or whose connection dropped, never submitted,
+   * and a paper never submitted was a zero with nothing to mark. When her time
+   * runs out the paper is marked from what was saved here instead.
+   */
+  @Prop({ type: [{ _id: false, questionId: String, answer: String }], default: [] })
+  draftAnswers: { questionId: string; answer: string }[];
+
+  /** Marked by the server when time ran out, not handed in by the student. */
+  @Prop({ type: Boolean, default: false })
+  autoSubmitted: boolean;
 }
 
 export const ExamResultSchema = SchemaFactory.createForClass(ExamResult);

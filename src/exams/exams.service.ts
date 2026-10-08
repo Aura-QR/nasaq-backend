@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
@@ -515,8 +516,22 @@ export class ExamsService {
     return exams.map(exam => transformExamResponse(exam));
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, user?: any) {
     this.validateObjectId(id, 'exam');
+
+    // The exam carries its answer key. A teacher reads her own, and the exams
+    // of subjects she teaches (the shared final, a colleague's quiz she may
+    // cover) — not every exam in the school by id.
+    if (user?.role === 'TEACHER') {
+      const meta = await this.examModel.findById(id).select('createdBy subjectOfferingId').exec();
+      if (
+        meta &&
+        String(meta.createdBy) !== String(user.userId) &&
+        !(await this.teachesOffering(user.userId, meta.subjectOfferingId))
+      ) {
+        throw new ForbiddenException('ليس لديك صلاحية لعرض هذا الامتحان');
+      }
+    }
 
     const exam = await this.examModel
       .findById(id)
@@ -768,6 +783,171 @@ export class ExamsService {
     return transformExamResponse(exam);
   }
 
+  private readonly logger = new Logger(ExamsService.name);
+  private sweeping = false;
+
+  /** When a session's paper closes: her own time, or the exam's window, whichever is first. */
+  private static deadline(session: any, exam: any): number {
+    const ownTime = new Date(session.startedAt).getTime() + Number(exam.duration) * 60000;
+    return Math.min(ownTime, new Date(exam.endDate).getTime());
+  }
+
+  private static expired(session: any, exam: any, now = Date.now()): boolean {
+    return now > ExamsService.deadline(session, exam) + SUBMIT_GRACE_MINUTES * 60000;
+  }
+
+  /**
+   * Mark a paper. One answer per question, the first one sent — counted as
+   * sent, the same correct answer repeated scored past 100%. `strict` refuses
+   * an unknown question (a live submission); saved drafts skip it instead.
+   */
+  private markPaper(exam: any, answers: { questionId: string; answer: string }[], strict: boolean) {
+    const questionMap = new Map<string, string>();
+    exam.questions.forEach((q: any) => questionMap.set(q._id.toString(), q.correctAnswer));
+
+    const seen = new Set<string>();
+    const results = [];
+    for (const answer of answers ?? []) {
+      const id = String(answer.questionId);
+      if (seen.has(id)) continue;
+      const correctAnswer = questionMap.get(id);
+      if (correctAnswer === undefined) {
+        if (strict) {
+          throw new BadRequestException(`السؤال ذو المعرف ${id} غير موجود في هذا الامتحان`);
+        }
+        continue;
+      }
+      seen.add(id);
+      results.push({
+        questionId: id,
+        studentAnswer: String(answer.answer ?? ''),
+        correctAnswer,
+        isCorrect: String(answer.answer ?? '').trim().toLowerCase() === correctAnswer.trim().toLowerCase(),
+      });
+    }
+
+    const total = exam.questions.length || 1;
+    const correct = results.filter((r) => r.isCorrect).length;
+    const percentage = (correct / total) * 100;
+    return {
+      results,
+      correct,
+      percentage: parseFloat(percentage.toFixed(2)),
+      achievedGrade: parseFloat(((percentage / 100) * exam.grade).toFixed(2)),
+      passed: percentage >= 50,
+    };
+  }
+
+  /**
+   * Close a session whose time has run out, marking what she saved.
+   * Conditional on it still being open, so it never overwrites a paper the
+   * student handed in herself.
+   */
+  private async finalizeSession(session: any, exam: any): Promise<void> {
+    if (session.submitted) return;
+    const marked = this.markPaper(exam, session.draftAnswers ?? [], false);
+    await this.examResultModel.updateOne(
+      { _id: session._id, submitted: { $ne: true } },
+      {
+        submitted: true,
+        autoSubmitted: true,
+        achievedGrade: marked.achievedGrade,
+        percentage: marked.percentage,
+        passed: marked.passed,
+        answers: marked.results,
+      },
+    );
+  }
+
+  /**
+   * Every few minutes, mark the papers whose time ran out unsubmitted. Results
+   * carry no school, so exams are read across schools here; marking needs
+   * nothing but the exam and the session.
+   */
+  @Cron('*/5 * * * *', { name: 'exam-auto-submit' })
+  async sweepExpiredSessions(now: number = Date.now()): Promise<number> {
+    if (this.sweeping) return 0;
+    this.sweeping = true;
+    let closed = 0;
+    try {
+      const open = await this.examResultModel
+        .find({ submitted: { $ne: true } })
+        .select('_id examId startedAt submitted draftAnswers')
+        .lean()
+        .exec();
+      if (!open.length) return 0;
+      const exams = await this.examModel
+        .find({ _id: { $in: [...new Set(open.map((r: any) => String(r.examId)))] } })
+        .select('_id grade duration endDate questions')
+        .setOptions({ skipTenantScope: true } as any)
+        .lean()
+        .exec();
+      const byId = new Map(exams.map((e: any) => [String(e._id), e]));
+      for (const session of open) {
+        const exam = byId.get(String((session as any).examId));
+        if (!exam || !ExamsService.expired(session, exam, now)) continue;
+        try {
+          await this.finalizeSession(session, exam);
+          closed++;
+        } catch (error: any) {
+          this.logger.error(`Auto-submit failed for result ${(session as any)._id}: ${error?.message}`);
+        }
+      }
+    } finally {
+      this.sweeping = false;
+    }
+    return closed;
+  }
+
+  /**
+   * Save the student's answers so far. Called as she answers; replaces what
+   * was saved. Marked only if her time runs out before she submits.
+   */
+  async saveAnswers(examId: string, submitAnswersDto: SubmitAnswersDto, user: any) {
+    this.validateObjectId(examId, 'exam');
+    const exam = await this.examModel.findById(examId).exec();
+    if (!exam) {
+      throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
+    }
+    await this.assertStudentMaySit(exam, user);
+
+    const session = await this.examResultModel.findOne({ examId, studentId: user.userId });
+    if (!session) {
+      throw new BadRequestException('يجب بدء الامتحان أولاً قبل حفظ الإجابات');
+    }
+    if (session.submitted) {
+      throw new BadRequestException('لقد أديت هذا الامتحان من قبل');
+    }
+    if (ExamsService.expired(session, exam)) {
+      await this.finalizeSession(session, exam);
+      throw new BadRequestException('انتهى وقت الامتحان، وسُلّمت إجاباتك المحفوظة');
+    }
+
+    const known = new Set(exam.questions.map((q: any) => q._id.toString()));
+    const seen = new Set<string>();
+    const draft = (submitAnswersDto.answers ?? [])
+      .filter((a) => {
+        const id = String(a.questionId);
+        if (!known.has(id) || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map((a) => ({ questionId: String(a.questionId), answer: String(a.answer ?? '') }));
+
+    await this.examResultModel.updateOne(
+      { _id: session._id, submitted: { $ne: true } },
+      { draftAnswers: draft },
+    );
+
+    return {
+      message: 'تم حفظ الإجابات',
+      data: {
+        savedAnswers: draft.length,
+        remainingSeconds: Math.max(0, Math.floor((ExamsService.deadline(session, exam) - Date.now()) / 1000)),
+      },
+    };
+  }
+
   async startExam(examId: string, user: any) {
     this.validateObjectId(examId, 'exam');
 
@@ -792,6 +972,11 @@ export class ExamsService {
 
     let startedAt: Date;
     let remainingSeconds: number;
+
+    if (existing && ExamsService.expired(existing, exam, now.getTime())) {
+      await this.finalizeSession(existing, exam);
+      throw new BadRequestException('انتهى وقت الامتحان، وسُلّمت إجاباتك المحفوظة');
+    }
 
     if (existing) {
       const elapsedMinutes = (now.getTime() - existing.startedAt.getTime()) / 60000;
@@ -826,6 +1011,11 @@ export class ExamsService {
           grade: exam.grade,
           questions,
         },
+        // What she saved before the app closed, to put back on screen.
+        savedAnswers: (existing?.draftAnswers ?? []).map((a: any) => ({
+          questionId: a.questionId,
+          answer: a.answer,
+        })),
       },
     };
   }
@@ -844,12 +1034,8 @@ export class ExamsService {
     await this.assertStudentMaySit(exam, user);
 
     const now = new Date();
-    const grace = SUBMIT_GRACE_MINUTES * 60000;
     if (now < (exam as any).startDate) {
       throw new BadRequestException('لم يبدأ وقت الامتحان بعد');
-    }
-    if (now.getTime() > new Date((exam as any).endDate).getTime() + grace) {
-      throw new BadRequestException('انتهى وقت الامتحان');
     }
 
     const session = await this.examResultModel.findOne({ examId, studentId: user.userId });
@@ -861,10 +1047,11 @@ export class ExamsService {
       throw new BadRequestException('لقد أديت هذا الامتحان من قبل');
     }
 
-    // Duration check: now - startedAt must be within the allowed duration
-    const elapsedMinutes = (now.getTime() - session.startedAt.getTime()) / 60000;
-    if (elapsedMinutes > (exam as any).duration + SUBMIT_GRACE_MINUTES) {
-      throw new BadRequestException('انتهى وقت الامتحان المخصص لك');
+    // Past her time or the window, with grace: what she saved is marked
+    // instead, so a paper that arrives too late is not simply a zero.
+    if (ExamsService.expired(session, exam, now.getTime())) {
+      await this.finalizeSession(session, exam);
+      throw new BadRequestException('انتهى وقت الامتحان، وسُلّمت إجاباتك المحفوظة');
     }
 
     const totalQuestions = exam.questions.length;
@@ -873,60 +1060,13 @@ export class ExamsService {
     }
 
     const { answers } = submitAnswersDto;
-
-    const questionMap = new Map();
-    exam.questions.forEach((question: any) => {
-      questionMap.set(question._id.toString(), question.correctAnswer);
-    });
-
-    // One answer per question, the first one sent. Counted as sent, the same
-    // correct answer repeated scored past 100% — 20 copies on a five-question
-    // paper was 400%.
-    const seen = new Set<string>();
-    const uniqueAnswers = answers.filter((answer) => {
-      const id = String(answer.questionId);
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-
-    const results = uniqueAnswers.map((answer) => {
-      const correctAnswer = questionMap.get(answer.questionId);
-
-      if (correctAnswer === undefined) {
-        throw new BadRequestException(
-          `السؤال ذو المعرف ${answer.questionId} غير موجود في هذا الامتحان`
-        );
-      }
-
-      const isCorrect = answer.answer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
-
-      return {
-        questionId: answer.questionId,
-        studentAnswer: answer.answer,
-        correctAnswer: correctAnswer,
-        isCorrect: isCorrect,
-      };
-    });
-
-
-    const correctAnswersCount = results.filter((r) => r.isCorrect).length;
-
-
-    const percentage = (correctAnswersCount / totalQuestions) * 100;
-
-    // const examTypeWeights = {
-    //   final: gradesCriteria.final,
-    //   assignment: gradesCriteria.assignments,
-    //   project: gradesCriteria.projects,
-    //   activity: gradesCriteria.activities,
-    //   quiz: gradesCriteria.quizzes,
-    // }
-
+    const marked = this.markPaper(exam, answers, true);
+    const results = marked.results;
+    const correctAnswersCount = marked.correct;
+    const percentage = marked.percentage;
     const maxGrade = exam.grade;
-
-    const finalGrade = parseFloat(((percentage / 100) * maxGrade).toFixed(2));
-    const passed = percentage >= 50;
+    const finalGrade = marked.achievedGrade;
+    const passed = marked.passed;
 
     // Conditional on submitted: false, so two submissions racing each other
     // cannot both be accepted, the second overwriting the first.
@@ -948,7 +1088,7 @@ export class ExamsService {
       examId: exam._id,
       examType: exam.examType,
       totalQuestions: totalQuestions,
-      answeredQuestions: uniqueAnswers.length,
+      answeredQuestions: results.length,
       correctAnswers: correctAnswersCount,
       incorrectAnswers: totalQuestions - correctAnswersCount,
       percentage: parseFloat(percentage.toFixed(2)),
@@ -975,13 +1115,13 @@ export class ExamsService {
 
     const exam = await this.examModel
       .findById(examId)
-      .select('_id examType grade questions')
+      .select('_id examType grade questions duration endDate')
       .exec();
     if (!exam) {
       throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
     }
 
-    const result = await this.examResultModel
+    let result = await this.examResultModel
       .findOne({
         examId: new mongoose.Types.ObjectId(examId),
         studentId: new mongoose.Types.ObjectId(String(user.userId)),
@@ -990,6 +1130,10 @@ export class ExamsService {
 
     if (!result) {
       throw new NotFoundException('لم تقم بدخول هذا الامتحان');
+    }
+    if (!result.submitted && ExamsService.expired(result, exam)) {
+      await this.finalizeSession(result, exam);
+      result = await this.examResultModel.findById(result._id).exec();
     }
     if (!result.submitted) {
       throw new BadRequestException('لم تقم بتسليم هذا الامتحان بعد');
@@ -1045,7 +1189,7 @@ export class ExamsService {
 
     const exam = await this.examModel
       .findById(examId)
-      .select('_id grade examType subjectOfferingId classIds')
+      .select('_id grade examType subjectOfferingId classIds duration endDate questions')
       .exec();
     if (!exam) {
       throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
@@ -1059,6 +1203,15 @@ export class ExamsService {
       if (!lecture) {
         throw new ForbiddenException('ليس لديك صلاحية لعرض نتائج هذه المادة');
       }
+    }
+
+    // Papers whose time ran out are marked from what was saved before the
+    // list is read, not up to five minutes later.
+    const open = await this.examResultModel
+      .find({ examId: new mongoose.Types.ObjectId(examId), submitted: { $ne: true } })
+      .exec();
+    for (const session of open) {
+      if (ExamsService.expired(session, exam)) await this.finalizeSession(session, exam);
     }
 
     const results = await this.examResultModel
