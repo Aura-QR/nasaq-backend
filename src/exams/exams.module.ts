@@ -12,6 +12,7 @@ import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.schema';
 import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
 import { StudentClassResolverModule } from '../enrollments/student-class-resolver.module';
+import { AcademicYear, AcademicYearSchema } from '../academic-years/schemas/academic-year.schema';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { StudentClassResolverModule } from '../enrollments/student-class-resolve
       { name: ExamResult.name, schema: ExamResultSchema },
       { name: Enrollment.name, schema: EnrollmentSchema },
       { name: SubjectOffering.name, schema: SubjectOfferingSchema },
+      { name: AcademicYear.name, schema: AcademicYearSchema },
     ]),
     CaslModule,
   ],

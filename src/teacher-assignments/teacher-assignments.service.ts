@@ -271,10 +271,16 @@ export class TeacherAssignmentsService {
       })
       .exec();
 
+    // An assignment whose offering or term was deleted (a deleted academic
+    // year leaves them behind) points at nothing a teacher can still teach;
+    // listed, the exam form offered last year's subject and the exam went to
+    // last year's classes.
+    const live = rows.filter((r: any) => r.subjectOfferingId?.termId?._id);
+
     // termId lives on the offering, not on the assignment, so it cannot be part
     // of the Mongo query without an aggregation. Filtered here instead.
-    if (!filters.termId) return rows;
-    return rows.filter((r: any) => {
+    if (!filters.termId) return live;
+    return live.filter((r: any) => {
       const t = r.subjectOfferingId?.termId;
       return String(t?._id ?? t) === String(filters.termId);
     });

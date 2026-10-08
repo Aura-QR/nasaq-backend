@@ -1,3 +1,4 @@
+import { AcademicYear, AcademicYearSchema } from '../academic-years/schemas/academic-year.schema';
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { MulterModule } from '@nestjs/platform-express';
@@ -28,6 +29,7 @@ import { StudentClassResolverModule } from '../enrollments/student-class-resolve
       { name: Student.name, schema: StudentSchema },
       { name: Enrollment.name, schema: EnrollmentSchema },
       { name: SubjectOffering.name, schema: SubjectOfferingSchema },
+      { name: AcademicYear.name, schema: AcademicYearSchema },
     ]),
     CaslModule,
     MulterModule.register(multerConfig),

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import mongoose, { Model } from 'mongoose';
 import { Project } from './schemas/project.schema';
@@ -28,6 +28,8 @@ import { getPagination } from 'src/pagination/common/paginationUtils';
 import { Response } from 'express';
 import { transformProjectResponse } from './transforms/response.transform';
 import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
+import { AcademicYear } from '../academic-years/schemas/academic-year.schema';
+import { loadCurrentOffering } from '../subject-offerings/current-offering.util';
 
 @Injectable()
 export class ProjectsService {
@@ -58,6 +60,9 @@ export class ProjectsService {
     @InjectModel(Enrollment.name) private enrollmentModel: Model<Enrollment>,
     @InjectModel(SubjectOffering.name) private subjectOfferingModel: Model<SubjectOffering>,
     private readonly studentClassResolver: StudentClassResolverService,
+    @Optional()
+    @InjectModel(AcademicYear.name)
+    private readonly academicYearModel?: Model<AcademicYear>,
   ) {}
 
   /**
@@ -105,6 +110,8 @@ export class ProjectsService {
         createProjectDto.subjectOfferingId,
       );
     }
+
+    await loadCurrentOffering(this.subjectOfferingModel, this.academicYearModel, createProjectDto.subjectOfferingId);
 
     const gradesCriteria = await this.gradesCriteriaModel.findOne({
       subjectOfferingId: new mongoose.Types.ObjectId(createProjectDto.subjectOfferingId),

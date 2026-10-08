@@ -86,6 +86,7 @@ Show each message as it comes, the way other errors are shown.
 | Admin deletes «معايير الدرجات» that has exams or projects (it used to delete all of them and every mark, silently) | 400 | «لا يمكن حذف توزيع الدرجات لارتباطه بـ N اختبار وM مشروع؛ احذفها أولًا» |
 | Admin changes the weight or count of a type that already has exams or projects | 400 | «لا يمكن تعديل درجة أو عدد الاختبارات القصيرة بعد إنشاء الاختبارات القصيرة لهذه المادة؛ احذفها أولًا ثم عدّل التوزيع». Passing grade, and types with nothing yet, can still change |
 | A student opens an exam not set for her class; any non-student opens an exam | 403 | «هذا الامتحان غير مخصص لفصلك» / «أداء الامتحانات متاح للطلاب فقط» |
+| Creating an exam or project on a subject offering whose term was deleted, or whose year is not the active one | 400 | «هذه المادة تابعة لفصل دراسي محذوف؛ اختر مادة الفصل الدراسي الحالي» / «هذه المادة تابعة لعام دراسي غير العام الحالي؛ اختر مادة العام الدراسي الحالي». `GET /teacher-assignments` and `GET /subjects/teacher/me` no longer list offerings whose term was deleted, so the form should not offer them any more |
 | Teacher or admin deletes an exam any student has started | 400 | «لا يمكن حذف امتحان بدأه الطلاب؛ درجاتهم محفوظة عليه» |
 | Teacher or admin deletes a project any student has handed in | 400 | «لا يمكن حذف مشروع سلّمه الطلاب؛ تسليماتهم ودرجاتهم محفوظة عليه» |
 | A student uploads to, or deletes files from, a project not set for her class; any non-student does | 403 | «هذا المشروع غير مخصص لفصلك» / «تسليم المشاريع متاح للطلاب فقط» |

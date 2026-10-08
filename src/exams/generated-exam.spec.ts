@@ -6,6 +6,7 @@ import { ExamType } from './enums/exam-type.enum';
 import { GradesCriteria, GradesCriteriaSchema } from '../grades-criteria/schemas/grades-criteria.schema';
 import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
+import { Term, TermSchema } from '../terms/schemas/term.schema';
 import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 
@@ -24,12 +25,21 @@ describe('Generated dashboard exams', () => {
     exams = mongoose.model(Exam.name, ExamSchema);
     criteria = mongoose.model(GradesCriteria.name, GradesCriteriaSchema);
     classes = mongoose.model(Class.name, ClassSchema);
-    mongoose.model(SubjectOffering.name, SubjectOfferingSchema);
+    const offerings = mongoose.model(SubjectOffering.name, SubjectOfferingSchema);
+    const terms = mongoose.model(Term.name, TermSchema);
     mongoose.model(Subject.name, SubjectSchema);
+    // A current offering: its term exists (no active year is set here).
+    const termId = new Types.ObjectId();
+    await terms.collection.deleteMany({ schoolId });
+    await offerings.collection.deleteMany({ schoolId });
+    await terms.collection.insertOne({ _id: termId, schoolId, academicYearId: new Types.ObjectId(), name: 'ت', order: 1,
+      startDate: new Date('2026-08-30'), endDate: new Date('2027-01-10'), status: 'active' });
+    await offerings.collection.insertOne({ _id: subjectOfferingId, schoolId, subjectId: new Types.ObjectId(),
+      gradeLevelId: new Types.ObjectId(), termId });
     await exams.init(); await criteria.init();
     await classes.collection.insertOne({ _id: classId, schoolId, name: 'فصل اختبار' });
     const lectures = { find: () => ({ select: () => ({ exec: async () => assigned ? [{ classId }] : [] }) }) };
-    service = new ExamsService(exams, criteria, classes, lectures as any, null, null, null, null, null);
+    service = new ExamsService(exams, criteria, classes, lectures as any, null, null, null, offerings as any, null);
   });
   beforeEach(async () => {
     assigned = true;

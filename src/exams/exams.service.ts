@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, Optional, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -20,6 +20,8 @@ import { transformExamResponse } from './transforms/response.transform';
 import { PaginationDto } from '../pagination/dto/pagination.dto';
 import { getPagination } from '../pagination/common/paginationUtils';
 import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
+import { AcademicYear } from '../academic-years/schemas/academic-year.schema';
+import { loadCurrentOffering } from '../subject-offerings/current-offering.util';
 
 /**
  * Minutes a submission may arrive after the student's time or the exam's
@@ -58,6 +60,9 @@ export class ExamsService {
     @InjectModel(Enrollment.name) private enrollmentModel: Model<Enrollment>,
     @InjectModel(SubjectOffering.name) private subjectOfferingModel: Model<SubjectOffering>,
     private readonly studentClassResolver: StudentClassResolverService,
+    @Optional()
+    @InjectModel(AcademicYear.name)
+    private readonly academicYearModel?: Model<AcademicYear>,
   ) {}
 
   private validateObjectId(id: string, entityName: string): void {
@@ -190,6 +195,8 @@ export class ExamsService {
         'إنشاء الامتحانات متاح للمعلمين فقط — الامتحان يُنسب للمعلم الذي يقوم بتدريس الحصة',
       );
     }
+
+    await loadCurrentOffering(this.subjectOfferingModel, this.academicYearModel, subjectOfferingId);
 
     if (examType === 'final') {
       // Whatever classes were picked, the final is the whole grade's.

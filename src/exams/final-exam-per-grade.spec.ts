@@ -20,6 +20,7 @@ import { ProjectSubmission, ProjectSubmissionSchema } from '../projects/schemas/
 import { Subject, SubjectSchema } from '../subjects/schemas/subject.schema';
 import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
 import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-level.schema';
+import { AcademicYear, AcademicYearSchema } from '../academic-years/schemas/academic-year.schema';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 
 const URI = (process.env.MONGODB_URI || 'mongodb://localhost:27017/nasaq-test').replace(
@@ -76,6 +77,7 @@ describe('exams — the final is the grade\'s, grades count the student\'s own c
       [ProjectSubmission.name, ProjectSubmissionSchema],
       // Populated by the responses only.
       [Subject.name, SubjectSchema], [Teacher.name, TeacherSchema], [GradeLevel.name, GradeLevelSchema],
+      [AcademicYear.name, AcademicYearSchema],
     ] as const;
     moduleRef = await Test.createTestingModule({
       imports: [
@@ -87,7 +89,7 @@ describe('exams — the final is the grade\'s, grades count the student\'s own c
 
     exams = new ExamsService(
       m.Exam, m.GradesCriteria, m.Class, m.Lecture, {} as any, m.ExamResult,
-      {} as any, m.SubjectOffering, resolver as any,
+      {} as any, m.SubjectOffering, resolver as any, m.AcademicYear,
     );
     grades = new GradesCriteriaService(
       m.GradesCriteria, {} as any, {} as any, m.Lecture, m.Exam, m.Project, {} as any,
@@ -370,6 +372,34 @@ describe('exams — the final is the grade\'s, grades count the student\'s own c
     expect(ability(ExamsController, 'listResults')).toEqual([{ action: 'read', subject: 'Exam' }]);
     expect(ability(ProjectsController, 'listSubmissions')).toEqual([{ action: 'read', subject: 'Project' }]);
     expect(ability(ProjectsController, 'downloadSubmission')).toEqual([{ action: 'read', subject: 'Project' }]);
+  });
+
+  describe('an offering left behind by a deleted year', () => {
+    it('is refused — its exam would go to last year\'s classes', async () => {
+      // The yamamah report: the year and its term were deleted, the offering,
+      // the teacher's old lecture and assignment were not.
+      await m.Term.collection.deleteMany({});
+
+      await expect(asSchool(() => exams.create(paper('final', [String(classA)]), teacher(teacherA))))
+        .rejects.toThrow('فصل دراسي محذوف');
+      await expect(asSchool(() => exams.create(paper('quiz', [String(classA)]), teacher(teacherA))))
+        .rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('is refused when its year is not the active one', async () => {
+      await m.AcademicYear.collection.insertOne({ name: '2027/2028', status: 'active', schoolId });
+
+      await expect(asSchool(() => exams.create(paper('quiz', [String(classA)]), teacher(teacherA))))
+        .rejects.toThrow('عام دراسي غير العام الحالي');
+    });
+
+    it('is accepted in the active year', async () => {
+      await m.AcademicYear.collection.insertOne({ _id: yearId, name: '2026/2027', status: 'active', schoolId });
+
+      const created: any = await asSchool(() => exams.create(paper('final', [String(classA)]), teacher(teacherA)));
+      const stored = await m.Exam.collection.findOne({ _id: new Types.ObjectId(String(created._id ?? created.id)) });
+      expect(stored.classIds.map(String).sort()).toEqual([String(classA), String(classB)].sort());
+    });
   });
 
   describe('a paper never handed in', () => {

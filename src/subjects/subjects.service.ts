@@ -121,11 +121,19 @@ export class SubjectsService {
 
     const offerings = await this.subjectOfferingModel
       .find({ _id: { $in: Array.from(offeringIdsSet) } })
-      .select('subjectId')
+      .select('subjectId termId')
+      .populate('termId', '_id')
       .exec();
 
+    // Offerings of a deleted term (a deleted year leaves its timetable and
+    // assignments behind) are not hers to teach any more.
     const subjectIds = Array.from(
-      new Set(offerings.map((o) => o.subjectId?.toString()).filter(Boolean)),
+      new Set(
+        offerings
+          .filter((o: any) => o.termId?._id)
+          .map((o) => o.subjectId?.toString())
+          .filter(Boolean),
+      ),
     );
 
     if (subjectIds.length === 0) {
