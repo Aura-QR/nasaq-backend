@@ -99,8 +99,17 @@ export class ExamsService {
     );
 
     if (unauthorizedClasses.length > 0) {
+      // Names, not ids: the teacher reads this message.
+      const named = await this.classModel
+        .find({ _id: { $in: unauthorizedClasses.filter((id) => mongoose.Types.ObjectId.isValid(id)) } })
+        .select('name')
+        .lean()
+        .exec();
+      const names = unauthorizedClasses.map(
+        (id) => (named as any[]).find((c) => String(c._id) === id)?.name ?? 'فصل غير معروف',
+      );
       throw new ForbiddenException(
-        `ليس لديك صلاحية لإنشاء امتحانات للفصول: ${unauthorizedClasses.join(', ')}. يمكنك الإنشاء فقط للفصول التي تدرس فيها هذه المادة.`,
+        `ليس لديك صلاحية لإنشاء اختبار للفصول: ${names.join('، ')}. يمكنك الإنشاء فقط للفصول التي تدرّس فيها هذه المادة.`,
       );
     }
   }

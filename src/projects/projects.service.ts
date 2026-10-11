@@ -93,8 +93,18 @@ export class ProjectsService {
     );
 
     if (unauthorizedClasses.length > 0) {
+      // Names, not ids: the teacher reads this message.
+      const ClassModel = (this.lectureModel as any).db?.models?.['Class'];
+      const named: any[] = ClassModel
+        ? await ClassModel.find({
+            _id: { $in: unauthorizedClasses.filter((id) => mongoose.Types.ObjectId.isValid(id)) },
+          }).select('name').lean().exec()
+        : [];
+      const names = unauthorizedClasses.map(
+        (id) => named.find((c) => String(c._id) === id)?.name ?? 'فصل غير معروف',
+      );
       throw new ForbiddenException(
-        `ليس لديك صلاحية لإنشاء مشاريع للفصول: ${unauthorizedClasses.join(', ')}. يمكنك الإنشاء فقط للفصول التي تدرس فيها هذه المادة.`,
+        `ليس لديك صلاحية لإنشاء مشاريع للفصول: ${names.join('، ')}. يمكنك الإنشاء فقط للفصول التي تدرّس فيها هذه المادة.`,
       );
     }
   }
