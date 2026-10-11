@@ -72,12 +72,14 @@ export class TeacherAssignmentsController {
     @Query('subjectOfferingId') subjectOfferingId?: string,
     @Query('termId') termId?: string,
     @Query('classId') classId?: string,
+    @Query('academicYearId') academicYearId?: string,
   ) {
     return await this.teacherAssignmentsService.findAll({
       teacherId,
       subjectOfferingId,
       termId,
       classId,
+      academicYearId,
     });
   }
 

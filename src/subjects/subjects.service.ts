@@ -1,3 +1,4 @@
+import { scopedOfferingIds } from '../terms/current-scope.util';
 import {
   Injectable,
   NotFoundException,
@@ -119,8 +120,13 @@ export class SubjectsService {
       return { message: 'تم استرجاع مواد المعلم بنجاح', data: [] };
     }
 
+    // This year's offerings only (see terms/current-scope.util).
+    const inYear = await scopedOfferingIds(this.subjectOfferingModel.db);
+    const wanted = Array.from(offeringIdsSet).filter(
+      (id) => !inYear || inYear.some((o) => String(o) === id),
+    );
     const offerings = await this.subjectOfferingModel
-      .find({ _id: { $in: Array.from(offeringIdsSet) } })
+      .find({ _id: { $in: wanted } })
       .select('subjectId termId')
       .populate('termId', '_id')
       .exec();

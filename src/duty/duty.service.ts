@@ -1,3 +1,4 @@
+import { currentScope, currentTermFilter } from '../terms/current-scope.util';
 import {
   BadRequestException,
   ForbiddenException,
@@ -612,13 +613,14 @@ export class DutyService {
     const date = dayStart(dateStr ?? new Date());
     const weekday = WEEKDAY_NAMES[date.getUTCDay()];
 
-    const term: any = await this.termModel
-      .findOne({ status: 'active' })
-      .lean()
-      .exec();
-
-    const lectureFilter: any = { teacherId: userId, dayOfWeek: weekday };
-    if (term) lectureFilter.termId = term._id;
+    // The current term of the active year. «Active» alone matched nothing
+    // while every term was still upcoming, and then every year's lectures
+    // for that weekday came back.
+    const lectureFilter: any = {
+      teacherId: userId,
+      dayOfWeek: weekday,
+      ...currentTermFilter(await currentScope(this.lectureModel.db, date)),
+    };
 
     const [own, cover]: any[] = await Promise.all([
       this.lectureModel
@@ -877,10 +879,8 @@ export class DutyService {
     const date = dayStart(dateStr ?? new Date());
     const weekday = WEEKDAY_NAMES[date.getUTCDay()];
 
-    const term: any = await this.termModel
-      .findOne({ status: 'active' })
-      .lean()
-      .exec();
+    const scope = await currentScope(this.lectureModel.db, date);
+    const termFilter = currentTermFilter(scope);
 
     const [
       teachers,
@@ -953,7 +953,7 @@ export class DutyService {
     ]);
 
     const lectureFilter: any = { dayOfWeek: weekday };
-    if (term) lectureFilter.termId = term._id;
+    Object.assign(lectureFilter, termFilter);
 
     const lectures: any[] = await this.lectureModel
       .find(lectureFilter)
@@ -1057,7 +1057,7 @@ export class DutyService {
     return {
       date: toDateOnly(date),
       dayOfWeek: weekday,
-      termId: term ? String(term._id) : null,
+      termId: scope.termId ? String(scope.termId) : null,
       checkInInUse,
       absentTeachers: absentIds.map((id: string) => ({
         teacherId: id,

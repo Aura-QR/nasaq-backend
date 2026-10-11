@@ -1,3 +1,4 @@
+import { currentScope, currentTermFilter, termIdsOfYear, yearTermFilter } from '../terms/current-scope.util';
 import {
   Injectable,
   NotFoundException,
@@ -79,15 +80,36 @@ export class LecturesService {
     return this.findOne(newLecture._id.toString());
   }
 
+  /**
+   * Which terms a list covers when the caller did not name one.
+   *
+   * A named term wins; then a named year (validated within the school); then
+   * a class, which belongs to one year already. Otherwise the current year —
+   * this used to be every year, so a teacher's lectures mixed last year's
+   * classes with this year's.
+   */
+  private async termScope(termId?: string, classId?: string, academicYearId?: string) {
+    if (termId) {
+      if (!mongoose.Types.ObjectId.isValid(termId)) throw new BadRequestException('معرّف الفصل الدراسي غير صالح');
+      return { termId: new mongoose.Types.ObjectId(termId) };
+    }
+    if (academicYearId) {
+      return { termId: { $in: await termIdsOfYear(this.lectureModel.db, academicYearId) } };
+    }
+    if (classId) return {};
+    return yearTermFilter(await currentScope(this.lectureModel.db));
+  }
+
   async findAll(
     termId?: string,
     classId?: string,
     teacherId?: string,
     dayOfWeek?: string,
     slot?: number | string,
+    academicYearId?: string,
+    termFilter?: Record<string, any>,
   ) {
-    const filter: any = {};
-    if (termId) filter.termId = new mongoose.Types.ObjectId(termId);
+    const filter: any = termFilter ?? (await this.termScope(termId, classId, academicYearId));
     if (classId) filter.classId = new mongoose.Types.ObjectId(classId);
     if (teacherId) filter.teacherId = new mongoose.Types.ObjectId(teacherId);
 
@@ -113,7 +135,7 @@ export class LecturesService {
         ],
       })
       .populate('teacherId', 'name email phoneNumber')
-      .populate('termId', 'name order status')
+      .populate('termId', 'name order status academicYearId')
       .sort({ dayOfWeek: 1, slot: 1 })
       .exec();
   }
@@ -122,9 +144,11 @@ export class LecturesService {
    * The caller's own timetable. Never accepts a teacherId — the id is taken from
    * the token, so one teacher cannot read another's schedule.
    */
-  async findMyTeacherLectures(teacherId: string, termId?: string) {
-    const resolvedTermId = termId ?? (await this.getActiveTermId());
-    return this.findAll(resolvedTermId, undefined, teacherId);
+  async findMyTeacherLectures(teacherId: string, termId?: string, academicYearId?: string) {
+    // The current term by default: a timetable is one term's week.
+    const termFilter =
+      termId || academicYearId ? undefined : currentTermFilter(await currentScope(this.lectureModel.db));
+    return this.findAll(termId, undefined, teacherId, undefined, undefined, academicYearId, termFilter);
   }
 
   /**
@@ -148,11 +172,15 @@ export class LecturesService {
       throw new BadRequestException('الطالب غير مسجل في أي فصل');
     }
 
-    const resolvedTermId = termId ?? (await this.getActiveTermId());
+    const termFilter = termId ? undefined : currentTermFilter(await currentScope(this.lectureModel.db));
     const lectures = await this.findAll(
-      resolvedTermId,
+      termId,
       student.classId.toString(),
       undefined,
+      undefined,
+      undefined,
+      undefined,
+      termFilter,
     );
 
     return this.withWeeksPreparation(lectures, weekOf);
@@ -203,19 +231,6 @@ export class LecturesService {
     });
   }
 
-  /**
-   * Falls back to the active term so the apps can call /me with no arguments.
-   * Returns undefined when no term is active, which makes findAll return
-   * every term rather than nothing.
-   */
-  private async getActiveTermId(): Promise<string | undefined> {
-    const activeTerm = await this.termModel
-      .findOne({ status: 'active' })
-      .select('_id')
-      .exec();
-    return activeTerm ? activeTerm._id.toString() : undefined;
-  }
-
   async findOne(id: string) {
     const lecture = await this.lectureModel
       .findById(id)
@@ -228,7 +243,7 @@ export class LecturesService {
         ],
       })
       .populate('teacherId', 'name email phoneNumber')
-      .populate('termId', 'name order status')
+      .populate('termId', 'name order status academicYearId')
       .exec();
 
     if (!lecture) {

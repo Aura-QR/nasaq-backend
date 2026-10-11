@@ -22,6 +22,7 @@ import { getPagination } from '../pagination/common/paginationUtils';
 import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
 import { AcademicYear } from '../academic-years/schemas/academic-year.schema';
 import { loadCurrentOffering } from '../subject-offerings/current-offering.util';
+import { scopedOfferingIds } from '../terms/current-scope.util';
 import { gradingSystemOf } from '../grade-register/grading-system.util';
 import { DEFAULT_EXAM_GRADE, EXAM_PART, resolveAssessmentType } from '../grade-register/ministry-template';
 
@@ -485,6 +486,9 @@ export class ExamsService {
 
   async filtering(filters: any, pagination: PaginationDto = {},user : any) {
     const query: any = {};
+    // Never a field on the exam: it picks which year's offerings to list.
+    const academicYearId = filters.academicYearId;
+    delete filters.academicYearId;
 
     const exactMatchFields = ['examType', 'gradesCriteriaId', 'classIds', 'subjectOfferingId'];
 
@@ -516,6 +520,13 @@ export class ExamsService {
         { createdBy: new mongoose.Types.ObjectId(String(user.userId)) },
         { examType: 'final', subjectOfferingId: { $in: offerings } },
       ];
+    }
+    // A teacher's list is this year's unless a subject or year is named;
+    // last year's exams sat in it otherwise. Applied before counting, so the
+    // totals and pages match what is shown.
+    if (!query.subjectOfferingId && (user?.role === 'TEACHER' || academicYearId)) {
+      const inYear = await scopedOfferingIds(this.examModel.db, academicYearId);
+      if (inYear) query.subjectOfferingId = { $in: inYear };
     }
 
 

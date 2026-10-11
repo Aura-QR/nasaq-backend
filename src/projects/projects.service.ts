@@ -30,6 +30,7 @@ import { transformProjectResponse } from './transforms/response.transform';
 import { StudentClassResolverService } from '../enrollments/student-class-resolver.service';
 import { AcademicYear } from '../academic-years/schemas/academic-year.schema';
 import { loadCurrentOffering } from '../subject-offerings/current-offering.util';
+import { scopedOfferingIds } from '../terms/current-scope.util';
 import { gradingSystemOf } from '../grade-register/grading-system.util';
 import { DEFAULT_EXAM_GRADE } from '../grade-register/ministry-template';
 
@@ -344,6 +345,11 @@ export class ProjectsService {
 
   async getTeacherProjects(teacherId: string, filters: any = {}, pagination: PaginationDto = {}, req: any) {
     const query: any = { createdBy: teacherId };
+    // This year's projects unless a subject or year is named.
+    if (!(filters.subjectOfferingId && mongoose.Types.ObjectId.isValid(filters.subjectOfferingId))) {
+      const inYear = await scopedOfferingIds(this.projectModel.db, filters.academicYearId);
+      if (inYear) query.subjectOfferingId = { $in: inYear };
+    }
 
     const now = new Date();
     if (filters.status === 'upcoming') query.dueDate = { $gt: now };
@@ -416,6 +422,12 @@ export class ProjectsService {
 
     if(user?.role === 'TEACHER')
       query['createdBy'] = user.userId;
+
+    // A teacher's list is this year's unless a subject or year is named.
+    if (!query.subjectOfferingId && (user?.role === 'TEACHER' || filters.academicYearId)) {
+      const inYear = await scopedOfferingIds(this.projectModel.db, filters.academicYearId);
+      if (inYear) query.subjectOfferingId = { $in: inYear };
+    }
 
     const total = await this.projectModel.countDocuments(query).exec();
     const paginationMeta = getPagination(pagination.page, pagination.limit, total);

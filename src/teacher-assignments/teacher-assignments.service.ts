@@ -1,3 +1,4 @@
+import { scopedOfferingIds } from '../terms/current-scope.util';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -244,9 +245,21 @@ export class TeacherAssignmentsService {
       subjectOfferingId?: string;
       termId?: string;
       classId?: string;
+      academicYearId?: string;
     } = {},
   ) {
     const query: any = {};
+    // One teacher's assignments are this year's unless a term or year is
+    // named — they fill her exam and project forms, and last year's subjects
+    // there sent her work to last year's classes.
+    if (filters.teacherId && !filters.termId && !filters.subjectOfferingId) {
+      const offerings = await scopedOfferingIds(this.teacherAssignmentModel.db, filters.academicYearId);
+      if (offerings) query.subjectOfferingId = { $in: offerings };
+    } else if (filters.academicYearId) {
+      query.subjectOfferingId = {
+        $in: await scopedOfferingIds(this.teacherAssignmentModel.db, filters.academicYearId),
+      };
+    }
     if (filters.teacherId) {
       query.teacherId = new mongoose.Types.ObjectId(filters.teacherId);
     }

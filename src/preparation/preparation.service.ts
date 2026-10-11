@@ -1,3 +1,4 @@
+import { currentScope, currentTermFilter } from '../terms/current-scope.util';
 import {
   Injectable,
   NotFoundException,
@@ -770,7 +771,9 @@ export class PreparationService {
     const lectureFilter: any = {};
     if (teacherId) lectureFilter.teacherId = teacherId;
     else lectureFilter.teacherId = { $ne: null };
+    // The term that week falls in, within the active year — never every year.
     if (params.termId) lectureFilter.termId = params.termId;
+    else Object.assign(lectureFilter, currentTermFilter(await currentScope(this.lectureModel.db, weekOf)));
 
     const lectures = await this.lectureModel
       .find(lectureFilter)

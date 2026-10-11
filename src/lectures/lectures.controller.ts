@@ -150,6 +150,7 @@ export class LecturesController {
     @Query('teacherId') teacherId?: string,
     @Query('dayOfWeek') dayOfWeek?: string,
     @Query('slot') slot?: string,
+    @Query('academicYearId') academicYearId?: string,
   ) {
     // A teacher may only ever see their own timetable through this route —
     // whatever teacherId they pass is ignored.
@@ -161,6 +162,7 @@ export class LecturesController {
       effectiveTeacherId,
       dayOfWeek,
       slot,
+      academicYearId,
     );
   }
 
@@ -174,8 +176,9 @@ export class LecturesController {
   async findMyTeacherLectures(
     @CurrentUser() user: any,
     @Query('termId') termId?: string,
+    @Query('academicYearId') academicYearId?: string,
   ) {
-    return await this.lecturesService.findMyTeacherLectures(user.userId, termId);
+    return await this.lecturesService.findMyTeacherLectures(user.userId, termId, academicYearId);
   }
 
   @ApiOperation({ summary: "Get the authenticated student's own weekly timetable" })

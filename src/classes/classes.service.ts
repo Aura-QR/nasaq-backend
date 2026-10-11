@@ -1,3 +1,4 @@
+import { currentScope, currentTermFilter, termIdsOfYear, yearTermFilter } from '../terms/current-scope.util';
 import { refuseIfWork, removeSkeleton } from '../common/school-structure.util';
 import {
   Injectable,
@@ -38,19 +39,20 @@ export class ClassesService {
    * form-teacher relationship: a maths teacher may teach six classes and be in
    * charge of one, or of none.
    *
-   * Defaults to the active term, matching GET /lectures/teacher/me, so the two
-   * agree with each other. When no term is active it falls back to every term
-   * rather than returning nothing.
+   * Defaults to the current academic year (see terms/current-scope.util).
    */
   async findMyTeacherClasses(teacherId: string, termId?: string) {
     this.validateObjectId(teacherId, 'teacher');
 
     const filter: any = { teacherId: new mongoose.Types.ObjectId(teacherId) };
 
-    const resolvedTermId = termId ?? (await this.getActiveTermId());
-    if (resolvedTermId) {
-      this.validateObjectId(resolvedTermId, 'term');
-      filter.termId = new mongoose.Types.ObjectId(resolvedTermId);
+    // A named term, else the whole current year — never every year, which put
+    // last year's classes in her list.
+    if (termId) {
+      this.validateObjectId(termId, 'term');
+      filter.termId = new mongoose.Types.ObjectId(termId);
+    } else {
+      Object.assign(filter, yearTermFilter(await currentScope(this.lectureModel.db)));
     }
 
     const classIds = await this.lectureModel.distinct('classId', filter);
@@ -71,14 +73,6 @@ export class ClassesService {
       total: classes.length,
       data: classes,
     };
-  }
-
-  private async getActiveTermId(): Promise<string | undefined> {
-    const activeTerm = await this.termModel
-      .findOne({ status: 'active' })
-      .select('_id')
-      .exec();
-    return activeTerm ? activeTerm._id.toString() : undefined;
   }
 
   private validateObjectId(id: string, entityName: string): void {

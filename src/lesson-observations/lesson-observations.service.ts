@@ -1,3 +1,4 @@
+import { currentScope, currentTermFilter } from '../terms/current-scope.util';
 import {
   BadRequestException,
   ConflictException,
@@ -99,13 +100,11 @@ export class LessonObservationsService {
     const date = dayStart(dateStr);
     const weekday = WEEKDAYS[date.getUTCDay()];
 
-    const term: any = await this.termModel
-      .findOne({ status: 'active' })
-      .lean()
-      .exec();
-
-    const filter: any = { dayOfWeek: weekday };
-    if (term) filter.termId = term._id;
+    const scope = await currentScope(this.lectureModel.db, date);
+    const term: any = scope.termId
+      ? await this.termModel.findById(scope.termId).select('name').lean().exec()
+      : null;
+    const filter: any = { dayOfWeek: weekday, ...currentTermFilter(scope) };
 
     const [lectures, observations, covers, checkIns]: any[] = await Promise.all([
       this.lectureModel

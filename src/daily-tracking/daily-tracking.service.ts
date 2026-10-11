@@ -25,6 +25,7 @@ import { CaslAbilityFactory } from '../casl/casl-ability.factory';
 import { ACTIVITY_NOT_TRACKED, isActivityLecture } from '../subjects/activity.util';
 import { GradeRegisterSheet } from '../grade-register/schemas/grade-register-sheet.schema';
 import { gradingSystemOf } from '../grade-register/grading-system.util';
+import { currentScope } from '../terms/current-scope.util';
 
 /** What one student's row resolves to once defaults are applied. */
 export interface ResolvedTrackingRecord {
@@ -227,6 +228,14 @@ export class DailyTrackingService {
     const classId = (lecture as any).classId?._id ?? (lecture as any).classId;
     const offering = (lecture as any).subjectOfferingId;
     const date = this.parseSchoolDate(dto.date);
+
+    // A link to last year's period still opens, but records nothing: the
+    // active year is the only one being written.
+    const scope = await currentScope(this.lectureModel.db);
+    const lectureTerm = (lecture as any).termId?._id ?? (lecture as any).termId;
+    if (scope.termIds && lectureTerm && !scope.termIds.some((t) => String(t) === String(lectureTerm))) {
+      throw new ConflictException('هذه الحصة من عام دراسي غير العام الحالي؛ لا يمكن الرصد عليها');
+    }
 
     const records = dto.records.map((r) => DailyTrackingService.resolveRecord(r));
 
