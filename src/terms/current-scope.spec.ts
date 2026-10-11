@@ -145,6 +145,24 @@ describe('teacher views are scoped to the active academic year', () => {
     expect(pickCurrentTerm([], now)).toBeNull();
   });
 
+  it('a teacher\'s absence is recorded though last year has a term on the same dates', async () => {
+    // Both years' terms cover 6 Sep. Old code took whichever term came first
+    // (last year's), missed the period, and the tracking save reported
+    // «تعذّر تسجيل غياب».
+    const { AttendanceService } = await import('../attendance/attendance.service');
+    const attendance = new AttendanceService(
+      {} as any, {} as any, m.Class, m.Lecture, m.Term, {} as any, {} as any, {} as any,
+    );
+    const teacher = { role: 'TEACHER', userId: String(teacherId) };
+    await expect(asSchool(() =>
+      (attendance as any).assertMayRecordForClass(teacher, String(ids.newClass), '2026-09-06'),
+    )).resolves.toBeUndefined();
+    // Last year's class is still refused: its period is not this year's.
+    await expect(asSchool(() =>
+      (attendance as any).assertMayRecordForClass(teacher, String(ids.oldClass), '2026-09-06'),
+    )).rejects.toThrow();
+  });
+
   it('refuses to record tracking on last year\'s period (A5)', async () => {
     const { DailyTrackingService } = await import('../daily-tracking/daily-tracking.service');
     const tracking = new DailyTrackingService(

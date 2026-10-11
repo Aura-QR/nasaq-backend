@@ -35,6 +35,7 @@ import {
   SubmitAbsenceExcuseDto,
 } from './dto/absence-excuse.dto';
 import { isActivityLecture } from '../subjects/activity.util';
+import { currentScope } from '../terms/current-scope.util';
 
 @Injectable()
 export class AttendanceService {
@@ -420,15 +421,27 @@ export class AttendanceService {
       dayOfWeek: weekday,
     };
 
-    // Scope to the term the date falls in, so last term's timetable does not
-    // keep granting access. If the date sits outside every term, stay lenient.
+    // Only this year's timetable grants access. The date's term is looked up
+    // among this year's terms: searched across every year it can land on last
+    // year's term with the same dates, miss the teacher's period, and refuse
+    // an absence the teacher just recorded on the tracking sheet.
+    const scope = await currentScope(this.termModel.db);
+    const yearTerms = scope.termIds ? { _id: { $in: scope.termIds } } : {};
     const term = await this.termModel
-      .findOne({ startDate: { $lte: day }, endDate: { $gte: day } })
+      .findOne({ ...yearTerms, startDate: { $lte: day }, endDate: { $gte: day } })
       .select('_id')
       .exec();
-    if (term) filter.termId = term._id;
 
-    const lecture = await this.lectureModel.findOne(filter).exec();
+    let lecture = term
+      ? await this.lectureModel.findOne({ ...filter, termId: term._id }).exec()
+      : null;
+    // A school still on term one's timetable after term two's dates began,
+    // or a date outside every term: any period of this year will do.
+    if (!lecture) {
+      lecture = await this.lectureModel
+        .findOne({ ...filter, ...(scope.termIds ? { termId: { $in: scope.termIds } } : {}) })
+        .exec();
+    }
     if (
       !lecture &&
       !(await coversClass(this.substitutionModel, this.lectureModel, user.userId, classId, day))
