@@ -625,7 +625,17 @@ export class FinancialRecordService {
       query.academicYearId = new mongoose.Types.ObjectId(ayId);
     }
     if (filters.classId && mongoose.Types.ObjectId.isValid(filters.classId)) {
-      query.classId = new mongoose.Types.ObjectId(filters.classId);
+      // A record opened by a bus or a fee, not tuition, carries no classId:
+      // match it through the class's enrolments as well.
+      const classOid = new mongoose.Types.ObjectId(filters.classId);
+      const Enrollment = (this.recordModel as any).db?.models?.['Enrollment'];
+      const enrolled: any[] = Enrollment
+        ? await Enrollment.find({ classId: classOid, status: 'active' }).select('studentId academicYearId').lean().exec()
+        : [];
+      query.$or = [
+        { classId: classOid },
+        ...enrolled.map((e) => ({ classId: null, studentId: e.studentId, academicYearId: e.academicYearId })),
+      ];
     }
     if (filters.tuitionStatus) query['tuition.status'] = filters.tuitionStatus;
     if (filters.studentName) {
@@ -650,12 +660,12 @@ export class FinancialRecordService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYearId gender')
+      .populate('classId', 'name roomNumber academicYearId gender')
       .populate('installmentPlanId', 'name numberOfInstallments linkedDiscountId');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
-    const rawData = await q.exec();
-    const data = rawData.filter((doc) => doc.studentId !== null);
+    const rawData = await q.lean().exec();
+    const data = await this.withClass(rawData.filter((doc: any) => doc.studentId !== null));
 
     if (isPaginated) {
       return {
@@ -668,16 +678,42 @@ export class FinancialRecordService {
     return { message: 'تم استرجاع السجلات المالية بنجاح', data };
   }
 
+  /**
+   * Every record with its student's class as `classId: { _id, name, … }`.
+   * A record opened by a bus or a fee has no classId of its own; the class
+   * comes from the student's enrolment in the record's year.
+   */
+  private async withClass(records: any[]): Promise<any[]> {
+    const missing = records.filter((r) => !r.classId);
+    if (!missing.length) return records;
+    const Enrollment = (this.recordModel as any).db?.models?.['Enrollment'];
+    if (!Enrollment) return records;
+    const enrolments: any[] = await Enrollment.find({
+      status: 'active',
+      $or: missing.map((r) => ({ studentId: r.studentId._id ?? r.studentId, academicYearId: r.academicYearId })),
+    })
+      .select('studentId academicYearId classId')
+      .populate('classId', 'name roomNumber academicYearId gender')
+      .lean()
+      .exec();
+    const key = (studentId: any, yearId: any) => `${String(studentId)}|${String(yearId)}`;
+    const classOf = new Map(enrolments.map((e) => [key(e.studentId, e.academicYearId), e.classId]));
+    return records.map((r) =>
+      r.classId ? r : { ...r, classId: classOf.get(key(r.studentId._id ?? r.studentId, r.academicYearId)) ?? null },
+    );
+  }
+
   async findOne(studentId: string, academicYearId?: string) {
     const query = this.buildStudentQuery(studentId, academicYearId);
     const record = await this.recordModel
       .findOne(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYearId gender')
+      .populate('classId', 'name roomNumber academicYearId gender')
       .populate('installmentPlanId', 'name numberOfInstallments dueDates linkedDiscountId')
       .lean()
-      .exec();
+      .exec()
+      .then(async (r: any) => (r ? (await this.withClass([r]))[0] : r));
     if (!record) throw new NotFoundException('لا يوجد سجل مالي لهذا الطالب');
 
     const data = {
