@@ -1,5 +1,36 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize, IsArray, IsBoolean, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Length, Matches, MaxLength,
+  ValidateIf, ValidateNested,
+} from 'class-validator';
+import { WEEKDAYS } from '../../platform/schools/schemas/school.schema';
+
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/** One day of a staff member's own week — the school settings' WorkDay without periods. */
+export class StaffWorkDayDto {
+  @IsIn(WEEKDAYS as unknown as string[], { message: 'day يجب أن يكون أحد أيام الأسبوع بالإنجليزية بحروف صغيرة' })
+  @ApiProperty({ example: 'sunday' })
+  day: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @ApiPropertyOptional({ example: true })
+  isWorkingDay?: boolean;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Matches(TIME, { message: 'startTime يجب أن يكون بصيغة HH:mm بنظام 24 ساعة' })
+  @ApiPropertyOptional({ example: '06:30' })
+  startTime?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @Matches(TIME, { message: 'endTime يجب أن يكون بصيغة HH:mm بنظام 24 ساعة' })
+  @ApiPropertyOptional({ example: '13:30' })
+  endTime?: string | null;
+}
 
 const USERNAME = /^[A-Za-z0-9._-]+$/;
 
@@ -45,6 +76,19 @@ export class CreateStaffMemberDto {
   @IsOptional()
   @ApiPropertyOptional()
   email?: string;
+
+  /**
+   * Their own hours, where they differ from the school's. Each day listed
+   * replaces the school's day of that name; [] clears it, and the person
+   * follows the school again.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(7)
+  @ValidateNested({ each: true })
+  @Type(() => StaffWorkDayDto)
+  @ApiPropertyOptional({ type: [StaffWorkDayDto] })
+  workSchedule?: StaffWorkDayDto[];
 }
 
 export class UpdateStaffMemberDto {
@@ -81,4 +125,17 @@ export class UpdateStaffMemberDto {
   @Length(6, 100)
   @ApiPropertyOptional()
   password?: string;
+
+  /**
+   * Their own hours, where they differ from the school's. Each day listed
+   * replaces the school's day of that name; [] clears it, and the person
+   * follows the school again.
+   */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(7)
+  @ValidateNested({ each: true })
+  @Type(() => StaffWorkDayDto)
+  @ApiPropertyOptional({ type: [StaffWorkDayDto] })
+  workSchedule?: StaffWorkDayDto[];
 }

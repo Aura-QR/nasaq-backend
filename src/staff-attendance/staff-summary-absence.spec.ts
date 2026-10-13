@@ -52,6 +52,8 @@ describe('Absence in the staff summary', () => {
         select: () => ({
           sort: () => ({ lean: async () => directory }),
           setOptions: () => ({ lean: () => ({ exec: async () => [] }) }),
+          // Nobody here has hours of their own.
+          lean: async () => [],
         }),
       }),
     };

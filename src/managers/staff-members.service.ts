@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Admin } from 'src/admin/schemas/admin.schema';
 import { PasswordUtil } from 'src/auth/utils/password.util';
-import { CreateStaffMemberDto, UpdateStaffMemberDto } from './dto/staff-member.dto';
+import { CreateStaffMemberDto, StaffWorkDayDto, UpdateStaffMemberDto } from './dto/staff-member.dto';
 
 /**
  * موظفو الخدمات — a guard, a cleaner, a driver.
@@ -31,10 +31,41 @@ export class StaffMembersService {
       email: a.email,
       jobLabel: a.jobLabel || '',
       phoneNumber: a.phoneNumber || '',
+      // [] — follows the school's hours.
+      workSchedule: (a.workSchedule ?? []).map((d: any) => ({
+        day: d.day,
+        isWorkingDay: d.isWorkingDay !== false,
+        startTime: d.startTime ?? null,
+        endTime: d.endTime ?? null,
+      })),
       // A placeholder address cannot receive a reset code.
       hasEmail: !String(a.email || '').endsWith('.staff.local'),
       createdAt: a.createdAt,
     };
+  }
+
+  /**
+   * A week the attendance can measure: each day once, a working day with
+   * both times or neither (neither = no lateness that day), the start
+   * before the end — there is no night shift. A day off carries no times.
+   */
+  private static schedule(days: StaffWorkDayDto[]) {
+    const seen = new Set<string>();
+    return days.map((d) => {
+      if (seen.has(d.day)) throw new BadRequestException('لا يتكرر اليوم في مواعيد الموظف');
+      seen.add(d.day);
+      const isWorkingDay = d.isWorkingDay !== false;
+      if (!isWorkingDay) return { day: d.day, isWorkingDay, startTime: null, endTime: null };
+      const startTime = d.startTime ?? null;
+      const endTime = d.endTime ?? null;
+      if (!startTime !== !endTime) {
+        throw new BadRequestException('حدّد بداية الدوام ونهايته معًا في يوم العمل');
+      }
+      if (startTime && endTime && startTime >= endTime) {
+        throw new BadRequestException('بداية الدوام يجب أن تسبق نهايته');
+      }
+      return { day: d.day, isWorkingDay, startTime, endTime };
+    });
   }
 
   private static oid(id: string) {
@@ -45,7 +76,7 @@ export class StaffMembersService {
   async list() {
     const rows = await this.adminModel
       .find({ role: StaffMembersService.ROLE })
-      .select('fullName username email jobLabel phoneNumber createdAt')
+      .select('fullName username email jobLabel phoneNumber workSchedule createdAt')
       .sort({ fullName: 1, username: 1 })
       .lean()
       .exec();
@@ -72,6 +103,7 @@ export class StaffMembersService {
       fullName: dto.fullName.trim(),
       jobLabel: (dto.jobLabel ?? '').trim(),
       phoneNumber: (dto.phoneNumber ?? '').trim(),
+      workSchedule: StaffMembersService.schedule(dto.workSchedule ?? []),
       password: await PasswordUtil.hash(dto.password),
       role: StaffMembersService.ROLE,
       // Nothing. Their one action — their own attendance — is guarded by role.
@@ -101,6 +133,9 @@ export class StaffMembersService {
     if (dto.jobLabel !== undefined) staff.jobLabel = dto.jobLabel.trim();
     if (dto.phoneNumber !== undefined) staff.phoneNumber = dto.phoneNumber.trim();
     if (dto.password) staff.password = await PasswordUtil.hash(dto.password);
+    if (dto.workSchedule !== undefined) {
+      staff.workSchedule = StaffMembersService.schedule(dto.workSchedule) as any;
+    }
 
     await staff.save();
     return { status: true, message: 'تم تحديث بيانات الموظف', data: StaffMembersService.view(staff) };

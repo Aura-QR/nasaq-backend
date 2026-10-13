@@ -2,6 +2,25 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
+/** One day of a staff member's own week. Same shape as the school's WorkDay. */
+@Schema({ _id: false })
+export class StaffWorkDay {
+  @Prop({ required: true, enum: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] })
+  day: string;
+
+  @Prop({ default: true })
+  isWorkingDay: boolean;
+
+  /** "HH:mm" in the school's timezone; null on a day off. */
+  @Prop({ type: String, default: null })
+  startTime: string | null;
+
+  @Prop({ type: String, default: null })
+  endTime: string | null;
+}
+
+const StaffWorkDaySchema = SchemaFactory.createForClass(StaffWorkDay);
+
 @Schema({ timestamps: true })
 export class Admin extends Document {
   @Prop({ required: true })
@@ -40,6 +59,15 @@ export class Admin extends Document {
    */
   @Prop({ type: String, default: '' })
   phoneNumber: string;
+
+  /**
+   * This person's own hours, where they differ from the school's — a guard
+   * who opens at 6:30. Each day listed replaces the school's day of that
+   * name; days not listed, and an empty list, follow the school. See
+   * staff-attendance/staff-schedule.util.ts.
+   */
+  @Prop({ type: [StaffWorkDaySchema], default: [] })
+  workSchedule: StaffWorkDay[];
 
   @Prop({ type: [String], default: [] })
   permissions: string[];

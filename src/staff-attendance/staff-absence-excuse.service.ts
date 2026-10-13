@@ -22,6 +22,7 @@ import {
 } from '../attendance/attendance.utils';
 import { schoolDayHasEnded, schoolNow } from '../teacher-attendance/teacher-presence.util';
 import { ATTENDANCE_STAFF_ROLES } from './dto/staff-attendance.dto';
+import { settingsForStaff } from './staff-schedule.util';
 import {
   ListStaffAbsenceExcusesDto,
   RecordStaffAbsenceExcuseDto,
@@ -122,13 +123,14 @@ export class StaffAbsenceExcuseService {
    */
   private async assertExcusable(schoolId: any, staffId: Types.ObjectId, date: Date) {
     const settings = await this.settingsOf(schoolId);
+    const person = await this.admins.findById(staffId).select('workSchedule').lean();
     const today = schoolNow(settings?.timezone).date;
     if (date > today) {
       throw new BadRequestException(
         'لا يمكن تقديم عذر عن يوم لم يأتِ بعد — استخدم طلب الاستئذان',
       );
     }
-    if (workingDatesBetween(settings, date, date).length === 0) {
+    if (workingDatesBetween(settingsForStaff(settings, person), date, date).length === 0) {
       throw new BadRequestException('هذا اليوم ليس يوم عمل');
     }
 
@@ -149,7 +151,7 @@ export class StaffAbsenceExcuseService {
   /**
    * The days this person was away and has not explained. Same exclusions as
    * the teacher list: holidays, days before their account or first check-in,
-   * and today until the day has ended. Staff have no per-person work days.
+   * and today until their day has ended — on their own hours, if they have them.
    */
   async pendingDays(user: any, days = 14, nowAt: Date = new Date()) {
     const staffId = StaffAbsenceExcuseService.oid(user?.userId);
@@ -164,7 +166,7 @@ export class StaffAbsenceExcuseService {
     const today = now.date;
 
     const [person, firstRecord]: any[] = await Promise.all([
-      this.admins.findById(staffId).select('createdAt').lean(),
+      this.admins.findById(staffId).select('createdAt workSchedule').lean(),
       this.records.findOne({ staffId }).sort({ date: 1 }).select('date').lean(),
     ]);
     if (!firstRecord) {
@@ -177,12 +179,13 @@ export class StaffAbsenceExcuseService {
     if (person?.createdAt) floors.push(normalizeDate(person.createdAt));
     const start = new Date(Math.max(...floors.map((d) => d.getTime())));
 
-    const todayEnded = schoolDayHasEnded(resolveDaySchedule(settings, today).endTime, now.minutes);
+    const own = settingsForStaff(settings, person);
+    const todayEnded = schoolDayHasEnded(resolveDaySchedule(own, today).endTime, now.minutes);
     const end = new Date(today);
     if (!todayEnded) end.setUTCDate(end.getUTCDate() - 1);
     if (start > end) return { status: true, message: 'لا توجد أيام غياب', data: [] };
 
-    const workingDays = workingDatesBetween(settings, start, end);
+    const workingDays = workingDatesBetween(own, start, end);
     const range = { $gte: start, $lte: end };
     const [present, explained] = await Promise.all([
       this.records.find({ staffId, date: range }).select('date').lean(),
@@ -342,7 +345,9 @@ export class StaffAbsenceExcuseService {
     const already = await this.records.exists({ staffId: excuse.staffId, date: excuse.date });
     if (!already) {
       const settings = await this.settingsOf(user?.schoolId);
-      const time = checkInAt || resolveDaySchedule(settings, excuse.date).startTime || '07:00';
+      const person = await this.admins.findById(excuse.staffId).select('workSchedule').lean();
+      const time =
+        checkInAt || resolveDaySchedule(settingsForStaff(settings, person), excuse.date).startTime || '07:00';
       const instant = parseCheckInTime(day, time, settings?.timezone);
       await this.attendance.createManual(user, {
         staffId: String(excuse.staffId),

@@ -6,6 +6,7 @@ import { Admin } from '../admin/schemas/admin.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { resolveDaySchedule } from '../attendance/attendance.utils';
+import { settingsForStaff } from './staff-schedule.util';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 import { dayLabel, schoolDayHasEnded, schoolNow } from '../teacher-attendance/teacher-presence.util';
 import { ATTENDANCE_STAFF_ROLES } from './dto/staff-attendance.dto';
@@ -72,23 +73,32 @@ export class StaffAbsenceSweepService {
     if (settings.staffCheckInEnabled !== true) return 0;
 
     const clock = schoolNow(settings.timezone, now);
-    const day = resolveDaySchedule(settings, clock.date);
-    if (!day.isWorkingDay) return 0;
-    if (!schoolDayHasEnded(day.endTime, clock.minutes, StaffAbsenceSweepService.MARGIN_MINUTES)) {
-      return 0;
-    }
+    // Asked once each person's own day is over: the guard who leaves at 13:30
+    // is asked before the administrator who leaves at 14:00, and somebody
+    // who works the school's Saturday is asked about it.
+    const dayIsOver = (person: any) => {
+      const day = resolveDaySchedule(settingsForStaff(settings, person), clock.date);
+      return (
+        day.isWorkingDay &&
+        schoolDayHasEnded(day.endTime, clock.minutes, StaffAbsenceSweepService.MARGIN_MINUTES)
+      );
+    };
 
     const schoolId = String(school._id);
     return tenantLocalStorage.run({ schoolId, isAdminContext: false }, () =>
-      this.notifyAbsent(schoolId, clock.date),
+      this.notifyAbsent(schoolId, clock.date, dayIsOver),
     );
   }
 
-  private async notifyAbsent(schoolId: string, date: Date): Promise<number> {
-    const [staff, present, explained, noticed]: any[] = await Promise.all([
+  private async notifyAbsent(
+    schoolId: string,
+    date: Date,
+    dayIsOver: (person: any) => boolean = () => true,
+  ): Promise<number> {
+    const [everyone, present, explained, noticed]: any[] = await Promise.all([
       this.admins
         .find({ schoolId: new Types.ObjectId(schoolId), role: { $in: ATTENDANCE_STAFF_ROLES } })
-        .select('_id createdAt')
+        .select('_id createdAt workSchedule')
         .lean(),
       this.records.find({ date }).select('staffId').lean(),
       this.excuses.find({ date }).select('staffId').lean(),
@@ -100,6 +110,9 @@ export class StaffAbsenceSweepService {
       ...explained.map((r: any) => String(r.staffId)),
       ...noticed.map((r: any) => String(r.staffId)),
     ]);
+
+    const staff = everyone.filter(dayIsOver);
+    if (staff.length === 0) return 0;
 
     const endOfDay = new Date(date.getTime() + 86_399_999);
     const candidates = staff.filter(

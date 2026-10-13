@@ -29,6 +29,7 @@ import {
   ReviewStaffLateReasonDto,
   SubmitStaffLateReasonDto,
 } from './dto/staff-late-reason.dto';
+import { settingsForStaff } from './staff-schedule.util';
 import {
   ATTENDANCE_STAFF_ROLES,
   CreateManualStaffAttendanceDto,
@@ -131,6 +132,19 @@ export class StaffAttendanceService {
     return school.settings;
   }
 
+  /** staffId → { workSchedule } for everyone with hours of their own. */
+  private async ownSchedules(user: any): Promise<Map<string, any>> {
+    const rows = await this.admins
+      .find({
+        ...this.scope(user),
+        role: { $in: ATTENDANCE_STAFF_ROLES },
+        'workSchedule.0': { $exists: true },
+      })
+      .select('workSchedule')
+      .lean();
+    return new Map(rows.map((r: any) => [String(r._id), r]));
+  }
+
   private async staffMember(user: any, staffId: string, self = false) {
     if (self && !ATTENDANCE_STAFF_ROLES.includes(user.role)) {
       throw new ForbiddenException(
@@ -143,7 +157,7 @@ export class StaffAttendanceService {
         _id: this.objectId(staffId),
         role: self ? user.role : { $in: ATTENDANCE_STAFF_ROLES },
       })
-      .select('username fullName jobLabel email role')
+      .select('username fullName jobLabel email role workSchedule')
       .lean();
     if (!staff)
       throw new NotFoundException('المدير أو المشرف غير موجود في هذه المدرسة');
@@ -243,7 +257,7 @@ export class StaffAttendanceService {
     const key = { ...this.scope(user), staffId: staff._id, date };
     const existing = await this.records.findOne(key).lean();
     if (existing) this.duplicate(existing);
-    const schedule = resolveDaySchedule(settings, date);
+    const schedule = resolveDaySchedule(settingsForStaff(settings, staff), date);
     const record = await this.createRecord({
       ...key,
       name: displayNameOf(staff),
@@ -288,7 +302,7 @@ export class StaffAttendanceService {
     const record = await this.records.findOne(key).lean();
     if (!record) throw new BadRequestException('لا يوجد تسجيل حضور لك اليوم');
     if (record.checkOutAt) this.duplicate(record, true);
-    const schedule = resolveDaySchedule(settings, date);
+    const schedule = resolveDaySchedule(settingsForStaff(settings, staff), date);
 
     /*
      * An approved استئذان, if there is one.
@@ -346,7 +360,7 @@ export class StaffAttendanceService {
       dto.checkOutAt !== undefined
         ? this.manualTime(dto.checkOutAt, date, settings)
         : null;
-    const schedule = resolveDaySchedule(settings, date);
+    const schedule = resolveDaySchedule(settingsForStaff(settings, staff), date);
     const record = await this.createRecord({
       ...this.scope(user),
       staffId: staff._id,
@@ -465,7 +479,20 @@ export class StaffAttendanceService {
       throw new BadRequestException('لا يمكن حساب الغياب لتاريخ مستقبلي');
     }
     const schedule = resolveDaySchedule(settings, date);
-    if (!schedule.isWorkingDay) {
+    const [staff, present, hours] = await Promise.all([
+      this.listStaff(user, query),
+      this.records
+        .find({ ...this.scope(user), date })
+        .select('staffId')
+        .lean(),
+      this.ownSchedules(user),
+    ]);
+    // A working day is each person's own: the guard who works the school's
+    // Saturday is absent from it, the school's staff are not.
+    const working = staff.data.filter(
+      (s) => resolveDaySchedule(settingsForStaff(settings, hours.get(String(s.staffId))), date).isWorkingDay,
+    );
+    if (!working.length) {
       return {
         status: true,
         date: day,
@@ -475,15 +502,8 @@ export class StaffAttendanceService {
         absentStaff: [],
       };
     }
-    const [staff, present] = await Promise.all([
-      this.listStaff(user, query),
-      this.records
-        .find({ ...this.scope(user), date })
-        .select('staffId')
-        .lean(),
-    ]);
     const presentIds = new Set(present.map((r) => String(r.staffId)));
-    const absentStaff = staff.data.filter(
+    const absentStaff = working.filter(
       (s) => !presentIds.has(String(s.staffId)),
     );
     return {
@@ -1171,6 +1191,18 @@ export class StaffAttendanceService {
       normalizeDate(query.dateFrom),
       normalizeDate(query.dateTo),
     ).length;
+    // Somebody on hours of their own is measured against their own week.
+    const hours = await this.ownSchedules(user);
+    const workingDaysOf = (staffId: any) => {
+      const own = hours.get(String(staffId));
+      return own
+        ? workingDatesBetween(
+            settingsForStaff(settings, own),
+            normalizeDate(query.dateFrom),
+            normalizeDate(query.dateTo),
+          ).length
+        : workingDays;
+    };
 
     const directory = await this.listStaff(user, {
       role: (query as any).role,
@@ -1232,10 +1264,10 @@ export class StaffAttendanceService {
       // Never negative: a school that shortened its week mid-period can leave
       // more attended days on file than the schedule now has working days,
       // and "-2 days absent" is a number nobody can act on.
-      row.workingDays = workingDays;
+      row.workingDays = workingDaysOf(row.staffId);
       row.daysAbsent = Math.max(
         0,
-        workingDays - (row.daysPresentOnWorkingDays ?? 0),
+        row.workingDays - (row.daysPresentOnWorkingDays ?? 0),
       );
     }
 
@@ -1264,7 +1296,8 @@ export class StaffAttendanceService {
     this.assertNotOwnRecord(user, record.staffId);
     if (dto.checkInAt !== undefined || dto.checkOutAt !== undefined) {
       const settings = await this.settings(user);
-      const schedule = resolveDaySchedule(settings, record.date);
+      const person = await this.admins.findById(record.staffId).select('workSchedule').lean();
+      const schedule = resolveDaySchedule(settingsForStaff(settings, person), record.date);
       const checkInAt = dto.checkInAt !== undefined
         ? this.manualTime(dto.checkInAt, record.date, settings) : record.checkInAt;
       const checkOutAt = dto.checkOutAt !== undefined
