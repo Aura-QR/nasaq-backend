@@ -43,6 +43,9 @@ export const OWNER_PERMISSIONS: RolePermissions = {
   preparation: { read: true, add: false, edit: false, delete: true },
   financial: ALL,
   financialSettings: ALL,
+  // شاشة الإعلانات on every home screen. Reading the feed needs no box;
+  // this is managing the slides.
+  announcements: ALL,
 };
 
 /**
@@ -99,6 +102,11 @@ export const MANAGER_PERMISSIONS: RolePermissions = {
   academicYears: { read: true, add: true, edit: true, delete: false },
   schoolSettings: { read: true, add: false, edit: true, delete: false },
   messaging: { read: true, add: false, edit: true, delete: false },
+
+  // Managing the home-screen slides. New in this release, so a token signed
+  // before it holds no announcements key and a manager gets 403 there until
+  // signing in again — the same as gradeRegister, and no older reach is lost.
+  announcements: ALL,
 };
 
 /**

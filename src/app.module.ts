@@ -51,6 +51,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { CatalogModule } from './catalog/catalog.module';
 import { CurriculumModule } from './curriculum/curriculum.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { AnnouncementsModule } from './announcements/announcements.module';
 
 
 
@@ -105,6 +106,7 @@ import { MessagingModule } from './messaging/messaging.module';
     DutyModule,
     NotificationsModule,
     MessagingModule,
+    AnnouncementsModule,
     TasksModule,
     FinancialModule,
     ExpensesModule,

@@ -29,6 +29,7 @@ export type Subjects =
   | 'AcademicYear'
   | 'SchoolSettings'
   | 'Messaging'
+  | 'Announcement'
   | 'all';
 
 export type AppAbility = PureAbility<[Actions, Subjects]>;
@@ -61,6 +62,7 @@ const ENTITY_TO_SUBJECT_MAP: Record<string, Subjects> = {
   academicYears: 'AcademicYear',
   schoolSettings: 'SchoolSettings',
   messaging: 'Messaging',
+  announcements: 'Announcement',
 };
 
 @Injectable()

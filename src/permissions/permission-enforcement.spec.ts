@@ -84,6 +84,9 @@ const NO_ABILITY_BY_DESIGN: Record<string, string> = {
   'StaffAttendanceController.myAbsenceExcuses': 'own excuses',
   'StaffAttendanceController.submitAbsenceExcuse': 'own excuse',
   'StaffAttendanceController.uploadAbsenceAttachment': 'uploads a file; grants nothing by itself',
+  // Create OR update, which @CheckAbilities cannot say; checked before the
+  // file is written by AnnouncementEditorGuard.
+  'AnnouncementsController.upload': 'announcements.add or .edit, in AnnouncementEditorGuard',
 };
 
 describe('permission enforcement — route sweep', () => {
@@ -143,6 +146,9 @@ describe('permission enforcement — route sweep', () => {
     ['AcademicYearsController.create', 'create', 'AcademicYear'],
     ['SchoolsController.updateMySettings', 'update', 'SchoolSettings'],
     ['ExpenseController.find', 'read', 'Expense'],
+    ['AnnouncementsController.create', 'create', 'Announcement'],
+    ['AnnouncementsController.reorder', 'update', 'Announcement'],
+    ['AnnouncementsController.remove', 'delete', 'Announcement'],
   ])('%s requires %s %s', (id, action, subject) => {
     const route = all.find((r) => r.id === id)!;
     expect(route.abilities).toEqual([expect.objectContaining({ action, subject })]);
@@ -157,6 +163,14 @@ describe('permission enforcement — route sweep', () => {
     const route = all.find((r) => r.id === id)!;
     expect(route.roles).toEqual(expect.arrayContaining(['OWNER', 'SUPERVISOR', 'MANAGER']));
     expect(route.abilities).toEqual([expect.objectContaining({ action: 'update', subject })]);
+  });
+
+  // The home-screen feed is not a management screen: every role with a home
+  // screen reads it, whatever their announcements box says.
+  it('opens the announcements feed to every home-screen role, with no ability check', () => {
+    const route = all.find((r) => r.id === 'AnnouncementsController.feed')!;
+    expect(route.roles).toEqual(expect.arrayContaining(['OWNER', 'SUPERVISOR', 'MANAGER', 'TEACHER', 'STUDENT']));
+    expect(route.abilities).toBeUndefined();
   });
 });
 
@@ -242,6 +256,7 @@ describe('AbilitiesGuard — role-scoped requirements', () => {
     ['schoolSettings', 'SchoolSettings'],
     ['messaging', 'Messaging'],
     ['expenses', 'Expense'],
+    ['announcements', 'Announcement'],
   ])('maps school.%s.* onto %s', async (entity, subject) => {
     const ability = await factory.defineAbilitiesFor({ role: 'MANAGER', permissionsVersion: 2, permissions: [`school.${entity}.update`] });
     expect(ability.can('update', subject as any)).toBe(true);
