@@ -223,7 +223,8 @@ export class AnnouncementsService {
     const content: Content = { body, imageUrl, students: [], video: null, cta: null };
 
     if (type === 'honor_roll') {
-      content.students = dto.students !== undefined ? await this.resolveRoll(dto.students) : kept('students', []);
+      content.students =
+        dto.students !== undefined ? await this.resolveRoll(user, dto.students, current) : kept('students', []);
       if (!content.students.length) {
         throw new BadRequestException('أضف اسم طالب واحد على الأقل إلى لوحة التميز');
       }
@@ -254,9 +255,12 @@ export class AnnouncementsService {
 
   /**
    * The roll, snapshotted. A picked student brings their name and the class
-   * they are in now; a typed name stands as typed.
+   * they are in now; a typed name stands as typed. A photo is checked like the
+   * slide's image: only a new one, so a roll whose photos are already on it
+   * saves as it was.
    */
-  private async resolveRoll(entries: HonorRollEntryDto[]): Promise<HonorRollEntry[]> {
+  private async resolveRoll(user: any, entries: HonorRollEntryDto[], current?: Announcement): Promise<HonorRollEntry[]> {
+    const keptPhotos = new Set((current?.students ?? []).map((s) => s.photoUrl).filter(Boolean));
     const ids = entries.map((e) => e.studentId).filter((id): id is string => !!id);
     if (new Set(ids).size !== ids.length) throw new BadRequestException('تكرر الطالب نفسه في لوحة التميز');
 
@@ -294,6 +298,7 @@ export class AnnouncementsService {
         className:
           cleanText(entry.className) ?? (entry.studentId ? className.get(classOf.get(entry.studentId) ?? '') ?? null : null),
         note: cleanText(entry.note),
+        photoUrl: !entry.photoUrl ? null : keptPhotos.has(entry.photoUrl) ? entry.photoUrl : this.ownImage(user, entry.photoUrl),
       };
     });
   }
@@ -333,7 +338,9 @@ export class AnnouncementsService {
   /** Best effort: a file left behind is clutter, a slide that fails to save is a bug. */
   private async removeUnusedFiles(urls: string[]) {
     for (const url of urls) {
-      const stillUsed = await this.announcementModel.countDocuments({ imageUrl: url }).exec();
+      const stillUsed = await this.announcementModel
+        .countDocuments({ $or: [{ imageUrl: url }, { 'students.photoUrl': url }] })
+        .exec();
       if (!stillUsed) await unlink(localPath(url)).catch(() => undefined);
     }
   }
@@ -347,7 +354,12 @@ export class AnnouncementsService {
       title: a.title,
       body: a.body ?? null,
       imageUrl: a.imageUrl ?? null,
-      students: (a.students ?? []).map((s: any) => ({ name: s.name, className: s.className ?? null, note: s.note ?? null })),
+      students: (a.students ?? []).map((s: any) => ({
+        name: s.name,
+        className: s.className ?? null,
+        note: s.note ?? null,
+        photoUrl: s.photoUrl ?? null,
+      })),
       video: a.video ? { url: a.video.url, youtubeId: a.video.youtubeId ?? null } : null,
       cta: a.cta ? { label: a.cta.label, url: a.cta.url } : null,
       durationSeconds: a.durationSeconds ?? null,
@@ -362,6 +374,7 @@ export class AnnouncementsService {
         name: s.name,
         className: s.className ?? null,
         note: s.note ?? null,
+        photoUrl: s.photoUrl ?? null,
       })),
       audiences: a.audiences ?? [],
       startsAt: a.startsAt,
@@ -403,7 +416,8 @@ function localPath(url: string): string {
   return join('.', url);
 }
 
-/** The files on this server a slide holds — its image, if uploaded. */
-function filesOf(a: { imageUrl?: string | null }): string[] {
-  return a.imageUrl ? [a.imageUrl] : [];
+/** The files on this server a slide holds — its image and its students' photos. */
+function filesOf(a: { imageUrl?: string | null; students?: { photoUrl?: string | null }[] }): string[] {
+  const files = [a.imageUrl, ...(a.students ?? []).map((s) => s.photoUrl)].filter((f): f is string => !!f);
+  return [...new Set(files)];
 }

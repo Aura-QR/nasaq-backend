@@ -6,7 +6,7 @@ import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
  * The three kinds of slide the home-screen carousel shows. Each one is drawn
  * differently by the clients, so the type decides which fields mean anything:
  *
- * - honor_roll — الطلاب المتميزون: a title and a list of names
+ * - honor_roll — الطلاب المتميزون: a title and a list of names, each with a photo
  * - program    — إعلان برنامج: text, an image and an optional button
  * - video      — فيديو توعوي: a link to the clip on YouTube or the like
  */
@@ -43,6 +43,10 @@ export class HonorRollEntry {
   /** The reason, e.g. «الأول على الصف» or «حافظ لجزء عمّ». */
   @Prop({ type: String, default: null })
   note: string | null;
+
+  /** Uploaded like a slide's image; null and the clients show the name's first letter. */
+  @Prop({ type: String, default: null })
+  photoUrl: string | null;
 }
 const HonorRollEntrySchema = SchemaFactory.createForClass(HonorRollEntry);
 

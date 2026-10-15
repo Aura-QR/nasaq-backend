@@ -56,6 +56,12 @@ export class HonorRollEntryDto {
   @MaxLength(100)
   @ApiPropertyOptional({ example: 'الأول على الصف' })
   note?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  @ApiPropertyOptional({ nullable: true, description: "The student's photo: a url returned by POST /announcements/uploads" })
+  photoUrl?: string | null;
 }
 
 /** The clip lives on YouTube (or any https host); the slide only links to it. */

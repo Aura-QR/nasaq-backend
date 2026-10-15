@@ -80,6 +80,15 @@ describe('Announcement rules', () => {
     await expect(body({ source: 'upload', url: '/uploads/announcements/x.mp4' })).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('lets a name on the roll carry a photo, and nothing else unknown', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+    const body = (entry: any) =>
+      pipe.transform({ type: 'honor_roll', title: 'المتميزون', students: [entry] }, { type: 'body', metatype: CreateAnnouncementDto });
+    await expect(body({ name: 'نورة', photoUrl: '/uploads/announcements/x/y.jpg' })).resolves.toBeDefined();
+    await expect(body({ name: 'نورة', photoUrl: null })).resolves.toBeDefined();
+    await expect(body({ name: 'نورة', avatar: 'y.jpg' })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('gives every home-screen role an audience, and service staff none', () => {
     expect(['STUDENT', 'TEACHER', 'OWNER', 'SUPERVISOR', 'MANAGER', 'STAFF'].map(audienceOf)).toEqual([
       'STUDENT', 'TEACHER', 'ADMIN', 'ADMIN', 'ADMIN', null,
@@ -194,7 +203,7 @@ describe('AnnouncementsService', () => {
     it('names a picked student and the class they are in this year', async () => {
       const slide = await create({ type: 'honor_roll', students: [{ studentId: String(ahmedId), note: 'الأول على الصف' }] });
       expect(slide.students).toEqual([
-        { studentId: String(ahmedId), name: 'أحمد محمد العتيبي', className: '3/2', note: 'الأول على الصف' },
+        { studentId: String(ahmedId), name: 'أحمد محمد العتيبي', className: '3/2', note: 'الأول على الصف', photoUrl: null },
       ]);
     });
 
@@ -204,9 +213,43 @@ describe('AnnouncementsService', () => {
         students: [{ studentId: String(saraId), name: 'سارة خالد' }, { name: '  نورة  ', className: '1/1' }],
       });
       expect(slide.students).toEqual([
-        { studentId: String(saraId), name: 'سارة خالد', className: null, note: null },
-        { studentId: null, name: 'نورة', className: '1/1', note: null },
+        { studentId: String(saraId), name: 'سارة خالد', className: null, note: null, photoUrl: null },
+        { studentId: null, name: 'نورة', className: '1/1', note: null, photoUrl: null },
       ]);
+    });
+
+    it("shows each student's photo, taking only this school's own uploads", async () => {
+      const photo = uploaded('.jpg');
+      const slide = await create({ type: 'honor_roll', students: [{ name: 'نورة', photoUrl: photo }, { name: 'ريم' }] });
+      expect(slide.students.map((s: any) => s.photoUrl)).toEqual([photo, null]);
+      expect((await feed(STUDENT))[0].students).toEqual([
+        { name: 'نورة', className: null, note: null, photoUrl: photo },
+        { name: 'ريم', className: null, note: null, photoUrl: null },
+      ]);
+
+      for (const photoUrl of [uploaded('.png', otherFolder, otherSchoolId), 'https://cdn.example/face.jpg', uploaded('.mp4')]) {
+        await expect(create({ type: 'honor_roll', students: [{ name: 'نورة', photoUrl }] })).rejects.toBeInstanceOf(
+          BadRequestException,
+        );
+      }
+    });
+
+    it("deletes a removed student's photo, but not one another slide still shows", async () => {
+      const [kept, dropped, shared] = [uploaded('.jpg'), uploaded('.jpg'), uploaded('.jpg')];
+      const slide = await create({
+        type: 'honor_roll',
+        students: [{ name: 'نورة', photoUrl: kept }, { name: 'ريم', photoUrl: dropped }, { name: 'هند', photoUrl: shared }],
+      });
+      await program({ imageUrl: shared });
+
+      const edited = await as(schoolId, () =>
+        service.update(OWNER, slide.id, { students: [{ name: 'نورة', photoUrl: kept }] }, NOW),
+      ).then((r) => r.data);
+      expect(edited.students.map((s: any) => s.photoUrl)).toEqual([kept]);
+      expect([onDisk(kept), onDisk(dropped), onDisk(shared)]).toEqual([true, false, true]);
+
+      await as(schoolId, () => service.remove(slide.id));
+      expect(onDisk(kept)).toBe(false);
     });
 
     it('needs a name, refuses the same student twice, and cannot reach another school', async () => {
