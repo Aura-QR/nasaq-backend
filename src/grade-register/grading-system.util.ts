@@ -46,8 +46,13 @@ export async function assertGradingSystemMayChange(conn: Connection, schoolId: s
       schoolId: sid,
       subjectOfferingId: { $in: offeringIds },
       $or: [{ status: 'approved' }, { 'finalMarks.0': { $exists: true } }, { 'writtenItems.marks.0': { $exists: true } }],
-    })) ||
-    (await col('DailyTracking')?.countDocuments({ schoolId: sid, subjectOfferingId: { $in: offeringIds }, quizScore: { $ne: null } }));
+    }));
+  // Not the paper quiz marks typed on the daily tracking sheet. Under the
+  // flexible system they carry no weight, so switching changes no mark a
+  // student was already given; under the ministry template they then count
+  // toward the written part, as the owner expects. Locking on them let one
+  // typed mark block a school for the year — مواهب, 15 Oct 2026: ten marks in
+  // one period.
 
   if (marked) {
     throw new BadRequestException(

@@ -305,6 +305,12 @@ describe('annual register (ministry template)', () => {
   it('will not switch the grading system once marks exist in the year', async () => {
     await expect(assertGradingSystemMayChange(conn, String(schoolId))).resolves.toBeUndefined();
 
+    // A paper quiz mark on the tracking sheet reads the same under both
+    // systems, so it does not lock the switch.
+    await m.DailyTracking.collection.insertOne({ studentId: sara, classId, subjectOfferingId: continuous,
+      date: past, quizScore: 1, quizMaxScore: 20, schoolId });
+    await expect(assertGradingSystemMayChange(conn, String(schoolId))).resolves.toBeUndefined();
+
     const quiz = (await m.Exam.collection.insertOne({ subjectOfferingId: continuous, classIds: [classId], examType: 'quiz',
       grade: 5, endDate: past, schoolId })).insertedId;
     await m.ExamResult.collection.insertOne({ examId: quiz, studentId: sara, startedAt: past, submitted: true, achievedGrade: 4 });
