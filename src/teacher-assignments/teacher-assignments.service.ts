@@ -267,7 +267,21 @@ export class TeacherAssignmentsService {
       query.subjectOfferingId = new mongoose.Types.ObjectId(filters.subjectOfferingId);
     }
     if (filters.classId) {
-      query.classId = new mongoose.Types.ObjectId(filters.classId);
+      // A grade-wide assignment (classId null) teaches every class of its
+      // grade. Matching the class alone left the add-period form with «لا
+      // يوجد معلم مسند» for a subject the timetable shows a teacher on.
+      const classOid = new mongoose.Types.ObjectId(filters.classId);
+      const Class = (this.subjectOfferingModel as any).db?.models?.['Class'];
+      const klass: any = Class ? await Class.findById(classOid).select('gradeLevelId').lean().exec() : null;
+      // Only grade-wide rows of this class's own grade.
+      const gradeOfferings = klass?.gradeLevelId
+        ? (await this.subjectOfferingModel.find({ gradeLevelId: klass.gradeLevelId }).select('_id').lean().exec())
+            .map((o: any) => o._id)
+        : [];
+      query.$or = [
+        { classId: classOid },
+        { classId: null, subjectOfferingId: { $in: gradeOfferings } },
+      ];
     }
 
     const rows = await this.teacherAssignmentModel
