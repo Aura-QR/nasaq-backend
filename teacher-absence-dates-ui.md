@@ -1,7 +1,7 @@
-# Teacher attendance report: show which days were absent
+# Attendance reports: show which days were absent (teachers and staff)
 
-**For:** Arwaa (web) and Azza (mobile).
-**Backend:** live (`teacher-attendance/summary`). Nothing else changes.
+**For:** Azza (mobile). **Web is done** (`aefd190` teachers, `c28bc57` staff); copy its behaviour.
+**Backend:** live for both `GET /teacher-attendance/summary` and `GET /staff-attendance/summary`. Nothing else changes.
 
 ## Why
 
@@ -40,3 +40,7 @@ The report shows «أيام الغياب: 3» but not which three days. The scho
 | Dialog title | أيام غياب: {الاسم} |
 | Chips | بعذر / بدون عذر |
 | Empty state | لا توجد أيام غياب في هذه الفترة |
+
+## Staff report (same thing)
+
+`GET /staff-attendance/summary` rows carry the same `absentDates`, using each person's own working hours when set. On mobile, the owner's staff attendance report: tapping the absence figure opens the same bottom sheet.
