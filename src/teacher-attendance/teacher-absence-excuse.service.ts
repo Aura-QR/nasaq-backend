@@ -486,6 +486,22 @@ export class TeacherAbsenceExcuseService {
    * absence count itself is untouched: three absences with accepted excuses
    * stay three absences, marked.
    */
+  /** teacherId → the days (YYYY-MM-DD) whose absence the school accepted. */
+  async excusedDatesByTeacher(from: Date, to: Date): Promise<Map<string, Set<string>>> {
+    const rows = await this.excuseModel
+      .find({ date: { $gte: normalizeDate(from), $lte: normalizeDate(to) }, status: 'accepted' })
+      .select('teacherId date')
+      .lean()
+      .exec();
+    const dates = new Map<string, Set<string>>();
+    for (const row of rows as any[]) {
+      const key = String(row.teacherId);
+      if (!dates.has(key)) dates.set(key, new Set());
+      dates.get(key)!.add(normalizeDate(row.date).toISOString().slice(0, 10));
+    }
+    return dates;
+  }
+
   async excusedByTeacher(from: Date, to: Date): Promise<Map<string, number>> {
     const rows = await this.excuseModel
       .find({ date: { $gte: normalizeDate(from), $lte: normalizeDate(to) }, status: 'accepted' })

@@ -1116,11 +1116,17 @@ export class TeacherAttendanceService {
     // feature that quietly edits an attendance number is one nobody can
     // audit afterwards.
     let excusedByTeacher = new Map<string, number>();
+    let excusedDates = new Map<string, Set<string>>();
     try {
       excusedByTeacher = await this.absenceExcuses.excusedByTeacher(
         normalizeDate(query.dateFrom),
         normalizeDate(query.dateTo),
       );
+      excusedDates =
+        (await this.absenceExcuses.excusedDatesByTeacher?.(
+          normalizeDate(query.dateFrom),
+          normalizeDate(query.dateTo),
+        )) ?? excusedDates;
     } catch (error: any) {
       // The summary is the point. A failure to read excuses must not cost
       // the school its attendance report.
@@ -1140,15 +1146,24 @@ export class TeacherAttendanceService {
       // A teacher who works fewer days than the school is measured against
       // her own days: the school days that fall on her weekdays, and of
       // those, the ones with no record.
+      const present = new Set(
+        (row.presentDates ?? []).map((d: Date) => dayLabel(new Date(d))),
+      );
       const ownDays = workDaysByTeacher.get(String(row.teacherId));
+      const expected = ownDays
+        ? workingDates.filter((d) => ownDays.includes(weekdayOf(d)))
+        : workingDates;
       if (ownDays) {
-        const present = new Set(
-          (row.presentDates ?? []).map((d: Date) => dayLabel(new Date(d))),
-        );
-        const expected = workingDates.filter((d) => ownDays.includes(weekdayOf(d)));
         row.workingDays = expected.length;
         row.daysAbsent = expected.filter((d) => !present.has(dayLabel(d))).length;
       }
+      // Which days, not only how many: «3 days absent» cannot be checked or
+      // followed up without them. Each says whether the school accepted an
+      // excuse for it.
+      const accepted = excusedDates.get(String(row.teacherId)) ?? new Set<string>();
+      row.absentDates = expected
+        .filter((d) => !present.has(dayLabel(d)))
+        .map((d) => ({ date: dayLabel(d), excused: accepted.has(dayLabel(d)) }));
       delete row.presentDates;
 
       // Capped at daysAbsent: an excuse filed for a day she turned out to

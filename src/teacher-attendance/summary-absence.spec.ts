@@ -125,6 +125,31 @@ describe('Absence in the monthly summary', () => {
     expect(row.daysAbsent).toBe(2);
   });
 
+  it('names the days absent, and which of them were excused', async () => {
+    // «3 days absent» cannot be checked or followed up without the dates.
+    aggregateRows = [
+      { teacherId: teacherA, teacherName: 'أ. سارة', daysPresent: 3, daysPresentOnWorkingDays: 3,
+        presentDates: [new Date('2026-09-20'), new Date('2026-09-22'), new Date('2026-09-24')] },
+    ];
+    (service as any).absenceExcuses = {
+      excusedByTeacher: jest.fn().mockResolvedValue(new Map([[teacherA, 1]])),
+      excusedDatesByTeacher: jest.fn().mockResolvedValue(new Map([[teacherA, new Set(['2026-09-23'])]])),
+    };
+
+    const result = await summary();
+    const row = result.data.find((r: any) => r.teacherName === 'أ. سارة');
+    expect(row.daysAbsent).toBe(2);
+    expect(row.absentDates).toEqual([
+      { date: '2026-09-21', excused: false },
+      { date: '2026-09-23', excused: true },
+    ]);
+    // A teacher with no records: every school day, none excused.
+    const never = result.data.find((r: any) => r.teacherName === 'أ. نورة');
+    expect(never.absentDates.map((d: any) => d.date)).toEqual(
+      ['2026-09-20', '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24'],
+    );
+  });
+
   it('never reports a negative absence', async () => {
     // A school that shortened its week mid-period can leave more attended
     // days on file than the current schedule has working days, and "-2 days
