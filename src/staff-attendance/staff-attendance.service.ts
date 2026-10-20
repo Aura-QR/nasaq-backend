@@ -1166,6 +1166,7 @@ export class StaffAttendanceService {
           },
           // Only these count against the school's working days. Somebody who
           // came in on a Friday has not thereby covered a Tuesday.
+          presentDates: { $addToSet: '$date' },
           daysPresentOnWorkingDays: {
             $sum: { $cond: [{ $eq: ['$isWorkingDay', false] }, 0, 1] },
           },
@@ -1186,23 +1187,26 @@ export class StaffAttendanceService {
      * report had.
      */
     const settings = await this.settings(user);
-    const workingDays = workingDatesBetween(
+    const schoolDates = workingDatesBetween(
       settings,
       normalizeDate(query.dateFrom),
       normalizeDate(query.dateTo),
-    ).length;
+    );
+    const workingDays = schoolDates.length;
     // Somebody on hours of their own is measured against their own week.
     const hours = await this.ownSchedules(user);
-    const workingDaysOf = (staffId: any) => {
+    const workingDatesOf = (staffId: any): Date[] => {
       const own = hours.get(String(staffId));
       return own
         ? workingDatesBetween(
             settingsForStaff(settings, own),
             normalizeDate(query.dateFrom),
             normalizeDate(query.dateTo),
-          ).length
-        : workingDays;
+          )
+        : schoolDates;
     };
+    const workingDaysOf = (staffId: any) => workingDatesOf(staffId).length;
+    const label = (d: Date) => normalizeDate(d).toISOString().slice(0, 10);
 
     const directory = await this.listStaff(user, {
       role: (query as any).role,
@@ -1245,6 +1249,7 @@ export class StaffAttendanceService {
     // Absences the school accepted an excuse for. Shown beside the count,
     // never subtracted from it — the same rule as the teacher report.
     const excused = new Map<string, number>();
+    const excusedDates = new Map<string, Set<string>>();
     if (this.absenceExcuses) {
       const rows = await this.absenceExcuses
         .find({
@@ -1252,10 +1257,12 @@ export class StaffAttendanceService {
           status: 'accepted',
           date: { $gte: normalizeDate(query.dateFrom), $lte: normalizeDate(query.dateTo) },
         })
-        .select('staffId')
+        .select('staffId date')
         .lean();
       for (const r of rows as any[]) {
         excused.set(String(r.staffId), (excused.get(String(r.staffId)) ?? 0) + 1);
+        if (!excusedDates.has(String(r.staffId))) excusedDates.set(String(r.staffId), new Set());
+        if (r.date) excusedDates.get(String(r.staffId))!.add(label(r.date));
       }
     }
 
@@ -1269,6 +1276,14 @@ export class StaffAttendanceService {
         0,
         row.workingDays - (row.daysPresentOnWorkingDays ?? 0),
       );
+      // Which days, not only how many — each marked when an excuse was
+      // accepted. The same as the teacher report.
+      const present = new Set((row.presentDates ?? []).map((d: Date) => label(d)));
+      const accepted = excusedDates.get(String(row.staffId)) ?? new Set<string>();
+      row.absentDates = workingDatesOf(row.staffId)
+        .filter((d) => !present.has(label(d)))
+        .map((d) => ({ date: label(d), excused: accepted.has(label(d)) }));
+      delete row.presentDates;
     }
 
     data.sort((a: any, b: any) =>

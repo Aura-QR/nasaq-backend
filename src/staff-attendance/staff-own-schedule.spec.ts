@@ -202,6 +202,24 @@ describe('Staff on hours of their own', () => {
     expect(row(guardId).daysAbsent).toBe(6);
   });
 
+  it('the monthly report names each person\'s absent days, on their own week', async () => {
+    await manual(guardId, SUNDAY, '06:30');
+    const res: any = await asTenant(() =>
+      attendance.getSummary(OWNER, { dateFrom: SUNDAY, dateTo: SATURDAY } as any),
+    );
+    const row = (id: any) => res.data.find((r: any) => String(r.staffId) === String(id));
+    // The guard came Sunday; he also works Saturday.
+    expect(row(guardId).absentDates.map((d: any) => d.date)).toEqual(
+      ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-26'],
+    );
+    expect(row(guardId).absentDates.length).toBe(row(guardId).daysAbsent);
+    // The cleaner, on the school's week, never came.
+    expect(row(cleanerId).absentDates.map((d: any) => d.date)).toEqual(
+      ['2026-09-20', '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24'],
+    );
+    expect(row(cleanerId).absentDates.every((d: any) => d.excused === false)).toBe(true);
+  });
+
   it('the end-of-day notice comes after their own day ends', async () => {
     // Both have used check-in before, so both are asked about a missed day.
     await manual(guardId, '2026-09-17', '06:30');
