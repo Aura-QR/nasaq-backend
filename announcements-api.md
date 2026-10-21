@@ -4,11 +4,21 @@
 **Needed from:** web (`nasaq-frontend`) and mobile (`nasaq_mobile`): a carousel on every home screen, and one management page for the school.
 **Nothing else changes:** no existing endpoint or response shape is touched.
 
+## Update, 15 Oct 2026: student photos on the honor roll
+
+- **New, optional:** each honor-roll name can carry a `photoUrl`, uploaded through the same `POST /announcements/uploads` as a slide's image. It comes back on the feed and on the admin view. It is `null` when there is no photo, and on every slide saved before this update.
+- **Nothing breaks:** existing slides and clients keep working. A client that ignores `photoUrl` shows the names as before.
+- **Deploy the backend first.** The API refuses unknown fields, so a server without this change answers the web form's `photoUrl` with a 400.
+- **Web display changed too (no API change):**
+  - A program's image now shows **whole, beside the text**. It used to be a faded background under the text.
+  - The web no longer shows an image on honor-roll or video slides.
+  - Mobile should follow; see [Mobile](#mobile-nasaq_mobile).
+
 ## Why
 
 The client asked for an announcements area at the top of the platform's home screen. It should change on its own and show three kinds of content in the same space:
 
-- **الطلاب المتميزون:** a title and a list of names
+- **الطلاب المتميزون:** a title and a list of names, each with an optional photo
 - **إعلان برنامج:** text, an image and an optional button
 - **فيديو توعوي قصير:** a link to the clip on YouTube (or any https host). **Videos are never uploaded to our server.**
 
@@ -29,8 +39,8 @@ The school picks when each slide starts and stops showing, puts the slides in or
 |---|---|---|---|
 | `title` | required | required | required |
 | `body` | optional | optional (the text) | optional |
-| `imageUrl` | optional (background) | optional (the picture) | optional (poster) |
-| `students` | **required**, 1–60 | — | — |
+| `imageUrl` | optional; not shown on web (the students' photos are the picture) | optional (the picture) | optional (poster); not shown on web |
+| `students` | **required**, 1–60, each with an optional `photoUrl` | — | — |
 | `cta` (button) | — | optional | — |
 | `video` | — | — | **required** (a link) |
 
@@ -72,10 +82,10 @@ Returns the slides showing **now** for the caller's role, already in order. It r
     "type": "honor_roll",
     "title": "الطلاب المتميزون لشهر أكتوبر",
     "body": "نبارك لأبنائنا تميزهم",
-    "imageUrl": "/uploads/announcements/6a1b…/3f2c….jpg",
+    "imageUrl": null,
     "students": [
-      { "name": "أحمد محمد العتيبي", "className": "3/2", "note": "الأول على الصف" },
-      { "name": "نورة", "className": "1/1", "note": null }
+      { "name": "أحمد محمد العتيبي", "className": "3/2", "note": "الأول على الصف", "photoUrl": "/uploads/announcements/6a1b…/a71d….jpg" },
+      { "name": "نورة", "className": "1/1", "note": null, "photoUrl": null }
     ],
     "video": null,
     "cta": null,
@@ -106,7 +116,11 @@ Returns the slides showing **now** for the caller's role, already in order. It r
 ]
 ```
 
-- **`imageUrl` is a relative path** (`/uploads/…`). Prefix it with the API origin the same way library and preparation files are; see `fileUrl` in `src/pages/Student/PreparationView.jsx`.
+- **`imageUrl` and `students[].photoUrl` are relative paths** (`/uploads/…`). Prefix them with the API origin the same way library and preparation files are; see `announcementMediaUrl` in `src/APIs/school/announcements.js`.
+- **Show `imageUrl` whole, not as a background.** It is often a designed poster with its own text.
+  - Fit it inside its frame (`contain`) so nothing is cropped, and let a tap open it full size.
+  - Do not fade it, and do not put text over it.
+- **`students[].photoUrl`:** show it in a circle, cropped to fill. When it is `null`, or the image fails to load, show the first letter of `name` instead.
 - **`video` is always an external link:**
   - `youtubeId` set: embed `https://www.youtube.com/embed/<youtubeId>` on web, or hand the id to the YouTube player on mobile.
   - `youtubeId: null`: another https host (Vimeo, a CDN…). Open it, or play it if it is a direct `.mp4` link.
@@ -124,7 +138,7 @@ Both filters are optional: `status` is `live | scheduled | expired | paused` and
   "title": "…",
   "body": "…",
   "imageUrl": "…",
-  "students": [{ "studentId": "6a2c…", "name": "أحمد محمد العتيبي", "className": "3/2", "note": "الأول على الصف" }],
+  "students": [{ "studentId": "6a2c…", "name": "أحمد محمد العتيبي", "className": "3/2", "note": "الأول على الصف", "photoUrl": "/uploads/announcements/6a1b…/a71d….jpg" }],
   "video": null,
   "cta": null,
   "durationSeconds": null,
@@ -148,7 +162,7 @@ A clip served from our server goes to every home screen that opens it: a 50 MB v
 
 ### 1 · Upload an image first: `POST /announcements/uploads`
 
-`multipart/form-data` with one field, `file`. **Images only:** JPG, PNG or WEBP, up to 5 MB. It returns the url to put on the slide:
+`multipart/form-data` with one field, `file`. **Images only:** JPG, PNG or WEBP, up to 5 MB. The same endpoint takes a slide's image and each student's photo. It returns the url to send as the slide's `imageUrl` or as a student's `photoUrl`:
 
 ```json
 { "url": "/uploads/announcements/6a1b…/3f2c….jpg", "originalName": "banner.jpg", "size": 734003 }
@@ -157,7 +171,9 @@ A clip served from our server goes to every home screen that opens it: a 50 MB v
 - **A video file is refused** with «لا يُرفع الفيديو على المنصة — ارفعه على يوتيوب وضع رابطه في الإعلان».
 - **SVG is refused**, because it can carry script.
 - **A file over 5 MB** is refused (413) while it uploads, so it never reaches the server's disk. Check the size on the client too, before sending.
-- **Suggested banner ratio:** 16:9 (for example 1600×900). Nothing enforces it.
+- **Suggested sizes** (nothing enforces them):
+  - Banner: 16:9, for example 1600×900. The web card frames it at 16:9.
+  - Student photo: square, for example 400×400. It is shown in a circle, cropped to fill.
 
 Upload as soon as the image is picked, then send the returned `url` with the slide.
 
@@ -168,9 +184,8 @@ Upload as soon as the image is picked, then send the returned `url` with the sli
   "type": "honor_roll",
   "title": "الطلاب المتميزون لشهر أكتوبر",
   "body": "نبارك لأبنائنا تميزهم",
-  "imageUrl": "/uploads/announcements/6a1b…/3f2c….jpg",
   "students": [
-    { "studentId": "6a2c…", "note": "الأول على الصف" },
+    { "studentId": "6a2c…", "note": "الأول على الصف", "photoUrl": "/uploads/announcements/6a1b…/a71d….jpg" },
     { "name": "نورة", "className": "1/1" }
   ],
   "audiences": ["STUDENT", "TEACHER", "ADMIN"],
@@ -188,6 +203,9 @@ Upload as soon as the image is picked, then send the returned `url` with the sli
 - **What is typed wins over the record.** Sending `studentId` together with `name: "أحمد محمد"` shows «أحمد محمد».
 - **The roll is a snapshot.** Promoting the student next year does not change what this slide says.
 - `note` is the reason, for example «الأول على الصف» or «حافظ لجزء عمّ». It is optional, up to 100 characters.
+- **`photoUrl`** is optional. Upload the photo first, like the slide's image, and send the returned url.
+  - Student records have no photo, so picking a student brings none; it is always uploaded here.
+  - Only this school's own uploads are accepted.
 
 **Program:**
 
@@ -206,7 +224,11 @@ Any YouTube link form works: `youtu.be/…`, `youtube.com/watch?v=…`, `/shorts
 
 ### 3 · Edit: `PATCH /announcements/:id`
 
-Send only what changes. A key left out is kept, and `null` clears it (`imageUrl`, `endsAt`, `cta`, `durationSeconds`). `students`, when sent, replaces the whole list. Replacing or clearing an uploaded image deletes the old file.
+Send only what changes. A key left out is kept, and `null` clears it (`imageUrl`, `endsAt`, `cta`, `durationSeconds`).
+
+- **`students`, when sent, replaces the whole list.** To keep a student's photo, send its `photoUrl` again. Leave it out to remove the photo.
+- **Photos already on the slide are kept as they are** when the list is sent again; only new ones are checked.
+- **Replaced or cleared files are deleted.** This covers the slide's image and any student photo no longer on the list. A file another slide still uses is kept.
 
 ### 4 · On/off: `PATCH /announcements/:id/status`
 
@@ -226,7 +248,7 @@ The listed slides take positions 0, 1, 2…. **Any slide not listed keeps its re
 
 ### 6 · Delete: `DELETE /announcements/:id`
 
-This deletes the slide and its uploaded image. It returns `{ "id": "…" }`.
+This deletes the slide, its uploaded image and its students' photos. A file another slide still uses is kept. It returns `{ "id": "…" }`.
 
 ### Validation (400 unless noted, message in Arabic)
 
@@ -240,8 +262,8 @@ This deletes the slide and its uploaded image. It returns `{ "id": "…" }`.
 | Video slide with no link | ضع رابط الفيديو (يوتيوب مثلًا) |
 | Video link not https | رابط الفيديو يجب أن يبدأ بـ https:// |
 | Button link not https or `/…` | رابط الزر يجب أن يبدأ بـ https:// أو بـ / لصفحة داخل المنصة |
-| `imageUrl` not from `/announcements/uploads` | الصورة يجب أن تُرفع أولًا عبر رفع صور الإعلانات |
-| Uploaded image no longer on the server | الصورة غير موجودة، ارفعها مرة أخرى |
+| `imageUrl` or a student's `photoUrl` not from this school's `/announcements/uploads` | الصورة يجب أن تُرفع أولًا عبر رفع صور الإعلانات |
+| Uploaded image or photo no longer on the server | الصورة غير موجودة، ارفعها مرة أخرى |
 | End before start | تاريخ النهاية يجب أن يكون بعد تاريخ البداية |
 | End already past (only when setting it) | تاريخ النهاية قد مضى |
 | Uploading a video file | لا يُرفع الفيديو على المنصة — ارفعه على يوتيوب وضع رابطه في الإعلان |
@@ -269,11 +291,15 @@ An expired slide can still be edited (its title, for example) without first bein
    What it does:
    - Fetches `GET /announcements/feed` once on load, and **renders nothing** when the array is empty, so there is no blank box.
    - Moves on every `durationSeconds ?? 6` seconds; a video waits for its end. Arrows and dots for manual paging, and swipe on touch.
-   - Pauses on hover and while a video plays.
-   - Renders one card per `type`:
-     - `honor_roll`: title and a grid of names, each with class and note. Scroll or paginate when the list is long.
-     - `program`: image, text, button.
-     - `video`: a YouTube iframe from `youtubeId` (`?mute=1&playsinline=1` so autoplay is allowed), or a link card for other hosts.
+   - Pauses on hover, while a video plays, and while the full-size image or the full honor list is open.
+   - Renders one card per `type`. The text sits in its own column, never over a picture. On phones the picture goes above the text.
+     - `honor_roll`: the title beside a row of student portraits.
+       - Each portrait is a round photo in a gold ring, or the name's first letter when there is no photo, with the name, note and class under it.
+       - Up to 4 portraits show (3 on phones). With more, a «+N · عرض الكل» tile opens the whole list in a dialog.
+     - `program`: the text and button beside the image in a 16:9 frame.
+       - The image shows whole, contained over a blurred copy of itself, and is never faded.
+       - Clicking it opens the image full size with the title, the full text and the button.
+     - `video`: the same 16:9 frame, holding a YouTube iframe from `youtubeId` (`?mute=1&playsinline=1` so autoplay is allowed), or a link card for other hosts.
    - RTL: arrows and swipe direction follow the page direction.
    - Responsive on phone, tablet and desktop. Keep a fixed aspect ratio so the page does not jump between slides.
    - `framer-motion` is already a dependency, for the transitions.
@@ -285,23 +311,26 @@ An expired slide can still be edited (its title, for example) without first bein
      - edit and delete per row.
    - **Form:**
      - type chosen first, with three tabs that show only that type's fields;
-     - honor roll: student search plus "add a name by hand" rows;
+     - honor roll: student search plus "add a name by hand" rows. Each row has a round photo picker that uploads at once, shows the photo, and can remove it;
+     - program: an image field with a thumbnail, replace and remove (the only type whose form offers an image);
      - video: a «رابط الفيديو» field with a hint to upload on YouTube as غير مدرج; preview the embed once the link is recognised;
      - start and end date pickers, with "no end" as an option;
      - audience checkboxes, all ticked by default;
      - an optional duration.
-   - **Preview:** render the slide in the same carousel card component.
+   - **Preview:** render the slide in the same carousel card component, with a switch between the teacher look (dark) and the student and admin look (light).
 4. **Permissions labels:** add `announcements: "الإعلانات"` to `ENTITY_LABELS` in `src/pages/SchoolPermissions/permissionLabels.js`, and to the copy in `src/components/school/SchoolRolePermissionsDialog.jsx`.
 
 ## Mobile (`nasaq_mobile`)
 
-1. **Model:** parse the feed item above. Treat `video`, `cta` and `imageUrl` as nullable and `students` as a possibly empty list.
+1. **Model:** parse the feed item above. Treat `video`, `cta`, `imageUrl` and each student's `photoUrl` as nullable, and `students` as a possibly empty list.
 2. **Carousel** at the top of the student, teacher and owner home screens. It follows the same rules as web: hidden when empty, auto-advance by `durationSeconds ?? 6`, page indicator dots, swipe, and a card per type.
+   - **Honor roll:** a round photo per student from `photoUrl`, with the API origin prefixed. Show the name's first letter when it is `null` or fails to load.
+   - **Program image:** show it whole (`BoxFit.contain`), not as a faded background under the text, and open it full screen on tap.
    - **Video:** with `youtubeId`, use the YouTube player package with the id, starting muted. Without it, open the link.
    - **Button:**
      - `cta.url` starting with `/`: map it to the matching in-app route where one exists.
      - `https://`: open in the browser.
-3. **Owner management** (if the owner app manages content): the same list, switch, reorder and form as web. Images go up with `MultipartFile` to `/announcements/uploads`, then send the returned `url`. Videos are a link field only.
+3. **Owner management** (if the owner app manages content): the same list, switch, reorder and form as web. Images go up with `MultipartFile` to `/announcements/uploads`, then send the returned `url`. Honor-roll photos go up the same way, one per name. Videos are a link field only.
 
 ## UI copy (formal Arabic)
 
@@ -314,6 +343,9 @@ An expired slide can still be edited (its title, for example) without first bein
 | Dates | يبدأ في / ينتهي في / بدون تاريخ نهاية |
 | Audience | يظهر لـ: الطلاب / المعلمين / الإدارة |
 | Names | إضافة طالب من القائمة / إضافة اسم يدويًا / سبب التميز |
+| Student photo | صورة الطالب / إزالة الصورة |
+| Program image | صورة الإعلان / استبدال الصورة / إزالة |
+| Carousel | تكبير / عرض الكل / عدد الطلاب: N |
 | Button fields | نص الزر / رابط الزر |
 | Video | رابط الفيديو (يوتيوب) — تلميح: ارفع الفيديو على يوتيوب كـ «غير مدرج» ثم الصق الرابط |
 | Duration | مدة العرض بالثواني (اختياري) |
@@ -334,3 +366,8 @@ Run these on a test school, not a live one.
 9. Add a video slide with an Unlisted YouTube link. It plays in the carousel. A Private video does not, which is expected.
 10. Delete a slide with an uploaded image. The image's URL now returns 404.
 11. Sign in as a manager with the announcements boxes unticked. The carousel shows; the management page is hidden and its calls return 403.
+12. Make an honor roll with a photo for one student and none for another. The first shows the photo in a gold ring; the second shows the first letter of their name.
+13. Add six students. On a computer the card shows three portraits and «+3 · عرض الكل», and the button opens all six. A phone shows two portraits and «+4».
+14. Remove one student's photo and save. That photo's URL now returns 404; the other photos still load.
+15. Send a `photoUrl` from another school's folder, or one that was never uploaded. It is refused.
+16. Add a program with a tall poster. The whole poster shows in the card, and a tap opens it full size.
