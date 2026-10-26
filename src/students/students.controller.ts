@@ -80,6 +80,9 @@ export class StudentsController {
   @ApiQuery({ name: 'classId', required: false })
   @ApiQuery({ name: 'gender', required: false, enum: ['male', 'female'] })
   @ApiQuery({ name: 'nationality', required: false, description: 'saudi | non_saudi | unspecified | ISO code (EG)' })
+  // School-wide counts and the names of students missing a nationality: the
+  // school's administration only, never a teacher or a student.
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @CheckAbilities({ action: 'read', subject: 'Student', roles: [Role.MANAGER] })
   @Get('statistics')
   @HttpCode(HttpStatus.OK)
