@@ -53,6 +53,10 @@ export const NOTIFICATION_TYPES = [
   'staff_leave_requested',
   'staff_leave_approved',
   'staff_leave_rejected',
+  // A non-Saudi student's residency document: the family's upload goes to the
+  // school for review, and the ruling goes back to the student.
+  'residency_document_submitted',
+  'residency_document_reviewed',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

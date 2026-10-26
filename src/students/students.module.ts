@@ -13,6 +13,12 @@ import { AcademicYear, AcademicYearSchema } from '../academic-years/schemas/acad
 import { StudentStatisticsService } from './student-statistics.service';
 import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
 import { TenancyModule } from '../tenancy/tenancy.module';
+import { StudentResidencyDocument, StudentResidencyDocumentSchema } from './residency/residency-document.schema';
+import { ResidencyDocumentsService } from './residency/residency-documents.service';
+import { ResidencyDocumentsController } from './residency/residency-documents.controller';
+import { Admin, AdminSchema } from '../admin/schemas/admin.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 import { EmailModule } from 'src/email/email.module';
 import { FinancialModule } from 'src/financial/financial.module';
 
@@ -30,13 +36,17 @@ import { StudentFinancialRecord, StudentFinancialRecordSchema } from '../financi
       { name: Stage.name, schema: StageSchema },
       { name: AcademicYear.name, schema: AcademicYearSchema },
       { name: School.name, schema: SchoolSchema },
+      { name: StudentResidencyDocument.name, schema: StudentResidencyDocumentSchema },
+      { name: Admin.name, schema: AdminSchema },
     ]),
     EmailModule,
     TenancyModule,
+    NotificationsModule,
+    PermissionsModule,
     FinancialModule,
   ],
-  controllers: [StudentsController, NationalitiesController],
-  providers: [StudentsService, StudentStatisticsService],
+  controllers: [StudentsController, NationalitiesController, ResidencyDocumentsController],
+  providers: [StudentsService, StudentStatisticsService, ResidencyDocumentsService],
   exports: [StudentsService, MongooseModule],
 })
 export class StudentsModule {}

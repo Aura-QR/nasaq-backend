@@ -8,6 +8,7 @@ import { Stage } from '../stages/schemas/stage.schema';
 import { AcademicYear } from '../academic-years/schemas/academic-year.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { TenantContextService } from '../tenancy/tenant-context.service';
+import { StudentResidencyDocument } from './residency/residency-document.schema';
 import { NATIONALITIES, resolveNationalityCode } from '../common/constants/nationalities.constant';
 
 export interface StudentStatisticsFilters {
@@ -86,6 +87,7 @@ export class StudentStatisticsService {
     @InjectModel(AcademicYear.name) private academicYearModel: Model<AcademicYear>,
     @InjectModel(School.name) private schoolModel: Model<School>,
     private tenantContext: TenantContextService,
+    @InjectModel(StudentResidencyDocument.name) private residencyModel: Model<StudentResidencyDocument>,
   ) {}
 
   async getStatistics(query: StudentStatisticsFilters = {}) {
@@ -138,6 +140,7 @@ export class StudentStatisticsService {
     // Listed by name so the school can open each record and fill in the nationality.
     const unspecifiedStudents: { _id: string; name: string; classId: string; className: string | null }[] = [];
     const classNameById = new Map(classes.map((c: any) => [String(c._id), c.name]));
+    const nonSaudiStudents: { _id: string; name: string; classId: string; className: string | null }[] = [];
 
     for (const raw of students as any[]) {
       const s: CountedStudent = {
@@ -154,6 +157,14 @@ export class StudentStatisticsService {
       n.total++;
       byNationality.set(s.nationalityCode, n);
 
+      if (s.nationalityCode && s.nationalityCode !== SAUDI) {
+        nonSaudiStudents.push({
+          _id: String(raw._id),
+          name: raw.name || [raw.firstName, raw.fatherName, raw.familyName].filter(Boolean).join(' '),
+          classId: String(raw.classId),
+          className: classNameById.get(String(raw.classId)) ?? null,
+        });
+      }
       if (!s.nationalityCode) {
         unspecifiedStudents.push({
           _id: String(raw._id),
@@ -215,6 +226,8 @@ export class StudentStatisticsService {
       ? await this.schoolModel.findById(schoolId).select('name').setOptions({ skipTenantScope: true }).lean().exec()
       : null;
 
+    const residency = await this.residencySummary(nonSaudiStudents);
+
     return {
       school: { name: (school as any)?.name ?? null },
       academicYear: { _id: String(year._id), name: (year as any).name },
@@ -225,7 +238,62 @@ export class StudentStatisticsService {
       byClass,
       byNationality: nationalities,
       unspecifiedStudents: unspecifiedStudents.sort((a, b) => a.name.localeCompare(b.name, 'ar')),
+      residency,
     };
+  }
+
+  /**
+   * Where the non-Saudi students stand on the residency document the ministry
+   * reviews: none filed, one waiting for the school, or an approved one that
+   * has expired or expires within 30 days.
+   */
+  private async residencySummary(students: { _id: string; name: string; classId: string; className: string | null }[]) {
+    const docs = await this.residencyModel
+      .find({ studentId: { $in: students.map((s) => new Types.ObjectId(s._id)) }, status: { $in: ['approved', 'pending'] } })
+      .select('studentId status expiryDate createdAt')
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const soon = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const current = new Map<string, any>();
+    const pending = new Set<string>();
+    for (const d of docs as any[]) {
+      const id = String(d.studentId);
+      if (d.status === 'pending') pending.add(id);
+      else if (!current.has(id)) current.set(id, d);
+    }
+
+    const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'ar');
+    const out = {
+      nonSaudi: students.length,
+      valid: 0,
+      missing: [] as typeof students,
+      pending: [] as typeof students,
+      expired: [] as (typeof students[number] & { expiryDate: Date })[],
+      expiringSoon: [] as (typeof students[number] & { expiryDate: Date })[],
+    };
+    for (const st of students) {
+      const doc = current.get(st._id);
+      if (pending.has(st._id)) out.pending.push(st);
+      if (!doc) {
+        if (!pending.has(st._id)) out.missing.push(st);
+        continue;
+      }
+      if (doc.expiryDate && doc.expiryDate < today) out.expired.push({ ...st, expiryDate: doc.expiryDate });
+      else {
+        out.valid++;
+        if (doc.expiryDate && doc.expiryDate < soon) out.expiringSoon.push({ ...st, expiryDate: doc.expiryDate });
+      }
+    }
+    out.missing.sort(byName);
+    out.pending.sort(byName);
+    out.expired.sort(byName);
+    out.expiringSoon.sort((a, b) => +a.expiryDate - +b.expiryDate);
+    return out;
   }
 
   private matches(s: CountedStudent, filters: StudentStatisticsFilters): boolean {
