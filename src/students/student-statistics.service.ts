@@ -128,13 +128,16 @@ export class StudentStatisticsService {
 
     const students = await this.studentModel
       .find({ classId: { $in: classes.map((c: any) => c._id) }, isActive: { $ne: false } })
-      .select('_id classId gender nationality nationalityCode')
+      .select('_id classId gender nationality nationalityCode name firstName fatherName familyName')
       .lean()
       .exec();
 
     const total = emptyCounts();
     const byClassId = new Map<string, StatisticsCounts>(classes.map((c: any) => [String(c._id), emptyCounts()]));
     const byNationality = new Map<string | null, { male: number; female: number; total: number }>();
+    // Listed by name so the school can open each record and fill in the nationality.
+    const unspecifiedStudents: { _id: string; name: string; classId: string; className: string | null }[] = [];
+    const classNameById = new Map(classes.map((c: any) => [String(c._id), c.name]));
 
     for (const raw of students as any[]) {
       const s: CountedStudent = {
@@ -150,6 +153,15 @@ export class StudentStatisticsService {
       n[s.gender]++;
       n.total++;
       byNationality.set(s.nationalityCode, n);
+
+      if (!s.nationalityCode) {
+        unspecifiedStudents.push({
+          _id: String(raw._id),
+          name: raw.name || [raw.firstName, raw.fatherName, raw.familyName].filter(Boolean).join(' '),
+          classId: String(raw.classId),
+          className: classNameById.get(String(raw.classId)) ?? null,
+        });
+      }
     }
 
     const byClass = classes.map((c: any) => {
@@ -212,6 +224,7 @@ export class StudentStatisticsService {
       byGradeLevel,
       byClass,
       byNationality: nationalities,
+      unspecifiedStudents: unspecifiedStudents.sort((a, b) => a.name.localeCompare(b.name, 'ar')),
     };
   }
 

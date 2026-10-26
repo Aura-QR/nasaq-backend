@@ -80,6 +80,8 @@ describe('StudentStatisticsService', () => {
       maleSaudi: 1, maleNonSaudi: 1, femaleSaudi: 2, femaleNonSaudi: 1,
     });
     expect(r.byNationality.map((n: any) => [n.code, n.total])).toEqual([['SA', 3], ['YE', 1], ['EG', 1], [null, 1]]);
+    expect(r.unspecifiedStudents).toHaveLength(1);
+    expect(r.unspecifiedStudents[0]).toMatchObject({ name: 'ط م ع', className: 'أول أ' });
   });
 
   it('breaks down by stage, grade and class, keeping empty classes', async () => {
