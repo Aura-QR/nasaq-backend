@@ -11,6 +11,8 @@ import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-leve
 import { Stage, StageSchema } from '../stages/schemas/stage.schema';
 import { AcademicYear, AcademicYearSchema } from '../academic-years/schemas/academic-year.schema';
 import { StudentStatisticsService } from './student-statistics.service';
+import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
+import { TenancyModule } from '../tenancy/tenancy.module';
 import { EmailModule } from 'src/email/email.module';
 import { FinancialModule } from 'src/financial/financial.module';
 
@@ -27,8 +29,10 @@ import { StudentFinancialRecord, StudentFinancialRecordSchema } from '../financi
       { name: GradeLevel.name, schema: GradeLevelSchema },
       { name: Stage.name, schema: StageSchema },
       { name: AcademicYear.name, schema: AcademicYearSchema },
+      { name: School.name, schema: SchoolSchema },
     ]),
     EmailModule,
+    TenancyModule,
     FinancialModule,
   ],
   controllers: [StudentsController, NationalitiesController],

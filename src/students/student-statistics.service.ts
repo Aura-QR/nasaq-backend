@@ -6,6 +6,8 @@ import { Class } from '../classes/schemas/class.schema';
 import { GradeLevel } from '../grade-levels/schemas/grade-level.schema';
 import { Stage } from '../stages/schemas/stage.schema';
 import { AcademicYear } from '../academic-years/schemas/academic-year.schema';
+import { School } from '../platform/schools/schemas/school.schema';
+import { TenantContextService } from '../tenancy/tenant-context.service';
 import { NATIONALITIES, resolveNationalityCode } from '../common/constants/nationalities.constant';
 
 export interface StudentStatisticsFilters {
@@ -82,6 +84,8 @@ export class StudentStatisticsService {
     @InjectModel(GradeLevel.name) private gradeLevelModel: Model<GradeLevel>,
     @InjectModel(Stage.name) private stageModel: Model<Stage>,
     @InjectModel(AcademicYear.name) private academicYearModel: Model<AcademicYear>,
+    @InjectModel(School.name) private schoolModel: Model<School>,
+    private tenantContext: TenantContextService,
   ) {}
 
   async getStatistics(query: StudentStatisticsFilters = {}) {
@@ -193,7 +197,14 @@ export class StudentStatisticsService {
       }))
       .sort((a, b) => (a.code === null ? 1 : b.code === null ? -1 : b.total - a.total));
 
+    // For the printed report's heading.
+    const schoolId = this.tenantContext.getSchoolId();
+    const school = schoolId
+      ? await this.schoolModel.findById(schoolId).select('name').setOptions({ skipTenantScope: true }).lean().exec()
+      : null;
+
     return {
+      school: { name: (school as any)?.name ?? null },
       academicYear: { _id: String(year._id), name: (year as any).name },
       filters,
       total,

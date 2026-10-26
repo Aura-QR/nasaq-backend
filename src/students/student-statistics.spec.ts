@@ -6,6 +6,7 @@ import { Class, ClassSchema } from '../classes/schemas/class.schema';
 import { GradeLevel, GradeLevelSchema } from '../grade-levels/schemas/grade-level.schema';
 import { Stage, StageSchema } from '../stages/schemas/stage.schema';
 import { AcademicYear, AcademicYearSchema } from '../academic-years/schemas/academic-year.schema';
+import { School, SchoolSchema } from '../platform/schools/schemas/school.schema';
 import { TenantContextService } from '../tenancy/tenant-context.service';
 
 dotenv.config();
@@ -37,7 +38,8 @@ describe('StudentStatisticsService', () => {
     models.grade = model(GradeLevel.name, GradeLevelSchema);
     models.stage = model(Stage.name, StageSchema);
     models.year = model(AcademicYear.name, AcademicYearSchema);
-    service = new StudentStatisticsService(models.student, models.class, models.grade, models.stage, models.year);
+    const schoolModel = model(School.name, SchoolSchema);
+    service = new StudentStatisticsService(models.student, models.class, models.grade, models.stage, models.year, schoolModel, contextService);
 
     await run(async () => {
       const old = await models.year.create({ name: 'y1', startDate: new Date('2025-08-01'), endDate: new Date('2026-06-01'), status: 'archived' });
