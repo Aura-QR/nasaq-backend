@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { StudentsService } from './students.service';
+import { StudentStatisticsService } from './student-statistics.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
@@ -30,7 +31,10 @@ import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 @Controller('students')
 @ApiTags('Students')
 export class StudentsController {
-  constructor(private readonly studentsService: StudentsService) { }
+  constructor(
+    private readonly studentsService: StudentsService,
+    private readonly statisticsService: StudentStatisticsService,
+  ) { }
 
   @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
   @CheckAbilities({ action: 'create', subject: 'Student' })
@@ -68,6 +72,25 @@ export class StudentsController {
   @HttpCode(HttpStatus.OK)
   async list() {
     return await this.studentsService.list();
+  }
+
+  @ApiOperation({ summary: 'Student head counts of the active year by stage, grade, class, gender and nationality' })
+  @ApiQuery({ name: 'stageId', required: false })
+  @ApiQuery({ name: 'gradeLevelId', required: false })
+  @ApiQuery({ name: 'classId', required: false })
+  @ApiQuery({ name: 'gender', required: false, enum: ['male', 'female'] })
+  @ApiQuery({ name: 'nationality', required: false, description: 'saudi | non_saudi | unspecified | ISO code (EG)' })
+  @CheckAbilities({ action: 'read', subject: 'Student', roles: [Role.MANAGER] })
+  @Get('statistics')
+  @HttpCode(HttpStatus.OK)
+  async statistics(
+    @Query('stageId') stageId?: string,
+    @Query('gradeLevelId') gradeLevelId?: string,
+    @Query('classId') classId?: string,
+    @Query('gender') gender?: string,
+    @Query('nationality') nationality?: string,
+  ) {
+    return await this.statisticsService.getStatistics({ stageId, gradeLevelId, classId, gender, nationality });
   }
 
   @ApiOperation({ summary: 'Get the authenticated student profile' })

@@ -80,3 +80,40 @@ export const NATIONALITIES: Nationality[] = COUNTRY_CODES.map((code) => {
 });
 
 export const NATIONALITY_CODES = NATIONALITIES.map(n => n.code);
+
+/**
+ * Most students were registered before the form sent a code, so the record
+ * often holds only the label, and in the country's name rather than the
+ * demonym: «المملكة العربية السعودية», not «سعودي». Reports that count Saudis
+ * must read both, or they count four out of five Saudis as unknown.
+ */
+const normalizeLabel = (label: string) =>
+  label
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/^ال/, '')
+    .replace(/\s+/g, ' ');
+
+const CODE_BY_LABEL = new Map<string, string>();
+for (const n of NATIONALITIES) {
+  for (const label of [n.labelAr, n.labelEn, arabicRegionNames.of(n.code), englishRegionNames.of(n.code)]) {
+    if (label) CODE_BY_LABEL.set(normalizeLabel(label), n.code);
+  }
+}
+// Spellings seen in school data that differ from the Intl names.
+for (const [label, code] of Object.entries({
+  'السعوديه': 'SA', 'السعودية': 'SA', 'سعوديه': 'SA', 'سعودية': 'SA', 'سوريا': 'SY', 'مصريه': 'EG', 'يمنيه': 'YE',
+})) {
+  CODE_BY_LABEL.set(normalizeLabel(label), code);
+}
+
+/** The ISO code for a student's nationality, from the code or else the label; null when neither identifies one. */
+export function resolveNationalityCode(code?: string | null, label?: string | null): string | null {
+  const upper = code?.trim().toUpperCase();
+  if (upper && NATIONALITY_CODES.includes(upper)) return upper;
+  if (!label?.trim()) return null;
+  return CODE_BY_LABEL.get(normalizeLabel(label)) ?? null;
+}
