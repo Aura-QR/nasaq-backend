@@ -117,6 +117,10 @@ export class ResidencyDocumentsController {
     res.setHeader('Content-Type', file.mimeType || 'application/octet-stream');
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.originalName || 'document')}`);
-    res.sendFile(file.path);
+    // The dot-directory that keeps express.static away from these files makes
+    // sendFile refuse them too unless told this one is deliberate.
+    res.sendFile(file.path, { dotfiles: 'allow' }, (error) => {
+      if (error && !res.headersSent) res.status(404).json({ status: false, message: 'الملف غير موجود' });
+    });
   }
 }
