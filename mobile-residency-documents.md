@@ -1,7 +1,8 @@
 # Mobile: «وثيقة الإقامة» for non-Saudi students
 
 **For:** Azza (`nasaq_mobile`).
-**Backend:** live. **Web:** done (student portal, school review page, statistics), so the app only needs the student side.
+**Backend:** live. **Web:** done (student portal, school review page, statistics).
+**The app needs both sides:** the student's screen, and the school's screens in the admin panel (`lib/owner/`, at the end of this file).
 **Why:** the ministry reviews the residency document (iqama or visit visa) of every non-Saudi student. The family uploads it from the app, the school reviews it, and the family gets a notification with the decision.
 
 ## Where
@@ -82,6 +83,36 @@ New type **`residency_document_reviewed`**, sent to the student after the school
 
 All text is formal Arabic (فصحى), as written above.
 
+## The school's side (admin panel, `lib/owner/`)
+
+Shown to OWNER, SUPERVISOR, SUPER_ADMIN, and MANAGER with `PermissionHelper.can('read', 'students')`. Accepting, rejecting, uploading and deleting need `can('update', 'students')`.
+
+### 1. Review screen «وثائق الإقامة»
+A sidebar item in `individuals`, after «إحصائيات الطلاب».
+
+`GET /residency-documents?status=pending|approved|rejected` (default `pending`). Tabs: قيد المراجعة · المقبولة · المرفوضة. Each item is a document (same shape as above) plus:
+```json
+"student": { "_id", "name", "className", "nationality" }
+```
+- Show the student's name (it opens their profile), class and nationality, then the document card.
+- On pending items: **«قبول»** → `PATCH /residency-documents/:id/review` with `{ "decision": "approved" }`.
+- **«رفض»** → a dialog «سبب الرفض» (required, up to 300 characters; «يظهر السبب للطالب ليرفع الوثيقة مرة أخرى.») → `{ "decision": "rejected", "reason": "…" }`.
+- A document already reviewed → 400 «تمت مراجعة هذه الوثيقة من قبل»: show it and reload.
+- Empty pending tab: «لا توجد وثائق بانتظار المراجعة.»
+
+### 2. On the student's profile (non-Saudi students only)
+A section **«وثيقة الإقامة»** (hide it for Saudi students, same rule as above).
+
+`GET /students/:id/residency-documents` → `{ current, documents }`:
+- Pending documents first, with قبول / رفض.
+- Then `current` (the approved one), highlighted. If there is none and nothing is pending: «لا توجد وثيقة إقامة معتمدة لهذا الطالب.»
+- Then «الوثائق السابقة».
+- **«رفع وثيقة»** → the same form as the student's, sent to `POST /students/:id/residency-documents` (same multipart fields). **The school's upload is approved immediately.** Put this note in the form: «الوثيقة التي ترفعها المدرسة تُعتمد مباشرة.»
+- **«حذف»** on any document → confirm «حذف هذه الوثيقة وملفاتها نهائيًا؟» → `DELETE /residency-documents/:id`.
+
+### 3. Notification
+`residency_document_submitted` goes to the school's admins when a student uploads. `data`: `{ documentId, studentId }`. Tapping it opens the review screen.
+
 ## Test (QA school only, never مواهب)
 
 1. Log in as a non-Saudi student: the link shows. A Saudi student: it does not.
@@ -90,3 +121,5 @@ All text is formal Arabic (فصحى), as written above.
 4. From the web, the school rejects it with a reason: a push arrives, and the screen shows the reason in red.
 5. Upload again and the school accepts: «مقبولة» shows, and «عرض الملف» opens the image.
 6. A file larger than 10 MB, or a Word file: a clear message, nothing uploaded.
+7. As the school owner: the student's upload shows in «وثائق الإقامة» and a notification arrives; accept it from the app.
+8. On a non-Saudi student's profile, upload a document as the school: it shows as «مقبولة» directly. Delete it: it disappears.
