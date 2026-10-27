@@ -110,7 +110,14 @@ A section **«وثيقة الإقامة»** (hide it for Saudi students, same ru
 - **«رفع وثيقة»** → the same form as the student's, sent to `POST /students/:id/residency-documents` (same multipart fields). **The school's upload is approved immediately.** Put this note in the form: «الوثيقة التي ترفعها المدرسة تُعتمد مباشرة.»
 - **«حذف»** on any document → confirm «حذف هذه الوثيقة وملفاتها نهائيًا؟» → `DELETE /residency-documents/:id`.
 
-### 3. Notification
+### 3. On «إضافة طالب» (add student)
+When the chosen nationality is not Saudi, show a section **«وثيقة الإقامة (اختياري)»** with the same fields, and the note «تُرفع بعد حفظ الطالب وتُعتمد مباشرة، ويمكن رفعها لاحقًا من صفحة الطالب.»
+- Optional, **but once the user starts filling it, it must be complete** (at least one file, plus the name when the type is «أخرى»). Otherwise show the error and don't create the student.
+- After `POST /students` succeeds, take the new student's id and call `POST /students/:id/residency-documents`.
+- If the upload fails, the student still exists. Show a warning that stays on screen: «تمت إضافة الطالب، لكن تعذر رفع وثيقة الإقامة: {message}. يمكن رفعها من صفحة الطالب.»
+- Also show the section on «تعديل طالب» (same as the profile section above).
+
+### 4. Notification
 `residency_document_submitted` goes to the school's admins when a student uploads. `data`: `{ documentId, studentId }`. Tapping it opens the review screen.
 
 ## Test (QA school only, never مواهب)
