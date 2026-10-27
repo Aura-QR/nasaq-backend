@@ -1,3 +1,4 @@
+import { normalizeDate } from '../attendance/attendance.utils';
 import {
   BadRequestException,
   ConflictException,
@@ -236,7 +237,7 @@ describe('Teacher lateness and its reason', () => {
   describe('the question the client asks on open', () => {
     const todaysRecord = (row: any) =>
       attendanceModel.findOne.mockReturnValue({
-        lean: () => ({ exec: async () => row }),
+        sort: () => ({ lean: () => ({ exec: async () => row }) }),
       });
 
     it('is pending while a lateness has no reason', async () => {
@@ -252,6 +253,27 @@ describe('Teacher lateness and its reason', () => {
       expect(result.data.pending).toBe(true);
       expect(result.data.lateMinutes).toBe(25);
       expect(result.data.attendanceId).toBe('att1');
+    });
+
+    it("still asks the next day about yesterday's lateness, dated, newest first", async () => {
+      // Late Monday, on time Tuesday: the notice opened on Tuesday must still
+      // lead to a form, or the teacher has no way to answer it.
+      const today = normalizeDate(new Date());
+      const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+      todaysRecord({ _id: 'att0', date: yesterday, lateMinutes: 7, lateReason: null, checkInAt: yesterday });
+
+      const result: any = await service.pendingLateReason({ userId: teacherId, schoolId });
+
+      expect(result.data).toMatchObject({
+        pending: true,
+        attendanceId: 'att0',
+        date: yesterday.toISOString().slice(0, 10),
+        isToday: false,
+        lateMinutes: 7,
+      });
+      const query = attendanceModel.findOne.mock.calls[0][0];
+      expect(query.date.$lte.getTime()).toBe(today.getTime());
+      expect(query.date.$gte.getTime()).toBe(today.getTime() - 7 * 24 * 60 * 60 * 1000);
     });
 
     it('is not pending once the reason is in, so the dialog stops reappearing', async () => {

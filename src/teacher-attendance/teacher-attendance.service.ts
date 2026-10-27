@@ -47,6 +47,9 @@ import {
 // Preserve existing imports from this service for callers and tests.
 export * from '../attendance/attendance.utils';
 
+/** How far back a teacher is still asked for the reason of an unexplained lateness. */
+export const LATE_REASON_LOOKBACK_DAYS = 7;
+
 @Injectable()
 export class TeacherAttendanceService {
   private readonly logger = new Logger(TeacherAttendanceService.name);
@@ -171,7 +174,9 @@ export class TeacherAttendanceService {
           recipientId: record.teacherId,
           type: 'late_reason_required',
           title: 'يُرجى بيان سبب التأخير',
-          body: `سُجّل تأخيرك اليوم ${lateMinutes} دقيقة. اذكر السبب ليصل إلى إدارة المدرسة.`,
+          // Dated, not «اليوم»: a teacher who opens the bell the next morning
+          // read yesterday's notice as today's and could not find the form.
+          body: `سُجّل تأخيرك بتاريخ ${dateLabel} مدة ${lateMinutes} دقيقة. اذكر السبب ليصل إلى إدارة المدرسة.`,
           data: payload,
         }),
       ]);
@@ -192,14 +197,19 @@ export class TeacherAttendanceService {
    */
   async pendingLateReason(user: any) {
     const today = normalizeDate(new Date());
+    // The last week, newest first, not today alone: a teacher late on Monday
+    // who opens the notice on Tuesday found nothing to answer, because on
+    // Tuesday she was on time.
+    const since = new Date(today.getTime() - LATE_REASON_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
     const record = await this.teacherAttendanceModel
       .findOne({
         teacherId: new Types.ObjectId(String(user.userId)),
-        date: today,
+        date: { $gte: since, $lte: today },
         lateMinutes: { $gt: 0 },
         lateReason: null,
       })
+      .sort({ date: -1 })
       .lean()
       .exec();
 
@@ -212,7 +222,8 @@ export class TeacherAttendanceService {
       data: {
         pending: true,
         attendanceId: String((record as any)._id),
-        date: today.toISOString().slice(0, 10),
+        date: normalizeDate((record as any).date).toISOString().slice(0, 10),
+        isToday: normalizeDate((record as any).date).getTime() === today.getTime(),
         lateMinutes: (record as any).lateMinutes,
         checkInAt: (record as any).checkInAt,
       },

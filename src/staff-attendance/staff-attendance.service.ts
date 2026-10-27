@@ -547,26 +547,32 @@ export class StaffAttendanceService {
   async pendingLateReason(user: any) {
     const settings = await this.settings(user);
     const today = this.date(staffCalendarDate(new Date(), settings.timezone));
+    // The last week, newest first, as for teachers: a lateness opened the next
+    // day must still be answerable.
+    const since = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     const record = await this.records
       .findOne({
         ...this.scope(user),
         staffId: this.objectId(String(user.userId)),
-        date: today,
+        date: { $gte: since, $lte: today },
         lateMinutes: { $gt: 0 },
         lateReason: null,
       })
+      .sort({ date: -1 })
       .lean()
       .exec();
 
     if (!record) return { status: true, data: { pending: false } };
 
+    const recordDate = new Date((record as any).date);
     return {
       status: true,
       data: {
         pending: true,
         attendanceId: String((record as any)._id),
-        date: today.toISOString().slice(0, 10),
+        date: recordDate.toISOString().slice(0, 10),
+        isToday: recordDate.getTime() === today.getTime(),
         lateMinutes: (record as any).lateMinutes,
         checkInAt: (record as any).checkInAt,
       },
