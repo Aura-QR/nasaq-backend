@@ -22,9 +22,11 @@ export class CreateStaffLeaveRequestDto {
   @ApiProperty({ example: 'موعد طبي' })
   // Required (29 Oct): the school decides on the reason, and a request without
   // one only comes back as a question.
+  // A missing value fails all three, and any of them may be the message shown,
+  // so each one reads correctly on its own.
   @IsString({ message: 'سبب الاستئذان مطلوب' })
   @IsNotEmpty({ message: 'سبب الاستئذان مطلوب' })
-  @MaxLength(500)
+  @MaxLength(500, { message: 'سبب الاستئذان مطلوب، بحد أقصى 500 حرف' })
   reason: string;
 
   /**
