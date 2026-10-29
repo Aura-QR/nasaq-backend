@@ -203,6 +203,33 @@ describe('DutyService', () => {
       expect(result.data.leaveAt).toBe('11:30');
     });
 
+    it("tells the school's administrators, but not whoever filed it for the teacher", async () => {
+      const owner = await mk(models[Admin.name], {
+        username: 'owner-l', email: 'owner-l@x.com', password: 'x', role: 'OWNER', permissions: [], schoolId,
+      });
+      const manager = await mk(models[Admin.name], {
+        username: 'mgr-l', email: 'mgr-l@x.com', password: 'x', role: 'MANAGER', permissions: [], schoolId,
+      });
+
+      await file({ reason: 'موعد طبي' });
+      const notices: any[] = await models[Notification.name].collection.find({ type: 'leave_requested' }).toArray();
+      expect(notices.map((n: any) => String(n.recipientId)).sort()).toEqual([String(owner._id), String(manager._id)].sort());
+      expect(notices[0].title).toBe('طلب استئذان — أ. أروى');
+      expect(notices[0].body).toContain('انصراف 11:30');
+      expect(notices[0].body).toContain('موعد طبي');
+
+      // Filed by the manager on the teacher's behalf: only the owner hears of it.
+      await models[Notification.name].collection.deleteMany({});
+      await asTenant(() =>
+        service.createLeaveRequest(
+          { date: '2026-03-02', leaveAt: '10:00', teacherId: String(mathsTeacher) },
+          { userId: String(manager._id), role: 'MANAGER', schoolId },
+        ),
+      );
+      const second: any[] = await models[Notification.name].collection.find({ type: 'leave_requested' }).toArray();
+      expect(second.map((n: any) => String(n.recipientId))).toEqual([String(owner._id)]);
+    });
+
     it('ignores a teacherId sent by a teacher', async () => {
       const result: any = await asTenant(() =>
         service.createLeaveRequest(

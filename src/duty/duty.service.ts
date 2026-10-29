@@ -3,6 +3,8 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
+  Optional,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -30,6 +32,8 @@ import {
 import { SetDutySupervisorsDto } from './dto/duty-supervisor.dto';
 import { CreateSubstitutionDto } from './dto/substitution.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PermissionsService } from '../permissions/permissions.service';
+import { adminsWhoCanRead } from '../notifications/admin-audience';
 import { isActivityLecture } from '../subjects/activity.util';
 
 const WEEKDAY_NAMES = [
@@ -98,6 +102,8 @@ export class DutyService {
     @InjectModel(StaffLeaveRequest.name)
     private readonly staffLeaveModel: Model<StaffLeaveRequest>,
     private readonly notifications: NotificationsService,
+    // Optional: without it every administrator is told (adminsWhoCanRead).
+    @Optional() private readonly permissions?: PermissionsService,
   ) {}
 
   // ───────────────────────────────────────────────── leave requests
@@ -131,6 +137,7 @@ export class DutyService {
       existing.fromSlot = dto.fromSlot ?? null;
       existing.reason = dto.reason ?? '';
       await existing.save();
+      await this.announceLeaveRequest(existing, user, true);
       return { message: 'تم تحديث طلب الاستئذان', data: existing };
     }
 
@@ -144,7 +151,57 @@ export class DutyService {
       status: 'pending',
     }).save();
 
+    await this.announceLeaveRequest(created, user, false);
     return { message: 'تم إرسال طلب الاستئذان', data: created };
+  }
+
+  /**
+   * Tells the school's administrators a teacher asked to leave early.
+   *
+   * There was no notice at all: the request sat in the duty screen until
+   * somebody happened to open it, and a teacher asking to leave at ten got
+   * her answer after ten, if at all. Staff leave already notified; teachers
+   * now match it. Whoever filed it on the teacher's behalf is not told.
+   * Never throws: the request is saved whether or not the notice goes out.
+   */
+  private async announceLeaveRequest(request: any, user: any, updated: boolean) {
+    try {
+      const schoolId = user?.schoolId ?? request.schoolId;
+      if (!schoolId) return;
+      const admins = await this.adminModel
+        .find({
+          schoolId: new mongoose.Types.ObjectId(String(schoolId)),
+          role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] },
+        })
+        .select('_id role jobTitleId')
+        .setOptions({ skipTenantScope: true })
+        .lean()
+        .exec();
+      const actor = user?.role === 'TEACHER' ? null : String(user?.userId ?? '');
+      const recipients = (await adminsWhoCanRead(admins as any[], 'duty', schoolId, this.permissions)).filter(
+        (id) => id !== actor,
+      );
+      const dateLabel = toDateOnly(request.date);
+      await Promise.all(
+        recipients.map((recipientId) =>
+          this.notifications.notify({
+            recipientId,
+            type: 'leave_requested',
+            title: `${updated ? 'تعديل طلب استئذان' : 'طلب استئذان'} — ${request.teacherName || 'معلم'}`,
+            body: [`${dateLabel} · انصراف ${request.leaveAt}`, request.reason].filter(Boolean).join(' — '),
+            data: {
+              leaveRequestId: String(request._id),
+              teacherId: String(request.teacherId),
+              teacherName: request.teacherName ?? '',
+              date: dateLabel,
+              leaveAt: request.leaveAt,
+            },
+          }),
+        ),
+      );
+    } catch (error: any) {
+      new Logger(DutyService.name).error(`Could not announce leave request ${request?._id}: ${error?.message}`);
+    }
   }
 
   async listLeaveRequests(filters: {

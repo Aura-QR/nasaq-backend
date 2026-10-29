@@ -3,6 +3,8 @@ import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 export const NOTIFICATION_TYPES = [
+  // A teacher's request to leave early, to the school's administrators.
+  'leave_requested',
   'leave_approved',
   'leave_rejected',
   'cover_assigned',

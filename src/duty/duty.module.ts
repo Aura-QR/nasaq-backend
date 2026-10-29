@@ -31,6 +31,7 @@ import {
   StaffLeaveRequestSchema,
 } from '../staff-attendance/schemas/staff-leave-request.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PermissionsModule } from '../permissions/permissions.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: StaffLeaveRequest.name, schema: StaffLeaveRequestSchema },
     ]),
     NotificationsModule,
+    PermissionsModule,
   ],
   controllers: [DutyController],
   providers: [DutyService],
