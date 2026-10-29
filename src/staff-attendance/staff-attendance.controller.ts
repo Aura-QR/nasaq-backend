@@ -74,6 +74,18 @@ export class StaffAttendanceController {
   }
 
   @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
+  @Post('me/leave-return')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Back on site from an approved استئذان (reopens the day, tells the school)' })
+  returnFromLeave(
+    @CurrentUser() user: any,
+    @Body() dto: StaffLocationDto,
+    @Req() req: any,
+  ) {
+    return this.service.returnFromLeave(user, dto, req);
+  }
+
+  @Roles(Role.MANAGER, Role.SUPERVISOR, Role.STAFF)
   @Post('check-out')
   @HttpCode(200)
   @ApiOperation({ summary: 'Manager/supervisor self check-out' })

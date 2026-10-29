@@ -6,8 +6,7 @@ import {
   IsOptional,
   IsString,
   Matches,
-  MaxLength,
-} from 'class-validator';
+  MaxLength, IsNotEmpty } from 'class-validator';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -20,11 +19,13 @@ export class CreateStaffLeaveRequestDto {
   @Matches(TIME_PATTERN, { message: 'وقت الانصراف يجب أن يكون بصيغة HH:mm' })
   leaveAt: string;
 
-  @ApiPropertyOptional({ example: 'موعد طبي' })
-  @IsOptional()
-  @IsString()
+  @ApiProperty({ example: 'موعد طبي' })
+  // Required (29 Oct): the school decides on the reason, and a request without
+  // one only comes back as a question.
+  @IsString({ message: 'سبب الاستئذان مطلوب' })
+  @IsNotEmpty({ message: 'سبب الاستئذان مطلوب' })
   @MaxLength(500)
-  reason?: string;
+  reason: string;
 
   /**
    * Filing on behalf of somebody else. A manager may; a supervisor files only

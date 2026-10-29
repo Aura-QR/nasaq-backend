@@ -67,6 +67,26 @@ export class StaffLeaveRequest extends Document {
   @Prop({ type: String, default: '' })
   reviewNote: string;
 
+  /**
+   * Coming back from a استئذان (the teacher or staff member taps «تسجيل العودة»
+   * on site). departedAt is the check-out she recorded when leaving, if any;
+   * returning reopens her day so she checks out again at its end.
+   */
+  @Prop({ type: Date, default: null })
+  departedAt: Date | null;
+
+  @Prop({ type: Date, default: null })
+  returnedAt: Date | null;
+
+  @Prop({ type: Number, default: null })
+  returnDistanceMeters: number | null;
+
+  @Prop({ type: Object, default: null })
+  returnVerification: { gps: boolean; network: boolean } | null;
+
+  @Prop({ type: Boolean, default: false })
+  returnMockLocationSuspected: boolean;
+
   schoolId?: Types.ObjectId;
 }
 

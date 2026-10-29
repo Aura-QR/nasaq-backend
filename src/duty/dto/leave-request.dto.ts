@@ -8,8 +8,7 @@ import {
   Matches,
   Max,
   MaxLength,
-  Min,
-} from 'class-validator';
+  Min, IsNotEmpty } from 'class-validator';
 import { LEAVE_STATUSES, LeaveStatus } from '../schemas/leave-request.schema';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -37,11 +36,13 @@ export class CreateLeaveRequestDto {
   @Max(10)
   fromSlot?: number;
 
-  @ApiPropertyOptional({ example: 'ظرف عائلي' })
-  @IsOptional()
-  @IsString()
+  @ApiProperty({ example: 'ظرف عائلي' })
+  // Required (29 Oct): the school decides on the reason, and a request without
+  // one only comes back as a question.
+  @IsString({ message: 'سبب الاستئذان مطلوب' })
+  @IsNotEmpty({ message: 'سبب الاستئذان مطلوب' })
   @MaxLength(500)
-  reason?: string;
+  reason: string;
 
   @ApiPropertyOptional({
     description:

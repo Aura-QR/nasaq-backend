@@ -356,3 +356,74 @@ describe('Staff leave requests', () => {
     });
   });
 });
+
+describe('Coming back from a staff leave', () => {
+  const schoolId = '60d5ecb8b5c9c22b8c8b4200';
+  const staffId = '60d5ecb8b5c9c22b8c8b4009';
+  const managerId = '60d5ecb8b5c9c22b8c8b4100';
+  const guard = { userId: staffId, schoolId, role: 'STAFF', name: 'الحارس' };
+  const onSite = { lat: 24.7136, lng: 46.6753 };
+  const req = { ip: '203.0.113.5', headers: {} };
+  const leftAt = new Date('2026-09-22T07:00:00.000Z'); // 10:00 Riyadh
+
+  const build = (leave: any, record: any) => {
+    const records = {
+      findOne: jest.fn().mockReturnValue({ lean: async () => record }),
+      updateOne: jest.fn().mockResolvedValue({ modifiedCount: 1 }),
+    };
+    const leaves: any = { findOne: jest.fn().mockResolvedValue(leave) };
+    const admins = {
+      findOne: jest.fn().mockReturnValue({
+        select: () => ({ lean: async () => ({ _id: staffId, username: 'الحارس', role: 'STAFF' }) }),
+      }),
+      find: jest.fn().mockReturnValue({
+        select: () => ({ setOptions: () => ({ lean: () => ({ exec: async () => [{ _id: managerId }] }) }) }),
+      }),
+    };
+    const schools = {
+      findById: jest.fn().mockReturnValue({
+        setOptions: () => ({
+          lean: async () => ({
+            settings: { timezone: 'Asia/Riyadh', staffCheckInEnabled: true, location: onSite, checkInRadiusMeters: 150 },
+          }),
+        }),
+      }),
+    };
+    const notifications = { notify: jest.fn().mockResolvedValue(undefined) };
+    const service = new StaffAttendanceService(records as any, admins as any, schools as any, leaves, notifications as any);
+    return { service, records, notifications };
+  };
+
+  const approvedLeave = () => ({ _id: 'leave1', leaveAt: '10:00', status: 'approved', returnedAt: null, save: jest.fn() });
+
+  it('reopens the day closed when leaving, keeps when they left, and tells the school', async () => {
+    const leave = approvedLeave();
+    const { service, records, notifications } = build(leave, { _id: 'r1', checkInAt: new Date(), checkOutAt: leftAt });
+
+    const result: any = await service.returnFromLeave(guard, onSite as any, req);
+
+    expect(records.updateOne).toHaveBeenCalledWith(
+      expect.objectContaining({ _id: 'r1' }),
+      { $set: expect.objectContaining({ checkOutAt: null, workMinutes: null, earlyLeaveApproved: false }) },
+    );
+    expect((leave as any).departedAt).toBe(leftAt);
+    expect((leave as any).returnedAt).toBeInstanceOf(Date);
+    expect(leave.save).toHaveBeenCalled();
+    expect(result.data.departedAt).toBe(leftAt);
+    const notice = notifications.notify.mock.calls[0][0];
+    expect(notice).toMatchObject({ recipientId: managerId, type: 'staff_leave_returned', title: 'عاد الحارس من الاستئذان' });
+    expect(notice.body).toContain('خرج الساعة 10:00');
+  });
+
+  it('refuses without an approved leave today, and a second return', async () => {
+    await expect(build(null, null).service.returnFromLeave(guard, onSite as any, req)).rejects.toThrow('لا يوجد استئذان معتمد');
+    const back = { ...approvedLeave(), returnedAt: new Date() };
+    await expect(build(back, null).service.returnFromLeave(guard, onSite as any, req)).rejects.toThrow('بالفعل');
+  });
+
+  it('refuses off site', async () => {
+    await expect(
+      build(approvedLeave(), null).service.returnFromLeave(guard, { lat: 21.5, lng: 39.2 } as any, req),
+    ).rejects.toThrow('خارج نطاق المدرسة');
+  });
+});

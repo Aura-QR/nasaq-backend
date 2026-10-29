@@ -348,6 +348,97 @@ export class StaffAttendanceService {
     return { status: true, message: 'تم تسجيل انصرافك', data: updated };
   }
 
+  /**
+   * Back on site from an approved استئذان. Same reasoning as for teachers:
+   * the check-out made when leaving is kept on the leave as departedAt, the
+   * day is reopened so the rest of it is recorded, and the school is told.
+   */
+  async returnFromLeave(user: any, dto: StaffLocationDto, req: any) {
+    const staff = await this.staffMember(user, user.userId, true);
+    const settings = await this.settings(user);
+    const verified = this.verifyLocation(settings, dto, req);
+    const returnedAt = new Date();
+    const date = this.date(staffCalendarDate(returnedAt, settings.timezone));
+
+    const leave = await this.leaves.findOne({ ...this.scope(user), staffId: staff._id, date, status: 'approved' });
+    if (!leave) throw new BadRequestException('لا يوجد استئذان معتمد لك اليوم');
+    if ((leave as any).returnedAt) throw new ConflictException('تم تسجيل عودتك من الاستئذان بالفعل');
+
+    const key = { ...this.scope(user), staffId: staff._id, date };
+    const record = await this.records.findOne(key).lean();
+    if (record?.checkOutAt) {
+      (leave as any).departedAt = record.checkOutAt;
+      await this.records.updateOne(
+        { ...key, _id: record._id },
+        {
+          $set: {
+            checkOutAt: null,
+            checkOutMethod: null,
+            checkOutCoordinates: null,
+            checkOutDistanceMeters: null,
+            checkOutVerification: null,
+            checkOutMockLocationSuspected: false,
+            workMinutes: null,
+            earlyLeaveMinutes: null,
+            earlyLeaveApproved: false,
+            approvedLeaveAt: null,
+          },
+        },
+      );
+    }
+
+    (leave as any).returnedAt = returnedAt;
+    (leave as any).returnDistanceMeters = verified.distanceMeters;
+    (leave as any).returnVerification = verified.verification;
+    (leave as any).returnMockLocationSuspected = dto.mockLocationSuspected ?? false;
+    await leave.save();
+
+    const clock = (at: Date) =>
+      new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: settings.timezone || 'Asia/Riyadh',
+      }).format(at);
+    const name = displayNameOf(staff);
+    const departed = (leave as any).departedAt ? clock((leave as any).departedAt) : (leave as any).leaveAt;
+    try {
+      const admins = await this.adminIds(user.schoolId, user.userId);
+      await Promise.all(
+        admins.map((recipientId) =>
+          this.notifications.notify({
+            recipientId,
+            type: 'staff_leave_returned',
+            title: `عاد ${name} من الاستئذان`,
+            body: `خرج الساعة ${departed} وعاد الساعة ${clock(returnedAt)}`,
+            data: {
+              leaveRequestId: String(leave._id),
+              staffId: String(staff._id),
+              staffName: name,
+              date: date.toISOString().slice(0, 10),
+              departedAt: (leave as any).departedAt ?? null,
+              returnedAt,
+            },
+          }),
+        ),
+      );
+    } catch {
+      // The return is recorded whether or not the notice goes out.
+    }
+
+    return {
+      status: true,
+      message: 'تم تسجيل عودتك من الاستئذان',
+      data: {
+        leaveRequestId: String(leave._id),
+        departedAt: (leave as any).departedAt ?? null,
+        returnedAt,
+        distanceMeters: verified.distanceMeters,
+        verification: verified.verification,
+      },
+    };
+  }
+
   async createManual(user: any, dto: CreateManualStaffAttendanceDto) {
     // Resolve the target first: the owner is not staff, so a record for them is
     // "not found" whoever asks. Only a real staff member can be one's own.

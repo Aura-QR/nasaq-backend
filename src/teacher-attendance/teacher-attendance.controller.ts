@@ -197,6 +197,23 @@ export class TeacherAttendanceController {
     return this.teacherAttendanceService.checkIn(user, dto, req);
   }
 
+  @Post('me/leave-return')
+  @Roles(Role.TEACHER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Back on site from an approved استئذان',
+    description:
+      'Verified like a check-in. Reopens the day if leaving was recorded as a ' +
+      'check-out (kept on the leave as departedAt) and tells the school.',
+  })
+  async returnFromLeave(
+    @CurrentUser() user: any,
+    @Body() dto: CheckOutTeacherAttendanceDto,
+    @Req() req: any,
+  ) {
+    return this.teacherAttendanceService.returnFromLeave(user, dto, req);
+  }
+
   @Post('check-out')
   @Roles(Role.TEACHER)
   @HttpCode(HttpStatus.OK)

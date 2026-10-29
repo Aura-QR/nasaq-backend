@@ -952,6 +952,128 @@ export class TeacherAttendanceService {
   }
 
   /**
+   * The teacher is back on site from an approved استئذان.
+   *
+   * Leaving was recorded as a check-out, which closed her day; coming back
+   * has to reopen it, or the hours after her return go unrecorded and the
+   * monthly report shows her gone from ten o'clock. The check-out she made
+   * when leaving is kept on the leave as departedAt, the record is opened
+   * again, and she checks out at the end of the day as usual. The school is
+   * told, because a supervisor who let a teacher out wants to know she is
+   * back in the building. Verified on site the same way as a check-in.
+   */
+  async returnFromLeave(user: any, dto: CheckOutTeacherAttendanceDto, req?: any) {
+    const settings = await this.getSchoolSettings(user.schoolId);
+    if (!settings) {
+      throw new BadRequestException('لم يتم العثور على إعدادات المدرسة');
+    }
+    if (!settings.teacherCheckInEnabled) {
+      throw new BadRequestException('التسجيل الذاتي غير مفعّل');
+    }
+    if (
+      !settings.location ||
+      typeof settings.location.lat !== 'number' ||
+      typeof settings.location.lng !== 'number'
+    ) {
+      throw new BadRequestException('لم يتم تحديد موقع المدرسة بعد');
+    }
+
+    const today = normalizeDate(new Date());
+    const leave = await this.leaveRequestModel.findOne({
+      teacherId: new Types.ObjectId(String(user.userId)),
+      date: today,
+      status: 'approved',
+    });
+    if (!leave) {
+      throw new BadRequestException('لا يوجد استئذان معتمد لك اليوم');
+    }
+    if ((leave as any).returnedAt) {
+      throw new ConflictException('تم تسجيل عودتك من الاستئذان بالفعل');
+    }
+
+    const distanceMeters = calculateHaversineDistance(
+      { lat: dto.lat, lng: dto.lng },
+      settings.location,
+    );
+    const gpsPassed = distanceMeters <= (settings.checkInRadiusMeters || 150);
+    const networkPassed =
+      Array.isArray(settings.schoolNetworkIps) &&
+      settings.schoolNetworkIps.includes(extractClientIp(req));
+    if (!gpsPassed && !networkPassed) {
+      throw new ForbiddenException(
+        `الموقع الشبكي والإحداثيات خارج نطاق المدرسة (المسافة: ${distanceMeters} متر)`,
+      );
+    }
+
+    const returnedAt = new Date();
+    const record = await this.teacherAttendanceModel.findOne({
+      teacherId: new Types.ObjectId(String(user.userId)),
+      date: today,
+    });
+    if (record?.checkOutAt) {
+      (leave as any).departedAt = record.checkOutAt;
+      record.checkOutAt = null as any;
+      record.checkOutMethod = null as any;
+      record.checkOutCoordinates = null as any;
+      record.checkOutDistanceMeters = null as any;
+      record.checkOutVerification = null as any;
+      record.checkOutMockLocationSuspected = false;
+      record.workMinutes = null as any;
+      record.earlyLeaveMinutes = null as any;
+      record.earlyLeaveApproved = false;
+      record.approvedLeaveAt = null as any;
+      await record.save();
+    }
+
+    (leave as any).returnedAt = returnedAt;
+    (leave as any).returnDistanceMeters = distanceMeters;
+    (leave as any).returnVerification = { gps: gpsPassed, network: networkPassed };
+    (leave as any).returnMockLocationSuspected = dto.mockLocationSuspected ?? false;
+    await leave.save();
+
+    const teacherName = (leave as any).teacherName || record?.name || 'المعلم';
+    const departed = (leave as any).departedAt
+      ? this.clockTime((leave as any).departedAt, settings.timezone)
+      : leave.leaveAt;
+    const back = this.clockTime(returnedAt, settings.timezone);
+    try {
+      const admins = await this.schoolAdminIds(user.schoolId);
+      await Promise.all(
+        admins.map((recipientId) =>
+          this.notifications.notify({
+            recipientId,
+            type: 'leave_returned',
+            title: `عادت ${teacherName} من الاستئذان`,
+            body: `خرجت الساعة ${departed} وعادت الساعة ${back}`,
+            data: {
+              leaveRequestId: String(leave._id),
+              teacherId: String(leave.teacherId),
+              teacherName,
+              date: today.toISOString().slice(0, 10),
+              departedAt: (leave as any).departedAt ?? null,
+              returnedAt,
+            },
+          }),
+        ),
+      );
+    } catch (error: any) {
+      this.logger.error(`Could not announce the return from leave ${leave._id}: ${error?.message}`);
+    }
+
+    return {
+      status: true,
+      message: 'تم تسجيل عودتك من الاستئذان',
+      data: {
+        leaveRequestId: String(leave._id),
+        departedAt: (leave as any).departedAt ?? null,
+        returnedAt,
+        distanceMeters,
+        verification: { gps: gpsPassed, network: networkPassed },
+      },
+    };
+  }
+
+  /**
    * Per-teacher totals over a period.
    *
    * Reads the snapshotted lateMinutes / workMinutes rather than recomputing —

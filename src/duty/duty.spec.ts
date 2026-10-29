@@ -222,7 +222,7 @@ describe('DutyService', () => {
       await models[Notification.name].collection.deleteMany({});
       await asTenant(() =>
         service.createLeaveRequest(
-          { date: '2026-03-02', leaveAt: '10:00', teacherId: String(mathsTeacher) },
+          { date: '2026-03-02', leaveAt: '10:00', reason: 'ظرف طارئ', teacherId: String(mathsTeacher) },
           { userId: String(manager._id), role: 'MANAGER', schoolId },
         ),
       );
@@ -233,7 +233,7 @@ describe('DutyService', () => {
     it('ignores a teacherId sent by a teacher', async () => {
       const result: any = await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '10:00', teacherId: String(mathsTeacher) },
+          { date: DATE, leaveAt: '10:00', reason: 'ظرف طارئ', teacherId: String(mathsTeacher) },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -291,7 +291,7 @@ describe('DutyService', () => {
       await file();
       await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '12:00' },
+          { date: DATE, leaveAt: '12:00', reason: 'ظرف طارئ' },
           { userId: String(mathsTeacher), role: 'TEACHER' },
         ),
       );
@@ -444,7 +444,7 @@ describe('DutyService', () => {
       await checkInAllExcept();
       const filed: any = await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '10:00', fromSlot: 2 },
+          { date: DATE, leaveAt: '10:00', reason: 'ظرف طارئ', fromSlot: 2 },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -465,7 +465,7 @@ describe('DutyService', () => {
       await checkInAllExcept();
       const filed: any = await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '10:00' },
+          { date: DATE, leaveAt: '10:00', reason: 'ظرف طارئ' },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -481,7 +481,7 @@ describe('DutyService', () => {
       await checkInAllExcept();
       await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '10:00' },
+          { date: DATE, leaveAt: '10:00', reason: 'ظرف طارئ' },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -655,7 +655,7 @@ describe('DutyService', () => {
     it('reads a day where a teacher is both absent and on leave', async () => {
       const filed: any = await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '10:00' },
+          { date: DATE, leaveAt: '10:00', reason: 'ظرف طارئ' },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -715,7 +715,7 @@ describe('DutyService', () => {
     it('tells the teacher their leave was decided, and carries the note', async () => {
       const filed: any = await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '11:00' },
+          { date: DATE, leaveAt: '11:00', reason: 'ظرف طارئ' },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -736,7 +736,7 @@ describe('DutyService', () => {
     it('says so when a request is rejected', async () => {
       const filed: any = await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '11:00' },
+          { date: DATE, leaveAt: '11:00', reason: 'ظرف طارئ' },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -751,7 +751,7 @@ describe('DutyService', () => {
     it('writes nothing when a request is only put back to pending', async () => {
       const filed: any = await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '11:00' },
+          { date: DATE, leaveAt: '11:00', reason: 'ظرف طارئ' },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -906,7 +906,7 @@ describe('DutyService', () => {
     it('flags the periods an approved leave excuses, rather than hiding them', async () => {
       const filed: any = await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '10:00', fromSlot: 2 },
+          { date: DATE, leaveAt: '10:00', reason: 'ظرف طارئ', fromSlot: 2 },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -927,7 +927,7 @@ describe('DutyService', () => {
     it('reports a pending request without excusing anything', async () => {
       await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '10:00' },
+          { date: DATE, leaveAt: '10:00', reason: 'ظرف طارئ' },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );
@@ -1039,7 +1039,7 @@ describe('DutyService', () => {
     it('counts approved leaves but not pending ones', async () => {
       const filed: any = await asTenant(() =>
         service.createLeaveRequest(
-          { date: DATE, leaveAt: '11:00' },
+          { date: DATE, leaveAt: '11:00', reason: 'ظرف طارئ' },
           { userId: String(arabicTeacher), role: 'TEACHER' },
         ),
       );

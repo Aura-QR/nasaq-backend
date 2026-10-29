@@ -5,6 +5,8 @@ import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 export const NOTIFICATION_TYPES = [
   // A teacher's request to leave early, to the school's administrators.
   'leave_requested',
+  // Back on site from an approved استئذان, to the school's administrators.
+  'leave_returned',
   'leave_approved',
   'leave_rejected',
   'cover_assigned',
@@ -55,6 +57,7 @@ export const NOTIFICATION_TYPES = [
   'staff_leave_requested',
   'staff_leave_approved',
   'staff_leave_rejected',
+  'staff_leave_returned',
   // A non-Saudi student's residency document: the family's upload goes to the
   // school for review, and the ruling goes back to the student.
   'residency_document_submitted',
