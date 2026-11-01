@@ -357,6 +357,206 @@ export class TeachersService {
     };
   }
 
+  /**
+   * What «إنهاء خدمة المعلم» would do, without doing it.
+   *
+   * A teacher who leaves cannot be deleted while lectures point at her, and
+   * moving them one by one through the timetable is 20-odd edits. This shows
+   * where each lecture goes: to the replacement, or — when the replacement
+   * already teaches another class in that period — left without a teacher.
+   */
+  async previewEndService(id: string, replacementTeacherId?: string) {
+    const plan = await this.planEndService(id, replacementTeacherId);
+    return {
+      message: 'تم تجهيز ملخص إنهاء الخدمة',
+      data: this.describePlan(plan),
+    };
+  }
+
+  /**
+   * Ends a teacher's service: her lectures and subject assignments go to the
+   * replacement and her account is deactivated, which also stops her signing
+   * in. Nothing she recorded is deleted.
+   */
+  async endService(id: string, replacementTeacherId?: string) {
+    const plan = await this.planEndService(id, replacementTeacherId);
+    const { teacher, replacement, lectures, conflictIds, assignments } = plan;
+
+    if (teacher.isActive === false && (teacher as any).serviceEndedAt) {
+      throw new BadRequestException('تم إنهاء خدمة هذا المعلم بالفعل');
+    }
+
+    const unassignIds = replacement
+      ? lectures.filter((l) => conflictIds.has(String(l._id))).map((l) => l._id)
+      : lectures.map((l) => l._id);
+    const moveIds = replacement
+      ? lectures.filter((l) => !conflictIds.has(String(l._id))).map((l) => l._id)
+      : [];
+
+    if (unassignIds.length) {
+      await this.lectureModel
+        .updateMany({ _id: { $in: unassignIds } }, { $set: { teacherId: null } })
+        .exec();
+    }
+
+    if (moveIds.length) {
+      try {
+        await this.lectureModel
+          .updateMany({ _id: { $in: moveIds } }, { $set: { teacherId: replacement._id } })
+          .exec();
+      } catch (error: any) {
+        // The replacement was booked into one of these periods between the
+        // check above and this write.
+        if (error?.code === 11000) {
+          throw new ConflictException(
+            'تغيّر جدول المعلم البديل أثناء التنفيذ، يرجى إعادة المحاولة',
+          );
+        }
+        throw error;
+      }
+    }
+
+    if (replacement && assignments.length) {
+      const existing = await this.teacherAssignmentModel
+        .find({ teacherId: replacement._id })
+        .select('subjectOfferingId classId')
+        .lean()
+        .exec();
+      const key = (a: any) => `${String(a.subjectOfferingId)}|${String(a.classId ?? null)}`;
+      const held = new Set((existing as any[]).map(key));
+      const toCreate = assignments
+        .filter((a: any) => !held.has(key(a)))
+        .map((a: any) => ({
+          teacherId: replacement._id,
+          subjectOfferingId: a.subjectOfferingId,
+          classId: a.classId ?? null,
+        }));
+      if (toCreate.length) {
+        await this.teacherAssignmentModel.create(toCreate);
+      }
+    }
+    // Her assignments go either way: left behind, an inactive teacher keeps
+    // being offered for these subjects in every timetable form.
+    if (assignments.length) {
+      await this.teacherAssignmentModel.deleteMany({ teacherId: teacher._id }).exec();
+    }
+
+    await this.teacherModel
+      .updateOne(
+        { _id: teacher._id },
+        {
+          $set: {
+            isActive: false,
+            serviceEndedAt: new Date(),
+            replacedByTeacherId: replacement?._id ?? null,
+          },
+        },
+      )
+      .exec();
+
+    return {
+      message: replacement
+        ? `تم إنهاء خدمة ${teacher.name} ونقل ${moveIds.length} حصة إلى ${replacement.name}`
+        : `تم إنهاء خدمة ${teacher.name}`,
+      data: {
+        ...this.describePlan(plan),
+        movedLectures: moveIds.length,
+        unassignedLectures: unassignIds.length,
+      },
+    };
+  }
+
+  private async planEndService(id: string, replacementTeacherId?: string) {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new BadRequestException('معرّف المعلم غير صالح');
+    }
+    const teacher = await this.teacherModel.findById(id).exec();
+    if (!teacher) {
+      throw new NotFoundException(`المعلم بمعرف ${id} غير موجود`);
+    }
+
+    let replacement: any = null;
+    if (replacementTeacherId) {
+      if (!Types.ObjectId.isValid(replacementTeacherId)) {
+        throw new BadRequestException('المعلم البديل غير صالح');
+      }
+      if (String(replacementTeacherId) === String(teacher._id)) {
+        throw new BadRequestException('لا يمكن اختيار المعلم نفسه بديلاً');
+      }
+      replacement = await this.teacherModel.findById(replacementTeacherId).exec();
+      if (!replacement) {
+        throw new NotFoundException('المعلم البديل غير موجود');
+      }
+      if (replacement.isActive === false) {
+        throw new BadRequestException('المعلم البديل غير مفعّل');
+      }
+    }
+
+    const populateLecture = [
+      { path: 'classId', select: 'name' },
+      {
+        path: 'subjectOfferingId',
+        select: 'subjectId',
+        populate: { path: 'subjectId', select: 'subjectName' },
+      },
+    ];
+
+    const lectures = (await this.lectureModel
+      .find({ teacherId: teacher._id })
+      .populate(populateLecture)
+      .lean()
+      .exec()) as any[];
+
+    const slotKey = (l: any) =>
+      `${l.dayOfWeek}|${l.slot}|${String(l.termId?._id ?? l.termId)}`;
+
+    const busy = new Map<string, any>();
+    if (replacement && lectures.length) {
+      const replacementLectures = (await this.lectureModel
+        .find({ teacherId: replacement._id })
+        .populate(populateLecture)
+        .lean()
+        .exec()) as any[];
+      for (const l of replacementLectures) busy.set(slotKey(l), l);
+    }
+
+    const conflicts = lectures
+      .filter((l) => busy.has(slotKey(l)))
+      .map((l) => ({ lecture: l, busyWith: busy.get(slotKey(l)) }));
+    const conflictIds = new Set(conflicts.map((c) => String(c.lecture._id)));
+
+    const assignments = await this.teacherAssignmentModel
+      .find({ teacherId: teacher._id })
+      .lean()
+      .exec();
+
+    return { teacher, replacement, lectures, conflicts, conflictIds, assignments };
+  }
+
+  private describePlan(plan: Awaited<ReturnType<TeachersService['planEndService']>>) {
+    const { teacher, replacement, lectures, conflicts, assignments } = plan;
+    const describeLecture = (l: any) => ({
+      id: String(l._id),
+      dayOfWeek: l.dayOfWeek,
+      slot: l.slot,
+      className: l.classId?.name ?? null,
+      subjectName: l.subjectOfferingId?.subjectId?.subjectName ?? null,
+    });
+
+    return {
+      teacher: { id: String(teacher._id), name: teacher.name, isActive: teacher.isActive },
+      replacement: replacement ? { id: String(replacement._id), name: replacement.name } : null,
+      lectureCount: lectures.length,
+      toMove: replacement ? lectures.length - conflicts.length : 0,
+      toUnassign: replacement ? conflicts.length : lectures.length,
+      assignmentCount: assignments.length,
+      conflicts: conflicts.map((c) => ({
+        ...describeLecture(c.lecture),
+        busyWith: describeLecture(c.busyWith),
+      })),
+    };
+  }
+
   async list() {
     const teachers = await this.teacherModel.find().sort({ createdAt: -1 }).exec();
     return teachers.map((teacher) => ({

@@ -187,6 +187,13 @@ export class AuthService {
             throw new UnauthorizedException('بيانات الدخول غير صحيحة');
         }
 
+        // A teacher whose service ended (or who was switched off) kept signing
+        // in: nothing here looked at isActive. Checked after the password so
+        // the message does not reveal that an account exists.
+        if (role === Role.TEACHER && user.isActive === false) {
+            throw new UnauthorizedException('هذا الحساب موقوف، يرجى مراجعة إدارة المدرسة');
+        }
+
         // Fetch flat permissions
         let permissions: string[] = [];
         let jobTitle: { id: string; name: string } | null = null;

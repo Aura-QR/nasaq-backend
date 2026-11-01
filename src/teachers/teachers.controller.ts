@@ -23,6 +23,7 @@ import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../auth/enums/role.enum';
 import { AdminSetPasswordDto } from '../auth/dto/admin-set-password.dto';
+import { EndServiceDto } from './dto/end-service.dto';
 
 @Controller('teachers')
 @ApiTags('Teachers')
@@ -176,6 +177,30 @@ export class TeachersController {
   @HttpCode(HttpStatus.OK)
   async toggleActive(@Param('id') id: string) {
     return await this.teachersService.toggleActive(id);
+  }
+
+  @ApiOperation({ summary: 'Preview ending a teacher\'s service: where each lecture would go' })
+  @ApiQuery({ name: 'replacementTeacherId', required: false })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
+  @Get(':id/end-service/preview')
+  @HttpCode(HttpStatus.OK)
+  async previewEndService(
+    @Param('id') id: string,
+    @Query('replacementTeacherId') replacementTeacherId?: string,
+  ) {
+    return await this.teachersService.previewEndService(id, replacementTeacherId || undefined);
+  }
+
+  @ApiOperation({
+    summary: 'End a teacher\'s service: move her lectures to a replacement and deactivate her',
+  })
+  @Roles(Role.OWNER, Role.SUPERVISOR, Role.MANAGER, Role.SUPER_ADMIN)
+  @CheckAbilities({ action: 'update', subject: 'Teacher' })
+  @Post(':id/end-service')
+  @HttpCode(HttpStatus.OK)
+  async endService(@Param('id') id: string, @Body() dto: EndServiceDto) {
+    return await this.teachersService.endService(id, dto.replacementTeacherId);
   }
 
   // @ApiOperation({ summary: 'Add a subject to teacher' })

@@ -78,6 +78,18 @@ export class Teacher extends Document {
    */
   @Prop({ type: [String], default: null })
   workDays: string[] | null;
+
+  /**
+   * Set by «إنهاء خدمة المعلم»: when the teacher left, and who took over her
+   * lectures. The account stays (isActive false) so her attendance, daily
+   * tracking and grades keep their author; only her place in the timetable
+   * moves.
+   */
+  @Prop({ type: Date, default: null })
+  serviceEndedAt: Date | null;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Teacher', default: null })
+  replacedByTeacherId: Types.ObjectId | null;
 }
 
 export const TeacherSchema = SchemaFactory.createForClass(Teacher);
