@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBearerAuth }
 
 import { GradesCriteriaService } from './grades-criteria.service';
 import { CreateGradesCriteriaDto } from './dto/create-grades-criteria.dto';
+import { BulkCreateGradesCriteriaDto } from './dto/bulk-create-grades-criteria.dto';
 import { UpdateGradesCriteriaDto } from './dto/update-grades-criteria.dto';
 import { PaginationDto } from 'src/pagination/dto/pagination.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -41,6 +42,16 @@ export class GradesCriteriaController {
   @ApiResponse({ status: 409, description: 'Grading criteria already exists for this subject offering' })
   create(@Body() createGradesCriteriaDto: CreateGradesCriteriaDto) {
     return this.gradesCriteriaService.create(createGradesCriteriaDto);
+  }
+
+  @Post('bulk')
+  @CheckAbilities({ action: 'create', subject: 'GradesCriteria' })
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Apply one distribution to many subject offerings; offerings that already have one keep it' })
+  @ApiResponse({ status: 201, description: 'Distributions created' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation failed' })
+  bulkCreate(@Body() dto: BulkCreateGradesCriteriaDto) {
+    return this.gradesCriteriaService.bulkCreate(dto);
   }
 
   @ApiOperation({ summary: 'Get grading criteria for the authenticated student' })

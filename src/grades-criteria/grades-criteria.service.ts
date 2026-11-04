@@ -6,6 +6,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { CreateGradesCriteriaDto } from './dto/create-grades-criteria.dto';
+import { BulkCreateGradesCriteriaDto } from './dto/bulk-create-grades-criteria.dto';
 import { UpdateGradesCriteriaDto } from './dto/update-grades-criteria.dto';
 import { GradesCriteria } from './schemas/grades-criteria.schema';
 import { Subject } from '../subjects/schemas/subject.schema';
@@ -640,6 +641,59 @@ export class GradesCriteriaService {
     await newGradesCriteria.populate(this.getPopulateOptions());
 
     return transformGradesCriteriaResponse(newGradesCriteria);
+  }
+
+  /**
+   * One distribution for many subject offerings at once. A school starts a
+   * year with a hundred offerings or more and none of them has a
+   * distribution, so no teacher can create an exam; entering them one by one
+   * is what kept مواهب at zero. Offerings that already have a distribution
+   * keep it: this only fills the gaps.
+   */
+  async bulkCreate(dto: BulkCreateGradesCriteriaDto) {
+    const { subjectOfferingIds, ...criteriaFields } = dto;
+    this.validateGradesSum(dto);
+
+    const requested = [...new Set(subjectOfferingIds.map(String))].map(
+      (id) => new mongoose.Types.ObjectId(id),
+    );
+
+    const [offerings, existing] = await Promise.all([
+      this.subjectOfferingModel.find({ _id: { $in: requested } }).select('_id').lean(),
+      this.gradesCriteriaModel.find({ subjectOfferingId: { $in: requested } }).select('subjectOfferingId').lean(),
+    ]);
+
+    const found = new Set(offerings.map((o: any) => String(o._id)));
+    const taken = new Set(existing.map((c: any) => String(c.subjectOfferingId)));
+    const toCreate = requested.filter((id) => found.has(String(id)) && !taken.has(String(id)));
+
+    let created = 0;
+    if (toCreate.length) {
+      try {
+        const docs = await this.gradesCriteriaModel.insertMany(
+          toCreate.map((subjectOfferingId) => ({ ...criteriaFields, subjectOfferingId })),
+          { ordered: false },
+        );
+        created = docs.length;
+      } catch (error: any) {
+        // A distribution added for the same offering between the read and the
+        // write: the unique index refuses it, the rest still go in.
+        if (error?.code !== 11000 && !error?.writeErrors) throw error;
+        created = error?.insertedDocs?.length ?? error?.result?.insertedCount ?? 0;
+      }
+    }
+
+    return {
+      message:
+        created > 0
+          ? `تم توزيع الدرجات على ${created} مادة`
+          : 'لم تُضف توزيعات جديدة؛ المواد المختارة لديها توزيع بالفعل',
+      data: {
+        created,
+        alreadyHad: taken.size,
+        notFound: requested.length - found.size,
+      },
+    };
   }
 
   async filtering(filters: any, pagination: PaginationDto = {}, user?: any) {
