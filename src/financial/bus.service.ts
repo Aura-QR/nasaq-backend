@@ -146,7 +146,7 @@ export class BusService {
     const record = await this.recordModel
       .findOne({ studentId: new mongoose.Types.ObjectId(studentId) })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYearId gender')
+      .populate('classId', 'name roomNumber academicYearId gender')
       .populate('bus.installmentPlanId', 'name numberOfInstallments dueDates')
       .populate('bus.busPlanId', 'name serviceType fee')
       .lean()
@@ -185,7 +185,7 @@ export class BusService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYearId gender')
+      .populate('classId', 'name roomNumber academicYearId gender')
       .populate('bus.installmentPlanId', 'name numberOfInstallments')
       .populate('bus.busPlanId', 'name serviceType fee');
 
@@ -229,7 +229,7 @@ export class BusService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYearId gender');
+      .populate('classId', 'name roomNumber academicYearId gender');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const records = await q.exec();

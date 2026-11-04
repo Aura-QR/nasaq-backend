@@ -150,7 +150,7 @@ export class TripService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYearId gender');
+      .populate('classId', 'name roomNumber academicYearId gender');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const records = await q.exec();
@@ -206,7 +206,7 @@ export class TripService {
       .find(query)
       .sort({ createdAt: -1 })
       .populate('studentId', 'name email schoolEmail')
-      .populate('classId', 'roomNumber academicYearId gender');
+      .populate('classId', 'name roomNumber academicYearId gender');
 
     if (isPaginated) q = q.skip(paginationMeta.skip).limit(paginationMeta.limit);
     const records = await q.exec();
