@@ -39,15 +39,22 @@ export class HomeworkService {
 
   /** When homework set on this preparation is due: the class's next lesson in the subject. */
   async dueDateFor(prep: any): Promise<Date | null> {
-    const lectureId = id(prep?.lecture);
-    if (!prep?.weekOf || !Types.ObjectId.isValid(lectureId)) return null;
-    const lecture: any = await this.lectures.findById(lectureId).select('classId subjectOfferingId termId dayOfWeek slot').lean();
-    if (!lecture) return null;
-    const siblings: any[] = await this.lectures
-      .find({ classId: lecture.classId, subjectOfferingId: lecture.subjectOfferingId, termId: lecture.termId })
-      .select('dayOfWeek slot')
-      .lean();
-    return nextLessonDate(prep.weekOf, lecture, siblings);
+    return (await this.dueDates([prep])).get(id(prep)) ?? null;
+  }
+
+  /**
+   * The timetable slot a preparation was written for.
+   *
+   * Usually the live lecture. A lecture removed from the timetable after the
+   * preparation was written survives only as the snapshot the preparation
+   * keeps in `lecture`, and that snapshot still says which class, subject,
+   * day and period it was.
+   */
+  private slotFrom(prep: any, live: Map<string, any>): any | null {
+    const found = live.get(id(prep.lecture));
+    if (found) return found;
+    const snap = prep.lecture;
+    return snap && typeof snap === 'object' && snap.dayOfWeek && snap.classId && snap.subjectOfferingId ? snap : null;
   }
 
   /**
@@ -56,27 +63,28 @@ export class HomeworkService {
    * costs one timetable read per subject rather than one per lesson.
    */
   private async dueDates(preps: any[]): Promise<Map<string, Date | null>> {
-    const lectureIds = [...new Set(preps.map((p) => id(p.lecture)).filter((v) => Types.ObjectId.isValid(v)))];
     const out = new Map<string, Date | null>();
-    if (!lectureIds.length) return out;
-    const lectures: any[] = await this.lectures
-      .find({ _id: { $in: lectureIds } })
-      .select('classId subjectOfferingId termId dayOfWeek slot')
-      .lean();
-    const byId = new Map(lectures.map((l) => [id(l), l]));
+    const lectureIds = [...new Set(preps.map((p) => id(p.lecture)).filter((v) => Types.ObjectId.isValid(v)))];
+    const live: any[] = lectureIds.length
+      ? await this.lectures.find({ _id: { $in: lectureIds } }).select('classId subjectOfferingId termId dayOfWeek slot').lean()
+      : [];
+    const byId = new Map(live.map((l) => [id(l), l]));
     const groupKey = (l: any) => `${id(l.classId)}|${id(l.subjectOfferingId)}|${id(l.termId)}`;
     const groups = new Map<string, any[]>();
-    for (const l of lectures) {
+    const siblingsOf = async (l: any) => {
       const key = groupKey(l);
-      if (groups.has(key)) continue;
-      groups.set(key, await this.lectures
-        .find({ classId: l.classId, subjectOfferingId: l.subjectOfferingId, termId: l.termId })
-        .select('dayOfWeek slot')
-        .lean());
-    }
+      if (!groups.has(key)) {
+        const same = { classId: id(l.classId), subjectOfferingId: id(l.subjectOfferingId) };
+        let rows: any[] = await this.lectures.find({ ...same, ...(l.termId ? { termId: id(l.termId) } : {}) }).select('dayOfWeek slot').lean();
+        // The term the slot belonged to may be over; the class's timetable now is the next best answer.
+        if (!rows.length && l.termId) rows = await this.lectures.find(same).select('dayOfWeek slot').lean();
+        groups.set(key, rows);
+      }
+      return groups.get(key) ?? [];
+    };
     for (const p of preps) {
-      const lecture = byId.get(id(p.lecture));
-      out.set(id(p._id), lecture ? nextLessonDate(p.weekOf, lecture, groups.get(groupKey(lecture)) ?? []) : null);
+      const slot = this.slotFrom(p, byId);
+      out.set(id(p._id), slot ? nextLessonDate(p.weekOf, slot, await siblingsOf(slot)) : null);
     }
     return out;
   }
@@ -138,7 +146,7 @@ export class HomeworkService {
         subjectName: names.get(id(prep.subject)) ?? '',
         teacherName: teacherName.get(id(prep.submittedBy)) ?? '',
         lessonTitle: prep.lessonTitle ?? '',
-        assignedOn: dayKey(lessonDateFor(prep.weekOf, lectureDay.get(id(prep.lecture)))),
+        assignedOn: dayKey(lessonDateFor(prep.weekOf, lectureDay.get(id(prep.lecture)) ?? prep.lecture?.dayOfWeek)),
         dueAt: dayKey(due),
         totalGrade: r.totalGrade ?? null,
         link: r.link ?? '',

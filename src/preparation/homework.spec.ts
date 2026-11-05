@@ -102,6 +102,13 @@ describe('HomeworkService', () => {
     expect(dayKey(due)).toBe('2026-11-10');
   });
 
+  it('uses the preparation\'s snapshot when the lecture was removed from the timetable', async () => {
+    const snapshot = { _id: new Types.ObjectId(), classId, subjectOfferingId: offeringId, termId, dayOfWeek: 'sunday', slot: 2 };
+    const prep = await prepOn({ _id: snapshot._id }, { lecture: snapshot });
+    const due = await asTenant(() => service.dueDateFor(prep));
+    expect(dayKey(due)).toBe('2026-11-10');
+  });
+
   it('puts homework on the sheet of the day it is due, including old rows without a date', async () => {
     const prep = await prepOn(sunday);
     await asTenant(() => resources.create({ schoolId, preparationId: prep._id, type: 'homework', title: 'حل تمارين ص ٤٥', description: '١ و٢' }));
