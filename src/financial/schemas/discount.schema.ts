@@ -11,8 +11,17 @@ export class Discount extends Document {
   @Prop()
   description: string;
 
-  @Prop({ required: true, min: 0 })
+  /** percentage of the fee, or a fixed amount in riyals. */
+  @Prop({ enum: ['percentage', 'fixed'], default: 'percentage' })
+  type: string;
+
+  /** For a percentage discount. 0 on a fixed one. */
+  @Prop({ required: true, min: 0, default: 0 })
   percentage: number;
+
+  /** For a fixed discount, riyals off. */
+  @Prop({ type: Number, min: 0, default: null })
+  amount: number | null;
 
   @Prop({ default: true })
   isActive: boolean;

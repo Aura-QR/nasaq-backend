@@ -12,6 +12,8 @@ import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
 import { FinancialRecordService } from './financial-record.service';
 import { getPagination } from '../pagination/common/paginationUtils';
 
+import { discountAmountFor, percentOf } from './discount-calc';
+
 @Injectable()
 export class BusService {
   constructor(
@@ -109,9 +111,11 @@ export class BusService {
 
     let netFee = newPlan.fee;
     if (record.bus.discount) {
-      const pct = record.bus.discount.percentage;
-      const discountAmount = Math.round((newPlan.fee * pct) / 100);
-      record.bus.discount.discountAmount = discountAmount;
+      // A percentage follows the new plan's fee; a fixed amount stays.
+      const d: any = record.bus.discount;
+      const discountAmount = discountAmountFor(d.type, d.percentage, d.amount, newPlan.fee);
+      d.discountAmount = discountAmount;
+      if (d.type === 'fixed') d.percentage = percentOf(discountAmount, newPlan.fee);
       netFee = newPlan.fee - discountAmount;
     }
 

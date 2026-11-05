@@ -8,6 +8,8 @@ import { CreateDiscountDto } from './dto/create-discount.dto';
 import { UpdateDiscountDto } from './dto/update-discount.dto';
 import { ApplyDiscountDto } from './dto/apply-discount.dto';
 import { FinancialRecordService } from './financial-record.service';
+import { ApplyCustomDiscountDto } from './dto/apply-custom-discount.dto';
+import { entryFrom, recomputeTuitionDiscounts, tuitionEntries } from './discount-calc';
 
 @Injectable()
 export class DiscountService {
@@ -23,8 +25,28 @@ export class DiscountService {
     }
   }
 
-  private computeDiscountAmount(fee: number, value: number): number {
-    return Math.round((fee * value) / 100);
+  /** What a bus or trip section records: one discount, priced against its fee. */
+  private sectionSnapshot(discount: any, fee: number) {
+    const entry = entryFrom(discount, fee);
+    return { discountId: entry.discountId, name: entry.name, type: entry.type,
+      percentage: entry.percentage, amount: entry.amount, discountAmount: entry.discountAmount };
+  }
+
+  /**
+   * A discount is a percentage (0–100] or a fixed amount (> 0) — never both
+   * blank. Normalised so a fixed discount stores percentage 0 and a
+   * percentage one stores no amount.
+   */
+  private normalise(dto: { type?: string; percentage?: number; amount?: number | null }) {
+    const type = dto.type === 'fixed' ? 'fixed' : 'percentage';
+    if (type === 'fixed') {
+      if (!(Number(dto.amount) > 0)) throw new BadRequestException('أدخل مبلغ الخصم بالريال');
+      return { type, amount: Math.round(Number(dto.amount)), percentage: 0 };
+    }
+    const pct = Number(dto.percentage);
+    if (!(pct > 0)) throw new BadRequestException('أدخل نسبة الخصم');
+    if (pct > 100) throw new BadRequestException('نسبة الخصم لا يمكن أن تتجاوز 100%');
+    return { type, percentage: pct, amount: null };
   }
 
   /** Installments, totals and status follow the new net fee. */
@@ -33,10 +55,7 @@ export class DiscountService {
   }
 
   async create(dto: CreateDiscountDto, adminId: string) {
-    if (dto.percentage > 100) {
-      throw new BadRequestException('نسبة الخصم لا يمكن أن تتجاوز 100%');
-    }
-    const data = await this.discountModel.create({ ...dto, createdBy: adminId });
+    const data = await this.discountModel.create({ ...dto, ...this.normalise(dto), createdBy: adminId });
     return { message: 'تم إنشاء الخصم بنجاح', data };
   }
 
@@ -54,8 +73,15 @@ export class DiscountService {
 
   async update(id: string, dto: UpdateDiscountDto) {
     this.validateObjectId(id);
-    const data = await this.discountModel.findByIdAndUpdate(id, dto, { new: true }).exec();
-    if (!data) throw new NotFoundException('الخصم غير موجود');
+    const current = await this.discountModel.findById(id).exec();
+    if (!current) throw new NotFoundException('الخصم غير موجود');
+    // Changing the template changes future applications only; discounts
+    // already on students keep the value they were given.
+    const pricing = ['type', 'percentage', 'amount'].some((k) => (dto as any)[k] !== undefined)
+      ? this.normalise({ type: dto.type ?? current.type, percentage: dto.percentage ?? current.percentage,
+          amount: dto.amount ?? current.amount })
+      : {};
+    const data = await this.discountModel.findByIdAndUpdate(id, { ...dto, ...pricing }, { new: true }).exec();
     return { message: 'تم تحديث الخصم بنجاح', data };
   }
 
@@ -64,6 +90,7 @@ export class DiscountService {
     const inUse = await this.recordModel.findOne({
       $or: [
         { 'tuition.discount.discountId': new mongoose.Types.ObjectId(id) },
+        { 'tuition.discounts.discountId': new mongoose.Types.ObjectId(id) },
         { 'bus.discount.discountId': new mongoose.Types.ObjectId(id) },
         { 'trips.discount.discountId': new mongoose.Types.ObjectId(id) },
       ],
@@ -86,44 +113,79 @@ export class DiscountService {
     return record;
   }
 
-  async applyToTuition(studentId: string, dto: ApplyDiscountDto) {
+  /** Re-price the tuition's discounts, rebalance its installments, and save. */
+  private async saveTuition(record: StudentFinancialRecord) {
+    recomputeTuitionDiscounts(record.tuition);
+    this.rebalance(record.tuition);
+    record.markModified('tuition');
+    await record.save();
+  }
+
+  /**
+   * Add a discount from the school's list to a student's tuition. Several
+   * discounts add up (siblings and returning student); the same one twice
+   * does not.
+   */
+  async applyToTuition(studentId: string, dto: ApplyDiscountDto, adminId?: string) {
     const record = await this.getRecord(studentId, dto.academicYearId);
 
     const discount = await this.discountModel.findById(dto.discountId).exec();
     if (!discount) throw new NotFoundException('الخصم غير موجود');
     if (!discount.isActive) throw new BadRequestException('هذا الخصم غير نشط');
 
-    if (record.tuition.discount) {
-      throw new BadRequestException('يوجد خصم مطبق بالفعل على الرسوم الدراسية — قم بإزالته أولاً');
+    const entries = tuitionEntries(record.tuition);
+    if (entries.some((e: any) => String(e.discountId ?? '') === String(discount._id))) {
+      throw new BadRequestException('هذا الخصم مطبق بالفعل على الطالب');
     }
-
     const grossFee = record.tuition.grossFee || record.tuition.fee;
-    const discountAmount = this.computeDiscountAmount(grossFee, discount.percentage);
-    const netFee = grossFee - discountAmount;
-
-    record.tuition.discount = {
-      discountId: discount._id as mongoose.Types.ObjectId,
-      name: discount.name,
-      percentage: discount.percentage,
-      discountAmount,
-    } as any;
-    record.tuition.netFee = netFee;
-    this.rebalance(record.tuition);
-    record.markModified('tuition');
-    await record.save();
+    record.tuition.discounts = [...entries,
+      entryFrom(discount as any, grossFee, { appliedBy: adminId ? new mongoose.Types.ObjectId(adminId) : null })] as any;
+    await this.saveTuition(record);
 
     return { message: 'تم تطبيق الخصم على الرسوم الدراسية بنجاح', data: record.tuition };
   }
 
+  /** A discount typed in for this one student, with the reason it was given. */
+  async applyCustomToTuition(studentId: string, dto: ApplyCustomDiscountDto, adminId?: string) {
+    const record = await this.getRecord(studentId, dto.academicYearId);
+    if (dto.type === 'percentage' && dto.value > 100) {
+      throw new BadRequestException('نسبة الخصم لا يمكن أن تتجاوز 100%');
+    }
+    const grossFee = record.tuition.grossFee || record.tuition.fee;
+    const entry = entryFrom(
+      { name: 'خصم خاص', type: dto.type, percentage: dto.type === 'percentage' ? dto.value : 0,
+        amount: dto.type === 'fixed' ? dto.value : null },
+      grossFee,
+      { reason: dto.reason.trim(), custom: true, appliedBy: adminId ? new mongoose.Types.ObjectId(adminId) : null },
+    );
+    record.tuition.discounts = [...tuitionEntries(record.tuition), entry] as any;
+    await this.saveTuition(record);
+
+    return { message: 'تم تطبيق الخصم الخاص على الرسوم الدراسية بنجاح', data: record.tuition };
+  }
+
+  /** Remove one discount from the tuition; the others stay. */
+  async removeTuitionEntry(studentId: string, entryId: string, academicYearId?: string) {
+    this.validateObjectId(entryId);
+    const record = await this.getRecord(studentId, academicYearId);
+    const entries = tuitionEntries(record.tuition);
+    // A discount applied before tuition carried several has no entry id; its
+    // template id identifies it instead.
+    const keep = entries.filter((e: any) => String(e._id ?? e.discountId ?? '') !== entryId);
+    if (keep.length === entries.length) throw new NotFoundException('الخصم غير موجود على هذا الطالب');
+    record.tuition.discounts = keep as any;
+    if (!keep.length) record.tuition.discount = null;
+    await this.saveTuition(record);
+
+    return { message: 'تم إزالة الخصم من الرسوم الدراسية بنجاح', data: record.tuition };
+  }
+
+  /** Remove every discount from the tuition. */
   async removeFromTuition(studentId: string, academicYearId?: string) {
     const record = await this.getRecord(studentId, academicYearId);
-
-    const grossFee = record.tuition.grossFee || record.tuition.fee;
+    record.tuition.discounts = [] as any;
     record.tuition.discount = null;
-    record.tuition.netFee = grossFee;
-    this.rebalance(record.tuition);
-    record.markModified('tuition');
-    await record.save();
+    await this.saveTuition(record);
 
     return { message: 'تم إزالة الخصم من الرسوم الدراسية بنجاح', data: record.tuition };
   }
@@ -139,15 +201,10 @@ export class DiscountService {
     if (!discount) throw new NotFoundException('الخصم غير موجود');
     if (!discount.isActive) throw new BadRequestException('هذا الخصم غير نشط');
 
-    const discountAmount = this.computeDiscountAmount(record.bus.fee, discount.percentage);
-    const netFee = record.bus.fee - discountAmount;
+    const snapshot = this.sectionSnapshot(discount, record.bus.fee);
+    const netFee = record.bus.fee - snapshot.discountAmount;
 
-    record.bus.discount = {
-      discountId: discount._id as mongoose.Types.ObjectId,
-      name: discount.name,
-      percentage: discount.percentage,
-      discountAmount,
-    } as any;
+    record.bus.discount = snapshot as any;
     record.bus.netFee = netFee;
     this.rebalance(record.bus);
     record.markModified('bus');
@@ -182,15 +239,10 @@ export class DiscountService {
     if (!discount) throw new NotFoundException('الخصم غير موجود');
     if (!discount.isActive) throw new BadRequestException('هذا الخصم غير نشط');
 
-    const discountAmount = this.computeDiscountAmount(trip.fee, discount.percentage);
-    const netFee = trip.fee - discountAmount;
+    const snapshot = this.sectionSnapshot(discount, trip.fee);
+    const netFee = trip.fee - snapshot.discountAmount;
 
-    (trip as any).discount = {
-      discountId: discount._id as mongoose.Types.ObjectId,
-      name: discount.name,
-      percentage: discount.percentage,
-      discountAmount,
-    };
+    (trip as any).discount = snapshot;
     (trip as any).netFee = netFee;
     this.rebalance(trip);
     record.markModified('trips');

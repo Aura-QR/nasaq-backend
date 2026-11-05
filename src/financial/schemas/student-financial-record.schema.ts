@@ -6,19 +6,48 @@ import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
 @Schema({ _id: false })
 class DiscountSnapshot {
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Discount', required: true })
-  discountId: mongoose.Types.ObjectId;
+  /** The discount template; null for a custom discount or a sum of several. */
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Discount', default: null })
+  discountId: mongoose.Types.ObjectId | null;
 
   @Prop({ required: true })
   name: string;
 
+  /** percentage | fixed. Old snapshots have none and are percentages. */
+  @Prop({ enum: ['percentage', 'fixed'], default: 'percentage' })
+  type: string;
+
+  /** For a fixed discount, the share of the fee it came to. */
   @Prop({ required: true, min: 0 })
   percentage: number;
+
+  /** For a fixed discount, its amount in riyals. */
+  @Prop({ type: Number, default: null })
+  amount: number | null;
 
   @Prop({ required: true, min: 0 })
   discountAmount: number;
 }
 const DiscountSnapshotSchema = SchemaFactory.createForClass(DiscountSnapshot);
+
+/** One of the discounts on a student's tuition; several add up. */
+@Schema({ _id: true })
+class DiscountEntry extends DiscountSnapshot {
+  /** Why a custom discount was given; shown on the record. */
+  @Prop({ default: '' })
+  reason: string;
+
+  /** Typed in for this student rather than chosen from the school's list. */
+  @Prop({ default: false })
+  custom: boolean;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, default: null })
+  appliedBy: mongoose.Types.ObjectId | null;
+
+  @Prop({ type: Date, default: null })
+  appliedAt: Date | null;
+}
+const DiscountEntrySchema = SchemaFactory.createForClass(DiscountEntry);
 
 @Schema({ _id: false })
 export class SurchargeSnapshot {
@@ -185,8 +214,13 @@ class TuitionRecord {
   @Prop({ default: 0 })
   grossFee: number;
 
+  /** The sum of `discounts`, for screens that show one discount. */
   @Prop({ type: DiscountSnapshotSchema, default: null })
   discount: DiscountSnapshot | null;
+
+  /** Every discount on the tuition; see discount-calc.ts. */
+  @Prop({ type: [DiscountEntrySchema], default: [] })
+  discounts: DiscountEntry[];
 
   @Prop({ default: 0 })
   netFee: number;
@@ -204,8 +238,26 @@ const TuitionRecordSchema = SchemaFactory.createForClass(TuitionRecord);
 
 @Schema({ _id: true })
 class StudentAdditionalFee {
+  /**
+   * The fee this charge is paid by. For a sale of a priced item (uniform) it
+   * is a fresh id per sale, so the existing pay endpoint settles each sale.
+   */
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'AdditionalFee', required: true })
   additionalFeeId: mongoose.Types.ObjectId;
+
+  /** Set when this charge is a sale of a priced item from the settings. */
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'FeeItem', default: null })
+  feeItemId: mongoose.Types.ObjectId | null;
+
+  @Prop({ type: Number, default: null })
+  quantity: number | null;
+
+  /** The item's price at the time of sale; later price changes leave it alone. */
+  @Prop({ type: Number, default: null })
+  unitPrice: number | null;
+
+  @Prop({ type: Date, default: null })
+  soldAt: Date | null;
 
   @Prop({ required: true })
   name: string;

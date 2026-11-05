@@ -4,6 +4,9 @@ import { FeeConfig, FeeConfigSchema } from './schemas/fee-config.schema';
 import { InstallmentPlan, InstallmentPlanSchema } from './schemas/installment-plan.schema';
 import { StudentFinancialRecord, StudentFinancialRecordSchema } from './schemas/student-financial-record.schema';
 import { Discount, DiscountSchema } from './schemas/discount.schema';
+import { FeeItem, FeeItemSchema } from './schemas/fee-item.schema';
+import { FeeItemService } from './fee-item.service';
+import { FeeItemController } from './fee-item.controller';
 import { AdditionalFee, AdditionalFeeSchema } from './schemas/additional-fee.schema';
 import { AdditionalFeeService } from './additional-fee.service';
 import { AdditionalFeeController } from './additional-fee.controller';
@@ -44,6 +47,7 @@ import { School, SchoolSchema } from '../platform/schools/schemas/school.schema'
       { name: InstallmentPlan.name, schema: InstallmentPlanSchema },
       { name: StudentFinancialRecord.name, schema: StudentFinancialRecordSchema },
       { name: Discount.name, schema: DiscountSchema },
+      { name: FeeItem.name, schema: FeeItemSchema },
       { name: AdditionalFee.name, schema: AdditionalFeeSchema },
       { name: Student.name, schema: StudentSchema },
       { name: Class.name, schema: ClassSchema },
@@ -65,6 +69,7 @@ import { School, SchoolSchema } from '../platform/schools/schemas/school.schema'
     TripController,
     TripModuleController,
     DiscountController,
+    FeeItemController,
     AdditionalFeeController,
   ],
   providers: [
@@ -76,6 +81,7 @@ import { School, SchoolSchema } from '../platform/schools/schemas/school.schema'
     TripService,
     PaymentVoidService,
     DiscountService,
+    FeeItemService,
     AdditionalFeeService,
   ],
   exports: [FinancialRecordService, BusService],

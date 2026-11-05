@@ -11,6 +11,7 @@ import { DiscountService } from './discount.service';
 import { CreateDiscountDto } from './dto/create-discount.dto';
 import { UpdateDiscountDto } from './dto/update-discount.dto';
 import { ApplyDiscountDto } from './dto/apply-discount.dto';
+import { ApplyCustomDiscountDto } from './dto/apply-custom-discount.dto';
 
 @Controller('financial/discounts')
 @UseGuards(JwtAuthGuard, AbilitiesGuard)
@@ -66,9 +67,30 @@ export class DiscountController {
   @Post('apply/tuition/:studentId')
   @CheckAbilities({ action: 'update', subject: 'Financial' })
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Apply a discount to a student tuition fee' })
-  async applyToTuition(@Param('studentId') studentId: string, @Body() dto: ApplyDiscountDto) {
-    return this.discountService.applyToTuition(studentId, dto);
+  @ApiOperation({ summary: 'Add a discount from the list to a student tuition fee (discounts add up)' })
+  async applyToTuition(@Param('studentId') studentId: string, @Body() dto: ApplyDiscountDto, @CurrentUser() user: any) {
+    return this.discountService.applyToTuition(studentId, dto, user?.userId);
+  }
+
+  @Post('apply/tuition/:studentId/custom')
+  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Add a custom discount (percentage or riyals, with a reason) to a student tuition fee' })
+  async applyCustomToTuition(@Param('studentId') studentId: string, @Body() dto: ApplyCustomDiscountDto, @CurrentUser() user: any) {
+    return this.discountService.applyCustomToTuition(studentId, dto, user?.userId);
+  }
+
+  @Delete('apply/tuition/:studentId/:entryId')
+  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove one discount from a student tuition fee' })
+  @ApiQuery({ name: 'academicYearId', required: false })
+  async removeTuitionEntry(
+    @Param('studentId') studentId: string,
+    @Param('entryId') entryId: string,
+    @Query('academicYearId') academicYearId?: string,
+  ) {
+    return this.discountService.removeTuitionEntry(studentId, entryId, academicYearId);
   }
 
   @Delete('apply/tuition/:studentId')

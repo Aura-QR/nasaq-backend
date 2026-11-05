@@ -166,7 +166,7 @@ export class AdditionalFeeService {
     const fee = record.additionalFees.find(f => (f as any).additionalFeeId.toString() === feeId);
     if (!fee) throw new NotFoundException('الرسوم الإضافية غير موجودة في سجل الطالب');
     if (fee.status === 'paid') throw new BadRequestException('تم سداد هذه الرسوم بالفعل');
-    if (amount !== fee.amount) throw new BadRequestException(`المبلغ الصحيح هو ${fee.amount} جنيه`);
+    if (amount !== fee.amount) throw new BadRequestException(`المبلغ الصحيح هو ${fee.amount} ريال`);
 
     (fee.payments as any[]).push({
       recordedAt: new Date(),

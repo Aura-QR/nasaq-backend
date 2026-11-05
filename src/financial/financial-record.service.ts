@@ -17,6 +17,8 @@ import { RefundPaymentDto } from './dto/refund-payment.dto';
 import { FeeStatus, PaymentStatus } from './enums/payment-status.enum';
 import { getPagination } from '../pagination/common/paginationUtils';
 
+import { entryFrom, recomputeTuitionDiscounts } from './discount-calc';
+
 @Injectable()
 export class FinancialRecordService {
   constructor(
@@ -362,14 +364,9 @@ export class FinancialRecordService {
     record.tuition.surcharge = surchargeSnapshot as any;
     record.tuition.grossFee = grossFee;
 
-    if (record.tuition.discount) {
-      const pct = record.tuition.discount.percentage;
-      const discountAmount = Math.round((grossFee * pct) / 100);
-      record.tuition.discount.discountAmount = discountAmount;
-      record.tuition.netFee = grossFee - discountAmount;
-    } else {
-      record.tuition.netFee = grossFee;
-    }
+    // Every discount re-priced against the new gross: a percentage follows the
+    // fee, a fixed amount stays what it was.
+    recomputeTuitionDiscounts(record.tuition);
 
     this.rebalanceSection(record.tuition);
 
@@ -459,6 +456,7 @@ export class FinancialRecordService {
 
     let initialNetFee = grossFee;
     let initialDiscount: any = null;
+    let initialDiscounts: any[] = [];
 
     if (plan.linkedDiscountId) {
       const discount = await this.discountModel
@@ -466,14 +464,12 @@ export class FinancialRecordService {
         .setOptions({ skipTenantScope: true })
         .exec();
       if (discount && discount.isActive) {
-        const discountAmount = Math.round((grossFee * discount.percentage) / 100);
-        initialNetFee = grossFee - discountAmount;
-        initialDiscount = {
-          discountId: discount._id as mongoose.Types.ObjectId,
-          name: discount.name,
-          percentage: discount.percentage,
-          discountAmount,
-        };
+        // The plan's linked discount, priced like any other (percentage or fixed).
+        const seed: any = { fee: baseFee, grossFee, discounts: [entryFrom(discount as any, grossFee)] };
+        recomputeTuitionDiscounts(seed);
+        initialNetFee = seed.netFee;
+        initialDiscount = seed.discount;
+        initialDiscounts = seed.discounts;
       }
     }
 
@@ -501,6 +497,7 @@ export class FinancialRecordService {
               surcharge: surchargeSnapshot,
               grossFee: grossFee,
               discount: initialDiscount,
+              discounts: initialDiscounts,
               netFee: initialNetFee,
               status: FeeStatus.UNPAID,
               totalPaid: 0,
@@ -529,14 +526,9 @@ export class FinancialRecordService {
             .setOptions({ skipTenantScope: true })
             .exec();
           if (discount && discount.isActive) {
-            const discountAmount = Math.round((grossFee * discount.percentage) / 100);
-            record.tuition.discount = {
-              discountId: discount._id as mongoose.Types.ObjectId,
-              name: discount.name,
-              percentage: discount.percentage,
-              discountAmount,
-            } as any;
-            record.tuition.netFee = grossFee - discountAmount;
+            record.tuition.grossFee = grossFee;
+            record.tuition.discounts = [entryFrom(discount as any, grossFee)] as any;
+            recomputeTuitionDiscounts(record.tuition);
             modified = true;
           }
         }
@@ -552,14 +544,7 @@ export class FinancialRecordService {
           record.tuition.surcharge = surchargeSnapshot as any;
           record.tuition.grossFee = grossFee;
 
-          if (record.tuition.discount) {
-            const pct = record.tuition.discount.percentage;
-            const discountAmount = Math.round((grossFee * pct) / 100);
-            record.tuition.discount.discountAmount = discountAmount;
-            record.tuition.netFee = grossFee - discountAmount;
-          } else {
-            record.tuition.netFee = grossFee;
-          }
+          recomputeTuitionDiscounts(record.tuition);
 
           this.rebalanceSection(record.tuition);
           record.markModified('tuition');
@@ -602,14 +587,7 @@ export class FinancialRecordService {
       record.tuition.surcharge = surchargeSnapshot as any;
       record.tuition.grossFee = grossFee;
 
-      if (record.tuition.discount) {
-        const pct = record.tuition.discount.percentage;
-        const discountAmount = Math.round((grossFee * pct) / 100);
-        record.tuition.discount.discountAmount = discountAmount;
-        record.tuition.netFee = grossFee - discountAmount;
-      } else {
-        record.tuition.netFee = grossFee;
-      }
+      recomputeTuitionDiscounts(record.tuition);
 
       this.rebalanceSection(record.tuition);
 
@@ -996,14 +974,8 @@ export class FinancialRecordService {
     if (plan && plan.linkedDiscountId && !record.tuition.discount) {
       const discount = await this.discountModel.findById(plan.linkedDiscountId).exec();
       if (discount && discount.isActive) {
-        const discountAmount = Math.round((grossFee * discount.percentage) / 100);
-        record.tuition.discount = {
-          discountId: discount._id as mongoose.Types.ObjectId,
-          name: discount.name,
-          percentage: discount.percentage,
-          discountAmount,
-        } as any;
-        record.tuition.netFee = grossFee - discountAmount;
+        record.tuition.discounts = [entryFrom(discount as any, grossFee)] as any;
+        recomputeTuitionDiscounts(record.tuition);
       }
     }
 
