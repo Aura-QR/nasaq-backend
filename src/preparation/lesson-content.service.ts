@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -19,6 +20,8 @@ import { Library } from '../library/schemas/library.schema';
 import { CurriculumLesson } from '../curriculum/schemas/curriculum-lesson.schema';
 import { CurriculumUnit } from '../curriculum/schemas/curriculum-unit.schema';
 import { SubjectOffering } from '../subject-offerings/schemas/subject-offering.schema';
+import { HomeworkService } from './homework.service';
+import { parseDateOnly } from './utils/week.util';
 
 /** What the workflow is asked to write, and where each answer lands. */
 const TEXT_FIELDS = [
@@ -80,6 +83,7 @@ export class LessonContentService implements OnModuleInit {
     @InjectModel(Library.name)
     private readonly library: Model<Library>,
     private readonly exams?: ExamsService,
+    @Optional() private readonly homework?: HomeworkService,
   ) {}
 
   private get webhookUrl(): string {
@@ -125,12 +129,6 @@ export class LessonContentService implements OnModuleInit {
     if (!Types.ObjectId.isValid(id)) {
       throw new BadRequestException('معرّف غير صالح');
     }
-    if (!this.enabled || !this.webhookUrl) {
-      throw new BadRequestException(
-        'توليد محتوى التحضير غير مفعّل على هذا الخادم.',
-      );
-    }
-
     const prep = await this.preparations.findById(id).exec();
     if (!prep) throw new NotFoundException('التحضير غير موجود');
     if (
@@ -188,23 +186,39 @@ export class LessonContentService implements OnModuleInit {
         throw new BadRequestException('حدد نوع الامتحان وتواريخ صحيحة والمدة (١–٢٤٠ دقيقة) وعدد الأسئلة (١–٢٠)، وتأكد من فصل ومادة الحصة');
       }
     }
-    const context = await this.describe(prep);
-    if (!context.lessonTitle) {
-      throw new BadRequestException('اختر درسًا من المنهج أولًا — التوليد يحتاج اسم الدرس.');
+    // Homework the teacher wrote is saved as written; only the rest goes to the model.
+    const manual = missing.includes('homework') && options.homework
+      ? { title: String(options.homework.title ?? '').trim(), description: String(options.homework.description ?? '').trim() }
+      : null;
+    if (manual && (!manual.title || !manual.description)) {
+      throw new BadRequestException('اكتب عنوان الواجب ونصه، أو اختر توليده تلقائيًا');
     }
-    const generated = includeContent || missing.length
-      ? await this.ask({ ...context, resourceTypes: missing, includeContent,
-          ...(missing.includes('quiz') ? { exam: options.exam } : {}) }) : {};
+    const askFor = manual ? missing.filter((type) => type !== 'homework') : missing;
+    let generated: any = {};
+    if (includeContent || askFor.length) {
+      // Only the model needs the workflow; homework the teacher wrote does not.
+      if (!this.enabled || !this.webhookUrl) {
+        throw new BadRequestException(
+          'توليد محتوى التحضير غير مفعّل على هذا الخادم.',
+        );
+      }
+      const context = await this.describe(prep);
+      if (!context.lessonTitle) {
+        throw new BadRequestException('اختر درسًا من المنهج أولًا — التوليد يحتاج اسم الدرس.');
+      }
+      generated = await this.ask({ ...context, resourceTypes: askFor, includeContent,
+        ...(askFor.includes('quiz') ? { exam: options.exam } : {}) });
+    }
     const changes = includeContent ? this.onlyBlanks(prep, generated) : {};
     const attached = includeContent ? await this.attachDigitalContent(prep, changes) : 0;
-    const additions: { type: string; title: string; description: string }[] = [];
+    const additions: { type: string; title: string; description: string; dueAt?: Date | null }[] = [];
     for (const type of missing) {
       // A manual addition created while the model worked always takes precedence.
       if (await this.resources.exists({ preparationId: prep._id, type, ...(type === 'quiz' ? { examId: { $ne: null } } : {}) })) {
         resourceResults.push({ type, status: 'existing' });
         continue;
       }
-      const resource = Array.isArray(generated.resources)
+      const resource = type === 'homework' && manual ? manual : Array.isArray(generated.resources)
         ? generated.resources.find((item: any) => item?.type === type)
         : type === 'homework' ? generated.homework : null;
       const title = typeof resource?.title === 'string' ? resource.title.trim() : '';
@@ -213,7 +227,11 @@ export class LessonContentService implements OnModuleInit {
         resourceResults.push({ type, status: 'failed', message: 'لم تُرجع خدمة التوليد محتوى صالحًا لهذه الإضافة. حدّث سير عمل التوليد ثم أعد المحاولة.' });
         continue;
       }
-      additions.push({ type, title, description });
+      // Homework is due at the class's next lesson unless the teacher chose a day.
+      const dueAt = type !== 'homework' ? undefined
+        : options.homework?.dueAt ? parseDateOnly(options.homework.dueAt, 'dueAt')
+          : await this.homework?.dueDateFor(prep).catch(() => null) ?? null;
+      additions.push({ type, title, description, ...(dueAt ? { dueAt } : {}) });
     }
     let updated: any = prep;
     if (Object.keys(changes).length || additions.length) {

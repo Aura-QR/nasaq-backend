@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -18,6 +19,7 @@ import { Project } from '../projects/schemas/project.schema';
 import { Enrollment } from '../enrollments/schemas/enrollment.schema';
 import { Student } from '../students/schemas/student.schema';
 import { CreatePreparationResourceDto } from './dto/create-preparation-resource.dto';
+import { HomeworkService } from './homework.service';
 import {
   DEFAULT_TEACHING_AIDS,
   DEFAULT_TEACHING_STRATEGIES,
@@ -49,6 +51,7 @@ export class PreparationContentService {
     @InjectModel(Enrollment.name)
     private readonly enrollments: Model<Enrollment>,
     @InjectModel(Student.name) private readonly students: Model<Student>,
+    @Optional() private readonly homework?: HomeworkService,
   ) {}
   referenceLists() {
     return {
@@ -216,7 +219,11 @@ export class PreparationContentService {
     await this.validateResource(dto, prep);
     if (!(await this.invalidate(id)))
       throw new NotFoundException('التحضير غير موجود');
-    const resource = await this.resources.create({ ...dto, preparationId: id });
+    // Homework without a chosen day is due at the class's next lesson in the subject.
+    const dueAt = dto.type === 'homework' && !dto.dueAt
+      ? await this.homework?.dueDateFor(prep).catch(() => null) ?? null
+      : null;
+    const resource = await this.resources.create({ ...dto, ...(dueAt ? { dueAt } : {}), preparationId: id });
     // Invalidating on both sides prevents a concurrent submit retaining a stale review.
     if (!(await this.invalidate(id))) {
       await this.resources.deleteOne({ _id: resource._id });
@@ -314,6 +321,12 @@ export class PreparationContentService {
               : ''),
       ]),
     );
+  }
+  /** «واجباتي»: every lesson homework from this student's own classes. */
+  async studentHomework(user: any) {
+    if (user?.role !== 'STUDENT') throw new ForbiddenException();
+    const { classId } = await this.studentFilter(user);
+    return { data: this.homework ? await this.homework.forStudent({ classId }) : [] };
   }
   async studentView(id: string, user: any) {
     if (!user) throw new ForbiddenException();

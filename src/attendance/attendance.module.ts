@@ -12,6 +12,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { PermissionsModule } from '../permissions/permissions.module';
 import { Admin, AdminSchema } from 'src/admin/schemas/admin.schema';
 import { DailyTrackingModule } from '../daily-tracking/daily-tracking.module';
+import { PreparationContentModule } from '../preparation/preparation-content.module';
 
 @Module({
   imports: [
@@ -20,6 +21,8 @@ import { DailyTrackingModule } from '../daily-tracking/daily-tracking.module';
     PermissionsModule,
     // See AttendanceService's constructor for why this is circular.
     forwardRef(() => DailyTrackingModule),
+    // The sheet names the homework due in its period.
+    PreparationContentModule,
     MongooseModule.forFeature([
       { name: Attendance.name, schema: AttendanceSchema },
       { name: Student.name, schema: StudentSchema },

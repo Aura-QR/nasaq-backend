@@ -1,4 +1,4 @@
-import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsOptional, Matches, Max, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsDateString, IsEnum, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ExamType } from '../../exams/enums/exam-type.enum';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -10,6 +10,14 @@ export class GeneratedExamOptionsDto {
   @IsInt() @Min(1) @Max(240) duration: number;
   @IsInt() @Min(1) @Max(20) questionCount: number;
   @IsEnum(ExamType) examType: ExamType;
+}
+
+/** Homework the teacher wrote, saved as written instead of being generated. */
+export class ManualHomeworkDto {
+  @IsString() @IsNotEmpty({ message: 'اكتب عنوان الواجب' }) @MaxLength(300) title: string;
+  @IsString() @IsNotEmpty({ message: 'اكتب نص الواجب' }) @MaxLength(10000) description: string;
+  /** Defaults to the class's next lesson in the subject. */
+  @IsOptional() @IsDateString({ strict: true }) @Matches(/^\d{4}-\d{2}-\d{2}$/) dueAt?: string;
 }
 
 export class GeneratePreparationDto {
@@ -29,4 +37,8 @@ export class GeneratePreparationDto {
   @ApiPropertyOptional({ type: GeneratedExamOptionsDto })
   @IsOptional() @ValidateNested() @Type(() => GeneratedExamOptionsDto)
   exam?: GeneratedExamOptionsDto;
+
+  @ApiPropertyOptional({ type: ManualHomeworkDto, description: 'With homework in resourceTypes: save this text instead of generating one.' })
+  @IsOptional() @ValidateNested() @Type(() => ManualHomeworkDto)
+  homework?: ManualHomeworkDto;
 }

@@ -26,6 +26,9 @@ import {
   EnrollmentSchema,
 } from '../enrollments/schemas/enrollment.schema';
 import { Student, StudentSchema } from '../students/schemas/student.schema';
+import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
+import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
+import { HomeworkService } from './homework.service';
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -39,9 +42,12 @@ import { Student, StudentSchema } from '../students/schemas/student.schema';
       { name: Project.name, schema: ProjectSchema },
       { name: Enrollment.name, schema: EnrollmentSchema },
       { name: Student.name, schema: StudentSchema },
+      // Homework due dates come from the timetable; the student list names the teacher.
+      { name: Lecture.name, schema: LectureSchema },
+      { name: Teacher.name, schema: TeacherSchema },
     ]),
   ],
-  providers: [PreparationContentService],
-  exports: [PreparationContentService, MongooseModule],
+  providers: [PreparationContentService, HomeworkService],
+  exports: [PreparationContentService, HomeworkService, MongooseModule],
 })
 export class PreparationContentModule {}

@@ -272,7 +272,18 @@ export class PreparationController {
   @Get('generation-options')
   @CheckAbilities({ action: 'read', subject: 'Preparation' })
   generationOptions() {
-    return { version: 1, resourceTypes: RESOURCE_TYPES, includeContent: true, linkedExams: true };
+    // manualHomework: generate accepts `homework: { title, description, dueAt? }` and saves it as written.
+    return { version: 1, resourceTypes: RESOURCE_TYPES, includeContent: true, linkedExams: true, manualHomework: true };
+  }
+
+  @ApiOperation({
+    summary: "The signed-in student's lesson homework, with subject and due date",
+    description: 'Homework written on lessons of the student\'s own classes, from preparations the student may already open. Due date defaults to the class\'s next lesson in the subject.',
+  })
+  @Get('student/homework')
+  @Roles(Role.STUDENT)
+  studentHomework(@CurrentUser() user: any) {
+    return this.content.studentHomework(user);
   }
 
   @Get(':id/student-view')

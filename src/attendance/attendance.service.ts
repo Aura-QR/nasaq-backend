@@ -37,6 +37,7 @@ import {
 import { isActivityLecture } from '../subjects/activity.util';
 import { currentScope } from '../terms/current-scope.util';
 
+import { HomeworkService } from '../preparation/homework.service';
 @Injectable()
 export class AttendanceService {
   private readonly logger = new Logger(AttendanceService.name);
@@ -73,6 +74,8 @@ export class AttendanceService {
     // Who among the managers may hear about this — the permissions screen
     // decides. Optional so a hand-built service in a unit test still works.
     @Optional() private readonly permissions?: PermissionsService,
+    // Which homework is due in this period, so the «واجب» tick says what it is for.
+    @Optional() private readonly homework?: HomeworkService,
   ) {}
 
   /**
@@ -532,6 +535,9 @@ export class AttendanceService {
     const offeringId =
       (lecture as any).subjectOfferingId?._id ?? (lecture as any).subjectOfferingId ?? null;
     const registerLocked = await this.dailyTracking.registerLocked(classId, offeringId);
+    const homeworkDue = this.homework
+      ? await this.homework.dueOn(classId, offeringId, date).catch(() => [])
+      : [];
 
     return {
       message: 'تم استرجاع كشف الحضور بنجاح',
@@ -551,6 +557,8 @@ export class AttendanceService {
         quizMaxScore,
         // The annual register for this subject is approved: read only.
         registerLocked,
+        // Homework set in an earlier lesson and due in this one; [] when none.
+        homeworkDue,
         students: students.map((s: any) => {
           const id = s._id.toString();
           // The server owns the defaults, so web and mobile cannot drift
