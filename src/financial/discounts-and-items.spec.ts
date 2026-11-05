@@ -123,6 +123,22 @@ describe('DiscountService and FeeItemService', () => {
     expect(t.netFee).toBe(11000);
   });
 
+  it('applies one discount to many students, skipping those who have it or have no record', async () => {
+    const other = new Types.ObjectId();
+    await asTenant(() => records.create({
+      schoolId, studentId: other, academicYearId: new Types.ObjectId(), classId: new Types.ObjectId(), feeConfigId: new Types.ObjectId(),
+      tuition: { fee: 9000, grossFee: 9000, netFee: 9000, installments: [] },
+    }));
+    const returning: any = (await asTenant(() => discountService.create({ name: 'الطلاب السابقون', type: 'fixed', amount: 500 }, adminId))).data;
+    await asTenant(() => discountService.applyToTuition(String(studentId), { discountId: String(returning._id) }, adminId));
+    const ghost = String(new Types.ObjectId());
+    const r: any = await asTenant(() => discountService.applyToTuitionBulk(String(returning._id),
+      { studentIds: [String(studentId), String(other), ghost] }, adminId));
+    expect(r.data).toMatchObject({ applied: [String(other)], alreadyHad: [String(studentId)], noRecord: [ghost], failed: [] });
+    const net = ((await asTenant(() => records.findOne({ studentId: other }).lean())) as any).tuition.netFee;
+    expect(net).toBe(8500);
+  });
+
   it('sells two uniforms at today\'s price, keeps that price after a change, and cancels only unpaid sales', async () => {
     const uniform: any = (await asTenant(() => itemService.create({ name: 'الزي المدرسي', unitPrice: 150 }, adminId))).data;
     const sale: any = (await asTenant(() => itemService.sell(String(uniform._id), String(studentId), { quantity: 2 }, adminId))).data;

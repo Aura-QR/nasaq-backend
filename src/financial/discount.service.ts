@@ -9,6 +9,7 @@ import { UpdateDiscountDto } from './dto/update-discount.dto';
 import { ApplyDiscountDto } from './dto/apply-discount.dto';
 import { FinancialRecordService } from './financial-record.service';
 import { ApplyCustomDiscountDto } from './dto/apply-custom-discount.dto';
+import { BulkApplyDiscountDto } from './dto/bulk-apply-discount.dto';
 import { entryFrom, recomputeTuitionDiscounts, tuitionEntries } from './discount-calc';
 
 @Injectable()
@@ -143,6 +144,37 @@ export class DiscountService {
     await this.saveTuition(record);
 
     return { message: 'تم تطبيق الخصم على الرسوم الدراسية بنجاح', data: record.tuition };
+  }
+
+  /**
+   * Apply one discount to many students' tuition, e.g. every returning
+   * student. Each student is applied on their own: one without a financial
+   * record, or who already has this discount, is reported and skipped
+   * without stopping the others.
+   */
+  async applyToTuitionBulk(discountId: string, dto: BulkApplyDiscountDto, adminId?: string) {
+    this.validateObjectId(discountId);
+    const discount = await this.discountModel.findById(discountId).exec();
+    if (!discount) throw new NotFoundException('الخصم غير موجود');
+    if (!discount.isActive) throw new BadRequestException('هذا الخصم غير نشط');
+
+    const results = { applied: [] as string[], alreadyHad: [] as string[], noRecord: [] as string[], failed: [] as { studentId: string; message: string }[] };
+    for (const studentId of [...new Set(dto.studentIds.map(String))]) {
+      try {
+        await this.applyToTuition(studentId, { discountId, academicYearId: dto.academicYearId }, adminId);
+        results.applied.push(studentId);
+      } catch (error: any) {
+        const message = String(error?.message ?? '');
+        if (message.includes('مطبق بالفعل')) results.alreadyHad.push(studentId);
+        else if (message.includes('لا يوجد سجل مالي')) results.noRecord.push(studentId);
+        else results.failed.push({ studentId, message: message || 'تعذر تطبيق الخصم' });
+      }
+    }
+    const parts = [`تم تطبيق «${discount.name}» على ${results.applied.length} طالب`];
+    if (results.alreadyHad.length) parts.push(`${results.alreadyHad.length} لديهم الخصم بالفعل`);
+    if (results.noRecord.length) parts.push(`${results.noRecord.length} بلا سجل مالي`);
+    if (results.failed.length) parts.push(`تعذر التطبيق على ${results.failed.length}`);
+    return { message: parts.join('، '), data: results };
   }
 
   /** A discount typed in for this one student, with the reason it was given. */

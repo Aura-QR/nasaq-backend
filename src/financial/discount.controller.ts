@@ -12,6 +12,7 @@ import { CreateDiscountDto } from './dto/create-discount.dto';
 import { UpdateDiscountDto } from './dto/update-discount.dto';
 import { ApplyDiscountDto } from './dto/apply-discount.dto';
 import { ApplyCustomDiscountDto } from './dto/apply-custom-discount.dto';
+import { BulkApplyDiscountDto } from './dto/bulk-apply-discount.dto';
 
 @Controller('financial/discounts')
 @UseGuards(JwtAuthGuard, AbilitiesGuard)
@@ -70,6 +71,14 @@ export class DiscountController {
   @ApiOperation({ summary: 'Add a discount from the list to a student tuition fee (discounts add up)' })
   async applyToTuition(@Param('studentId') studentId: string, @Body() dto: ApplyDiscountDto, @CurrentUser() user: any) {
     return this.discountService.applyToTuition(studentId, dto, user?.userId);
+  }
+
+  @Post(':id/apply-bulk')
+  @CheckAbilities({ action: 'update', subject: 'Financial' })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Apply this discount to many students\' tuition at once' })
+  async applyToTuitionBulk(@Param('id') id: string, @Body() dto: BulkApplyDiscountDto, @CurrentUser() user: any) {
+    return this.discountService.applyToTuitionBulk(id, dto, user?.userId);
   }
 
   @Post('apply/tuition/:studentId/custom')
