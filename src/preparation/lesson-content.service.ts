@@ -386,14 +386,16 @@ export class LessonContentService implements OnModuleInit {
       throw new BadRequestException(
         timedOut
           ? 'استغرق توليد المحتوى وقتًا أطول من اللازم — حاول مرة أخرى'
-          : 'تعذر الوصول إلى خدمة توليد المحتوى',
+          : 'تعذر توليد المحتوى حاليًا لتوقف الخدمة مؤقتًا. يمكنك إكمال التحضير يدويًا، وإذا استمرت المشكلة فتواصل مع إدارة المدرسة.',
       );
     }
 
     if (!response.ok) {
       const text = (await response.text().catch(() => '')).slice(0, 200);
       this.logger.error(`Generation webhook failed: ${response.status} ${text}`);
-      throw new BadRequestException('تعذر توليد المحتوى — راجع إعدادات الخدمة');
+      throw new BadRequestException(
+        'تعذر توليد المحتوى حاليًا لتوقف الخدمة مؤقتًا. يمكنك إكمال التحضير يدويًا، وإذا استمرت المشكلة فتواصل مع إدارة المدرسة.',
+      );
     }
 
     /*
@@ -430,7 +432,10 @@ export class LessonContentService implements OnModuleInit {
           (text ? text.slice(0, 300) : '(empty body)'),
       );
       throw new BadRequestException(
-        'سير عمل التوليد لم يُرجع محتوى — راجع آخر تنفيذ في n8n',
+        // The teacher cannot act on n8n; the log line above is for us. The
+        // usual cause is the AI provider's credit running out (HTTP 402
+        // inside the workflow), which reaches here as an empty reply.
+        'تعذر توليد المحتوى حاليًا لتوقف الخدمة مؤقتًا. يمكنك إكمال التحضير يدويًا، وإذا استمرت المشكلة فتواصل مع إدارة المدرسة.',
       );
     }
 

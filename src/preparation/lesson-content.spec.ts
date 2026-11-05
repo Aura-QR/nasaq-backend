@@ -488,7 +488,7 @@ describe('LessonContentService', () => {
       const prep = await makePreparation();
       await expect(
         asTenant(() => service.generate(String(prep._id), TEACHER)),
-      ).rejects.toThrow('لم يُرجع محتوى');
+      ).rejects.toThrow('تعذر توليد المحتوى حاليًا');
     });
 
     /*
@@ -502,7 +502,7 @@ describe('LessonContentService', () => {
       const prep = await makePreparation();
       await expect(
         asTenant(() => service.generate(String(prep._id), TEACHER)),
-      ).rejects.toThrow('لم يُرجع محتوى');
+      ).rejects.toThrow('تعذر توليد المحتوى حاليًا');
     });
 
     it("rejects n8n's own error envelope", async () => {
@@ -510,7 +510,7 @@ describe('LessonContentService', () => {
       const prep = await makePreparation();
       await expect(
         asTenant(() => service.generate(String(prep._id), TEACHER)),
-      ).rejects.toThrow('لم يُرجع محتوى');
+      ).rejects.toThrow('تعذر توليد المحتوى حاليًا');
     });
 
     it('writes nothing to the preparation when the workflow failed', async () => {
