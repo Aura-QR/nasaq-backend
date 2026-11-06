@@ -280,7 +280,7 @@ describe('daily tracking summary', () => {
         { date: '2026-09-02', excuseStatus: 'accepted' },
         { date: '2026-09-09', excuseStatus: 'pending' },
       ]);
-      expect(b).toMatchObject({ studentName: 'نورة المنقولة', studentMissing: false, absentDays: 1 });
+      expect(b).toMatchObject({ studentName: 'نورة المنقولة', studentMissing: true, absentDays: 1 });
     });
   });
 });

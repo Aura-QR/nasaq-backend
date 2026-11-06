@@ -606,8 +606,8 @@ export class DailyTrackingService {
       row.excusedDays = days.filter((d) => d.excuseStatus === 'accepted').length;
       row.absences = days;
       // A student no longer on the roll still has rows; name her from her absences when possible.
-      if (!row.studentName) row.studentName = nameOf.get(String(row.studentId)) ?? '';
       row.studentMissing = !row.studentName;
+      if (!row.studentName) row.studentName = nameOf.get(String(row.studentId)) ?? '';
     }
 
     return {
