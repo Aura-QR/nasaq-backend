@@ -574,6 +574,42 @@ export class DailyTrackingService {
       { $sort: { studentName: 1 } },
     ]);
 
+    /*
+     * Absence is recorded per day, not per period: one «غائبة» marks the
+     * whole day. `absentCount` above counts tracked periods on those days, so
+     * 15 can be three days of five periods — and a school reading it as
+     * fifteen days was the reason for this. Each student also gets the days
+     * themselves, with whether the family's excuse was accepted.
+     */
+    const absences: any[] = rows.length
+      ? await this.attendanceModel
+          .find({ studentId: { $in: rows.map((r: any) => r.studentId) }, date: { $gte: start, $lte: end } })
+          .select('studentId date excuseStatus name')
+          .sort({ date: 1 })
+          .lean()
+          .exec()
+      : [];
+    const byStudent = new Map<string, Map<string, any>>();
+    const nameOf = new Map<string, string>();
+    for (const a of absences) {
+      const key = String(a.studentId);
+      const day = new Date(a.date).toISOString().slice(0, 10);
+      if (!byStudent.has(key)) byStudent.set(key, new Map());
+      const days = byStudent.get(key)!;
+      // Two classes may each record the same day; an accepted excuse on either wins.
+      if (!days.has(day) || a.excuseStatus === 'accepted') days.set(day, { date: day, excuseStatus: a.excuseStatus ?? null });
+      if (a.name && !nameOf.has(key)) nameOf.set(key, a.name);
+    }
+    for (const row of rows as any[]) {
+      const days = [...(byStudent.get(String(row.studentId))?.values() ?? [])];
+      row.absentDays = days.length;
+      row.excusedDays = days.filter((d) => d.excuseStatus === 'accepted').length;
+      row.absences = days;
+      // A student no longer on the roll still has rows; name her from her absences when possible.
+      if (!row.studentName) row.studentName = nameOf.get(String(row.studentId)) ?? '';
+      row.studentMissing = !row.studentName;
+    }
+
     return {
       status: true,
       message: 'تم استرجاع تقرير المتابعة',

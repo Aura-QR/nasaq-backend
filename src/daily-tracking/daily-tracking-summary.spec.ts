@@ -246,4 +246,41 @@ describe('daily tracking summary', () => {
       expect(String(lectureLookups[0].teacherId)).toBe(TEACHER);
     });
   });
+
+  describe('absence days', () => {
+    it('counts days, not periods, lists the dates with their excuse, and names a student no longer on the roll', async () => {
+      const A = '6ab0000000000000000000a1';
+      const B = '6ab0000000000000000000b2';
+      const trackingModel: any = {
+        aggregate: async () => [
+          { studentId: A, studentName: 'سارة', totalLectures: 10, presentCount: 5, absentCount: 5 },
+          { studentId: B, studentName: '', totalLectures: 4, presentCount: 4, absentCount: 0 },
+        ],
+      };
+      let filter: any;
+      const attendanceModel: any = {
+        find: (f: any) => {
+          filter = f;
+          const rows = [
+            { studentId: A, date: new Date('2026-09-02T00:00:00Z'), excuseStatus: null, name: 'سارة' },
+            { studentId: A, date: new Date('2026-09-02T00:00:00Z'), excuseStatus: 'accepted', name: 'سارة' },
+            { studentId: A, date: new Date('2026-09-09T00:00:00Z'), excuseStatus: 'pending', name: 'سارة' },
+            { studentId: B, date: new Date('2026-09-10T00:00:00Z'), excuseStatus: null, name: 'نورة المنقولة' },
+          ];
+          const q: any = { select: () => q, sort: () => q, lean: () => q, exec: async () => rows };
+          return q;
+        },
+      };
+      const service = new DailyTrackingService(trackingModel, {} as any, {} as any, attendanceModel, {} as any);
+      const result: any = await run(service);
+      const [a, b] = result.data.students;
+      expect(filter.date.$gte.toISOString()).toBe('2026-09-01T00:00:00.000Z');
+      expect(a).toMatchObject({ absentDays: 2, excusedDays: 1 });
+      expect(a.absences).toEqual([
+        { date: '2026-09-02', excuseStatus: 'accepted' },
+        { date: '2026-09-09', excuseStatus: 'pending' },
+      ]);
+      expect(b).toMatchObject({ studentName: 'نورة المنقولة', studentMissing: false, absentDays: 1 });
+    });
+  });
 });
