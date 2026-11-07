@@ -130,6 +130,12 @@ export class RemoteLearningService {
 
   // ───────────────────────────────────────────── links
 
+  async myMeetingUrl(user: any) {
+    if (user?.role !== 'TEACHER') throw new ForbiddenException();
+    const t: any = await this.teachers.findById(user.userId).select('meetingUrl').lean();
+    return { data: { meetingUrl: t?.meetingUrl || '' } };
+  }
+
   async setMyMeetingUrl(user: any, meetingUrl: string) {
     if (user?.role !== 'TEACHER') throw new ForbiddenException();
     await this.teachers.updateOne({ _id: user.userId }, { $set: { meetingUrl: meetingUrl.trim() } });

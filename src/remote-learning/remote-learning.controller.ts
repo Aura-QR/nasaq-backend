@@ -52,6 +52,13 @@ export class RemoteLearningController {
     return this.service.setTeacherMeetingUrl(id, dto.meetingUrl);
   }
 
+  @Get('me/meeting-url')
+  @Roles(Role.TEACHER)
+  @ApiOperation({ summary: "The signed-in teacher's standing meeting link" })
+  myLink(@CurrentUser() user: any) {
+    return this.service.myMeetingUrl(user);
+  }
+
   @Put('me/meeting-url')
   @Roles(Role.TEACHER)
   @ApiOperation({ summary: 'The signed-in teacher sets their standing meeting link' })
