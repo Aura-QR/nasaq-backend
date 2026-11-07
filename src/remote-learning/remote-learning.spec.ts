@@ -119,6 +119,14 @@ describe('RemoteLearningService', () => {
     expect(notified[0]).toMatchObject({ type: 'remote_day_announced', title: 'تعليم عن بُعد' });
   });
 
+  it('lists a remote day by class for the administration, counting lessons without a link', async () => {
+    await asTenant(() => service.createDay({ startDate: SUNDAY, stageIds: [String(primary)] }, teacher));
+    await mongoose.connection.collection('teachers').updateOne({ _id: teacherId }, { $set: { meetingUrl: '' } });
+    const r: any = await asTenant(() => service.dayPlan(SUNDAY));
+    expect(r.data).toMatchObject({ remote: true, missingLinks: 1 });
+    expect(r.data.classes).toEqual([expect.objectContaining({ className: 'خامس/بنات', lessons: [expect.objectContaining({ slot: 2, joinUrl: '' })] })]);
+  });
+
   it('refuses an end before the start', async () => {
     await expect(asTenant(() => service.createDay({ startDate: SUNDAY, endDate: '2026-11-01' }, teacher))).rejects.toThrow('قبل تاريخ البداية');
   });

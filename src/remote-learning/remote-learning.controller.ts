@@ -38,6 +38,14 @@ export class RemoteLearningController {
     return this.service.deleteDay(id);
   }
 
+  @Get('day-plan')
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @ApiOperation({ summary: "A remote day's lessons for every class, with links (to check and to send to class groups)" })
+  @ApiQuery({ name: 'date', required: false })
+  dayPlan(@Query('date') date?: string) {
+    return this.service.dayPlan(date);
+  }
+
   @Get('teachers')
   @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
   @ApiOperation({ summary: "Teachers' standing meeting links" })

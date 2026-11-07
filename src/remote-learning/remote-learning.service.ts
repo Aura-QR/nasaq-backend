@@ -249,6 +249,47 @@ export class RemoteLearningService {
   }
 
   /**
+   * The whole school's remote lessons on a day, grouped by class, for the
+   * administration to check and to send to class groups — students who use
+   * only the mobile app do not see the join card yet.
+   */
+  async dayPlan(date?: string) {
+    const day = this.day(date);
+    const remoteDays: any[] = await this.daysOn(day);
+    if (!remoteDays.length) return { data: { date: dayKey(day), remote: false, classes: [] } };
+    const lectures: any[] = await this.lectures.find({
+      ...currentTermFilter(await currentScope(this.lectures.db)),
+      dayOfWeek: DAY_NAMES[day.getUTCDay()],
+    })
+      .populate('classId', 'name')
+      .populate({ path: 'subjectOfferingId', select: 'subjectId', populate: { path: 'subjectId', select: 'subjectName isActivity' } })
+      .populate('teacherId', 'name meetingUrl')
+      .sort({ slot: 1 })
+      .lean();
+    const stageOf = await this.stageOfClasses([...new Set(lectures.map((l) => id(l.classId)))]);
+    const remote = lectures.filter((l) => l.classId && this.covers(remoteDays, stageOf.get(id(l.classId)) || ''));
+    const overrides = new Map(
+      ((await this.links.find({ lectureId: { $in: remote.map((l) => l._id) }, date: day }).lean()) as any[])
+        .map((o) => [id(o.lectureId), o.joinUrl]),
+    );
+    const byClass = new Map<string, any>();
+    for (const l of remote) {
+      const key = id(l.classId);
+      if (!byClass.has(key)) byClass.set(key, { classId: key, className: l.classId?.name || '', lessons: [] });
+      byClass.get(key).lessons.push({
+        lectureId: id(l), slot: l.slot,
+        subjectName: l.subjectOfferingId?.subjectId?.subjectName || '',
+        isActivity: Boolean(l.subjectOfferingId?.subjectId?.isActivity),
+        teacherName: l.teacherId?.name || '',
+        joinUrl: overrides.get(id(l)) || l.teacherId?.meetingUrl || '',
+      });
+    }
+    const classes = [...byClass.values()].sort((a, b) => a.className.localeCompare(b.className, 'ar'));
+    const missing = classes.reduce((n, c) => n + c.lessons.filter((x: any) => !x.joinUrl && !x.isActivity).length, 0);
+    return { data: { date: dayKey(day), remote: true, missingLinks: missing, classes } };
+  }
+
+  /**
    * Is today a remote day for this teacher — the whole school, or a stage
    * they teach today? Lets them check in from home.
    */
