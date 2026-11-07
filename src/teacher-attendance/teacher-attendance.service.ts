@@ -50,6 +50,7 @@ export * from '../attendance/attendance.utils';
 /** How far back a teacher is still asked for the reason of an unexplained lateness. */
 export const LATE_REASON_LOOKBACK_DAYS = 7;
 
+import { RemoteLearningService } from '../remote-learning/remote-learning.service';
 @Injectable()
 export class TeacherAttendanceService {
   private readonly logger = new Logger(TeacherAttendanceService.name);
@@ -78,6 +79,8 @@ export class TeacherAttendanceService {
     // Who among the managers may hear about this — the permissions screen
     // decides. Optional so a hand-built service in a unit test still works.
     @Optional() private readonly permissions?: PermissionsService,
+    // Remote-learning days let a teacher check in from outside the school.
+    @Optional() private readonly remoteLearning?: RemoteLearningService,
   ) {}
 
   /** "HH:mm" in the school's timezone — what a person would have read on the clock. */
@@ -363,7 +366,11 @@ export class TeacherAttendanceService {
       Array.isArray(school.settings.schoolNetworkIps) &&
       school.settings.schoolNetworkIps.includes(clientIp);
 
-    if (!gpsPassed && !networkPassed) {
+    // On a remote-learning day the teacher teaches from home and checks in from there.
+    const remoteDay = !gpsPassed && !networkPassed && this.remoteLearning
+      ? await this.remoteLearning.isRemoteDayForTeacher(user.userId, today).catch(() => false)
+      : false;
+    if (!gpsPassed && !networkPassed && !remoteDay) {
       throw new ForbiddenException(
         `الموقع الشبكي والإحداثيات خارج نطاق المدرسة (المسافة: ${distanceMeters} متر)`,
       );
@@ -391,7 +398,7 @@ export class TeacherAttendanceService {
       ),
       expectedWorkMinutes: daySchedule.expectedWorkMinutes,
       isWorkingDay: daySchedule.isWorkingDay,
-      method: 'location',
+      method: remoteDay ? 'remote' : 'location',
       coordinates: { lat: dto.lat, lng: dto.lng },
       distanceMeters,
       verification: { gps: gpsPassed, network: networkPassed },
@@ -892,8 +899,11 @@ export class TeacherAttendanceService {
     const clientIp = extractClientIp(req);
     const networkPassed =
       Array.isArray(settings.schoolNetworkIps) && settings.schoolNetworkIps.includes(clientIp);
+    const remoteDay = !gpsPassed && !networkPassed && this.remoteLearning
+      ? await this.remoteLearning.isRemoteDayForTeacher(user.userId, record.date).catch(() => false)
+      : false;
 
-    if (!gpsPassed && !networkPassed) {
+    if (!gpsPassed && !networkPassed && !remoteDay) {
       throw new ForbiddenException(
         `الموقع الشبكي والإحداثيات خارج نطاق المدرسة (المسافة: ${distanceMeters} متر)`,
       );

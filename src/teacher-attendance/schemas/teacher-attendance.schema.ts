@@ -13,7 +13,7 @@ export class TeacherAttendance extends Document {
   @Prop({ type: Date, required: true })
   checkInAt: Date;
 
-  @Prop({ required: true, enum: ['location', 'manual'], default: 'location' })
+  @Prop({ required: true, enum: ['location', 'manual', 'remote'], default: 'location' })
   method: string;
 
   @Prop({ type: { lat: Number, lng: Number }, default: null })

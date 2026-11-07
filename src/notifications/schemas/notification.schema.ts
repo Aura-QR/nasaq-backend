@@ -62,6 +62,8 @@ export const NOTIFICATION_TYPES = [
   // school for review, and the ruling goes back to the student.
   'residency_document_submitted',
   'residency_document_reviewed',
+  // The school declared remote-learning days; sent to students and teachers.
+  'remote_day_announced',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

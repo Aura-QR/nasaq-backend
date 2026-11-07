@@ -34,6 +34,10 @@ export class Teacher extends Document {
   @Prop({ default: false })
   isInCharge: boolean;
 
+  /** Standing meeting link (Teams, Zoom, Meet) used for lessons on remote days. */
+  @Prop({ default: '', trim: true })
+  meetingUrl: string;
+
   @Prop({ default: 'TEACHER' })
   role: string;
 

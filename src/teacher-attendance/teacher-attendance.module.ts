@@ -20,8 +20,11 @@ import { Admin, AdminSchema } from 'src/admin/schemas/admin.schema';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { PermissionsModule } from 'src/permissions/permissions.module';
 
+import { RemoteLearningModule } from '../remote-learning/remote-learning.module';
 @Module({
   imports: [
+    // Remote-learning days let a teacher check in from home.
+    RemoteLearningModule,
     MongooseModule.forFeature([
       { name: TeacherAttendance.name, schema: TeacherAttendanceSchema },
       // A collection of its own: an absent teacher has no attendance row to

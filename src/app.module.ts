@@ -26,6 +26,7 @@ import { ExamsModule } from './exams/exams.module';
 import { ProjectsModule } from './projects/projects.module';
 import { AuthModule } from './auth/auth.module';
 import { PreparationModule } from './preparation/preparation.module';
+import { RemoteLearningModule } from './remote-learning/remote-learning.module';
 import { DutyModule } from './duty/duty.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { TasksModule } from './tasks/tasks.module';
@@ -101,6 +102,7 @@ import { AnnouncementsModule } from './announcements/announcements.module';
     ProjectsModule,
     AuthModule,
     PreparationModule,
+    RemoteLearningModule,
     CatalogModule,
     CurriculumModule,
     DutyModule,
