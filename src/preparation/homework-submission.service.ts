@@ -79,6 +79,20 @@ export class HomeworkSubmissionService {
     return { resource, prep };
   }
 
+  /**
+   * The class a preparation is for. Older preparations never stored
+   * `classId`; their period (the live lecture, or the snapshot kept on the
+   * preparation) still says which class it was.
+   */
+  private async classOf(prep: any): Promise<string> {
+    if (prep.classId) return id(prep.classId);
+    if (prep.lecture?.classId) return id(prep.lecture.classId);
+    const lectureId = id(prep.lecture);
+    if (!Types.ObjectId.isValid(lectureId)) return '';
+    const lecture: any = await this.lectures.findById(lectureId).select('classId').lean();
+    return lecture?.classId ? id(lecture.classId) : '';
+  }
+
   /** The student's classes: active enrolments and `student.classId`, as the lesson page reads them. */
   private async classIdsOf(studentId: string): Promise<string[]> {
     const [rows, student] = await Promise.all([
@@ -130,7 +144,8 @@ export class HomeworkSubmissionService {
     if (user?.role !== 'STUDENT') throw new ForbiddenException();
     const { resource, prep } = await this.homeworkWithPrep(resourceId);
     const classIds = await this.classIdsOf(user.userId);
-    if (!classIds.includes(id(prep.classId)) || !VISIBLE_TO_STUDENTS.includes(prep.reviewStatus)) {
+    const classId = await this.classOf(prep);
+    if (!classId || !classIds.includes(classId) || !VISIBLE_TO_STUDENTS.includes(prep.reviewStatus)) {
       throw new ForbiddenException('هذا الواجب ليس لفصلك');
     }
     if (!files.length) throw new BadRequestException('أرفق صورة الواجب أو ملف PDF');
@@ -168,7 +183,7 @@ export class HomeworkSubmissionService {
       {
         $set: {
           preparationId: prep._id,
-          classId: prep.classId ?? null,
+          classId: oid(classId),
           files: saved,
           note: String(note ?? '').trim().slice(0, 500),
           status: 'submitted',
@@ -223,7 +238,9 @@ export class HomeworkSubmissionService {
 
     const prepById = new Map(preps.map((p) => [id(p), p]));
     const used = [...new Set(rows.map((r) => id(r.preparationId)))].map((k) => prepById.get(k)).filter(Boolean);
-    const classIds = [...new Set(used.map((p) => id(p.classId)).filter((v) => Types.ObjectId.isValid(v)))];
+    const classOfPrep = new Map<string, string>();
+    for (const p of used) classOfPrep.set(id(p), await this.classOf(p));
+    const classIds = [...new Set([...classOfPrep.values()].filter((v) => Types.ObjectId.isValid(v)))];
     const [names, due, classes, counts, sizes] = await Promise.all([
       this.homework.subjectNames(used.map((p) => id(p.subject))),
       this.homework.dueDates(used.filter((p) => rows.some((r) => id(r.preparationId) === id(p) && !r.dueAt))),
@@ -251,10 +268,10 @@ export class HomeworkSubmissionService {
         title: r.title ?? '',
         lessonTitle: prep.lessonTitle ?? '',
         subjectName: names.get(id(prep.subject)) ?? '',
-        classId: id(prep.classId),
-        className: className.get(id(prep.classId)) ?? '',
+        classId: classOfPrep.get(id(prep)) ?? '',
+        className: className.get(classOfPrep.get(id(prep)) ?? '') ?? '',
         dueAt: dayKey(r.dueAt ?? due.get(id(prep)) ?? null),
-        students: classSize.get(id(prep.classId)) ?? 0,
+        students: classSize.get(classOfPrep.get(id(prep)) ?? '') ?? 0,
         submitted,
         toReview: t.submitted ?? 0,
         accepted: t.accepted ?? 0,
@@ -277,10 +294,11 @@ export class HomeworkSubmissionService {
     const { resource, prep } = await this.homeworkWithPrep(resourceId);
     await this.assertCanReview(user, prep);
 
+    const classId = await this.classOf(prep);
     const [students, rows, klass, names, due] = await Promise.all([
-      prep.classId ? this.studentsOfClass(id(prep.classId)) : Promise.resolve([]),
+      classId ? this.studentsOfClass(classId) : Promise.resolve([]),
       this.submissions.find({ resourceId: resource._id }).lean(),
-      prep.classId ? this.classes.findById(prep.classId).select('name').lean() : Promise.resolve(null),
+      classId ? this.classes.findById(classId).select('name').lean() : Promise.resolve(null),
       this.homework.subjectNames([id(prep.subject)]),
       this.dueKeyOf(resource, prep),
     ]);
