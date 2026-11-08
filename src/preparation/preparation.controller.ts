@@ -39,6 +39,14 @@ import { CheckAbilities } from '../casl/decorators/check-abilities.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { multerConfig } from './config/multer.config';
 import { PreparationContentService } from './preparation-content.service';
+import { memoryStorage } from 'multer';
+import {
+  HomeworkSubmissionService,
+  SUBMISSION_MAX_BYTES,
+  SUBMISSION_MAX_FILES,
+  SUBMISSION_MIME,
+} from './homework-submission.service';
+import { BadRequestException } from '@nestjs/common';
 import { CreatePreparationResourceDto } from './dto/create-preparation-resource.dto';
 import { MongoIdPipe } from '../common/pipes/mongo-id.pipe';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -53,6 +61,7 @@ export class PreparationController {
     private readonly preparationService: PreparationService,
     private readonly content: PreparationContentService,
     private readonly lessonContent: LessonContentService,
+    private readonly handIns: HomeworkSubmissionService,
   ) {}
 
   @ApiOperation({ summary: 'Create a new preparation' })
@@ -284,6 +293,63 @@ export class PreparationController {
   @Roles(Role.STUDENT)
   studentHomework(@CurrentUser() user: any) {
     return this.content.studentHomework(user);
+  }
+
+  @ApiOperation({ summary: 'The student hands in lesson homework: photos of the notebook or a PDF (replaces an earlier hand-in)' })
+  @ApiConsumes('multipart/form-data')
+  @Post('student/homework/:resourceId/submission')
+  @Roles(Role.STUDENT)
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    FilesInterceptor('files', SUBMISSION_MAX_FILES, {
+      storage: memoryStorage(),
+      limits: { fileSize: SUBMISSION_MAX_BYTES },
+      fileFilter: (_req, file, cb) =>
+        SUBMISSION_MIME.test(file.mimetype)
+          ? cb(null, true)
+          : cb(new BadRequestException('يُقبل الصور وملفات PDF فقط'), false),
+    }),
+  )
+  submitHomework(
+    @Param('resourceId', MongoIdPipe) resourceId: string,
+    @CurrentUser() user: any,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('note') note?: string,
+  ) {
+    return this.handIns.submit(user, resourceId, files ?? [], note ?? '');
+  }
+
+  @ApiOperation({ summary: 'The student takes back a hand-in the teacher has not reviewed yet' })
+  @Delete('student/homework/:resourceId/submission')
+  @Roles(Role.STUDENT)
+  withdrawHomework(@Param('resourceId', MongoIdPipe) resourceId: string, @CurrentUser() user: any) {
+    return this.handIns.withdraw(user, resourceId);
+  }
+
+  @ApiOperation({ summary: "Lesson homework the signed-in teacher set lately, with hand-in counts per class" })
+  @Get('teacher/homework')
+  @Roles(Role.TEACHER)
+  teacherHomework(@CurrentUser() user: any) {
+    return this.handIns.teacherHomework(user);
+  }
+
+  @ApiOperation({ summary: 'Every student of the class against one lesson homework, with what each handed in' })
+  @Get('homework/:resourceId/submissions')
+  @Roles(Role.TEACHER, Role.OWNER, Role.MANAGER, Role.SUPERVISOR)
+  homeworkSubmissions(@Param('resourceId', MongoIdPipe) resourceId: string, @CurrentUser() user: any) {
+    return this.handIns.submissionsFor(user, resourceId);
+  }
+
+  @ApiOperation({ summary: 'Accept a hand-in, or return it to the student with a note' })
+  @Patch('homework/:resourceId/submissions/:studentId')
+  @Roles(Role.TEACHER, Role.OWNER, Role.MANAGER, Role.SUPERVISOR)
+  reviewHomework(
+    @Param('resourceId', MongoIdPipe) resourceId: string,
+    @Param('studentId', MongoIdPipe) studentId: string,
+    @Body() body: { status: 'accepted' | 'returned'; feedback?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.handIns.review(user, resourceId, studentId, body?.status, body?.feedback ?? '');
   }
 
   @Get(':id/student-view')

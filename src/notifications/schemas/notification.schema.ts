@@ -64,6 +64,8 @@ export const NOTIFICATION_TYPES = [
   'residency_document_reviewed',
   // The school declared remote-learning days; sent to students and teachers.
   'remote_day_announced',
+  // A teacher accepted or returned lesson homework the student handed in.
+  'homework_reviewed',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

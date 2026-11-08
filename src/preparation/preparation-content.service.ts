@@ -20,6 +20,7 @@ import { Enrollment } from '../enrollments/schemas/enrollment.schema';
 import { Student } from '../students/schemas/student.schema';
 import { CreatePreparationResourceDto } from './dto/create-preparation-resource.dto';
 import { HomeworkService } from './homework.service';
+import { HomeworkSubmissionService } from './homework-submission.service';
 import {
   DEFAULT_TEACHING_AIDS,
   DEFAULT_TEACHING_STRATEGIES,
@@ -52,6 +53,7 @@ export class PreparationContentService {
     private readonly enrollments: Model<Enrollment>,
     @InjectModel(Student.name) private readonly students: Model<Student>,
     @Optional() private readonly homework?: HomeworkService,
+    @Optional() private readonly handIns?: HomeworkSubmissionService,
   ) {}
   referenceLists() {
     return {
@@ -326,7 +328,10 @@ export class PreparationContentService {
   async studentHomework(user: any) {
     if (user?.role !== 'STUDENT') throw new ForbiddenException();
     const { classId } = await this.studentFilter(user);
-    return { data: this.homework ? await this.homework.forStudent({ classId }) : [] };
+    const items: any[] = this.homework ? await this.homework.forStudent({ classId }) : [];
+    // What the student handed in for each, so «واجباتي» can say done, returned or still to do.
+    const mine = this.handIns ? await this.handIns.mineFor(String(user.userId), items.map((i) => i._id)) : new Map();
+    return { data: items.map((i) => ({ ...i, submission: mine.get(i._id) ?? null })) };
   }
   async studentView(id: string, user: any) {
     if (!user) throw new ForbiddenException();

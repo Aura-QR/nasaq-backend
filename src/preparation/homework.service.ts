@@ -62,7 +62,7 @@ export class HomeworkService {
    * dates were set. Grouped by class and subject so a page of fifty lessons
    * costs one timetable read per subject rather than one per lesson.
    */
-  private async dueDates(preps: any[]): Promise<Map<string, Date | null>> {
+  async dueDates(preps: any[]): Promise<Map<string, Date | null>> {
     const out = new Map<string, Date | null>();
     const lectureIds = [...new Set(preps.map((p) => id(p.lecture)).filter((v) => Types.ObjectId.isValid(v)))];
     const live: any[] = lectureIds.length
@@ -90,7 +90,7 @@ export class HomeworkService {
   }
 
   /** Subject name per offering id, for labels. */
-  private async subjectNames(offeringIds: string[]): Promise<Map<string, string>> {
+  async subjectNames(offeringIds: string[]): Promise<Map<string, string>> {
     const ids = [...new Set(offeringIds)].filter((v) => Types.ObjectId.isValid(v));
     if (!ids.length) return new Map();
     const rows: any[] = await this.offerings

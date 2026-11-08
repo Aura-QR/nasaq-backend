@@ -29,6 +29,10 @@ import { Student, StudentSchema } from '../students/schemas/student.schema';
 import { Lecture, LectureSchema } from '../lectures/schemas/lecture.schema';
 import { Teacher, TeacherSchema } from '../teachers/schemas/teacher.schema';
 import { HomeworkService } from './homework.service';
+import { HomeworkSubmissionService } from './homework-submission.service';
+import { HomeworkSubmission, HomeworkSubmissionSchema } from './schemas/homework-submission.schema';
+import { Class, ClassSchema } from '../classes/schemas/class.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 @Module({
   imports: [
     MongooseModule.forFeature([
@@ -45,9 +49,13 @@ import { HomeworkService } from './homework.service';
       // Homework due dates come from the timetable; the student list names the teacher.
       { name: Lecture.name, schema: LectureSchema },
       { name: Teacher.name, schema: TeacherSchema },
+      // Students hand lesson homework in; the teacher's list names the class.
+      { name: HomeworkSubmission.name, schema: HomeworkSubmissionSchema },
+      { name: Class.name, schema: ClassSchema },
     ]),
+    NotificationsModule,
   ],
-  providers: [PreparationContentService, HomeworkService],
-  exports: [PreparationContentService, HomeworkService, MongooseModule],
+  providers: [PreparationContentService, HomeworkService, HomeworkSubmissionService],
+  exports: [PreparationContentService, HomeworkService, HomeworkSubmissionService, MongooseModule],
 })
 export class PreparationContentModule {}
