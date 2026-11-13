@@ -100,6 +100,18 @@ export class UpdateSchoolSettingsDto {
   @IsOptional()
   gradingSystem?: 'flexible' | 'ministry';
 
+  /**
+   * حد الغياب: unexcused days in the current term at which the school and the
+   * family are told. null turns the alert off — the default, so shipping this
+   * moves no existing school.
+   */
+  @ValidateIf((o) => o.absenceAlertDays !== null)
+  @IsInt({ message: 'حد الغياب يجب أن يكون عددًا صحيحًا' })
+  @Min(1, { message: 'حد الغياب يوم واحد على الأقل' })
+  @Max(60, { message: 'حد الغياب لا يتجاوز 60 يومًا' })
+  @IsOptional()
+  absenceAlertDays?: number | null;
+
   @IsArray()
   @IsString({ each: true })
   @IsIn(NATIONALITY_CODES, { each: true })

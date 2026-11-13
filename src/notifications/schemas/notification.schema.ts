@@ -20,6 +20,9 @@ export const NOTIFICATION_TYPES = [
   'late_reason_required',
   'late_reason_submitted',
   'student_absent',
+  // حد الغياب reached: unexcused days in the term hit the school's limit.
+  // To the admins and the family; see AttendanceService.alertAbsenceLimit.
+  'absence_limit_reached',
   // The family's side of an absence: the answer coming in, and the school's
   // verdict going back out. Separate types because they are read by different
   // people and mean different things to do.

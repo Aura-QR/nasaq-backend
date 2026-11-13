@@ -146,6 +146,76 @@ export class AttendanceService {
     }
   }
 
+  /**
+   * حد الغياب: the day a student's unexcused absences in the current term
+   * reach the school's limit, tell the school's admins and the family.
+   *
+   * Fires on reaching the number exactly, not on every absence past it: the
+   * third alert about the same child is noise. Off unless the school set a
+   * limit. Never throws, for the same reason announceAbsence does not.
+   */
+  private async alertAbsenceLimit(attendance: any, student: any, classData: any) {
+    try {
+      const School = this.adminModel.db.models['School'];
+      const schoolId = student?.schoolId ?? classData?.schoolId;
+      if (!School || !schoolId) return;
+      const school: any = await School.findById(schoolId).select('settings.absenceAlertDays').setOptions({ skipTenantScope: true }).lean().exec();
+      const limit = school?.settings?.absenceAlertDays;
+      if (typeof limit !== 'number' || limit < 1) return;
+
+      const scope = await currentScope(this.termModel.db, new Date(attendance.date));
+      const term: any = scope.termId
+        ? await this.termModel.findById(scope.termId).select('name startDate endDate').lean().exec()
+        : null;
+      const range: any = {};
+      if (term?.startDate) range.$gte = new Date(term.startDate);
+      if (term?.endDate) range.$lte = new Date(term.endDate);
+      const records: any[] = await this.attendanceModel
+        .find({ studentId: attendance.studentId, ...(Object.keys(range).length ? { date: range } : {}) })
+        .select('date excuseStatus')
+        .lean()
+        .exec();
+      const days = new Map<string, boolean>();
+      for (const r of records) {
+        const key = new Date(r.date).toISOString().slice(0, 10);
+        days.set(key, (days.get(key) ?? false) || r.excuseStatus === 'accepted');
+      }
+      const unexcused = [...days.values()].filter((excused) => !excused).length;
+      if (unexcused !== limit) return;
+
+      const studentName = student?.name ?? 'الطالب/ة';
+      const className = classData?.name ?? '';
+      const data = {
+        studentId: String(attendance.studentId),
+        studentName,
+        classId: String(attendance.classId),
+        className,
+        unexcusedDays: unexcused,
+        limit,
+        termName: term?.name ?? '',
+      };
+      const adminIds = await this.schoolAdminIds(schoolId);
+      for (const recipientId of adminIds) {
+        await this.notifications.notify({
+          recipientId,
+          type: 'absence_limit_reached',
+          title: 'تنبيه: بلوغ حد الغياب',
+          body: `بلغ غياب ${studentName}${className ? ` (${className})` : ''} بغير عذر ${unexcused} أيام${term?.name ? ` في ${term.name}` : ''}، وهو حد الغياب المعتمد في المدرسة.`,
+          data,
+        });
+      }
+      await this.notifications.notify({
+        recipientId: attendance.studentId,
+        type: 'absence_limit_reached',
+        title: `ولي أمر/الطالبة: ${studentName}`,
+        body: `نحيطكم علمًا بأن أيام الغياب بغير عذر بلغت ${unexcused} أيام${term?.name ? ` في ${term.name}` : ''}، وهو الحد المعتمد في المدرسة. نأمل التواصل مع إدارة المدرسة.`,
+        data,
+      });
+    } catch (error: any) {
+      this.logger.error(`Could not check the absence limit for ${attendance?._id}: ${error?.message}`);
+    }
+  }
+
   // ───────────────────────────────────────────────── absence excuses
 
   /**
@@ -610,6 +680,7 @@ export class AttendanceService {
     });
 
     await this.announceAbsence(attendance, student, classData);
+    await this.alertAbsenceLimit(attendance, student, classData);
 
     await attendance.populate([
       { path: 'studentId', select: AttendanceService.DETAILED_STUDENT_FIELDS },

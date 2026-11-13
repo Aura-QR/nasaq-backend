@@ -93,6 +93,10 @@ export class SchoolSettings {
   @Prop({ type: String, enum: ['flexible', 'ministry'], default: 'flexible' })
   gradingSystem: 'flexible' | 'ministry';
 
+  /** حد الغياب — unexcused days in the term that raise an alert; null is off. */
+  @Prop({ type: Number, default: null })
+  absenceAlertDays: number | null;
+
   @Prop({ type: [String], default: [] })
   localNationalityCodes: string[];
 

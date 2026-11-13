@@ -27,6 +27,7 @@ import {
   EXAM_PART,
   MINISTRY_PARTS,
   PERFORMANCE_SPLIT,
+  ratingOf,
   resolveAssessmentType,
   round2,
 } from './ministry-template';
@@ -312,6 +313,10 @@ export class GradeRegisterService {
 
   private present(klass: any, offering: any, type: AssessmentType, sheet: any, students: any[]) {
     const subject = offering.subjectId ?? {};
+    const passingGrade = typeof subject.passingGrade === 'number' ? subject.passingGrade : null;
+    // Rated on read, not stored: an approved snapshot taken before ratings
+    // existed gets one too, and a changed pass mark re-rates every sheet.
+    students = students.map((s) => ({ ...s, rating: s.complete === false ? null : ratingOf(s.total, passingGrade) }));
     return {
       classId: String(klass._id),
       className: klass.name,
@@ -571,8 +576,9 @@ export class GradeRegisterService {
         status: sheet?.status ?? 'draft',
       });
       for (const row of rows) {
-        const entry = totals.get(row.studentId) ?? { studentId: row.studentId, name: row.name, totals: {} };
+        const entry = totals.get(row.studentId) ?? { studentId: row.studentId, name: row.name, totals: {}, ratings: {} };
         entry.totals[String(offering._id)] = row.total;
+        entry.ratings[String(offering._id)] = ratingOf(row.total, offering.subjectId?.passingGrade);
         totals.set(row.studentId, entry);
       }
     }
@@ -624,6 +630,7 @@ export class GradeRegisterService {
         written: row?.written?.score ?? null,
         final: row?.final?.score ?? null,
         total: row?.total ?? null,
+        rating: ratingOf(row?.total, offering.subjectId?.passingGrade),
       });
     }
     return { status: true, message: 'تم استرجاع السجل السنوي', data: { className: klass?.name ?? '', subjects } };

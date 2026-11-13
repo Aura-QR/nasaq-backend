@@ -53,3 +53,32 @@ export function resolveAssessmentType(offering: any): AssessmentType | null {
 }
 
 export const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * التقدير — the ministry's verbal grade for a total out of 100.
+ *
+ * The bands above «مقبول» are fixed. The pass line is the subject's own
+ * passingGrade when the school set one, else 50: a school that raised its pass
+ * mark to 60 must not see a 55 called «مقبول».
+ */
+export type RatingKey = 'excellent' | 'very_good' | 'good' | 'acceptable' | 'failed';
+export const DEFAULT_PASSING_GRADE = 50;
+export const RATING_LABELS: Record<RatingKey, string> = {
+  excellent: 'ممتاز',
+  very_good: 'جيد جدًا',
+  good: 'جيد',
+  acceptable: 'مقبول',
+  failed: 'غير مجتاز',
+};
+
+export function ratingOf(total: number | null | undefined, passingGrade?: number | null): { key: RatingKey; label: string } | null {
+  if (typeof total !== 'number' || !Number.isFinite(total)) return null;
+  const pass = typeof passingGrade === 'number' && passingGrade > 0 ? passingGrade : DEFAULT_PASSING_GRADE;
+  const key: RatingKey =
+    total < pass ? 'failed'
+    : total >= 90 ? 'excellent'
+    : total >= 80 ? 'very_good'
+    : total >= 70 ? 'good'
+    : 'acceptable';
+  return { key, label: RATING_LABELS[key] };
+}

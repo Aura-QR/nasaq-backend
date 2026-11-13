@@ -163,6 +163,7 @@ describe('annual register (ministry template)', () => {
     expect(row.final).toBeNull();
     expect(row.total).toBe(68.2);
     expect(row.complete).toBe(true);
+    expect(row.rating).toEqual({ key: 'acceptable', label: 'مقبول' });
 
     // Noura: no tracking at all, a closed quiz unsat (0 of 5).
     const noRow = rowOf(sheet, noura);
@@ -170,6 +171,7 @@ describe('annual register (ministry template)', () => {
     expect(noRow.written.score).toBe(0);
     expect(noRow.total).toBeNull();
     expect(noRow.complete).toBe(false);
+    expect(noRow.rating).toBeNull();
   });
 
   it('a final-exam subject: tasks in the 40, the electronic final scaled to 40, a typed mark wins', async () => {

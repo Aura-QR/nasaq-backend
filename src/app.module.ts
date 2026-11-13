@@ -21,6 +21,7 @@ import { LibraryModule } from './library/library.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { DailyTrackingModule } from './daily-tracking/daily-tracking.module';
 import { GradeRegisterModule } from './grade-register/grade-register.module';
+import { ClassRecordModule } from './class-record/class-record.module';
 import { GradesCriteriaModule } from './grades-criteria/grades-criteria.module';
 import { ExamsModule } from './exams/exams.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -94,6 +95,7 @@ import { AnnouncementsModule } from './announcements/announcements.module';
     AttendanceModule,
     DailyTrackingModule,
     GradeRegisterModule,
+    ClassRecordModule,
     TeacherAttendanceModule,
     LessonObservationsModule,
     StaffAttendanceModule,
