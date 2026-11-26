@@ -6,6 +6,18 @@ export const LEAVE_STATUSES = ['pending', 'approved', 'rejected'] as const;
 export type LeaveStatus = (typeof LEAVE_STATUSES)[number];
 
 /**
+ * 'early_leave' — a استئذان: leaving before the end of a day she works.
+ * 'full_day' — a planned absence («غياب مسبق»): the whole day, known ahead,
+ * so its cover can be arranged the day before. Rows without a kind are
+ * early leaves.
+ */
+export const LEAVE_KINDS = ['early_leave', 'full_day'] as const;
+export type LeaveKind = (typeof LEAVE_KINDS)[number];
+
+/** A query fragment matching early leaves, old rows without a kind included. */
+export const EARLY_LEAVE_ONLY = { kind: { $ne: 'full_day' } } as const;
+
+/**
  * A teacher asking to leave before the end of the day (استئذان).
  *
  * Approval matters beyond the courtesy: attendance snapshots
@@ -31,9 +43,19 @@ export class LeaveRequest extends Document {
   @Prop({ type: Date, required: true, index: true })
   date: Date;
 
-  /** "HH:mm" in the school's timezone. What the teacher is asking for. */
-  @Prop({ type: String, required: true })
-  leaveAt: string;
+  @Prop({ type: String, enum: LEAVE_KINDS, default: 'early_leave', index: true })
+  kind: LeaveKind;
+
+  /**
+   * Days filed together («3 أيام إجازة مرضية») share it, so they are reviewed
+   * and cancelled as one. Set on every full-day row, even a single day.
+   */
+  @Prop({ type: MongooseSchema.Types.ObjectId, default: null, index: true })
+  groupId: Types.ObjectId | null;
+
+  /** "HH:mm" in the school's timezone. What the teacher is asking for. null for a full day. */
+  @Prop({ type: String, default: null })
+  leaveAt: string | null;
 
   /**
    * The first lecture the teacher will miss.

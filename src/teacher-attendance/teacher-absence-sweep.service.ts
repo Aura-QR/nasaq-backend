@@ -9,6 +9,7 @@ import { TeacherAbsenceExcuse } from './schemas/teacher-absence-excuse.schema';
 import { TeacherAbsenceNotice } from './schemas/teacher-absence-notice.schema';
 import { NotificationsService } from '../notifications/notifications.service';
 import { TeacherAttendanceService } from './teacher-attendance.service';
+import { LeaveRequest } from '../duty/schemas/leave-request.schema';
 import { resolveDaySchedule } from '../attendance/attendance.utils';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 import { dayLabel, schoolDayHasEnded, schoolNow, worksOn } from './teacher-presence.util';
@@ -49,6 +50,10 @@ export class TeacherAbsenceSweepService {
     // حد غياب المعلمين is checked against the report's own numbers. Optional
     // so a hand-built sweep in a unit test still works without it.
     @Optional() private readonly attendance?: TeacherAttendanceService,
+    // A teacher on an approved planned absence is not asked why she is away.
+    @Optional()
+    @InjectModel(LeaveRequest.name)
+    private readonly leaveModel?: Model<LeaveRequest>,
   ) {}
 
   @Cron('*/15 * * * *', { name: 'teacher-absence-sweep' })
@@ -99,17 +104,22 @@ export class TeacherAbsenceSweepService {
   }
 
   private async notifyAbsent(date: Date, schoolId?: string, now: Date = new Date()): Promise<number> {
-    const [teachers, present, explained, noticed] = await Promise.all([
+    const [teachers, present, explained, noticed, planned] = await Promise.all([
       this.teacherModel.find({ isActive: true }).select('_id name workDays hireDate').lean().exec(),
       this.attendanceModel.find({ date }).select('teacherId').lean().exec(),
       this.excuseModel.find({ date }).select('teacherId').lean().exec(),
       this.noticeModel.find({ date }).select('teacherId').lean().exec(),
+      this.leaveModel
+        ? this.leaveModel.find({ date, kind: 'full_day', status: 'approved' }).select('teacherId').lean().exec()
+        : Promise.resolve([] as any[]),
     ]);
 
     const skip = new Set<string>([
       ...present.map((r: any) => String(r.teacherId)),
       ...explained.map((r: any) => String(r.teacherId)),
       ...noticed.map((r: any) => String(r.teacherId)),
+      // «غياب مسبق»: the day off was agreed; nothing to explain.
+      ...(planned as any[]).map((r: any) => String(r.teacherId)),
     ]);
 
     const candidates = (teachers as any[]).filter(

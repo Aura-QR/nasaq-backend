@@ -10,6 +10,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { TeacherAbsenceExcuse } from './schemas/teacher-absence-excuse.schema';
 import { TeacherAttendance } from './schemas/teacher-attendance.schema';
+import { LeaveRequest } from '../duty/schemas/leave-request.schema';
 import { Teacher } from '../teachers/schemas/teacher.schema';
 import { School } from '../platform/schools/schemas/school.schema';
 import { Admin } from '../admin/schemas/admin.schema';
@@ -60,7 +61,46 @@ export class TeacherAbsenceExcuseService {
     // Who among the managers may hear about this — the permissions screen
     // decides. Optional so a hand-built service in a unit test still works.
     @Optional() private readonly permissions?: PermissionsService,
+    // Approved planned absences («غياب مسبق») are excused days too.
+    // Optional so a hand-built service in a unit test still works.
+    @Optional()
+    @InjectModel(LeaveRequest.name)
+    private readonly leaveModel?: Model<LeaveRequest>,
   ) {}
+
+  /**
+   * teacherId → the days (YYYY-MM-DD) of an approved full-day leave she did
+   * not come in on. A day she checked in anyway is a day present, not an
+   * excused absence.
+   */
+  async plannedAbsenceDates(from: Date, to: Date, teacherId?: Types.ObjectId): Promise<Map<string, Set<string>>> {
+    const out = new Map<string, Set<string>>();
+    if (!this.leaveModel) return out;
+    const range = { $gte: normalizeDate(from), $lte: normalizeDate(to) };
+    const leaves: any[] = await this.leaveModel
+      .find({ kind: 'full_day', status: 'approved', date: range, ...(teacherId ? { teacherId } : {}) })
+      .select('teacherId date')
+      .lean()
+      .exec();
+    if (!leaves.length) return out;
+    const present = new Set(
+      (
+        await this.attendanceModel
+          .find({ teacherId: { $in: [...new Set(leaves.map((l) => String(l.teacherId)))].map((id) => new Types.ObjectId(id)) }, date: range })
+          .select('teacherId date')
+          .lean()
+          .exec()
+      ).map((r: any) => `${r.teacherId}|${TeacherAbsenceExcuseService.dateLabel(r.date)}`),
+    );
+    for (const l of leaves) {
+      const key = String(l.teacherId);
+      const day = TeacherAbsenceExcuseService.dateLabel(l.date);
+      if (present.has(`${key}|${day}`)) continue;
+      if (!out.has(key)) out.set(key, new Set());
+      out.get(key)!.add(day);
+    }
+    return out;
+  }
 
   /** Everyone at the school who should see a teacher's explanation. */
   private async schoolAdminIds(schoolId: any): Promise<string[]> {
@@ -180,9 +220,12 @@ export class TeacherAbsenceExcuseService {
         .exec(),
     ]);
 
+    // A day off agreed ahead («غياب مسبق») has nothing to explain.
+    const planned = (await this.plannedAbsenceDates(start, end, teacherId)).get(String(teacherId)) ?? new Set<string>();
     const seen = new Set<string>([
       ...present.map((r: any) => TeacherAbsenceExcuseService.dateLabel(r.date)),
       ...explained.map((r: any) => TeacherAbsenceExcuseService.dateLabel(r.date)),
+      ...planned,
     ]);
 
     const data = workingDays
@@ -499,20 +542,38 @@ export class TeacherAbsenceExcuseService {
       if (!dates.has(key)) dates.set(key, new Set());
       dates.get(key)!.add(normalizeDate(row.date).toISOString().slice(0, 10));
     }
+    // An approved planned absence is an excused absence: the same day is
+    // counted once whichever way it was excused.
+    for (const [key, days] of await this.plannedAbsenceDates(from, to)) {
+      if (!dates.has(key)) dates.set(key, new Set());
+      for (const day of days) dates.get(key)!.add(day);
+    }
     return dates;
   }
 
   async excusedByTeacher(from: Date, to: Date): Promise<Map<string, number>> {
     const rows = await this.excuseModel
       .find({ date: { $gte: normalizeDate(from), $lte: normalizeDate(to) }, status: 'accepted' })
-      .select('teacherId')
+      .select('teacherId date')
       .lean()
       .exec();
 
     const counts = new Map<string, number>();
+    const excusedDays = new Map<string, Set<string>>();
     for (const row of rows as any[]) {
       const key = String(row.teacherId);
       counts.set(key, (counts.get(key) ?? 0) + 1);
+      if (row.date) {
+        if (!excusedDays.has(key)) excusedDays.set(key, new Set());
+        excusedDays.get(key)!.add(TeacherAbsenceExcuseService.dateLabel(row.date));
+      }
+    }
+    // Approved planned absences are excused days too — each counted once,
+    // not again when an excuse was also accepted for it.
+    for (const [key, days] of await this.plannedAbsenceDates(from, to)) {
+      const already = excusedDays.get(key) ?? new Set<string>();
+      const extra = [...days].filter((d) => !already.has(d)).length;
+      if (extra) counts.set(key, (counts.get(key) ?? 0) + extra);
     }
     return counts;
   }

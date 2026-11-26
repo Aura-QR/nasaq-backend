@@ -8,8 +8,8 @@ import {
   Matches,
   Max,
   MaxLength,
-  Min, IsNotEmpty } from 'class-validator';
-import { LEAVE_STATUSES, LeaveStatus } from '../schemas/leave-request.schema';
+  Min, IsNotEmpty, IsIn, ValidateIf } from 'class-validator';
+import { LEAVE_KINDS, LEAVE_STATUSES, LeaveKind, LeaveStatus } from '../schemas/leave-request.schema';
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -19,10 +19,26 @@ export class CreateLeaveRequestDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'date لازم يكون بصيغة YYYY-MM-DD' })
   date: string;
 
-  @ApiProperty({ description: 'Departure time, HH:mm', example: '11:30' })
+  @ApiPropertyOptional({
+    enum: LEAVE_KINDS,
+    default: 'early_leave',
+    description: "'early_leave' (استئذان) or 'full_day' (planned absence: «غياب مسبق»).",
+  })
+  @IsOptional()
+  @IsIn(LEAVE_KINDS, { message: `kind لازم يكون واحد من: ${LEAVE_KINDS.join(', ')}` })
+  kind?: LeaveKind;
+
+  @ApiPropertyOptional({ description: 'Departure time, HH:mm. Required for early_leave; not used for full_day.', example: '11:30' })
+  @ValidateIf((o) => (o.kind ?? 'early_leave') === 'early_leave')
   @IsString()
   @Matches(HHMM, { message: 'leaveAt لازم يكون بصيغة HH:mm' })
-  leaveAt: string;
+  leaveAt?: string;
+
+  @ApiPropertyOptional({ description: 'full_day only: the last day, YYYY-MM-DD (default: date). At most 30 days.', example: '2026-12-03' })
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'dateTo لازم يكون بصيغة YYYY-MM-DD' })
+  dateTo?: string;
 
   @ApiPropertyOptional({
     description:

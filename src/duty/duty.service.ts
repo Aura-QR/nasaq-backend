@@ -10,7 +10,9 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as mongoose from 'mongoose';
-import { LeaveRequest } from './schemas/leave-request.schema';
+import { EARLY_LEAVE_ONLY, LeaveRequest } from './schemas/leave-request.schema';
+import { resolveDaySchedule, workingDatesBetween } from '../attendance/attendance.utils';
+import { schoolNow, worksOn } from '../teacher-attendance/teacher-presence.util';
 import { DutySupervisor } from './schemas/duty-supervisor.schema';
 import {
   COVER_ADMIN_ROLES,
@@ -35,6 +37,12 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import { adminsWhoCanRead } from '../notifications/admin-audience';
 import { isActivityLecture } from '../subjects/activity.util';
+
+/** Arabic weekday names, Sunday first — «الخميس 2026-12-03». */
+const WEEKDAY_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+
+/** At most this many calendar days in one planned absence. */
+const MAX_PLANNED_DAYS = 30;
 
 const WEEKDAY_NAMES = [
   'sunday',
@@ -122,6 +130,13 @@ export class DutyService {
       throw new NotFoundException(`المدرس ${teacherId} غير موجود`);
     }
 
+    if (dto.kind === 'full_day') {
+      return this.createPlannedAbsence(dto, teacher, user);
+    }
+    if (!dto.leaveAt) {
+      throw new BadRequestException('leaveAt مطلوب في الاستئذان');
+    }
+
     const date = dayStart(dto.date);
 
     const existing = await this.leaveModel.findOne({ teacherId, date }).exec();
@@ -133,6 +148,8 @@ export class DutyService {
       }
       // A second request for the same day is an edit of the first, not a
       // separate ask — the day has one answer.
+      existing.kind = 'early_leave';
+      existing.groupId = null;
       existing.leaveAt = dto.leaveAt;
       existing.fromSlot = dto.fromSlot ?? null;
       existing.reason = dto.reason ?? '';
@@ -153,6 +170,175 @@ export class DutyService {
 
     await this.announceLeaveRequest(created, user, false);
     return { message: 'تم إرسال طلب الاستئذان', data: created };
+  }
+
+  /** The school's settings block, or {} — for its week, holidays and timezone. */
+  private async schoolSettings(schoolId: any): Promise<any> {
+    const School = this.leaveModel.db?.models?.['School'];
+    if (!School || !schoolId || !mongoose.Types.ObjectId.isValid(String(schoolId))) return {};
+    const school: any = await School.findById(schoolId)
+      .select('settings')
+      .setOptions({ skipTenantScope: true })
+      .lean()
+      .exec();
+    return school?.settings ?? {};
+  }
+
+  private static rangeLabel(dates: Date[]): string {
+    const labels = dates.map((d) => toDateOnly(d) as string).sort();
+    return labels.length > 1 ? `${labels[0]} إلى ${labels[labels.length - 1]}` : labels[0] ?? '';
+  }
+
+  /**
+   * «غياب مسبق»: a whole day, or several, known ahead — one row per working
+   * day she works, sharing a groupId. A teacher's request waits for review;
+   * staff filing on her behalf are the approvers, so theirs is approved.
+   * Nothing is written unless every day passes.
+   */
+  private async createPlannedAbsence(dto: CreateLeaveRequestDto, teacher: any, user: any) {
+    const settings = await this.schoolSettings(user?.schoolId ?? teacher.schoolId);
+    const today = schoolNow(settings?.timezone).date;
+    const from = dayStart(dto.date);
+    const to = dayStart(dto.dateTo ?? dto.date);
+
+    if (from < today) {
+      throw new BadRequestException('لا يُسجَّل غياب مسبق ليوم مضى؛ للأيام الماضية عذر الغياب');
+    }
+    if (to < from) {
+      throw new BadRequestException('تاريخ النهاية يجب ألا يسبق تاريخ البداية');
+    }
+    const span = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+    if (span > MAX_PLANNED_DAYS) {
+      throw new BadRequestException(`الغياب المسبق لا يتجاوز ${MAX_PLANNED_DAYS} يومًا`);
+    }
+
+    // Weekends, holidays and her own days off are not absences.
+    const days = workingDatesBetween(settings, from, to).filter((d) => worksOn(teacher.workDays, d));
+    if (days.length === 0) {
+      throw new BadRequestException('لا توجد أيام دوام في الفترة المحددة');
+    }
+
+    const existing: any[] = await this.leaveModel
+      .find({ teacherId: teacher._id, date: { $in: days } })
+      .exec();
+    const reviewed = existing.find((r) => r.status !== 'pending');
+    if (reviewed) {
+      throw new BadRequestException(`يوجد طلب مراجَع بتاريخ ${toDateOnly(reviewed.date)}`);
+    }
+
+    const byStaff = user?.role !== 'TEACHER';
+    const groupId = new mongoose.Types.ObjectId();
+    const review = byStaff
+      ? {
+          status: 'approved',
+          reviewedBy: user?.userId ?? null,
+          reviewedByName: user?.name ?? user?.email ?? '',
+          reviewedAt: new Date(),
+        }
+      : { status: 'pending' };
+    const fields = {
+      kind: 'full_day',
+      groupId,
+      leaveAt: null,
+      fromSlot: null,
+      reason: dto.reason ?? '',
+      ...review,
+    };
+
+    // A pending request on one of these days becomes this one.
+    const taken = new Set(existing.map((r) => toDateOnly(r.date)));
+    if (existing.length) {
+      await this.leaveModel.updateMany({ _id: { $in: existing.map((r) => r._id) } }, { $set: fields }).exec();
+    }
+    const fresh = days.filter((d) => !taken.has(toDateOnly(d)));
+    if (fresh.length) {
+      await this.leaveModel.insertMany(
+        fresh.map((date) => ({ teacherId: teacher._id, teacherName: teacher.name ?? '', date, ...fields })),
+      );
+    }
+
+    const rows: any[] = await this.leaveModel.find({ groupId }).sort({ date: 1 }).lean().exec();
+    const label = DutyService.rangeLabel(days);
+
+    try {
+      if (byStaff) {
+        await this.notifications.notify({
+          recipientId: teacher._id,
+          type: 'leave_approved',
+          title: 'تم تسجيل غيابك المسبق',
+          body: [label, dto.reason].filter(Boolean).join(' · '),
+          data: {
+            leaveRequestId: String(rows[0]?._id),
+            groupId: String(groupId),
+            kind: 'full_day',
+            dates: rows.map((r) => toDateOnly(r.date)),
+            status: 'approved',
+          },
+        });
+      } else {
+        await this.announcePlannedAbsence(rows, teacher, user, label);
+      }
+    } catch (error: any) {
+      new Logger(DutyService.name).error(`Could not announce planned absence ${groupId}: ${error?.message}`);
+    }
+
+    return {
+      message: byStaff ? 'تم تسجيل الغياب المسبق' : 'تم إرسال طلب الغياب',
+      data: rows.map((r) => ({ ...r, date: toDateOnly(r.date), groupDays: rows.length })),
+      groupId: String(groupId),
+    };
+  }
+
+  /** One notice to the admins for the whole group. */
+  private async announcePlannedAbsence(rows: any[], teacher: any, user: any, label: string) {
+    const schoolId = user?.schoolId ?? rows[0]?.schoolId;
+    if (!schoolId) return;
+    const admins = await this.adminModel
+      .find({ schoolId: new mongoose.Types.ObjectId(String(schoolId)), role: { $in: ['OWNER', 'MANAGER', 'SUPERVISOR'] } })
+      .select('_id role jobTitleId')
+      .setOptions({ skipTenantScope: true })
+      .lean()
+      .exec();
+    const recipients = await adminsWhoCanRead(admins as any[], 'duty', schoolId, this.permissions);
+    await Promise.all(
+      recipients.map((recipientId) =>
+        this.notifications.notify({
+          recipientId,
+          type: 'leave_requested',
+          title: 'طلب غياب يوم كامل',
+          body: [`${teacher.name ?? 'معلم'} · ${label}`, rows[0]?.reason].filter(Boolean).join(' — '),
+          data: {
+            leaveRequestId: String(rows[0]._id),
+            groupId: String(rows[0].groupId),
+            kind: 'full_day',
+            teacherId: String(teacher._id),
+            teacherName: teacher.name ?? '',
+            dates: rows.map((r) => toDateOnly(r.date)),
+          },
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Covers already assigned for these days of this teacher. Never deleted
+   * here: the screen asks the manager, and cancelling sends cover_removed.
+   */
+  private async affectedCovers(teacherId: any, dates: Date[]) {
+    if (!dates.length) return [];
+    const rows: any[] = await this.substitutionModel
+      .find({ absentTeacherId: teacherId, date: { $in: dates } })
+      .populate({ path: 'lectureId', select: 'slot' })
+      .lean()
+      .exec();
+    return rows
+      .map((r) => ({
+        substitutionId: String(r._id),
+        date: toDateOnly(r.date),
+        slot: r.lectureId?.slot ?? null,
+        substituteTeacherName: r.substituteTeacherName ?? '',
+      }))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a.slot ?? 0) - (b.slot ?? 0));
   }
 
   /**
@@ -210,6 +396,7 @@ export class DutyService {
     to?: string;
     status?: string;
     teacherId?: string;
+    kind?: string;
   }, user: any) {
     const query: any = {};
 
@@ -222,6 +409,9 @@ export class DutyService {
     }
 
     if (filters.status) query.status = filters.status;
+    if (filters.kind === 'full_day') query.kind = 'full_day';
+    else if (filters.kind === 'early_leave') Object.assign(query, EARLY_LEAVE_ONLY);
+    else if (filters.kind) throw new BadRequestException('kind لازم يكون early_leave أو full_day');
 
     // A teacher only ever sees their own, whatever they ask for.
     if (user?.role === 'TEACHER') {
@@ -236,7 +426,28 @@ export class DutyService {
       .lean()
       .exec();
 
-    return rows.map((row: any) => ({ ...row, date: toDateOnly(row.date) }));
+    // How many days each group has, so a client can show «3 أيام» on one row.
+    const groupIds = [...new Set(rows.map((r: any) => r.groupId).filter(Boolean).map(String))];
+    const sizes = new Map<string, number>(
+      groupIds.length
+        ? (
+            await this.leaveModel
+              .aggregate([
+                { $match: { groupId: { $in: groupIds.map((id) => new mongoose.Types.ObjectId(id)) } } },
+                { $group: { _id: '$groupId', n: { $sum: 1 } } },
+              ])
+              .exec()
+          ).map((g: any) => [String(g._id), g.n] as [string, number])
+        : [],
+    );
+
+    return rows.map((row: any) => ({
+      ...row,
+      date: toDateOnly(row.date),
+      kind: row.kind ?? 'early_leave',
+      groupId: row.groupId ? String(row.groupId) : null,
+      groupDays: row.groupId ? sizes.get(String(row.groupId)) ?? 1 : 1,
+    }));
   }
 
   async reviewLeaveRequest(id: string, dto: ReviewLeaveRequestDto, user: any) {
@@ -247,6 +458,11 @@ export class DutyService {
     const request = await this.leaveModel.findById(id).exec();
     if (!request) {
       throw new NotFoundException(`طلب الاستئذان ${id} غير موجود`);
+    }
+
+    // Days filed together are decided together, with one notice.
+    if (request.groupId) {
+      return this.reviewGroup(request, dto, user);
     }
 
     request.status = dto.status;
@@ -292,7 +508,70 @@ export class DutyService {
     };
   }
 
-  async cancelLeaveRequest(id: string, user: any) {
+  private async reviewGroup(request: any, dto: ReviewLeaveRequestDto, user: any) {
+    const rows: any[] = await this.leaveModel.find({ groupId: request.groupId }).sort({ date: 1 }).lean().exec();
+    const wasApproved = rows.filter((r) => r.status === 'approved');
+    await this.leaveModel
+      .updateMany(
+        { groupId: request.groupId },
+        {
+          $set: {
+            status: dto.status,
+            reviewNote: dto.reviewNote ?? '',
+            reviewedBy: user?.userId ?? null,
+            reviewedByName: user?.name ?? user?.email ?? '',
+            reviewedAt: new Date(),
+          },
+        },
+      )
+      .exec();
+
+    const label = DutyService.rangeLabel(rows.map((r) => r.date));
+    if (dto.status === 'approved' || dto.status === 'rejected') {
+      await this.notifications.notify({
+        recipientId: request.teacherId,
+        type: dto.status === 'approved' ? 'leave_approved' : 'leave_rejected',
+        title: dto.status === 'approved' ? 'تمت الموافقة على غيابك' : 'تم رفض طلب الغياب',
+        body: [label, dto.reviewNote].filter(Boolean).join(' · '),
+        data: {
+          leaveRequestId: String(request._id),
+          groupId: String(request.groupId),
+          kind: request.kind ?? 'early_leave',
+          dates: rows.map((r) => toDateOnly(r.date)),
+          status: dto.status,
+        },
+      });
+    }
+
+    // An approved group taken back: its covers are now for a teacher who is
+    // coming. Listed, not deleted — the manager decides.
+    const affectedCovers =
+      dto.status !== 'approved'
+        ? await this.affectedCovers(request.teacherId, wasApproved.map((r) => r.date))
+        : [];
+    const updated: any[] = await this.leaveModel.find({ groupId: request.groupId }).sort({ date: 1 }).lean().exec();
+
+    return {
+      message:
+        dto.status === 'approved'
+          ? 'تمت الموافقة على الغياب'
+          : dto.status === 'rejected'
+            ? 'تم رفض الغياب'
+            : 'تم إرجاع الطلب للمراجعة',
+      data: updated.map((r) => ({ ...r, date: toDateOnly(r.date), groupDays: updated.length })),
+      affectedCovers,
+    };
+  }
+
+  /**
+   * Cancel a request. A group goes as a whole unless staff ask for one day
+   * (`scope=day`). A teacher cancels only her own, and only while pending.
+   * Covers set for the cancelled days are returned, not deleted.
+   */
+  async cancelLeaveRequest(id: string, user: any, scope: string = 'group') {
+    if (scope !== 'group' && scope !== 'day') {
+      throw new BadRequestException('scope لازم يكون day أو group');
+    }
     const request = await this.leaveModel.findById(id).exec();
     if (!request) {
       throw new NotFoundException(`طلب الاستئذان ${id} غير موجود`);
@@ -307,10 +586,29 @@ export class DutyService {
           'تمت مراجعة الطلب بالفعل — راجع الإدارة لتعديله.',
         );
       }
+      // Her own pending group goes together.
+      scope = 'group';
     }
 
-    await this.leaveModel.findByIdAndDelete(id).exec();
-    return { message: 'تم إلغاء طلب الاستئذان', data: request };
+    const rows: any[] =
+      request.groupId && scope === 'group'
+        ? await this.leaveModel.find({ groupId: request.groupId }).lean().exec()
+        : [request.toObject()];
+    if (user?.role === 'TEACHER' && rows.some((r) => r.status !== 'pending')) {
+      throw new BadRequestException('تمت مراجعة الطلب بالفعل — راجع الإدارة لتعديله.');
+    }
+
+    await this.leaveModel.deleteMany({ _id: { $in: rows.map((r) => r._id) } }).exec();
+    const affectedCovers = await this.affectedCovers(
+      request.teacherId,
+      rows.filter((r) => r.status === 'approved').map((r) => r.date),
+    );
+    return {
+      message: request.kind === 'full_day' ? 'تم إلغاء الغياب المسبق' : 'تم إلغاء طلب الاستئذان',
+      data: request,
+      cancelled: rows.map((r) => ({ _id: String(r._id), date: toDateOnly(r.date) })),
+      affectedCovers,
+    };
   }
 
   /**
@@ -319,9 +617,14 @@ export class DutyService {
    * Used by the attendance module so a sanctioned departure is not recorded as
    * leaving early. Returns null when there is no approved request.
    */
-  async findApprovedLeave(teacherId: any, date: Date) {
+  async findApprovedLeave(teacherId: any, date: Date, kind: 'early_leave' | 'full_day' = 'early_leave') {
     return this.leaveModel
-      .findOne({ teacherId, date: dayStart(date), status: 'approved' })
+      .findOne({
+        teacherId,
+        date: dayStart(date),
+        status: 'approved',
+        ...(kind === 'full_day' ? { kind: 'full_day' } : EARLY_LEAVE_ONLY),
+      })
       .lean()
       .exec();
   }
@@ -514,12 +817,15 @@ export class DutyService {
       ? await this.classModel.findById(lecture.classId).select('name roomNumber').lean().exec()
       : null;
 
+    // Set the day before, it has to say which day: «الخميس 2026-12-03».
+    const settings = await this.schoolSettings(user?.schoolId);
+    const ahead = date > schoolNow(settings?.timezone).date;
     await this.notifications.notify({
       recipientId: dto.substituteTeacherId,
       type: 'cover_assigned',
       title: 'لديك حصة احتياط',
       body: [
-        toDateOnly(date),
+        ahead ? `${WEEKDAY_AR[date.getUTCDay()]} ${toDateOnly(date)}` : toDateOnly(date),
         `الحصة ${lecture.slot}`,
         classInfo?.name,
         absentTeacher?.name ? `بدلًا من ${absentTeacher.name}` : null,
@@ -749,14 +1055,16 @@ export class DutyService {
     return {
       date: toDateOnly(date),
       dayOfWeek: weekday,
+      // A full_day leave (planned absence) excuses every period: fromSlot null.
       leave: approvedLeave
         ? {
             leaveAt: approvedLeave.leaveAt,
             fromSlot: approvedLeave.fromSlot,
             status: approvedLeave.status,
+            kind: approvedLeave.kind ?? 'early_leave',
           }
         : leave
-          ? { leaveAt: (leave as any).leaveAt, status: (leave as any).status }
+          ? { leaveAt: (leave as any).leaveAt, status: (leave as any).status, kind: (leave as any).kind ?? 'early_leave' }
           : null,
       stats: {
         own: ownSlots.length,
@@ -933,8 +1241,35 @@ export class DutyService {
    * not already covering something else in it.
    */
   async getCoverage(dateStr: string | undefined, user: any) {
-    const date = dayStart(dateStr ?? new Date());
+    const settings = await this.schoolSettings(user?.schoolId);
+    const today = schoolNow(settings?.timezone).date;
+    const date = dateStr ? dayStart(dateStr) : today;
     const weekday = WEEKDAY_NAMES[date.getUTCDay()];
+    const isFuture = date > today;
+
+    // A weekend or a holiday has no lectures to cover, whatever the
+    // timetable's weekday says.
+    const daySchedule = resolveDaySchedule(settings, date);
+    if (!daySchedule.isWorkingDay) {
+      return {
+        date: toDateOnly(date),
+        dayOfWeek: weekday,
+        isWorkingDay: false,
+        isFuture,
+        message: daySchedule.holidayName
+          ? `هذا اليوم إجازة: ${daySchedule.holidayName}`
+          : 'هذا اليوم ليس يوم دوام',
+        termId: null,
+        checkInInUse: false,
+        absentTeachers: [],
+        onLeave: [],
+        plannedAbsences: [],
+        supervisors: null,
+        stats: { needCover: 0, covered: 0, uncovered: 0 },
+        uncovered: [],
+        covered: [],
+      };
+    }
 
     const scope = await currentScope(this.lectureModel.db, date);
     const termFilter = currentTermFilter(scope);
@@ -990,8 +1325,14 @@ export class DutyService {
     const presentIds = new Set<string>(
       attendance.map((a: any) => String(a.teacherId)),
     );
+    // A استئذان covers part of the day; a planned absence («غياب مسبق»)
+    // covers all of it, known ahead — so its lectures are on the board from
+    // the day before, when nobody has checked in.
     const leaveByTeacher = new Map<string, any>(
-      leaves.map((l: any) => [String(l.teacherId), l]),
+      leaves.filter((l: any) => l.kind !== 'full_day').map((l: any) => [String(l.teacherId), l]),
+    );
+    const plannedByTeacher = new Map<string, any>(
+      leaves.filter((l: any) => l.kind === 'full_day').map((l: any) => [String(l.teacherId), l]),
     );
 
     // Absent = did not check in. On a day nobody has checked in yet — early
@@ -1004,9 +1345,12 @@ export class DutyService {
           .filter((id: string) => !presentIds.has(id))
       : [];
 
+    // A teacher who came in after all is here to cover, not to be covered.
+    const plannedAway = [...plannedByTeacher.keys()].filter((id) => !presentIds.has(id));
     const needsCoverFrom = new Set<string>([
       ...(absentIds as string[]),
       ...leaveByTeacher.keys(),
+      ...plannedAway,
     ]);
 
     const lectureFilter: any = { dayOfWeek: weekday };
@@ -1056,10 +1400,26 @@ export class DutyService {
         leave != null &&
         (leave.fromSlot == null || lecture.slot >= leave.fromSlot);
 
+      const planned = ownerId ? plannedByTeacher.get(ownerId) : null;
+      const ownerPresent = ownerId != null && presentIds.has(ownerId);
       const isAbsent = ownerId != null && absentIds.includes(ownerId);
-      if (!isAbsent && !leaveApplies) continue;
-
       const existing = coverByLecture.get(String(lecture._id));
+
+      // A cover already set is always on the board, whatever its teacher's
+      // status: set the day before, it must not vanish at 07:00 because
+      // nobody has checked in yet. Otherwise a lecture is listed only when
+      // its teacher is away: absent, on leave, or on a planned absence she
+      // has not turned up for after all.
+      const plannedApplies = planned != null && !ownerPresent;
+      if (!existing && !isAbsent && !leaveApplies && !plannedApplies) continue;
+
+      const reason = planned
+        ? 'planned_absence'
+        : isAbsent
+          ? 'absent'
+          : leaveApplies
+            ? 'leave'
+            : (existing?.reason ?? 'other');
       const entry = {
         lectureId: String(lecture._id),
         slot: lecture.slot,
@@ -1075,8 +1435,11 @@ export class DutyService {
         absentTeacherName: ownerId
           ? (teacherById.get(ownerId)?.name ?? null)
           : null,
-        reason: isAbsent ? 'absent' : 'leave',
+        reason,
         leaveAt: leaveApplies ? leave.leaveAt : null,
+        leaveRequestId: planned ? String(planned._id) : leaveApplies ? String(leave._id) : null,
+        // She has a check-in on that date: «المعلمة حضرت».
+        ownerPresent,
       };
 
       if (existing) {
@@ -1115,6 +1478,8 @@ export class DutyService {
       date: toDateOnly(date),
       dayOfWeek: weekday,
       termId: scope.termId ? String(scope.termId) : null,
+      isWorkingDay: true,
+      isFuture,
       checkInInUse,
       absentTeachers: absentIds.map((id: string) => ({
         teacherId: id,
@@ -1125,6 +1490,15 @@ export class DutyService {
         name: l.teacherName,
         leaveAt: l.leaveAt,
         fromSlot: l.fromSlot,
+        kind: l.kind ?? 'early_leave',
+      })),
+      plannedAbsences: [...plannedByTeacher.values()].map((l: any) => ({
+        teacherId: String(l.teacherId),
+        name: teacherById.get(String(l.teacherId))?.name ?? l.teacherName,
+        reason: l.reason ?? '',
+        leaveRequestId: String(l._id),
+        groupId: l.groupId ? String(l.groupId) : null,
+        present: presentIds.has(String(l.teacherId)),
       })),
       supervisors: supervisors
         ? {

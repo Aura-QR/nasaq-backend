@@ -215,6 +215,7 @@ export class DutyController {
     enum: ['pending', 'approved', 'rejected'],
   })
   @ApiQuery({ name: 'teacherId', required: false })
+  @ApiQuery({ name: 'kind', required: false, enum: ['early_leave', 'full_day'] })
   @CheckAbilities({ action: 'read', subject: 'Duty', roles: [Role.MANAGER] })
   @Get('leave-requests')
   @HttpCode(HttpStatus.OK)
@@ -225,9 +226,10 @@ export class DutyController {
     @Query('to') to?: string,
     @Query('status') status?: string,
     @Query('teacherId') teacherId?: string,
+    @Query('kind') kind?: string,
   ) {
     return await this.dutyService.listLeaveRequests(
-      { date, from, to, status, teacherId },
+      { date, from, to, status, teacherId, kind },
       user,
     );
   }
@@ -250,11 +252,18 @@ export class DutyController {
     summary: 'Cancel a leave request',
     description:
       'A teacher may cancel their own while it is still pending; staff may ' +
-      'cancel any.',
+      'cancel any. Days filed together go together; staff may pass ' +
+      'scope=day to drop one of them. Covers already set for the cancelled ' +
+      'days are returned as affectedCovers, not deleted.',
   })
+  @ApiQuery({ name: 'scope', required: false, enum: ['group', 'day'] })
   @Delete('leave-requests/:id')
   @HttpCode(HttpStatus.OK)
-  async cancelLeave(@Param('id') id: string, @CurrentUser() user: any) {
-    return await this.dutyService.cancelLeaveRequest(id, user);
+  async cancelLeave(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('scope') scope?: string,
+  ) {
+    return await this.dutyService.cancelLeaveRequest(id, user, scope ?? 'group');
   }
 }

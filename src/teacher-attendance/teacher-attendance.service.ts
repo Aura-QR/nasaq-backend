@@ -34,7 +34,7 @@ import {
   rowRates,
 } from './attendance-rates.util';
 import { currentScope, pickCurrentTerm } from '../terms/current-scope.util';
-import { LeaveRequest } from '../duty/schemas/leave-request.schema';
+import { EARLY_LEAVE_ONLY, LeaveRequest } from '../duty/schemas/leave-request.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.dto';
 import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
@@ -946,11 +946,14 @@ export class TeacherAttendanceService {
     // number could not tell a permitted departure from a day that was never
     // measured, and one without the flag makes every approved leave look like
     // a fault.
+    // An early leave only: a planned full-day absence on a day she came in
+    // anyway does not turn her check-out into a sanctioned early leave.
     const approvedLeave = await this.leaveRequestModel
       .findOne({
         teacherId: record.teacherId,
         date: record.date,
         status: 'approved',
+        ...EARLY_LEAVE_ONLY,
       })
       .lean()
       .exec();
@@ -1011,10 +1014,12 @@ export class TeacherAttendanceService {
     }
 
     const today = normalizeDate(new Date());
+    // «تسجيل العودة» is for a استئذان, never a planned full-day absence.
     const leave = await this.leaveRequestModel.findOne({
       teacherId: new Types.ObjectId(String(user.userId)),
       date: today,
       status: 'approved',
+      ...EARLY_LEAVE_ONLY,
     });
     if (!leave) {
       throw new BadRequestException('لا يوجد استئذان معتمد لك اليوم');

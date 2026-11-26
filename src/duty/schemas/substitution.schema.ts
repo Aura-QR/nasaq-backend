@@ -2,7 +2,8 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
-export const COVER_REASONS = ['absent', 'leave', 'other'] as const;
+// 'planned_absence': the teacher's approved full-day leave («غياب مسبق»).
+export const COVER_REASONS = ['absent', 'leave', 'planned_absence', 'other'] as const;
 export type CoverReason = (typeof COVER_REASONS)[number];
 
 /**
