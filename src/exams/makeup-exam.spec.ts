@@ -413,4 +413,19 @@ describe('makeup exam', () => {
     await expect(asSchool(() => exams.update(String(mk.data._id), { grade: 20 } as any, teacher())))
       .rejects.toThrow(BadRequestException);
   });
+
+  it('9. the edit form re-sends the copied fields unchanged: the save goes through', async () => {
+    const mk: any = await makeup();
+    const same = {
+      subjectOfferingId: String(mk.data.subjectOfferingId),
+      classIds: mk.data.classIds.map(String),
+      examType: mk.data.examType,
+      grade: mk.data.grade,
+      duration: 25,
+    };
+    const saved: any = await asSchool(() => exams.update(String(mk.data._id), same as any, teacher()));
+    expect(saved.duration).toBe(25);
+    await expect(asSchool(() => exams.update(String(mk.data._id), { ...same, examType: 'assignment' } as any, teacher())))
+      .rejects.toThrow('تُنسخ من الاختبار الأصلي');
+  });
 });

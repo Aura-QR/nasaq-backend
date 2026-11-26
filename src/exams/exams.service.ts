@@ -1916,8 +1916,18 @@ export class ExamsService {
    * and told; one who has started it cannot be removed.
    */
   private async updateMakeup(makeup: any, dto: UpdateExamDto, user: any) {
-    const copied = ['subjectOfferingId', 'classIds', 'examType', 'grade'] as const;
-    if (copied.some((k) => (dto as any)[k] !== undefined)) {
+    // What the makeup copied from the original cannot change. The edit form
+    // sends every field on every save, so an unchanged value is ignored —
+    // refusing it refused every save, a question fixed included.
+    const ids = (v: any) => (Array.isArray(v) ? v : [v]).map((x: any) => String(x?._id ?? x)).sort().join(',');
+    const changed = (k: 'subjectOfferingId' | 'classIds' | 'examType' | 'grade') => {
+      const sent = (dto as any)[k];
+      if (sent === undefined || sent === null) return false;
+      if (k === 'grade') return Math.abs(Number(sent) - Number(makeup.grade)) > 1e-9;
+      if (k === 'examType') return String(sent) !== String(makeup.examType);
+      return ids(sent) !== ids(makeup[k]);
+    };
+    if ((['subjectOfferingId', 'classIds', 'examType', 'grade'] as const).some(changed)) {
       throw new BadRequestException('المادة والفصول والنوع والدرجة تُنسخ من الاختبار الأصلي ولا تُعدَّل في الاختبار البديل');
     }
     const startDate = dto.startDate ? new Date(dto.startDate) : makeup.startDate;
