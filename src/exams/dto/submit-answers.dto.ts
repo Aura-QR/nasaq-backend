@@ -1,4 +1,4 @@
-import { IsArray, IsMongoId, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsMongoId, IsString, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -10,7 +10,9 @@ export class AnswerDto {
   })
   questionId: string;
 
+  // An essay can be long.
   @IsString()
+  @MaxLength(5000, { message: 'الإجابة لا تتجاوز 5000 حرف' })
   @ApiProperty({
     description: 'The student\'s answer',
     example: 'Paris',

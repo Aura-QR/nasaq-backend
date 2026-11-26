@@ -25,14 +25,22 @@ export class ExamResult extends Document {
   @Prop({ default: false })
   submitted: boolean;
 
-  @Prop()
-  achievedGrade: number;
+  /**
+   * 'pending_review' while an essay answer waits for the teacher: the paper
+   * has no grade yet (achievedGrade, percentage and passed are null), and
+   * the register does not count it at all. Old rows have none: graded.
+   */
+  @Prop({ type: String, enum: ['graded', 'pending_review'], default: 'graded' })
+  status: 'graded' | 'pending_review';
 
-  @Prop()
-  percentage: number;
+  @Prop({ type: Number })
+  achievedGrade: number | null;
 
-  @Prop()
-  passed: boolean;
+  @Prop({ type: Number })
+  percentage: number | null;
+
+  @Prop({ type: Boolean })
+  passed: boolean | null;
 
   /**
    * What the student actually answered, kept so the result can be read back.
@@ -50,6 +58,16 @@ export class ExamResult extends Document {
         studentAnswer: String,
         correctAnswer: String,
         isCorrect: Boolean,
+        // Written for every question since question types; old rows lack
+        // these, and an unanswered question had no entry at all.
+        type: { type: String, enum: ['mcq', 'true_false', 'essay'] },
+        marks: Number,
+        // null: an essay answer the teacher has not marked yet. No default:
+        // an old row loaded from the database must not read as unmarked.
+        earned: { type: Number },
+        feedback: { type: String, default: null, maxlength: 1000 },
+        gradedAt: { type: Date, default: null },
+        gradedBy: { type: mongoose.Schema.Types.ObjectId, default: null },
       },
     ],
     default: [],
@@ -57,8 +75,14 @@ export class ExamResult extends Document {
   answers: {
     questionId: string;
     studentAnswer: string;
-    correctAnswer: string;
-    isCorrect: boolean;
+    correctAnswer: string | null;
+    isCorrect: boolean | null;
+    type?: 'mcq' | 'true_false' | 'essay';
+    marks?: number;
+    earned?: number | null;
+    feedback?: string | null;
+    gradedAt?: Date | null;
+    gradedBy?: mongoose.Types.ObjectId | null;
   }[];
 
   /**

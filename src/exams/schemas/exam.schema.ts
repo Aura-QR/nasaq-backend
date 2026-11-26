@@ -3,16 +3,35 @@ import mongoose, { Document } from 'mongoose';
 import { ExamType } from '../enums/exam-type.enum';
 import { tenantScopedPlugin } from 'src/tenancy/plugins/tenant-scoped.plugin';
 
+/**
+ * One question. Its rules per type live in question-rules.util — the
+ * schema only stores. A question written before `type` existed has none,
+ * and reads as 'mcq'; one with no `marks` shares the exam's grade equally.
+ */
 @Schema({ _id: true })
 export class Question {
+  @Prop({ type: String, enum: ['mcq', 'true_false', 'essay'], default: 'mcq' })
+  type: 'mcq' | 'true_false' | 'essay';
+
   @Prop({ required: true })
   question: string;
 
-  @Prop({ type: [String], required: true })
+  // Empty for an essay. A true/false question stores «صح»/«خطأ», so an app
+  // that only knows multiple choice still shows and marks it.
+  @Prop({ type: [String], default: [] })
   options: string[];
 
-  @Prop({ required: true })
-  correctAnswer: string;
+  // null for an essay, which the teacher marks.
+  @Prop({ type: String, default: null })
+  correctAnswer: string | null;
+
+  /** Essay only. Shown to the teacher while marking; to the student only after it is graded. */
+  @Prop({ type: String, default: null, maxlength: 2000 })
+  modelAnswer: string | null;
+
+  /** The question's weight. null on old exams → equal share. */
+  @Prop({ type: Number, default: null, min: 0.25 })
+  marks: number | null;
 }
 
 export const QuestionSchema = SchemaFactory.createForClass(Question);

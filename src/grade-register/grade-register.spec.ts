@@ -174,6 +174,33 @@ describe('annual register (ministry template)', () => {
     expect(noRow.rating).toBeNull();
   });
 
+  it('a paper waiting on an essay is not a 0: skipped, and the row is not complete', async () => {
+    await saraInMaths();
+    // Closed quiz with an essay. Sara's paper waits for the teacher; Noura never sat it.
+    const essayQuiz = (await m.Exam.collection.insertOne({ subjectOfferingId: continuous, classIds: [classId], examType: 'quiz',
+      grade: 20, endDate: past, schoolId })).insertedId;
+    await m.ExamResult.collection.insertOne({ examId: essayQuiz, studentId: sara, startedAt: past, submitted: true,
+      status: 'pending_review', achievedGrade: null, percentage: null, passed: null });
+
+    const sheet: any = await asSchool(() => register.getSheet(String(classId), String(continuous), owner));
+    const row = rowOf(sheet, sara);
+    // Exactly as without the quiz: still 3 written items at 72%, not a 0 out of 20.
+    expect(row.written).toMatchObject({ rate: 72, count: 3, score: 43.2 });
+    expect(row.complete).toBe(false);
+    expect(row.total).toBeNull();
+    expect(row.rating).toBeNull();
+
+    // A missing paper after the end date is still 0: Noura's two closed quizzes.
+    expect(rowOf(sheet, noura).written).toMatchObject({ count: 2, score: 0 });
+
+    // Once marked, it counts: 16/20 joins the written part and the row completes.
+    await m.ExamResult.collection.updateOne({ examId: essayQuiz, studentId: sara },
+      { $set: { status: 'graded', achievedGrade: 16, percentage: 80, passed: true } });
+    const after: any = await asSchool(() => register.getSheet(String(classId), String(continuous), owner));
+    expect(rowOf(after, sara).written).toMatchObject({ count: 4, rate: 75.6 }) // 34 of 45;
+    expect(rowOf(after, sara).complete).toBe(true);
+  });
+
   it('a final-exam subject: tasks in the 40, the electronic final scaled to 40, a typed mark wins', async () => {
     await saraInMaths(finalExam);
     const fin = (await m.Exam.collection.insertOne({ subjectOfferingId: finalExam, classIds: [classId], examType: 'final',

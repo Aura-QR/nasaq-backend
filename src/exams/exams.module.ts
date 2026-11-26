@@ -13,6 +13,7 @@ import { Enrollment, EnrollmentSchema } from '../enrollments/schemas/enrollment.
 import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/schemas/subject-offering.schema';
 import { StudentClassResolverModule } from '../enrollments/student-class-resolver.module';
 import { AcademicYear, AcademicYearSchema } from '../academic-years/schemas/academic-year.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -29,6 +30,8 @@ import { AcademicYear, AcademicYearSchema } from '../academic-years/schemas/acad
       { name: AcademicYear.name, schema: AcademicYearSchema },
     ]),
     CaslModule,
+    // exam_graded, when the teacher finishes marking an essay paper.
+    NotificationsModule,
   ],
   providers: [ExamsService],
   controllers: [ExamsController],

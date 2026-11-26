@@ -17,6 +17,7 @@ import { CreateExamDto, QuestionDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { SubmitAnswersDto } from './dto/submit-answers.dto';
+import { ReviewExamDto } from './dto/review-exam.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AbilitiesGuard } from 'src/casl/guards/abilities.guard';
 import { CheckAbilities } from 'src/casl/decorators/check-abilities.decorator';
@@ -141,6 +142,47 @@ export class ExamsController {
   @HttpCode(HttpStatus.OK)
   async getMyResult(@Param('examId') examId: string, @CurrentUser() user: any) {
     return await this.examsService.getMyResult(examId, user);
+  }
+
+  // Both above @Get(':id'), for the same reason as listResults.
+  @ApiOperation({
+    summary: 'تصحيح المقالي — إجابات الأسئلة المقالية مع الإجابة النموذجية',
+    description:
+      'status=pending (الافتراضي) ما ينتظر التصحيح فقط، و all كل الإجابات. ' +
+      'المعلمة ترى طالبات فصولها في هذه المادة فقط.',
+  })
+  @ApiParam({ name: 'examId', description: 'Exam ID' })
+  @ApiQuery({ name: 'status', required: false, enum: ['pending', 'all'] })
+  @ApiResponse({ status: 403, description: 'Not this subject\'s teacher, nor an admin' })
+  @Get(':examId/review')
+  @CheckAbilities({ action: 'read', subject: 'Exam' })
+  @HttpCode(HttpStatus.OK)
+  async getReview(
+    @Param('examId') examId: string,
+    @Query('status') status: string | undefined,
+    @CurrentUser() user: any,
+  ) {
+    return await this.examsService.getReview(examId, status, user);
+  }
+
+  @ApiOperation({
+    summary: 'حفظ تصحيح الأسئلة المقالية — حفظ واحد لشاشة كاملة',
+    description:
+      'الورقة التي صُحّح آخر سؤال مقالي فيها تصبح graded وتُبلَّغ الطالبة مرة واحدة. ' +
+      'إعادة التصحيح تعيد حساب المجموع دون إشعار جديد.',
+  })
+  @ApiParam({ name: 'examId', description: 'Exam ID' })
+  @ApiResponse({ status: 400, description: 'درجة خارج المدى، أو سؤال غير مقالي، أو طالبة بلا إجابة' })
+  @ApiResponse({ status: 403, description: 'طالبة ليست في فصول المعلمة' })
+  @Patch(':examId/review')
+  @CheckAbilities({ action: 'update', subject: 'Exam' })
+  @HttpCode(HttpStatus.OK)
+  async reviewAnswers(
+    @Param('examId') examId: string,
+    @Body() dto: ReviewExamDto,
+    @CurrentUser() user: any,
+  ) {
+    return await this.examsService.reviewAnswers(examId, dto, user);
   }
 
   @ApiOperation({ summary: 'Edit a student exam grade (Teacher only — must teach this subject in the student class)' })
