@@ -25,6 +25,26 @@ import { loadCurrentOffering } from '../subject-offerings/current-offering.util'
 import { scopedOfferingIds } from '../terms/current-scope.util';
 import { gradingSystemOf } from '../grade-register/grading-system.util';
 import { DEFAULT_EXAM_GRADE, EXAM_PART, resolveAssessmentType } from '../grade-register/ministry-template';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ReviewExamDto } from './dto/review-exam.dto';
+import {
+  allMarksSet,
+  assertMarksConsistent,
+  effectiveMarks,
+  isQuarter,
+  markPaper as markAnswers,
+  normalizeQuestion,
+  presentAnswers,
+  round2,
+  scorePaper,
+  studentQuestion,
+} from './question-rules.util';
+
+/** Who may mark essays besides the subject's teacher. */
+const REVIEW_ADMIN_ROLES = ['OWNER', 'SUPERVISOR', 'MANAGER', 'SUPER_ADMIN'];
+
+/** An essay answer still waiting for the teacher. Old rows have no type, so never. */
+const isPendingEssay = (a: any) => a?.type === 'essay' && (a.earned === null || a.earned === undefined);
 
 /**
  * Minutes a submission may arrive after the student's time or the exam's
@@ -66,7 +86,21 @@ export class ExamsService {
     @Optional()
     @InjectModel(AcademicYear.name)
     private readonly academicYearModel?: Model<AcademicYear>,
+    // exam_graded, when the teacher finishes marking a paper. Optional so a
+    // hand-built service in a unit test still works.
+    @Optional()
+    private readonly notifications?: NotificationsService,
   ) {}
+
+  /**
+   * The stored questions, each checked against its type, and the marks
+   * either on every question or on none. 400s name the question by number.
+   */
+  private normalizeQuestions(questions: any[]): any[] {
+    const normalized = (questions ?? []).map((q, i) => normalizeQuestion(q, `السؤال ${i + 1}`));
+    assertMarksConsistent(normalized);
+    return normalized;
+  }
 
   private validateObjectId(id: string, entityName: string): void {
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -171,24 +205,19 @@ export class ExamsService {
 
   async create(createExamDto: CreateExamDto, user: any, generatedFromPreparation?: string) {
 
-    const { subjectOfferingId, examType, questions, startDate, endDate, duration } = createExamDto;
+    const { subjectOfferingId, examType, startDate, endDate, duration } = createExamDto;
     let { classIds } = createExamDto;
 
     if (new Date(endDate) <= new Date(startDate)) {
       throw new BadRequestException('تاريخ انتهاء الامتحان يجب أن يكون بعد تاريخ البداية');
     }
 
-    if (!questions || questions.length === 0) {
+    if (!createExamDto.questions || createExamDto.questions.length === 0) {
       throw new BadRequestException('يجب أن يحتوي الامتحان على سؤال واحد على الأقل');
     }
 
-    for (const q of questions) {
-      if (!q.options.includes(q.correctAnswer)) {
-        throw new BadRequestException(
-          `الإجابة الصحيحة "${q.correctAnswer}" يجب أن تكون إحدى الخيارات المتاحة في السؤال: "${q.question}"`
-        );
-      }
-    }
+    // Each question against its type; true/false gets its two fixed options.
+    const questions = this.normalizeQuestions(createExamDto.questions);
 
     this.validateObjectId(subjectOfferingId, 'subjectOffering');
 
@@ -472,7 +501,8 @@ export class ExamsService {
 
       return {
         ...base,
-        questions: base.questions?.map(({ correctAnswer, ...q }) => q),
+        // No answer key and no model answer, ever, before the paper is graded.
+        questions: this.forStudent(base),
         status,
         hasTaken: takenExamIds.has(e._id.toString()),
       };
@@ -560,15 +590,43 @@ export class ExamsService {
     const totalDocs = paginationMate.total;
     const totalPages = paginationMate.totalPages;
 
+    // «3 بانتظار التصحيح» on each exam, in one query for the page.
+    const pending = await this.pendingReviewCounts(exams.map((e) => e._id));
+    const present = (exam: any) => {
+      const base: any = transformExamResponse(exam);
+      if (user?.role === 'STUDENT') base.questions = this.forStudent(base);
+      base.pendingReviewCount = pending.get(String(exam._id)) ?? 0;
+      return base;
+    };
+
     if (isPaginationRequested) {
       return {
-        data: exams.map(exam => transformExamResponse(exam)),
+        data: exams.map(present),
         totalDocs,
         totalPages
       };
     }
 
-    return exams.map(exam => transformExamResponse(exam));
+    return exams.map(present);
+  }
+
+  /** The questions of an exam as a student may see them before grading. */
+  private forStudent(exam: any): any[] {
+    const questions = exam?.questions ?? [];
+    const marks = effectiveMarks({ grade: exam?.grade, questions });
+    return questions.map((q: any, i: number) => studentQuestion(q, marks[i]));
+  }
+
+  /** examId → papers waiting for the teacher to mark an essay. */
+  private async pendingReviewCounts(examIds: any[]): Promise<Map<string, number>> {
+    if (!examIds.length) return new Map();
+    const rows = await this.examResultModel
+      .aggregate([
+        { $match: { examId: { $in: examIds.map((id) => new mongoose.Types.ObjectId(String(id))) }, status: 'pending_review', submitted: true } },
+        { $group: { _id: '$examId', count: { $sum: 1 } } },
+      ])
+      .exec();
+    return new Map(rows.map((r: any) => [String(r._id), r.count]));
   }
 
   async findOne(id: string, user?: any) {
@@ -600,7 +658,11 @@ export class ExamsService {
       throw new NotFoundException(`الامتحان ذو المعرف ${id} غير موجود`);
     }
 
-    return transformExamResponse(exam);
+    const base: any = transformExamResponse(exam);
+    // The exam carries its answer key and model answers; a student reading
+    // it by id gets the questions only.
+    if (user?.role === 'STUDENT') base.questions = this.forStudent(base);
+    return base;
   }
 
   async update(id: string, updateExamDto: UpdateExamDto, user?: any) {
@@ -614,6 +676,11 @@ export class ExamsService {
     await this.assertTeacherMayManage(existingExam, user);
     if (updateExamDto.questions) {
       await this.assertQuestionsOpen(existingExam._id);
+      if (updateExamDto.questions.length === 0) {
+        throw new BadRequestException('يجب أن يحتوي الامتحان على سؤال واحد على الأقل');
+      }
+      // The same rules as creating: this route must not be a way around them.
+      updateExamDto.questions = this.normalizeQuestions(updateExamDto.questions);
     }
 
     // A final stays the whole grade's, for the subject it was set for. Its
@@ -763,16 +830,35 @@ export class ExamsService {
     this.validateObjectId(questionId, 'question');
     await this.assertMayEditQuestions(examId, user);
 
-    const updateFields = {};
+    // The question after the change is checked whole, against its (possibly
+    // new) type, and against the others for marks — so a field changed alone
+    // cannot leave it half one type and half another.
+    const current: any = await this.examModel.findById(examId).select('questions').lean().exec();
+    const index = (current?.questions ?? []).findIndex((q: any) => String(q._id) === String(questionId));
+    if (index < 0) {
+      throw new NotFoundException('الامتحان أو السؤال غير موجود');
+    }
+    const before = current.questions[index];
+    const merged: any = { ...before, type: before.type ?? 'mcq' };
+    for (const key of ['type', 'question', 'options', 'correctAnswer', 'modelAnswer', 'marks'] as const) {
+      if (updateQuestionDto[key] !== undefined) merged[key] = updateQuestionDto[key];
+    }
+    // Switching to an essay drops what an essay cannot have, rather than
+    // making the client send empties for fields it never meant to keep.
+    if (updateQuestionDto.type === 'essay') {
+      if (updateQuestionDto.options === undefined) merged.options = [];
+      if (updateQuestionDto.correctAnswer === undefined) merged.correctAnswer = null;
+    } else if (updateQuestionDto.type && updateQuestionDto.modelAnswer === undefined) {
+      merged.modelAnswer = null;
+    }
+    const normalized = normalizeQuestion(merged, `السؤال ${index + 1}`);
+    assertMarksConsistent(
+      current.questions.map((q: any, i: number) => (i === index ? normalized : q)),
+    );
 
-    if (updateQuestionDto.question !== undefined) {
-      updateFields['questions.$.question'] = updateQuestionDto.question;
-    }
-    if (updateQuestionDto.options !== undefined) {
-      updateFields['questions.$.options'] = updateQuestionDto.options;
-    }
-    if (updateQuestionDto.correctAnswer !== undefined) {
-      updateFields['questions.$.correctAnswer'] = updateQuestionDto.correctAnswer;
+    const updateFields = {};
+    for (const [key, value] of Object.entries(normalized)) {
+      updateFields[`questions.$.${key}`] = value;
     }
 
     const result = await this.examModel.updateOne(
@@ -816,15 +902,13 @@ export class ExamsService {
     this.validateObjectId(examId, 'exam');
     await this.assertMayEditQuestions(examId, user);
 
-    if (!questionDto.options.includes(questionDto.correctAnswer)) {
-      throw new BadRequestException(
-        `الإجابة الصحيحة "${questionDto.correctAnswer}" يجب أن تكون إحدى الخيارات المتاحة`
-      );
-    }
+    const current: any = await this.examModel.findById(examId).select('questions').lean().exec();
+    const normalized = normalizeQuestion(questionDto, `السؤال ${(current?.questions?.length ?? 0) + 1}`);
+    assertMarksConsistent([...(current?.questions ?? []), normalized]);
 
     const result = await this.examModel.updateOne(
       { _id: examId },
-      { $push: { questions: questionDto } }
+      { $push: { questions: normalized } }
     );
 
     if (result.matchedCount === 0) {
@@ -857,40 +941,12 @@ export class ExamsService {
    * an unknown question (a live submission); saved drafts skip it instead.
    */
   private markPaper(exam: any, answers: { questionId: string; answer: string }[], strict: boolean) {
-    const questionMap = new Map<string, string>();
-    exam.questions.forEach((q: any) => questionMap.set(q._id.toString(), q.correctAnswer));
-
-    const seen = new Set<string>();
-    const results = [];
-    for (const answer of answers ?? []) {
-      const id = String(answer.questionId);
-      if (seen.has(id)) continue;
-      const correctAnswer = questionMap.get(id);
-      if (correctAnswer === undefined) {
-        if (strict) {
-          throw new BadRequestException(`السؤال ذو المعرف ${id} غير موجود في هذا الامتحان`);
-        }
-        continue;
-      }
-      seen.add(id);
-      results.push({
-        questionId: id,
-        studentAnswer: String(answer.answer ?? ''),
-        correctAnswer,
-        isCorrect: String(answer.answer ?? '').trim().toLowerCase() === correctAnswer.trim().toLowerCase(),
-      });
-    }
-
-    const total = exam.questions.length || 1;
-    const correct = results.filter((r) => r.isCorrect).length;
-    const percentage = (correct / total) * 100;
-    return {
-      results,
-      correct,
-      percentage: parseFloat(percentage.toFixed(2)),
-      achievedGrade: parseFloat(((percentage / 100) * exam.grade).toFixed(2)),
-      passed: percentage >= 50,
-    };
+    // Every question gets an entry. Multiple choice and true/false are
+    // marked here; an essay answered is left for the teacher, which leaves
+    // the whole paper pending_review with no grade.
+    return markAnswers(exam, answers, strict, (id) => {
+      throw new BadRequestException(`السؤال ذو المعرف ${id} غير موجود في هذا الامتحان`);
+    });
   }
 
   /**
@@ -906,6 +962,7 @@ export class ExamsService {
       {
         submitted: true,
         autoSubmitted: true,
+        status: marked.status,
         achievedGrade: marked.achievedGrade,
         percentage: marked.percentage,
         passed: marked.passed,
@@ -1049,11 +1106,8 @@ export class ExamsService {
       Math.floor((ExamsService.deadline(session, exam) - now.getTime()) / 1000),
     );
 
-    const questions = exam.questions.map((q: any) => ({
-      _id: q._id,
-      question: q.question,
-      options: q.options,
-    }));
+    // No answer key and no model answer.
+    const questions = this.forStudent(exam);
 
     return {
       message: existing ? 'الامتحان قيد التقدم بالفعل' : 'تم بدء الامتحان بنجاح',
@@ -1119,10 +1173,7 @@ export class ExamsService {
     const marked = this.markPaper(exam, answers, true);
     const results = marked.results;
     const correctAnswersCount = marked.correct;
-    const percentage = marked.percentage;
     const maxGrade = exam.grade;
-    const finalGrade = marked.achievedGrade;
-    const passed = marked.passed;
 
     // Conditional on submitted: false, so two submissions racing each other
     // cannot both be accepted, the second overwriting the first.
@@ -1130,9 +1181,10 @@ export class ExamsService {
       { _id: session._id, submitted: { $ne: true } },
       {
         submitted: true,
-        achievedGrade: finalGrade,
-        percentage: parseFloat(percentage.toFixed(2)),
-        passed,
+        status: marked.status,
+        achievedGrade: marked.achievedGrade,
+        percentage: marked.percentage,
+        passed: marked.passed,
         answers: results,
       },
     );
@@ -1140,18 +1192,39 @@ export class ExamsService {
       throw new BadRequestException('لقد أديت هذا الامتحان من قبل');
     }
 
+    const answered = results.filter((r) => r.studentAnswer.trim() !== '').length;
+
+    // An essay waits for the teacher: no score now, not even a partial one —
+    // it would read as final.
+    if (marked.status === 'pending_review') {
+      return {
+        message: 'تم التسليم، وستظهر النتيجة بعد تصحيح المعلمة',
+        examId: exam._id,
+        examType: exam.examType,
+        status: marked.status,
+        totalQuestions,
+        answeredQuestions: answered,
+        maxGrade,
+        achievedGrade: null,
+        percentage: null,
+        passed: null,
+        results: [],
+      };
+    }
+
     return {
       examId: exam._id,
       examType: exam.examType,
+      status: marked.status,
       totalQuestions: totalQuestions,
-      answeredQuestions: results.length,
+      answeredQuestions: answered,
       correctAnswers: correctAnswersCount,
       incorrectAnswers: totalQuestions - correctAnswersCount,
-      percentage: parseFloat(percentage.toFixed(2)),
+      percentage: marked.percentage,
       maxGrade: maxGrade,
-      achievedGrade: finalGrade,
-      results: results,
-      passed,
+      achievedGrade: marked.achievedGrade,
+      results: presentAnswers(exam as any, results),
+      passed: marked.passed,
     };
   }
 
@@ -1196,28 +1269,57 @@ export class ExamsService {
     }
 
     const totalQuestions = exam.questions?.length ?? 0;
+    const submittedAt = (result as any).updatedAt ?? null;
+
+    // Waiting for the teacher: no answers and no partial score — it would
+    // read as a final grade when it is not one.
+    if ((result as any).status === 'pending_review') {
+      return {
+        message: 'تم التسليم، وستظهر النتيجة بعد تصحيح المعلمة',
+        data: {
+          examId: exam._id,
+          examType: (exam as any).examType,
+          status: 'pending_review',
+          submittedAt,
+          totalQuestions,
+          maxGrade: (exam as any).grade,
+          achievedGrade: null,
+          percentage: null,
+          passed: null,
+          results: [],
+        },
+      };
+    }
+
     const answers = result.answers ?? [];
     // Older rows kept no answers, so the count has to come back out of the
     // percentage that was stored alongside the grade.
     const correctAnswers = answers.length
       ? answers.filter((a) => a.isCorrect).length
       : Math.round(((result.percentage ?? 0) / 100) * totalQuestions);
+    // Rows since question types hold every question, answered or not.
+    const answeredQuestions = answers.some((a: any) => a.type)
+      ? answers.filter((a: any) => String(a.studentAnswer ?? '').trim() !== '').length
+      : answers.length;
 
     return {
       message: 'تم استرجاع نتيجة الامتحان بنجاح',
       data: {
         examId: exam._id,
         examType: (exam as any).examType,
+        status: 'graded',
         totalQuestions,
-        answeredQuestions: answers.length,
+        answeredQuestions,
         correctAnswers,
         incorrectAnswers: totalQuestions - correctAnswers,
         percentage: result.percentage ?? 0,
         maxGrade: (exam as any).grade,
         achievedGrade: result.achievedGrade ?? 0,
         passed: result.passed ?? false,
-        submittedAt: (result as any).updatedAt ?? null,
-        results: answers,
+        submittedAt,
+        // Her mark and the teacher's note on each; the model answer on an
+        // essay; the correct answer only where there is one.
+        results: presentAnswers(exam as any, answers),
       },
     };
   }
@@ -1292,12 +1394,17 @@ export class ExamsService {
         enrolledCount: enrolled,
         startedCount: results.length,
         gradedCount: results.filter((r) => r.achievedGrade !== undefined && r.achievedGrade !== null).length,
+        pendingReviewCount: results.filter((r: any) => r.submitted && r.status === 'pending_review').length,
         results: results.map((r: any) => ({
           studentId: r.studentId?._id ?? r.studentId,
           studentName: r.studentId?.name ?? null,
           schoolEmail: r.studentId?.schoolEmail ?? null,
           startedAt: r.startedAt,
           submitted: r.submitted,
+          // null while the paper is still being sat.
+          status: r.submitted ? r.status ?? 'graded' : null,
+          // Essay answers in this paper still waiting for the teacher.
+          pendingCount: (r.answers ?? []).filter(isPendingEssay).length,
           achievedGrade: r.achievedGrade ?? null,
           percentage: r.percentage ?? null,
           passed: r.passed ?? null,
@@ -1341,11 +1448,16 @@ export class ExamsService {
     const percentage = parseFloat(((achievedGrade / exam.grade) * 100).toFixed(2));
     const passed = percentage >= 50;
 
+    // The whole-paper override also closes a paper waiting on an essay: the
+    // teacher has given its mark. The essay answers stay unmarked (null).
+    const wasPending = (result as any).status === 'pending_review';
     const updated = await this.examResultModel.findByIdAndUpdate(
       result._id,
-      { achievedGrade, percentage, passed },
+      { achievedGrade, percentage, passed, status: 'graded' },
       { new: true },
     );
+    // The student was told to wait for this mark; tell her it came.
+    if (wasPending) await this.notifyGraded(exam, studentId, updated.achievedGrade as number);
 
     return {
       message: 'تم تعديل درجة الطالب بنجاح',
@@ -1360,4 +1472,272 @@ export class ExamsService {
     };
   }
 
+  // ─────────────────────────────────────────── تصحيح الأسئلة المقالية
+
+  /**
+   * Who may mark this exam's essays, and whose answers they see: a teacher,
+   * the students of the classes she teaches this subject to (the same rule
+   * as editStudentGrade); the school's admins, everyone (null).
+   */
+  private async reviewScope(exam: any, user: any): Promise<Set<string> | null> {
+    if (REVIEW_ADMIN_ROLES.includes(user?.role)) return null;
+    if (user?.role !== 'TEACHER') {
+      throw new ForbiddenException('تصحيح الأسئلة المقالية متاح لمعلمة المادة وإدارة المدرسة فقط');
+    }
+    const classIds = (
+      await this.lectureModel
+        .distinct('classId', {
+          teacherId: new mongoose.Types.ObjectId(String(user.userId)),
+          subjectOfferingId: exam.subjectOfferingId,
+        })
+        .exec()
+    ).map(String);
+    if (!classIds.length) {
+      throw new ForbiddenException('ليس لديك صلاحية لتصحيح هذا الامتحان');
+    }
+    return new Set(classIds);
+  }
+
+  /** studentId → her current classes, read as editStudentGrade reads them. */
+  private async classesOf(studentIds: string[]): Promise<Map<string, string[]>> {
+    const unique = [...new Set(studentIds.map(String))];
+    const entries = await Promise.all(
+      unique.map(async (id) => [id, (await this.studentClassResolver.resolveClassIds(id)).map(String)] as const),
+    );
+    return new Map(entries);
+  }
+
+  private inScope(scope: Set<string> | null, classIds: string[] | undefined): boolean {
+    return scope === null || (classIds ?? []).some((c) => scope.has(c));
+  }
+
+  /**
+   * The essay answers of an exam, by question, with the model answer beside
+   * them. `pending` (default) lists only those waiting for a mark.
+   */
+  async getReview(examId: string, status: string | undefined, user: any) {
+    this.validateObjectId(examId, 'exam');
+    const which = status ?? 'pending';
+    if (which !== 'pending' && which !== 'all') {
+      throw new BadRequestException('status يجب أن يكون pending أو all');
+    }
+    const exam: any = await this.examModel
+      .findById(examId)
+      .select('_id grade subjectOfferingId classIds questions')
+      .lean()
+      .exec();
+    if (!exam) throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
+    const scope = await this.reviewScope(exam, user);
+
+    const results: any[] = await this.examResultModel
+      .find({ examId: exam._id, submitted: true })
+      .select('studentId status answers')
+      .populate({ path: 'studentId', select: 'name' })
+      .lean()
+      .exec();
+    const sid = (r: any) => String(r.studentId?._id ?? r.studentId);
+    const classes = await this.classesOf(results.map(sid));
+    const visible = results.filter((r) => this.inScope(scope, classes.get(sid(r))));
+
+    const examClasses = new Set((exam.classIds ?? []).map(String));
+    const classIds = [...new Set([...classes.values()].flat())]
+      .filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const names = new Map(
+      (
+        await this.classModel.find({ _id: { $in: classIds } }).select('name').lean().exec()
+      ).map((c: any) => [String(c._id), c.name]),
+    );
+    const classNameOf = (studentId: string) => {
+      const mine = classes.get(studentId) ?? [];
+      const id = mine.find((c) => examClasses.has(c)) ?? mine[0];
+      return id ? names.get(id) ?? null : null;
+    };
+
+    const marks = effectiveMarks(exam);
+    let pendingCount = 0;
+    const questions = (exam.questions ?? [])
+      .map((q: any, i: number) => ({ q, marks: marks[i] }))
+      .filter(({ q }: any) => q.type === 'essay')
+      .map(({ q, marks: m }: any) => {
+        const answers: any[] = [];
+        for (const r of visible) {
+          const a = (r.answers ?? []).find((x: any) => String(x.questionId) === String(q._id));
+          if (!a || a.type !== 'essay') continue;
+          // A paper closed by the whole-paper override is not waiting on anyone.
+          const pending = isPendingEssay(a) && r.status === 'pending_review';
+          if (pending) pendingCount++;
+          if (which === 'pending' && !pending) continue;
+          answers.push({
+            studentId: sid(r),
+            studentName: r.studentId?.name ?? null,
+            className: classNameOf(sid(r)),
+            answer: a.studentAnswer ?? '',
+            earned: a.earned ?? null,
+            feedback: a.feedback ?? null,
+            gradedAt: a.gradedAt ?? null,
+          });
+        }
+        return {
+          questionId: String(q._id),
+          question: q.question,
+          marks: round2(m),
+          modelAnswer: q.modelAnswer ?? null,
+          answers,
+        };
+      });
+
+    return {
+      message: 'تم استرجاع إجابات التصحيح',
+      data: {
+        examId: String(exam._id),
+        grade: exam.grade,
+        totalMarks: round2(marks.reduce((a, b) => a + b, 0)),
+        pendingCount,
+        questions,
+      },
+    };
+  }
+
+  /**
+   * Mark essay answers — one save for a whole screen. Everything is checked
+   * before anything is written. A paper whose last essay is marked becomes
+   * graded, and the student is told, once.
+   */
+  async reviewAnswers(examId: string, dto: ReviewExamDto, user: any) {
+    this.validateObjectId(examId, 'exam');
+    const exam: any = await this.examModel
+      .findById(examId)
+      .select('_id grade subjectOfferingId classIds questions')
+      .lean()
+      .exec();
+    if (!exam) throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
+    const scope = await this.reviewScope(exam, user);
+
+    const grades = dto?.grades ?? [];
+    if (grades.length < 1 || grades.length > 500) {
+      throw new BadRequestException('عدد الدرجات بين 1 و 500');
+    }
+
+    const marks = effectiveMarks(exam);
+    const questionOf = new Map<string, { q: any; marks: number }>(
+      (exam.questions ?? []).map((q: any, i: number) => [String(q._id), { q, marks: marks[i] }]),
+    );
+    const seen = new Set<string>();
+    for (const g of grades) {
+      const key = `${g.studentId}|${g.questionId}`;
+      if (seen.has(key)) throw new BadRequestException('إجابة مكررة في الطلب نفسه');
+      seen.add(key);
+      const found = questionOf.get(String(g.questionId));
+      if (!found) throw new BadRequestException('السؤال غير موجود في هذا الامتحان');
+      if (found.q.type !== 'essay') {
+        throw new BadRequestException('التصحيح اليدوي للأسئلة المقالية فقط');
+      }
+      const full = round2(found.marks);
+      const earned = Number(g.earned);
+      const isFull = Math.abs(earned - full) < 1e-9;
+      if (!Number.isFinite(earned) || earned < 0 || earned > full + 1e-9 || !(isQuarter(earned) || isFull)) {
+        throw new BadRequestException(`الدرجة يجب أن تكون من مضاعفات 0.25 بين 0 و ${full}`);
+      }
+    }
+
+    const studentIds = [...new Set(grades.map((g) => String(g.studentId)))];
+    const results: any[] = await this.examResultModel
+      .find({ examId: exam._id, studentId: { $in: studentIds.map((id) => new mongoose.Types.ObjectId(id)) } })
+      .select('_id studentId submitted status answers')
+      .lean()
+      .exec();
+    const resultOf = new Map(results.map((r) => [String(r.studentId), r]));
+    for (const g of grades) {
+      const r = resultOf.get(String(g.studentId));
+      if (!r || !r.submitted) {
+        throw new BadRequestException('لا توجد إجابة مسلّمة لهذه الطالبة في هذا الامتحان');
+      }
+      if (!(r.answers ?? []).some((a: any) => String(a.questionId) === String(g.questionId) && a.type === 'essay')) {
+        throw new BadRequestException('لا توجد إجابة لهذه الطالبة على هذا السؤال');
+      }
+    }
+    const classes = await this.classesOf(studentIds);
+    if (studentIds.some((id) => !this.inScope(scope, classes.get(id)))) {
+      throw new ForbiddenException('ليس لديك صلاحية لتصحيح إجابات طالبة ليست في فصولك');
+    }
+
+    const now = new Date();
+    const gradedBy = mongoose.Types.ObjectId.isValid(String(user?.userId))
+      ? new mongoose.Types.ObjectId(String(user.userId))
+      : null;
+    const equalShare = !allMarksSet(exam.questions ?? []);
+    const gradedNow: string[] = [];
+    let updated = 0;
+
+    for (const studentId of studentIds) {
+      const result = resultOf.get(studentId);
+      const mine = grades.filter((g) => String(g.studentId) === studentId);
+
+      // Positional writes, one per answer: two teachers marking different
+      // questions of the same paper at once do not overwrite each other.
+      const set: Record<string, any> = {};
+      const arrayFilters: any[] = [];
+      mine.forEach((g, k) => {
+        const full = questionOf.get(String(g.questionId))!.marks;
+        const earned = Math.abs(Number(g.earned) - round2(full)) < 1e-9 ? full : Number(g.earned);
+        set[`answers.$[a${k}].earned`] = earned;
+        if (g.feedback !== undefined) set[`answers.$[a${k}].feedback`] = g.feedback ?? null;
+        set[`answers.$[a${k}].gradedAt`] = now;
+        set[`answers.$[a${k}].gradedBy`] = gradedBy;
+        arrayFilters.push({ [`a${k}.questionId`]: String(g.questionId) });
+      });
+      await this.examResultModel.updateOne({ _id: result._id }, { $set: set }, { arrayFilters });
+      updated += mine.length;
+
+      // Re-read, then score from what is stored now.
+      const fresh: any = await this.examResultModel.findById(result._id).select('status answers').lean().exec();
+      const score = scorePaper(fresh.answers ?? [], exam.grade, equalShare);
+      if (score.status !== 'graded') continue;
+      const totals = { achievedGrade: score.achievedGrade, percentage: score.percentage, passed: score.passed };
+
+      if (fresh.status === 'pending_review') {
+        // Only the write that moves it out of pending tells the student.
+        const moved = await this.examResultModel.updateOne(
+          { _id: result._id, status: 'pending_review' },
+          { $set: { status: 'graded', ...totals } },
+        );
+        if (moved.modifiedCount === 1) {
+          gradedNow.push(studentId);
+          await this.notifyGraded(exam, studentId, score.achievedGrade as number);
+          continue;
+        }
+      }
+      // Already graded: re-marking recomputes the total, without a second notice.
+      await this.examResultModel.updateOne({ _id: result._id }, { $set: totals });
+    }
+
+    const { data } = await this.getReview(examId, 'pending', user);
+    return {
+      message: 'تم حفظ التصحيح',
+      data: { updated, gradedNow, pendingCount: data.pendingCount },
+    };
+  }
+
+  /** exam_graded to the student (and her family, through the student's own delivery). Never throws. */
+  private async notifyGraded(exam: any, studentId: string, achievedGrade: number): Promise<void> {
+    if (!this.notifications) return;
+    try {
+      const offering: any = await this.subjectOfferingModel
+        .findById(exam.subjectOfferingId)
+        .populate('subjectId', 'subjectName')
+        .lean()
+        .exec();
+      const subjectName = offering?.subjectId?.subjectName ?? '';
+      const grade = round2(Number(exam.grade));
+      await this.notifications.notify({
+        recipientId: studentId,
+        type: 'exam_graded',
+        title: 'تم تصحيح اختبار',
+        body: `صُحِّح اختبار ${subjectName}، ودرجتك ${achievedGrade} من ${grade}.`,
+        data: { examId: String(exam._id), subjectName, achievedGrade, grade },
+      });
+    } catch (error: any) {
+      this.logger.error(`Could not tell ${studentId} that exam ${exam?._id} was graded: ${error?.message}`);
+    }
+  }
 }

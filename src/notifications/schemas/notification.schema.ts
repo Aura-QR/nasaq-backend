@@ -72,6 +72,8 @@ export const NOTIFICATION_TYPES = [
   'remote_day_announced',
   // A teacher accepted or returned lesson homework the student handed in.
   'homework_reviewed',
+  // A paper waiting on an essay was marked: the student's grade is in.
+  'exam_graded',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

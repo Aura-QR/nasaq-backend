@@ -181,7 +181,7 @@ export class GradeRegisterService {
     const results = exams.length
       ? await this.examResultModel
           .find({ examId: { $in: exams.map((e: any) => e._id) }, studentId: { $in: studentIds } })
-          .select('examId studentId achievedGrade')
+          .select('examId studentId achievedGrade status')
           .lean()
           .exec()
       : [];
@@ -219,6 +219,9 @@ export class GradeRegisterService {
       const written = new Tally();
       const tasks = new Tally();
       let electronicFinal: number | null = null;
+      // A paper waiting for the teacher to mark an essay: not a 0, and not
+      // a total yet either.
+      let awaitingReview = false;
 
       for (const t of present) {
         if (typeof (t as any).quizScore === 'number' && (t as any).quizMaxScore > 0) {
@@ -228,6 +231,12 @@ export class GradeRegisterService {
       for (const exam of exams as any[]) {
         const part = EXAM_PART[exam.examType];
         const result: any = resultOf.get(`${exam._id}|${sid}`);
+        // Handed in and waiting on an essay: treated like an exam not yet
+        // held — skipped, and the row is not complete until it is marked.
+        if (result?.status === 'pending_review') {
+          awaitingReview = true;
+          continue;
+        }
         const got = typeof result?.achievedGrade === 'number' ? result.achievedGrade : null;
         const closed = new Date(exam.endDate).getTime() < now;
         if (got === null && !closed) continue; // not held yet, or still open
@@ -282,6 +291,7 @@ export class GradeRegisterService {
       }
 
       const complete =
+        !awaitingReview &&
         performance !== null && writtenScore !== null && (type === 'continuous' || finalScore !== null);
       const total = complete ? round2((performance as number) + (writtenScore as number) + (finalScore ?? 0)) : null;
 

@@ -1,9 +1,22 @@
-import { IsEnum, IsArray, IsString, IsMongoId, ValidateNested, IsDate, IsInt, Min, Max, IsNumber, IsOptional } from 'class-validator';
+import { IsEnum, IsArray, IsString, IsMongoId, ValidateNested, IsDate, IsInt, Min, Max, IsNumber, IsOptional, IsIn, MaxLength, ValidateIf } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ExamType } from '../enums/exam-type.enum';
 
+/**
+ * One question. The per-type rules (options, answer key, model answer) are
+ * checked in the service by question-rules.util, where the messages name
+ * the question; these only check the shapes.
+ */
 export class QuestionDto {
+  @IsOptional()
+  @IsIn(['mcq', 'true_false', 'essay'], { message: 'نوع السؤال غير صالح' })
+  @ApiPropertyOptional({
+    description: "Question type. Default 'mcq'.",
+    enum: ['mcq', 'true_false', 'essay'],
+  })
+  type?: 'mcq' | 'true_false' | 'essay';
+
   @IsString()
   @ApiProperty({
     description: 'The question text',
@@ -11,20 +24,40 @@ export class QuestionDto {
   })
   question: string;
 
+  // mcq: two or more. true_false: ignored (set to «صح»/«خطأ»). essay: none.
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  @ApiProperty({
-    description: 'Array of possible answer options',
+  @ApiPropertyOptional({
+    description: 'Answer options (mcq). Ignored for true_false; must be empty for essay.',
     example: ['Paris', 'London', 'Berlin', 'Madrid'],
   })
-  options: string[];
+  options?: string[];
 
+  @ValidateIf((o) => o.correctAnswer !== null && o.correctAnswer !== undefined)
   @IsString()
-  @ApiProperty({
-    description: 'The correct answer (must match one of the options)',
+  @ApiPropertyOptional({
+    description: 'mcq: one of the options. true_false: «صح» or «خطأ». essay: null.',
     example: 'Paris',
+    nullable: true,
   })
-  correctAnswer: string;
+  correctAnswer?: string | null;
+
+  @ValidateIf((o) => o.modelAnswer !== null && o.modelAnswer !== undefined)
+  @IsString()
+  @MaxLength(2000, { message: 'الإجابة النموذجية لا تتجاوز 2000 حرف' })
+  @ApiPropertyOptional({ description: 'Essay only: shown to the teacher while marking', nullable: true })
+  modelAnswer?: string | null;
+
+  @ValidateIf((o) => o.marks !== null && o.marks !== undefined)
+  @IsNumber({}, { message: 'درجة السؤال يجب أن تكون رقمًا' })
+  @Min(0.25, { message: 'درجة السؤال لا تقل عن 0.25' })
+  @ApiPropertyOptional({
+    description: 'The question\'s weight, a multiple of 0.25. Set on every question or on none (equal share).',
+    example: 2,
+    nullable: true,
+  })
+  marks?: number | null;
 }
 
 export class CreateExamDto {
