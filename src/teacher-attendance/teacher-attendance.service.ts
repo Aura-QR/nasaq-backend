@@ -17,7 +17,23 @@ import { NotificationsService } from 'src/notifications/notifications.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import { adminsWhoCanRead } from '../notifications/admin-audience';
 import { TeacherAbsenceExcuseService } from './teacher-absence-excuse.service';
-import { dayLabel, weekdayOf, worksOn } from './teacher-presence.util';
+import {
+  dayLabel,
+  schoolDayHasEnded,
+  schoolNow,
+  weekdayOf,
+  worksOn,
+} from './teacher-presence.util';
+import {
+  byWeekday,
+  closedDay,
+  DailyEntry,
+  daySnapshot,
+  pooledRates,
+  rateOf,
+  rowRates,
+} from './attendance-rates.util';
+import { currentScope, pickCurrentTerm } from '../terms/current-scope.util';
 import { LeaveRequest } from '../duty/schemas/leave-request.schema';
 import { Teacher } from 'src/teachers/schemas/teacher.schema';
 import { CheckInTeacherAttendanceDto } from './dto/check-in-teacher-attendance.dto';
@@ -49,6 +65,12 @@ export * from '../attendance/attendance.utils';
 
 /** How far back a teacher is still asked for the reason of an unexplained lateness. */
 export const LATE_REASON_LOOKBACK_DAYS = 7;
+
+/** settings.teacherAbsenceAlertDays as a usable limit; null when off or not a positive whole number. */
+export function teacherAbsenceLimitOf(settings: any): number | null {
+  const limit = settings?.teacherAbsenceAlertDays;
+  return Number.isInteger(limit) && limit >= 1 ? limit : null;
+}
 
 import { RemoteLearningService } from '../remote-learning/remote-learning.service';
 @Injectable()
@@ -1090,7 +1112,12 @@ export class TeacherAttendanceService {
    * so the report says what was true on each day, not what today's settings
    * would make of it.
    */
-  async getMonthlySummary(query: SummaryTeacherAttendanceDto, user?: any) {
+  async getMonthlySummary(
+    query: SummaryTeacherAttendanceDto,
+    user?: any,
+    // The moment "today" is judged against. Only the sweep and tests pass it.
+    opts: { now?: Date } = {},
+  ) {
     const match: any = {
       date: {
         $gte: normalizeDate(query.dateFrom),
@@ -1157,6 +1184,17 @@ export class TeacherAttendanceService {
           // fewer days than the school, whose absences are counted against
           // her own days. Dropped from the response before it is returned.
           presentDates: { $addToSet: '$date' },
+          // The same for overview.daily: which of those days were late, and
+          // on which lateness was not measured. null for the other days,
+          // dropped in memory.
+          lateDates: {
+            $addToSet: { $cond: [{ $gt: ['$lateMinutes', 0] }, '$date', null] },
+          },
+          untrackedDates: {
+            $addToSet: {
+              $cond: [{ $eq: [{ $ifNull: ['$lateMinutes', null] }, null] }, '$date', null],
+            },
+          },
         },
       },
       { $lookup: { from: 'teachers', localField: '_id', foreignField: '_id', as: 'teacher' } },
@@ -1182,6 +1220,8 @@ export class TeacherAttendanceService {
           daysOnDayOff: 1,
           daysPresentOnWorkingDays: 1,
           presentDates: 1,
+          lateDates: 1,
+          untrackedDates: 1,
         },
       },
       { $sort: { teacherName: 1 } },
@@ -1197,11 +1237,35 @@ export class TeacherAttendanceService {
      * missing from it.
      */
     const settings = await this.getSchoolSettings(user?.schoolId);
-    const workingDates = workingDatesBetween(
+
+    /*
+     * Today counts once it is over, and the days after it never do.
+     *
+     * Before this, a report ending today called every teacher absent at 7:30
+     * in the morning — she had not checked in yet, so she had "no record" —
+     * and a report for the whole term called her absent on days that had not
+     * happened. A day joins the period when the school day ends, the same
+     * moment the teacher is first asked about it.
+     */
+    const clock = schoolNow(settings?.timezone, opts.now);
+    const todayEnded = schoolDayHasEnded(
+      resolveDaySchedule(settings, clock.date).endTime,
+      clock.minutes,
+    );
+    const isCountable = (key: string) =>
+      key < clock.label || (key === clock.label && todayEnded);
+    const scheduledDates = workingDatesBetween(
       settings,
       normalizeDate(query.dateFrom),
       normalizeDate(query.dateTo),
     );
+    const workingDates = scheduledDates.filter((d) => isCountable(dayLabel(d)));
+    // Working days dropped above: a record on one of them (today's check-in)
+    // must not count against the days that remain.
+    const notYetCounted = new Set(
+      scheduledDates.filter((d) => !isCountable(dayLabel(d))).map(dayLabel),
+    );
+    const todayInProgress = notYetCounted.has(clock.label);
     const workingDays = workingDates.length;
 
     const teacherFilter: any = { isActive: true };
@@ -1276,22 +1340,49 @@ export class TeacherAttendanceService {
       this.logger.error(`Could not read absence excuses: ${error?.message}`);
     }
 
+    const limit = teacherAbsenceLimitOf(settings);
+    const activeIds = new Set((activeTeachers as any[]).map((t) => String(t._id)));
+    const labelsOf = (dates: any[] | undefined) =>
+      new Set((dates ?? []).filter(Boolean).map((d: any) => dayLabel(new Date(d))));
+
+    // overview.daily, filled from the same sets as the rows below: no query
+    // per day, and Σpresent / Σexpected comes out equal to the pooled rate.
+    const daily = new Map<string, DailyEntry & { latenessNotTracked: number }>(
+      workingDates.map((d) => [
+        dayLabel(d),
+        {
+          date: dayLabel(d),
+          expected: 0,
+          present: 0,
+          late: 0,
+          latenessNotTracked: 0,
+          absent: 0,
+          absentExcused: 0,
+          attendanceRate: null,
+          punctualityRate: null,
+        },
+      ]),
+    );
+    // Active teachers only: the overview describes the staff the school has.
+    const counted: any[] = [];
+
     for (const row of rows as any[]) {
+      const present = labelsOf(row.presentDates);
+      // Today's check-in, while today is not yet part of the period.
+      const presentNotYetCounted = [...present].filter((k) => notYetCounted.has(k)).length;
+
       // Never negative: a school that shortened its week mid-period can leave
       // more attended days on file than the current schedule has working days,
       // and "-2 days absent" is a number nobody can act on.
       row.workingDays = workingDays;
       row.daysAbsent = Math.max(
         0,
-        workingDays - (row.daysPresentOnWorkingDays ?? 0),
+        workingDays - Math.max(0, (row.daysPresentOnWorkingDays ?? 0) - presentNotYetCounted),
       );
 
       // A teacher who works fewer days than the school is measured against
       // her own days: the school days that fall on her weekdays, and of
       // those, the ones with no record.
-      const present = new Set(
-        (row.presentDates ?? []).map((d: Date) => dayLabel(new Date(d))),
-      );
       const ownDays = workDaysByTeacher.get(String(row.teacherId));
       const expected = ownDays
         ? workingDates.filter((d) => ownDays.includes(weekdayOf(d)))
@@ -1307,18 +1398,82 @@ export class TeacherAttendanceService {
       row.absentDates = expected
         .filter((d) => !present.has(dayLabel(d)))
         .map((d) => ({ date: dayLabel(d), excused: accepted.has(dayLabel(d)) }));
-      delete row.presentDates;
 
       // Capped at daysAbsent: an excuse filed for a day she turned out to
       // have attended must not make the explained count exceed the absences.
       const excused = excusedByTeacher.get(String(row.teacherId)) ?? 0;
       row.daysAbsentExcused = Math.min(excused, row.daysAbsent);
       row.daysAbsentUnexcused = Math.max(0, row.daysAbsent - row.daysAbsentExcused);
+
+      // Percentages. An accepted excuse does not raise attendanceRate: an
+      // excused absence is still an absence (ع is not ح on the student side).
+      Object.assign(row, rowRates(row));
+      row.overLimit = limit === null ? null : row.daysAbsentUnexcused >= limit;
+
+      if (!row.teacherDeleted && activeIds.has(String(row.teacherId))) {
+        counted.push(row);
+        const late = labelsOf(row.lateDates);
+        const untracked = labelsOf(row.untrackedDates);
+        for (const d of expected) {
+          const key = dayLabel(d);
+          const day = daily.get(key);
+          if (!day) continue;
+          day.expected += 1;
+          if (present.has(key)) {
+            day.present += 1;
+            if (late.has(key)) day.late += 1;
+            if (untracked.has(key)) day.latenessNotTracked += 1;
+          } else {
+            day.absent += 1;
+            if (accepted.has(key)) day.absentExcused += 1;
+          }
+        }
+      }
+
+      delete row.presentDates;
+      delete row.lateDates;
+      delete row.untrackedDates;
     }
 
     rows.sort((a: any, b: any) =>
       String(a.teacherName ?? '').localeCompare(String(b.teacherName ?? ''), 'ar'),
     );
+
+    const dailyList = [...daily.values()].map((day) => ({
+      ...day,
+      attendanceRate: rateOf(day.present, day.expected),
+      punctualityRate: rateOf(
+        day.present - day.late - day.latenessNotTracked,
+        day.present - day.latenessNotTracked,
+      ),
+    }));
+    const sum = (key: string) => counted.reduce((n, r) => n + (r[key] ?? 0), 0);
+    const overLimitRows =
+      limit === null
+        ? null
+        : counted
+            .filter((r) => r.overLimit)
+            .sort((a, b) => b.daysAbsentUnexcused - a.daysAbsentUnexcused)
+            .map((r) => ({
+              teacherId: r.teacherId,
+              teacherName: r.teacherName,
+              daysAbsentUnexcused: r.daysAbsentUnexcused,
+              daysAbsent: r.daysAbsent,
+            }));
+
+    const overview = {
+      ...pooledRates(counted),
+      totalAbsentDays: sum('daysAbsent'),
+      totalAbsentExcused: sum('daysAbsentExcused'),
+      totalAbsentUnexcused: sum('daysAbsentUnexcused'),
+      perfectAttendanceCount: counted.filter((r) => r.workingDays > 0 && r.daysAbsent === 0)
+        .length,
+      teacherAbsenceAlertDays: limit,
+      overLimitCount: overLimitRows === null ? null : overLimitRows.length,
+      overLimit: overLimitRows,
+      daily: dailyList.map(({ latenessNotTracked, ...day }) => day),
+      byWeekday: byWeekday(dailyList),
+    };
 
     return {
       status: true,
@@ -1328,9 +1483,217 @@ export class TeacherAttendanceService {
       // with no denominator — 3 out of 5 reads very differently from 3 out
       // of 22.
       workingDays,
+      // True while today is in the period but its school day has not ended:
+      // today is left out of workingDays and absence until it does.
+      todayInProgress,
       totalTeachers: rows.length,
+      overview,
       data: rows,
     };
+  }
+
+  /**
+   * The school's current term, or null — the window a teacher's own numbers
+   * and the absence limit are measured over.
+   */
+  private async currentTerm(now: Date = new Date()): Promise<any | null> {
+    const conn: any = (this.teacherModel as any)?.db;
+    const Term = conn?.models?.['Term'];
+    if (!Term) return null;
+    const scope = await currentScope(conn, now);
+    if (!scope.termIds && !scope.termId) return null;
+    const ids = scope.termIds ?? [scope.termId];
+    const terms: any[] = await Term.find({ _id: { $in: ids } })
+      .select('name startDate endDate status order')
+      .lean()
+      .exec();
+    return pickCurrentTerm(terms, now);
+  }
+
+  /**
+   * «حضوري» — a teacher's own figures, from the same calculation as the
+   * school's report. Defaults to the current term up to today.
+   */
+  async getMyStats(user: any, query: { dateFrom?: string; dateTo?: string }, now = new Date()) {
+    const settings = await this.getSchoolSettings(user?.schoolId);
+    const today = schoolNow(settings?.timezone, now).date;
+    const term = await this.currentTerm(now);
+
+    const DAY = 86_400_000;
+    let defaultFrom = new Date(today.getTime() - 29 * DAY);
+    let defaultTo = today;
+    if (term?.startDate) {
+      defaultFrom = normalizeDate(term.startDate);
+      const termEnd = term.endDate ? normalizeDate(term.endDate) : today;
+      defaultTo = termEnd < today ? termEnd : today;
+      if (defaultFrom > defaultTo) defaultFrom = defaultTo;
+    }
+    const from = query.dateFrom ? normalizeDate(query.dateFrom) : defaultFrom;
+    const to = query.dateTo ? normalizeDate(query.dateTo) : defaultTo;
+    if (from > to) {
+      throw new BadRequestException('تاريخ البداية يجب أن يسبق تاريخ النهاية');
+    }
+    if ((to.getTime() - from.getTime()) / DAY + 1 > 366) {
+      throw new BadRequestException('الفترة لا تتجاوز 366 يومًا');
+    }
+
+    const dateFrom = dayLabel(from);
+    const dateTo = dayLabel(to);
+    const summary = await this.getMonthlySummary(
+      { teacherId: String(user.userId), dateFrom, dateTo },
+      user,
+      { now },
+    );
+    const row: any = summary.data[0] ?? null;
+    const limit = teacherAbsenceLimitOf(settings);
+
+    return {
+      status: true,
+      message: 'Success',
+      data: {
+        dateFrom,
+        dateTo,
+        term: term ? { _id: String(term._id), name: term.name } : null,
+        workingDays: row?.workingDays ?? summary.workingDays,
+        daysPresent: row?.daysPresent ?? 0,
+        daysAbsent: row?.daysAbsent ?? 0,
+        daysAbsentExcused: row?.daysAbsentExcused ?? 0,
+        daysAbsentUnexcused: row?.daysAbsentUnexcused ?? 0,
+        absentDates: row?.absentDates ?? [],
+        daysLate: row?.daysLate ?? 0,
+        totalLateMinutes: row?.totalLateMinutes ?? 0,
+        daysLeftEarly: row?.daysLeftEarly ?? 0,
+        attendanceRate: row?.attendanceRate ?? null,
+        punctualityRate: row?.punctualityRate ?? null,
+        teacherAbsenceAlertDays: limit,
+        overLimit: row?.overLimit ?? (limit === null ? null : false),
+        todayInProgress: summary.todayInProgress,
+      },
+    };
+  }
+
+  /**
+   * One school day across all active teachers — «حضر 17 من 20».
+   *
+   * Before the day ends a teacher with no record is "not in yet", not absent;
+   * after it ends she is absent. Uses the same who-is-expected rule as the
+   * summary, so the two never disagree about a day.
+   */
+  async getTodaySnapshot(dateStr: string | undefined, user?: any, now = new Date()) {
+    const settings = await this.getSchoolSettings(user?.schoolId);
+    const clock = schoolNow(settings?.timezone, now);
+    const date = dateStr ? normalizeDate(dateStr) : clock.date;
+    const label = dayLabel(date);
+    const schedule = resolveDaySchedule(settings, date);
+    if (!schedule.isWorkingDay) return closedDay(label);
+
+    const dayEnded =
+      label < clock.label ||
+      (label === clock.label && schoolDayHasEnded(schedule.endTime, clock.minutes));
+
+    const [teachers, records] = await Promise.all([
+      this.teacherModel.find({ isActive: true }).select('_id workDays').lean(),
+      this.teacherAttendanceModel
+        .find({ date })
+        .select('teacherId lateMinutes earlyLeaveMinutes')
+        .lean(),
+    ]);
+    const expected = new Set(
+      (teachers as any[]).filter((t) => worksOn(t.workDays, date)).map((t) => String(t._id)),
+    );
+
+    const counts = {
+      expected: expected.size,
+      present: 0,
+      late: 0,
+      latenessNotTracked: 0,
+      leftEarly: 0,
+      absentExcused: 0,
+    };
+    const seen = new Set<string>();
+    for (const r of records as any[]) {
+      const id = String(r.teacherId);
+      // A check-in on her day off is real, but she was not expected.
+      if (!expected.has(id) || seen.has(id)) continue;
+      seen.add(id);
+      counts.present += 1;
+      if (r.lateMinutes === null || r.lateMinutes === undefined) counts.latenessNotTracked += 1;
+      else if (r.lateMinutes > 0) counts.late += 1;
+      if (r.earlyLeaveMinutes > 0) counts.leftEarly += 1;
+    }
+
+    if (dayEnded) {
+      try {
+        const excused = await this.absenceExcuses.excusedDatesByTeacher(date, date);
+        for (const id of expected) {
+          if (!seen.has(id) && excused.get(id)?.has(label)) counts.absentExcused += 1;
+        }
+      } catch (error: any) {
+        this.logger.error(`Could not read absence excuses: ${error?.message}`);
+      }
+    }
+
+    return daySnapshot(label, counts, dayEnded);
+  }
+
+  /**
+   * حد غياب المعلمين: called by the end-of-day sweep right after a teacher is
+   * asked about a day. When her unexcused days in the current term reach the
+   * school's limit exactly, the admins are told — once, not again on the
+   * days after. Never throws: the sweep must go on.
+   */
+  async alertTeacherAbsenceLimit(
+    teacher: { _id: any; name?: string },
+    date: Date,
+    schoolId: any,
+    now: Date = new Date(),
+  ): Promise<boolean> {
+    try {
+      const settings = await this.getSchoolSettings(schoolId);
+      const limit = teacherAbsenceLimitOf(settings);
+      if (limit === null) return false;
+
+      const term = await this.currentTerm(date);
+      if (!term?.startDate) return false;
+      const from = normalizeDate(term.startDate);
+      if (from > date) return false;
+
+      const summary = await this.getMonthlySummary(
+        { teacherId: String(teacher._id), dateFrom: dayLabel(from), dateTo: dayLabel(date) },
+        { schoolId },
+        { now },
+      );
+      const row: any = summary.data.find((r: any) => String(r.teacherId) === String(teacher._id));
+      const unexcused = row?.daysAbsentUnexcused ?? 0;
+      if (unexcused !== limit) return false;
+
+      const teacherName = teacher.name ?? row?.teacherName ?? 'المعلمة';
+      const termName = term.name ?? '';
+      const data = {
+        teacherId: String(teacher._id),
+        teacherName,
+        unexcusedDays: unexcused,
+        limit,
+        termName,
+        date: dayLabel(date),
+      };
+      const adminIds = await this.schoolAdminIds(schoolId);
+      for (const recipientId of adminIds) {
+        await this.notifications.notify({
+          recipientId,
+          type: 'teacher_absence_limit_reached',
+          title: 'تنبيه: بلوغ حد غياب معلمة',
+          body: `بلغ غياب ${teacherName} بغير عذر مقبول ${unexcused} أيام${termName ? ` في ${termName}` : ''}، وهو حد الغياب المعتمد للمعلمين.`,
+          data,
+        });
+      }
+      return adminIds.length > 0;
+    } catch (error: any) {
+      this.logger.error(
+        `Could not check the absence limit for teacher ${teacher?._id}: ${error?.message}`,
+      );
+      return false;
+    }
   }
 
 

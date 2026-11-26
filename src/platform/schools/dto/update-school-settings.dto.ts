@@ -112,6 +112,17 @@ export class UpdateSchoolSettingsDto {
   @IsOptional()
   absenceAlertDays?: number | null;
 
+  /**
+   * حد غياب المعلمين: a teacher's unexcused days in the current term at which
+   * the admins are told. null turns it off — the default.
+   */
+  @ValidateIf((o) => o.teacherAbsenceAlertDays !== null)
+  @IsInt({ message: 'حد غياب المعلمين يجب أن يكون عددًا صحيحًا من 1 إلى 60' })
+  @Min(1, { message: 'حد غياب المعلمين يجب أن يكون عددًا صحيحًا من 1 إلى 60' })
+  @Max(60, { message: 'حد غياب المعلمين يجب أن يكون عددًا صحيحًا من 1 إلى 60' })
+  @IsOptional()
+  teacherAbsenceAlertDays?: number | null;
+
   @IsArray()
   @IsString({ each: true })
   @IsIn(NATIONALITY_CODES, { each: true })

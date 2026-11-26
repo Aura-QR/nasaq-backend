@@ -104,6 +104,36 @@ describe('Dashboards Service Integration', () => {
     });
   });
 
+  it('adds teachersToday beside attendanceToday, which keeps counting student rows', async () => {
+    const snapshot = { date: '2026-10-04', isWorkingDay: true, expected: 20, present: 17 };
+    const getTodaySnapshot = jest.fn().mockResolvedValue(snapshot);
+    (service as any).teacherAttendance = { getTodaySnapshot };
+    try {
+      await contextService.runWithTenant(schoolIdA, false, async () => {
+        const before = await attendanceModel.countDocuments({});
+        const dash: any = await service.getOwnerDashboard(schoolIdA);
+        expect(dash.teachersToday).toEqual(snapshot);
+        expect(getTodaySnapshot).toHaveBeenCalledWith(undefined, { schoolId: schoolIdA });
+        expect(typeof dash.attendanceToday).toBe('number');
+        expect(dash.attendanceToday).toBeLessThanOrEqual(before);
+
+        // Managers: only with the teacher-attendance permission.
+        const withIt: any = await service.getManagerDashboard(['school.teacherAttendance.read'], schoolIdA);
+        expect(withIt.metrics.teachersToday).toEqual(snapshot);
+        const without: any = await service.getManagerDashboard(['school.students.read'], schoolIdA);
+        expect(without.metrics.teachersToday).toBeUndefined();
+
+        // A failing tile is null, not a blank dashboard.
+        getTodaySnapshot.mockRejectedValueOnce(new Error('boom'));
+        const failed: any = await service.getOwnerDashboard(schoolIdA);
+        expect(failed.teachersToday).toBeNull();
+        expect(failed.counts).toBeDefined();
+      });
+    } finally {
+      (service as any).teacherAttendance = undefined;
+    }
+  });
+
   it('should dynamically filter Manager dashboard metrics based on permissions', async () => {
     await contextService.runWithTenant(schoolIdA, false, async () => {
       const studentOnlyDash = await service.getManagerDashboard(['school.students.read']);

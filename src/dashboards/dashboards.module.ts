@@ -17,6 +17,7 @@ import {
 } from 'src/financial/schemas/student-financial-record.schema';
 import { Enrollment, EnrollmentSchema } from 'src/enrollments/schemas/enrollment.schema';
 import { DashboardsService } from './dashboards.service';
+import { TeacherAttendanceModule } from 'src/teacher-attendance/teacher-attendance.module';
 import { DashboardsController } from './dashboards.controller';
 
 @Module({
@@ -33,6 +34,8 @@ import { DashboardsController } from './dashboards.controller';
       { name: StudentFinancialRecord.name, schema: StudentFinancialRecordSchema },
       { name: Enrollment.name, schema: EnrollmentSchema },
     ]),
+    // teachersToday on the owner and manager home screens.
+    TeacherAttendanceModule,
   ],
   controllers: [DashboardsController],
   providers: [DashboardsService],

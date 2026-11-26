@@ -97,6 +97,14 @@ export class SchoolSettings {
   @Prop({ type: Number, default: null })
   absenceAlertDays: number | null;
 
+  /**
+   * حد غياب المعلمين — a teacher's unexcused days in the term that alert the
+   * admins. Separate from the students' limit: schools hold staff to a
+   * different number. null is off.
+   */
+  @Prop({ type: Number, default: null })
+  teacherAbsenceAlertDays: number | null;
+
   @Prop({ type: [String], default: [] })
   localNationalityCodes: string[];
 
