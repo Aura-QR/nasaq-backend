@@ -422,6 +422,15 @@ describe('question types: from the database', () => {
       expect(row(sara)).toMatchObject({ status: 'graded', pendingCount: 0, achievedGrade: 11 });
       expect(results.data.pendingReviewCount).toBe(1);
 
+      // The teacher reads each paper: Reem's essay text, and the key beside
+      // the choice questions.
+      const essay = row(reem).answers.find((a: any) => a.type === 'essay');
+      expect(essay).toMatchObject({ studentAnswer: 'جواب', earned: null, marks: 7 });
+      expect(essay.modelAnswer).toBe('نضرب ثم نجمع، والوحدة سم');
+      const choice = row(reem).answers.find((a: any) => a.type === 'mcq');
+      expect(choice).toHaveProperty('correctAnswer');
+      expect(row(reem).answers).toHaveLength(exam.questions.length);
+
       const mine: any = await asSchool(() => service.filtering({}, {}, teacher(noura)));
       expect(mine.find((e: any) => String(e._id) === String(exam._id)).pendingReviewCount).toBe(1);
     });

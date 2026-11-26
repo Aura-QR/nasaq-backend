@@ -1385,6 +1385,12 @@ export class ExamsService {
       .countDocuments({ classId: { $in: exam.classIds } })
       .exec();
 
+    // Each paper's answers, so the teacher can read what a student wrote —
+    // her essay above all, which no score can stand in for. Never to a
+    // student: this is the whole class's papers.
+    const staff = user?.role !== 'STUDENT';
+    const examShape: any = exam.toObject();
+
     return {
       message: 'تم استرجاع نتائج الامتحان بنجاح',
       data: {
@@ -1408,6 +1414,8 @@ export class ExamsService {
           achievedGrade: r.achievedGrade ?? null,
           percentage: r.percentage ?? null,
           passed: r.passed ?? null,
+          // Handed-in papers only: an open one has drafts, not answers.
+          answers: staff && r.submitted ? presentAnswers(examShape, r.answers ?? []) : [],
         })),
       },
     };
