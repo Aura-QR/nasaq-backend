@@ -18,6 +18,7 @@ import { UpdateExamDto } from './dto/update-exam.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { SubmitAnswersDto } from './dto/submit-answers.dto';
 import { ReviewExamDto } from './dto/review-exam.dto';
+import { CreateMakeupExamDto } from './dto/makeup-exam.dto';
 import { ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AbilitiesGuard } from 'src/casl/guards/abilities.guard';
 import { CheckAbilities } from 'src/casl/decorators/check-abilities.decorator';
@@ -142,6 +143,40 @@ export class ExamsController {
   @HttpCode(HttpStatus.OK)
   async getMyResult(@Param('examId') examId: string, @CurrentUser() user: any) {
     return await this.examsService.getMyResult(examId, user);
+  }
+
+  // «اختبار بديل» — both above @Get(':id').
+  @ApiOperation({
+    summary: 'من لم تؤدِّ الاختبار — مرشحات الاختبار البديل',
+    description:
+      'طالبات فصول الاختبار (فصول المعلمة) ممن لم يسلّمن الاختبار، مع غيابهن في أيامه ' +
+      '(excused / unexcused / none) والاختبار البديل القائم إن وُجد. الوسم معلومة لا قاعدة.',
+  })
+  @ApiParam({ name: 'examId', description: 'The original exam' })
+  @Get(':examId/makeup-candidates')
+  @CheckAbilities({ action: 'read', subject: 'Exam' })
+  @HttpCode(HttpStatus.OK)
+  async makeupCandidates(@Param('examId') examId: string, @CurrentUser() user: any) {
+    return await this.examsService.makeupCandidates(examId, user);
+  }
+
+  @ApiOperation({
+    summary: 'إنشاء اختبار بديل لطالبات مختارات',
+    description:
+      'يرث المادة والفصول والنوع والدرجة من الأصلي، ونتيجته تحل محل الصفر في الأصلي. ' +
+      'لا يُحسب ضمن عدد الاختبارات. copyQuestions ينسخ الأسئلة بمعرّفات جديدة.',
+  })
+  @ApiParam({ name: 'examId', description: 'The original exam' })
+  @ApiResponse({ status: 400, description: 'طالبة أدّت الأصلي أو لديها بديل قائم، أو موعد منتهٍ، أو بديل لبديل' })
+  @Post(':examId/makeup')
+  @CheckAbilities({ action: 'update', subject: 'Exam' })
+  @HttpCode(HttpStatus.CREATED)
+  async createMakeup(
+    @Param('examId') examId: string,
+    @Body() dto: CreateMakeupExamDto,
+    @CurrentUser() user: any,
+  ) {
+    return await this.examsService.createMakeup(examId, dto, user);
   }
 
   // Both above @Get(':id'), for the same reason as listResults.

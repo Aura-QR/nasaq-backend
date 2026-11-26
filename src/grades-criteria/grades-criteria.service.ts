@@ -17,6 +17,7 @@ import { transformGradesCriteriaResponse } from './transforms/response.transform
 import { Lecture } from 'src/lectures/schemas/lecture.schema';
 import { Exam } from '../exams/schemas/exam.schema';
 import { ExamResult } from '../exams/schemas/exam-result.schema';
+import { loadMakeupView, ORIGINALS_ONLY } from '../exams/makeup.util';
 import { Project } from '../projects/schemas/project.schema';
 import { ProjectSubmission } from '../projects/schemas/project-submission.schema';
 import { Student } from '../students/schemas/student.schema';
@@ -284,8 +285,10 @@ export class GradesCriteriaService {
       ],
     };
 
+    // Makeups («اختبار بديل») are not items of their own: their result is
+    // the original's, and one still open makes the original "upcoming" for her.
     const allExams = await this.examModel
-      .find(forOffering)
+      .find({ ...forOffering, ...ORIGINALS_ONLY })
       .sort({ createdAt: 1 })
       .select('_id examType classIds endDate')
       .exec();
@@ -293,8 +296,20 @@ export class GradesCriteriaService {
       .find({ studentId: sid, examId: { $in: allExams.map((e) => e._id) } })
       .select('examId achievedGrade')
       .exec();
-    const examEnd = new Map(allExams.map((e: any) => [e._id.toString(), e.endDate]));
-    const resultMap = new Map(results.map((r) => [r.examId.toString(), r.achievedGrade]));
+    const examEnd = new Map<string, any>(allExams.map((e: any) => [e._id.toString(), e.endDate]));
+    const resultMap = new Map<string, any>(results.map((r) => [r.examId.toString(), r.achievedGrade]));
+    const makeups = await loadMakeupView(
+      this.examModel as any, this.examResultModel as any, allExams.map((e) => e._id), [sid],
+    );
+    for (const [key, r] of makeups.resultOf) {
+      const examId = key.split('|')[0];
+      if (!resultMap.has(examId)) resultMap.set(examId, r.achievedGrade ?? null);
+    }
+    for (const [key, closes] of makeups.closesAt) {
+      const examId = key.split('|')[0];
+      const own = examEnd.get(examId) ? new Date(examEnd.get(examId)).getTime() : 0;
+      if (closes > own) examEnd.set(examId, new Date(closes));
+    }
 
     const inClass = (ids: any[] | undefined) =>
       (ids ?? []).some((c) => classes.some((k) => k.equals(c)));
@@ -884,7 +899,8 @@ export class GradesCriteriaService {
       $or: [{ gradesCriteriaId: result._id }, { subjectOfferingId: result.subjectOfferingId }],
     };
     const [examCount, projectCount] = await Promise.all([
-      this.examModel.countDocuments(forCriteria).exec(),
+      // A makeup is not another exam: it goes with its original.
+      this.examModel.countDocuments({ ...forCriteria, ...ORIGINALS_ONLY }).exec(),
       this.projectModel.countDocuments(forCriteria).exec(),
     ]);
     if (examCount || projectCount) {

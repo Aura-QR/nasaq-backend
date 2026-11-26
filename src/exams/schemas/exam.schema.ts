@@ -91,6 +91,18 @@ export class Exam extends Document {
 
   @Prop({ type: [QuestionSchema], required: true })
   questions: Question[];
+
+  /**
+   * Set on a makeup exam («اختبار بديل»): the exam it stands in for. Its
+   * results count as the original's, so a makeup is never a column, a count
+   * or a list row of its own.
+   */
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Exam', default: null, index: true })
+  makeupOf: mongoose.Types.ObjectId | null;
+
+  /** Makeup only: who may see and sit it. Empty on a normal exam (the whole of classIds). */
+  @Prop({ type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }], default: [] })
+  studentIds: mongoose.Types.ObjectId[];
 }
 
 export const ExamSchema = SchemaFactory.createForClass(Exam);

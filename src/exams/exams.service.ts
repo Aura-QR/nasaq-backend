@@ -27,6 +27,8 @@ import { gradingSystemOf } from '../grade-register/grading-system.util';
 import { DEFAULT_EXAM_GRADE, EXAM_PART, resolveAssessmentType } from '../grade-register/ministry-template';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ReviewExamDto } from './dto/review-exam.dto';
+import { CreateMakeupExamDto } from './dto/makeup-exam.dto';
+import { Attendance } from '../attendance/schemas/attendance.schema';
 import {
   allMarksSet,
   assertMarksConsistent,
@@ -90,6 +92,10 @@ export class ExamsService {
     // hand-built service in a unit test still works.
     @Optional()
     private readonly notifications?: NotificationsService,
+    // Student absence rows: labels makeup candidates «غياب بعذر» or not.
+    @Optional()
+    @InjectModel(Attendance.name)
+    private readonly attendanceModel?: Model<Attendance>,
   ) {}
 
   /**
@@ -354,6 +360,7 @@ export class ExamsService {
     if (examType === 'final') {
       const existingExam = await this.examModel.findOne({
         examType: 'final',
+        makeupOf: null,
         $or: [
           { subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId) },
           ...(gradesCriteria ? [{ gradesCriteriaId: gradesCriteria._id }] : []),
@@ -431,8 +438,14 @@ export class ExamsService {
       (id) => new mongoose.Types.ObjectId(id),
     );
 
+    const me = new mongoose.Types.ObjectId(String(studentId));
+    // Her classes' exams, and only the makeups set for her — a makeup is
+    // invisible to the rest of the class.
     const query: any = {
-      classIds: { $in: studentClassObjectIds },
+      $or: [
+        { classIds: { $in: studentClassObjectIds }, makeupOf: null },
+        { makeupOf: { $ne: null }, studentIds: me },
+      ],
     };
 
     const allowedFilters: Record<string, 'string' | 'objectId'> = {
@@ -489,8 +502,23 @@ export class ExamsService {
       .exec();
     const takenExamIds = new Set(takenResults.map(r => r.examId.toString()));
 
+    // «لديك اختبار بديل» on an original she has a makeup of.
+    const originalIds = exams.filter((e: any) => !e.makeupOf).map((e) => e._id);
+    const myMakeups: any[] = originalIds.length
+      ? await this.examModel
+          .find({ makeupOf: { $in: originalIds }, studentIds: me })
+          .select('_id makeupOf createdAt')
+          .sort({ createdAt: 1 })
+          .lean()
+          .exec()
+      : [];
+    const makeupFor = new Map(myMakeups.map((x) => [String(x.makeupOf), String(x._id)]));
+
     const data = exams.map(e => {
-      const base = transformExamResponse(e);
+      const base: any = transformExamResponse(e);
+      // Who else the makeup is for is not hers to read.
+      delete base.studentIds;
+      const isMakeup = !!(e as any).makeupOf;
       const start: Date = (e as any).startDate;
       const end: Date = (e as any).endDate;
 
@@ -505,6 +533,9 @@ export class ExamsService {
         questions: this.forStudent(base),
         status,
         hasTaken: takenExamIds.has(e._id.toString()),
+        isMakeup,
+        makeupOf: isMakeup ? String((e as any).makeupOf) : null,
+        makeupExamId: isMakeup ? null : makeupFor.get(String(e._id)) ?? null,
       };
     });
 
@@ -569,6 +600,9 @@ export class ExamsService {
     }
 
 
+    // Makeups are listed under their original, never as rows of their own.
+    query.makeupOf = null;
+
     const total = await this.examModel.countDocuments(query).exec();
 
     const paginationMate = getPagination(pagination.page, pagination.limit, total);
@@ -592,10 +626,15 @@ export class ExamsService {
 
     // «3 بانتظار التصحيح» on each exam, in one query for the page.
     const pending = await this.pendingReviewCounts(exams.map((e) => e._id));
+    const makeups = await this.makeupsByOriginal(exams.map((e) => e._id));
     const present = (exam: any) => {
       const base: any = transformExamResponse(exam);
-      if (user?.role === 'STUDENT') base.questions = this.forStudent(base);
+      if (user?.role === 'STUDENT') {
+        base.questions = this.forStudent(base);
+        delete base.studentIds;
+      }
       base.pendingReviewCount = pending.get(String(exam._id)) ?? 0;
+      base.makeups = makeups.get(String(exam._id)) ?? [];
       return base;
     };
 
@@ -615,6 +654,44 @@ export class ExamsService {
     const questions = exam?.questions ?? [];
     const marks = effectiveMarks({ grade: exam?.grade, questions });
     return questions.map((q: any, i: number) => studentQuestion(q, marks[i]));
+  }
+
+  /** originalId → its makeups, as a list nests them: dates, how many set and taken. */
+  private async makeupsByOriginal(originalIds: any[]): Promise<Map<string, any[]>> {
+    const out = new Map<string, any[]>();
+    if (!originalIds.length) return out;
+    const makeups: any[] = await this.examModel
+      .find({ makeupOf: { $in: originalIds.map((id) => new mongoose.Types.ObjectId(String(id))) } })
+      .select('_id makeupOf startDate endDate duration studentIds createdAt')
+      .sort({ createdAt: 1 })
+      .lean()
+      .exec();
+    if (!makeups.length) return out;
+    const ids = makeups.map((x) => x._id);
+    const [taken, pending] = await Promise.all([
+      this.examResultModel
+        .aggregate([
+          { $match: { examId: { $in: ids }, submitted: true } },
+          { $group: { _id: '$examId', count: { $sum: 1 } } },
+        ])
+        .exec(),
+      this.pendingReviewCounts(ids),
+    ]);
+    const takenOf = new Map(taken.map((r: any) => [String(r._id), r.count]));
+    for (const x of makeups) {
+      const key = String(x.makeupOf);
+      if (!out.has(key)) out.set(key, []);
+      out.get(key)!.push({
+        _id: x._id,
+        startDate: x.startDate,
+        endDate: x.endDate,
+        duration: x.duration,
+        studentCount: (x.studentIds ?? []).length,
+        takenCount: takenOf.get(String(x._id)) ?? 0,
+        pendingReviewCount: pending.get(String(x._id)) ?? 0,
+      });
+    }
+    return out;
   }
 
   /** examId → papers waiting for the teacher to mark an essay. */
@@ -674,6 +751,9 @@ export class ExamsService {
     }
 
     await this.assertTeacherMayManage(existingExam, user);
+    if (updateExamDto.studentIds !== undefined && !existingExam.makeupOf) {
+      throw new BadRequestException('الطالبات يُحدَّدن في الاختبار البديل فقط؛ الاختبار العادي لفصوله كاملة');
+    }
     if (updateExamDto.questions) {
       await this.assertQuestionsOpen(existingExam._id);
       if (updateExamDto.questions.length === 0) {
@@ -681,6 +761,10 @@ export class ExamsService {
       }
       // The same rules as creating: this route must not be a way around them.
       updateExamDto.questions = this.normalizeQuestions(updateExamDto.questions);
+    }
+
+    if (existingExam.makeupOf) {
+      return this.updateMakeup(existingExam, updateExamDto, user);
     }
 
     // A final stays the whole grade's, for the subject it was set for. Its
@@ -743,6 +827,10 @@ export class ExamsService {
     if (await this.examResultModel.exists({ examId: exam._id })) {
       throw new BadRequestException('لا يمكن حذف امتحان بدأه الطلاب؛ درجاتهم محفوظة عليه');
     }
+    // Its makeups' marks count as its own; without it they would hang on nothing.
+    if (await this.examModel.exists({ makeupOf: exam._id })) {
+      throw new BadRequestException('لهذا الاختبار اختبار بديل؛ احذف الاختبار البديل أولًا');
+    }
 
     await this.examModel.findByIdAndDelete(id);
 
@@ -761,9 +849,25 @@ export class ExamsService {
     if (user?.role !== 'STUDENT') {
       throw new ForbiddenException('أداء الامتحانات متاح للطلاب فقط');
     }
+    // A makeup is for the students picked for it, and nobody else in the class.
+    if ((exam as any).makeupOf) {
+      if (!((exam as any).studentIds ?? []).some((id: any) => String(id) === String(user.userId))) {
+        throw new ForbiddenException('هذا الاختبار البديل غير مخصص لك');
+      }
+      return;
+    }
     const classIds = await this.studentClassResolver.resolveClassIds(user.userId);
     if (!(exam.classIds ?? []).some((c) => classIds.includes(String(c)))) {
       throw new ForbiddenException('هذا الامتحان غير مخصص لفصلك');
+    }
+    // She sits the original or its makeup, never both.
+    if (
+      await this.examModel.exists({
+        makeupOf: exam._id,
+        studentIds: new mongoose.Types.ObjectId(String(user.userId)),
+      })
+    ) {
+      throw new ForbiddenException('لديك اختبار بديل لهذا الاختبار');
     }
   }
 
@@ -801,6 +905,8 @@ export class ExamsService {
     for (const classId of classIds) {
       const existing = await this.examModel.countDocuments({
         examType,
+        // A makeup stands in for an exam; it is not another one of its type.
+        makeupOf: null,
         classIds: new mongoose.Types.ObjectId(classId),
         $or: [
           { subjectOfferingId: new mongoose.Types.ObjectId(subjectOfferingId) },
@@ -1347,7 +1453,7 @@ export class ExamsService {
 
     const exam = await this.examModel
       .findById(examId)
-      .select('_id grade examType subjectOfferingId classIds duration endDate questions')
+      .select('_id grade examType subjectOfferingId classIds duration endDate questions makeupOf studentIds')
       .exec();
     if (!exam) {
       throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
@@ -1372,18 +1478,55 @@ export class ExamsService {
       if (ExamsService.expired(session, exam)) await this.finalizeSession(session, exam);
     }
 
-    const results = await this.examResultModel
+    const own = await this.examResultModel
       .find({ examId: new mongoose.Types.ObjectId(examId) })
       .populate({ path: 'studentId', select: 'name schoolEmail classId' })
       .sort({ createdAt: 1 })
       .exec();
 
+    // One sheet for the exam: the makeup papers sit on it as rows, marked
+    // with the makeup they came from. The original's paper wins if both exist.
+    const fromMakeup = new Map<string, string>();
+    // makeupId → the makeup itself, to read its papers' answers against.
+    const makeupShape = new Map<string, any>();
+    let results: any[] = own;
+    if (!(exam as any).makeupOf) {
+      const makeups: any[] = await this.examModel
+        .find({ makeupOf: exam._id })
+        .select('_id grade duration endDate questions studentIds')
+        .lean()
+        .exec();
+      if (makeups.length) {
+        for (const makeup of makeups) makeupShape.set(String(makeup._id), makeup);
+        for (const makeup of makeups) {
+          const openOnMakeup = await this.examResultModel.find({ examId: makeup._id, submitted: { $ne: true } }).exec();
+          for (const session of openOnMakeup) {
+            if (ExamsService.expired(session, makeup)) await this.finalizeSession(session, makeup);
+          }
+        }
+        const seen = new Set(own.map((r: any) => String(r.studentId?._id ?? r.studentId)));
+        const extra = await this.examResultModel
+          .find({ examId: { $in: makeups.map((x) => x._id) } })
+          .populate({ path: 'studentId', select: 'name schoolEmail classId' })
+          .sort({ createdAt: 1 })
+          .exec();
+        for (const r of extra as any[]) {
+          const sid = String(r.studentId?._id ?? r.studentId);
+          if (seen.has(sid)) continue;
+          seen.add(sid);
+          fromMakeup.set(String(r._id), String(r.examId));
+          results = [...results, r];
+        }
+      }
+    }
+
     // A student who has not started the exam has no result row at all, so the
     // count of results is not the size of the class. Both numbers are returned
     // because the difference is exactly what the teacher is looking for.
-    const enrolled = await this.studentModel
-      .countDocuments({ classId: { $in: exam.classIds } })
-      .exec();
+    // A makeup is for the students picked for it, not the whole class.
+    const enrolled = (exam as any).makeupOf
+      ? ((exam as any).studentIds ?? []).length
+      : await this.studentModel.countDocuments({ classId: { $in: exam.classIds } }).exec();
 
     // Each paper's answers, so the teacher can read what a student wrote —
     // her essay above all, which no score can stand in for. Never to a
@@ -1414,8 +1557,13 @@ export class ExamsService {
           achievedGrade: r.achievedGrade ?? null,
           percentage: r.percentage ?? null,
           passed: r.passed ?? null,
-          // Handed-in papers only: an open one has drafts, not answers.
-          answers: staff && r.submitted ? presentAnswers(examShape, r.answers ?? []) : [],
+          // Handed-in papers only: an open one has drafts, not answers. A
+          // makeup paper is read against the makeup's own questions.
+          answers: staff && r.submitted
+            ? presentAnswers(makeupShape.get(fromMakeup.get(String(r._id)) ?? '') ?? examShape, r.answers ?? [])
+            : [],
+          // The makeup this paper was sat on; null for the exam's own.
+          fromMakeup: fromMakeup.get(String(r._id)) ?? null,
         })),
       },
     };
@@ -1478,6 +1626,395 @@ export class ExamsService {
         passed: updated.passed,
       },
     };
+  }
+
+  // ─────────────────────────────────────────── الاختبار البديل
+
+  /** The original exam a makeup is made of — never a makeup itself. */
+  private async loadOriginal(examId: string): Promise<any> {
+    this.validateObjectId(examId, 'exam');
+    const exam: any = await this.examModel.findById(examId).exec();
+    if (!exam) throw new NotFoundException(`الامتحان ذو المعرف ${examId} غير موجود`);
+    if (exam.makeupOf) {
+      throw new BadRequestException('لا يكون للاختبار البديل اختبار بديل؛ أنشئه من الاختبار الأصلي');
+    }
+    return exam;
+  }
+
+  /**
+   * The original's classes this caller may give a makeup in: a teacher, the
+   * ones she teaches this subject to (as in the essay review); an admin, all.
+   */
+  private async makeupClassIds(original: any, user: any): Promise<string[]> {
+    const all = (original.classIds ?? []).map(String);
+    if (user?.role !== 'TEACHER') return all;
+    const mine = new Set(
+      (
+        await this.lectureModel
+          .distinct('classId', {
+            teacherId: new mongoose.Types.ObjectId(String(user.userId)),
+            subjectOfferingId: original.subjectOfferingId,
+          })
+          .exec()
+      ).map(String),
+    );
+    return all.filter((id: string) => mine.has(id));
+  }
+
+  /** Mark the original's papers whose time ran out, so they count as sat. */
+  private async closeExpired(exam: any): Promise<void> {
+    const open = await this.examResultModel.find({ examId: exam._id, submitted: { $ne: true } }).exec();
+    for (const session of open) {
+      if (ExamsService.expired(session, exam)) await this.finalizeSession(session, exam);
+    }
+  }
+
+  /**
+   * Who sat what, for an original and its makeups: submitted papers on the
+   * original, submitted papers on each makeup, and the makeups themselves.
+   */
+  private async makeupState(original: any) {
+    const makeups: any[] = await this.examModel
+      .find({ makeupOf: original._id })
+      .select('_id startDate endDate studentIds createdAt')
+      .sort({ createdAt: 1 })
+      .lean()
+      .exec();
+    const [onOriginal, onMakeups] = await Promise.all([
+      this.examResultModel.distinct('studentId', { examId: original._id, submitted: true }).exec(),
+      makeups.length
+        ? this.examResultModel
+            .find({ examId: { $in: makeups.map((x) => x._id) }, submitted: true })
+            .select('examId studentId')
+            .lean()
+            .exec()
+        : Promise.resolve([] as any[]),
+    ]);
+    return {
+      makeups,
+      satOriginal: new Set(onOriginal.map(String)),
+      satMakeup: new Set((onMakeups as any[]).map((r) => `${r.examId}|${r.studentId}`)),
+    };
+  }
+
+  /**
+   * Every student must be a current candidate: in the caller's classes of the
+   * exam, no paper handed in on it or on any of its makeups, and not already
+   * in a makeup of it that is still open. `exceptMakeup` is the makeup being
+   * edited. Returns the students, for their names.
+   */
+  private async assertMakeupCandidates(original: any, studentIds: string[], user: any, exceptMakeup?: any) {
+    if (!studentIds.length) return [];
+    const classIds = new Set(await this.makeupClassIds(original, user));
+    const students: any[] = await this.studentModel
+      .find({ _id: { $in: studentIds.map((id) => new mongoose.Types.ObjectId(id)) } })
+      .select('name classId')
+      .lean()
+      .exec();
+    const byId = new Map(students.map((x) => [String(x._id), x]));
+    const { makeups, satOriginal, satMakeup } = await this.makeupState(original);
+    const now = Date.now();
+
+    for (const id of studentIds) {
+      const student = byId.get(id);
+      if (!student) throw new BadRequestException('طالبة غير موجودة');
+      const name = student.name ?? 'الطالبة';
+      if (!classIds.has(String(student.classId))) {
+        throw new BadRequestException(`${name} ليست من طالبات هذا الاختبار في فصولك`);
+      }
+      if (satOriginal.has(id)) {
+        throw new BadRequestException(`${name} أدّت الاختبار الأصلي`);
+      }
+      for (const makeup of makeups) {
+        if (exceptMakeup && String(makeup._id) === String(exceptMakeup._id)) continue;
+        if (satMakeup.has(`${makeup._id}|${id}`)) {
+          throw new BadRequestException(`${name} أدّت اختبارًا بديلًا لهذا الاختبار`);
+        }
+        const isIn = (makeup.studentIds ?? []).some((s: any) => String(s) === id);
+        if (isIn && new Date(makeup.endDate).getTime() >= now) {
+          throw new BadRequestException(`${name} لديها اختبار بديل قائم`);
+        }
+      }
+    }
+    return students;
+  }
+
+  /**
+   * «اختبار بديل»: the students of the exam's classes (the caller's) who have
+   * not handed it in, each with her absence on the exam's days — information
+   * for the teacher, not a rule — and the makeup she is already in.
+   */
+  async makeupCandidates(examId: string, user: any) {
+    const original = await this.loadOriginal(examId);
+    await this.assertTeacherMayManage(original, user);
+    await this.closeExpired(original);
+
+    const classIds = await this.makeupClassIds(original, user);
+    const students: any[] = classIds.length
+      ? await this.studentModel
+          .find({ classId: { $in: classIds.map((id) => new mongoose.Types.ObjectId(id)) }, isActive: { $ne: false } })
+          .select('name classId')
+          .lean()
+          .exec()
+      : [];
+    const { makeups, satOriginal, satMakeup } = await this.makeupState(original);
+    const missed = students.filter((x) => !satOriginal.has(String(x._id)));
+
+    // Absence on any day of the exam's window.
+    const from = new Date(original.startDate);
+    from.setUTCHours(0, 0, 0, 0);
+    const absences: any[] =
+      this.attendanceModel && missed.length
+        ? await this.attendanceModel
+            .find({
+              studentId: { $in: missed.map((x) => x._id) },
+              date: { $gte: from, $lte: new Date(original.endDate) },
+            })
+            .select('studentId date excuseStatus')
+            .lean()
+            .exec()
+        : [];
+
+    const names = new Map(
+      (
+        await this.classModel
+          .find({ _id: { $in: classIds.map((id) => new mongoose.Types.ObjectId(id)) } })
+          .select('name')
+          .lean()
+          .exec()
+      ).map((c: any) => [String(c._id), c.name]),
+    );
+    const now = Date.now();
+    const order = { excused: 0, unexcused: 1, none: 2 } as const;
+
+    const candidates = missed
+      .map((x) => {
+        const sid = String(x._id);
+        const mine = absences.filter((a) => String(a.studentId) === sid);
+        const absence: keyof typeof order = mine.some((a) => a.excuseStatus === 'accepted')
+          ? 'excused'
+          : mine.length
+            ? 'unexcused'
+            : 'none';
+        // The most recent makeup she is in.
+        const makeup = [...makeups].reverse().find((m) => (m.studentIds ?? []).some((s: any) => String(s) === sid));
+        return {
+          studentId: sid,
+          name: x.name ?? null,
+          className: names.get(String(x.classId)) ?? null,
+          absence,
+          absenceDates: [...new Set(mine.map((a) => new Date(a.date).toISOString().slice(0, 10)))].sort(),
+          makeup: makeup
+            ? {
+                examId: String(makeup._id),
+                startDate: makeup.startDate,
+                endDate: makeup.endDate,
+                status: satMakeup.has(`${makeup._id}|${sid}`)
+                  ? 'taken'
+                  : new Date(makeup.endDate).getTime() < now
+                    ? 'missed'
+                    : 'scheduled',
+              }
+            : null,
+        };
+      })
+      .sort(
+        (a, b) =>
+          order[a.absence] - order[b.absence] || String(a.name ?? '').localeCompare(String(b.name ?? ''), 'ar'),
+      );
+
+    return {
+      message: 'تم استرجاع المرشحات للاختبار البديل',
+      data: { examId: String(original._id), candidates },
+    };
+  }
+
+  /** YYYY-MM-DD is the whole day, as when an exam is created; a date-time is that moment. */
+  private static makeupDate(value: any, edge: 'start' | 'end'): Date {
+    if (value instanceof Date) return value;
+    const text = String(value ?? '');
+    const d = new Date(text);
+    if (Number.isNaN(d.getTime())) throw new BadRequestException('تاريخ غير صالح');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      if (edge === 'start') d.setHours(0, 0, 0, 0);
+      else d.setHours(23, 59, 59, 999);
+    }
+    return d;
+  }
+
+  async createMakeup(examId: string, dto: CreateMakeupExamDto, user: any) {
+    const original = await this.loadOriginal(examId);
+    await this.assertTeacherMayManage(original, user);
+
+    const studentIds = [...new Set((dto.studentIds ?? []).map(String))];
+    if (studentIds.length < 1 || studentIds.length > 200) {
+      throw new BadRequestException('اختر من طالبة واحدة إلى 200 طالبة');
+    }
+    const startDate = ExamsService.makeupDate(dto.startDate, 'start');
+    const endDate = ExamsService.makeupDate(dto.endDate, 'end');
+    if (startDate > endDate) {
+      throw new BadRequestException('بداية الاختبار البديل يجب أن تسبق نهايته');
+    }
+    if (endDate.getTime() <= Date.now()) {
+      throw new BadRequestException('موعد الاختبار البديل يجب أن يكون اليوم أو بعده');
+    }
+
+    await this.closeExpired(original);
+    await this.assertMakeupCandidates(original, studentIds, user);
+
+    // A copy of the original's questions (new ids — the teacher usually
+    // changes the one that leaked), or her own, under the same rules.
+    let questions: any[];
+    if (dto.copyQuestions) {
+      questions = (original.questions ?? []).map((q: any) => ({
+        type: q.type ?? 'mcq',
+        question: q.question,
+        options: [...(q.options ?? [])],
+        correctAnswer: q.correctAnswer ?? null,
+        modelAnswer: q.modelAnswer ?? null,
+        marks: q.marks ?? null,
+      }));
+    } else {
+      if (!dto.questions?.length) {
+        throw new BadRequestException('أضف أسئلة الاختبار البديل، أو انسخ أسئلة الاختبار الأصلي');
+      }
+      questions = this.normalizeQuestions(dto.questions);
+    }
+
+    // No assertWithinCount: a makeup stands in for an exam, it is not another.
+    const makeup = await this.examModel.create({
+      gradesCriteriaId: original.gradesCriteriaId ?? null,
+      subjectOfferingId: original.subjectOfferingId,
+      classIds: original.classIds,
+      examType: original.examType,
+      grade: original.grade,
+      // createdBy is a Teacher; an admin's makeup stays the teacher's exam.
+      createdBy: user?.role === 'TEACHER' ? user.userId : original.createdBy,
+      startDate,
+      endDate,
+      duration: dto.duration,
+      questions,
+      makeupOf: original._id,
+      studentIds: studentIds.map((id) => new mongoose.Types.ObjectId(id)),
+    });
+
+    await this.notifyMakeup(makeup, studentIds);
+
+    await makeup.populate([
+      ExamsService.GRADES_CRITERIA_POPULATE,
+      { path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER },
+    ]);
+    return {
+      message: 'تم إنشاء الاختبار البديل',
+      data: transformExamResponse(makeup),
+    };
+  }
+
+  /**
+   * PATCH on a makeup: its dates, duration, questions and students. What it
+   * copied from the original stays the original's. A student added is checked
+   * and told; one who has started it cannot be removed.
+   */
+  private async updateMakeup(makeup: any, dto: UpdateExamDto, user: any) {
+    const copied = ['subjectOfferingId', 'classIds', 'examType', 'grade'] as const;
+    if (copied.some((k) => (dto as any)[k] !== undefined)) {
+      throw new BadRequestException('المادة والفصول والنوع والدرجة تُنسخ من الاختبار الأصلي ولا تُعدَّل في الاختبار البديل');
+    }
+    const startDate = dto.startDate ? new Date(dto.startDate) : makeup.startDate;
+    const endDate = dto.endDate ? new Date(dto.endDate) : makeup.endDate;
+    if (new Date(startDate) > new Date(endDate)) {
+      throw new BadRequestException('بداية الاختبار البديل يجب أن تسبق نهايته');
+    }
+
+    const update: any = {};
+    if (dto.startDate) update.startDate = startDate;
+    if (dto.endDate) update.endDate = endDate;
+    if (dto.duration !== undefined) update.duration = dto.duration;
+    if (dto.questions) update.questions = dto.questions;
+
+    let added: string[] = [];
+    if (dto.studentIds !== undefined) {
+      const next = [...new Set(dto.studentIds.map(String))];
+      const current = (makeup.studentIds ?? []).map(String);
+      const removed = current.filter((id: string) => !next.includes(id));
+      added = next.filter((id) => !current.includes(id));
+
+      if (removed.length) {
+        const started: any[] = await this.examResultModel
+          .find({ examId: makeup._id, studentId: { $in: removed.map((id: string) => new mongoose.Types.ObjectId(id)) } })
+          .populate({ path: 'studentId', select: 'name' })
+          .lean()
+          .exec();
+        if (started.length) {
+          throw new BadRequestException(`${started[0].studentId?.name ?? 'الطالبة'} بدأت الاختبار البديل ولا يمكن إزالتها`);
+        }
+      }
+      if (added.length) {
+        const original = await this.loadOriginal(String(makeup.makeupOf));
+        await this.closeExpired(original);
+        await this.assertMakeupCandidates(original, added, user, makeup);
+      }
+      update.studentIds = next.map((id) => new mongoose.Types.ObjectId(id));
+    }
+
+    const updated = await this.examModel.findByIdAndUpdate(makeup._id, update, { new: true, runValidators: true });
+    if (added.length) await this.notifyMakeup(updated, added);
+    await updated.populate([
+      ExamsService.GRADES_CRITERIA_POPULATE,
+      { path: 'classIds', select: ExamsService.CLASS_FIELDS_GENDER },
+    ]);
+    return transformExamResponse(updated);
+  }
+
+  /** "2026-12-08 08:00" in the school's own time. */
+  private async whenLabel(date: Date, schoolId: any): Promise<string> {
+    let tz = 'Asia/Riyadh';
+    try {
+      const School = this.examModel.db?.models?.['School'];
+      const school: any = School && schoolId
+        ? await School.findById(schoolId).select('settings.timezone').setOptions({ skipTenantScope: true }).lean().exec()
+        : null;
+      tz = school?.settings?.timezone || tz;
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      }).formatToParts(new Date(date));
+      const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+      return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
+    } catch {
+      return new Date(date).toISOString().slice(0, 16).replace('T', ' ');
+    }
+  }
+
+  /** makeup_exam_scheduled to each student (and her family, through the student's own delivery). Never throws. */
+  private async notifyMakeup(makeup: any, studentIds: string[]): Promise<void> {
+    if (!this.notifications || !studentIds.length) return;
+    try {
+      const offering: any = await this.subjectOfferingModel
+        .findById(makeup.subjectOfferingId)
+        .populate('subjectId', 'subjectName')
+        .lean()
+        .exec();
+      const subjectName = offering?.subjectId?.subjectName ?? '';
+      const start = await this.whenLabel(makeup.startDate, makeup.schoolId);
+      const end = await this.whenLabel(makeup.endDate, makeup.schoolId);
+      for (const studentId of studentIds) {
+        await this.notifications.notify({
+          recipientId: studentId,
+          type: 'makeup_exam_scheduled',
+          title: 'اختبار بديل',
+          body: `حُدِّد لكِ اختبار بديل في ${subjectName} من ${start} إلى ${end}، ومدته ${makeup.duration} دقيقة.`,
+          data: {
+            examId: String(makeup._id),
+            makeupOf: String(makeup.makeupOf),
+            subjectName,
+            startDate: new Date(makeup.startDate).toISOString(),
+            endDate: new Date(makeup.endDate).toISOString(),
+          },
+        });
+      }
+    } catch (error: any) {
+      this.logger.error(`Could not announce makeup ${makeup?._id}: ${error?.message}`);
+    }
   }
 
   // ─────────────────────────────────────────── تصحيح الأسئلة المقالية

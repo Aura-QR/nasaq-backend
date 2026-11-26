@@ -14,6 +14,7 @@ import { SubjectOffering, SubjectOfferingSchema } from '../subject-offerings/sch
 import { StudentClassResolverModule } from '../enrollments/student-class-resolver.module';
 import { AcademicYear, AcademicYearSchema } from '../academic-years/schemas/academic-year.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { Attendance, AttendanceSchema } from '../attendance/schemas/attendance.schema';
 
 @Module({
   imports: [
@@ -28,6 +29,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
       { name: Enrollment.name, schema: EnrollmentSchema },
       { name: SubjectOffering.name, schema: SubjectOfferingSchema },
       { name: AcademicYear.name, schema: AcademicYearSchema },
+      // Makeup candidates are labelled with their absence on the exam's days.
+      { name: Attendance.name, schema: AttendanceSchema },
     ]),
     CaslModule,
     // exam_graded, when the teacher finishes marking an essay paper.

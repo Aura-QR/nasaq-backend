@@ -74,6 +74,8 @@ export const NOTIFICATION_TYPES = [
   'homework_reviewed',
   // A paper waiting on an essay was marked: the student's grade is in.
   'exam_graded',
+  // A makeup exam («اختبار بديل») was set for this student.
+  'makeup_exam_scheduled',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

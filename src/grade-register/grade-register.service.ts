@@ -16,6 +16,7 @@ import { DailyTracking } from '../daily-tracking/schemas/daily-tracking.schema';
 import { Attendance } from '../attendance/schemas/attendance.schema';
 import { Exam } from '../exams/schemas/exam.schema';
 import { ExamResult } from '../exams/schemas/exam-result.schema';
+import { loadMakeupView, makeupStillOpen, ORIGINALS_ONLY } from '../exams/makeup.util';
 import { Project } from '../projects/schemas/project.schema';
 import { ProjectSubmission } from '../projects/schemas/project-submission.schema';
 import { Lecture } from '../lectures/schemas/lecture.schema';
@@ -173,8 +174,10 @@ export class GradeRegisterService {
       : [];
     const absent = new Set(absences.map((a: any) => `${a.studentId}|${new Date(a.date).getTime()}`));
 
+    // Makeups are never columns of their own: their results land on the
+    // original below.
     const exams = await this.examModel
-      .find({ subjectOfferingId: offeringId, classIds: classId })
+      .find({ subjectOfferingId: offeringId, classIds: classId, ...ORIGINALS_ONLY })
       .select('_id examType grade endDate')
       .lean()
       .exec();
@@ -186,6 +189,14 @@ export class GradeRegisterService {
           .exec()
       : [];
     const resultOf = new Map(results.map((r: any) => [`${r.examId}|${r.studentId}`, r]));
+    // A makeup's paper is the original's paper for her. Should both exist,
+    // the original's own wins.
+    const makeups = await loadMakeupView(
+      this.examModel as any, this.examResultModel as any, exams.map((e: any) => e._id), studentIds,
+    );
+    for (const [key, r] of makeups.resultOf) {
+      if (!resultOf.has(key)) resultOf.set(key, r);
+    }
 
     const projects = await this.projectModel
       .find({ subjectOfferingId: offeringId, classIds: classId })
@@ -238,6 +249,12 @@ export class GradeRegisterService {
           continue;
         }
         const got = typeof result?.achievedGrade === 'number' ? result.achievedGrade : null;
+        // A makeup set for her and not closed yet: the exam is not held for
+        // her until it is — not a 0, and the row not complete.
+        if (got === null && makeupStillOpen(makeups, exam._id, sid, now)) {
+          awaitingReview = true;
+          continue;
+        }
         const closed = new Date(exam.endDate).getTime() < now;
         if (got === null && !closed) continue; // not held yet, or still open
         const earned = got ?? 0;
