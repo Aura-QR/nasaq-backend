@@ -26,7 +26,7 @@ export class DashboardsController {
   @ApiOperation({ summary: 'Get permission-filtered metrics for Manager' })
   async getManagerDashboard(@Req() req: any) {
     const userPermissions = req.user?.permissions || [];
-    return this.dashboardsService.getManagerDashboard(userPermissions);
+    return this.dashboardsService.getManagerDashboard(userPermissions, req.user?.schoolId);
   }
 
   @Get('super-admin')

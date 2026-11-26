@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { School } from 'src/platform/schools/schemas/school.schema';
@@ -11,9 +11,12 @@ import { Attendance } from 'src/attendance/schemas/attendance.schema';
 import { Expense } from 'src/expenses/schemas/expense.schema';
 import { StudentFinancialRecord } from 'src/financial/schemas/student-financial-record.schema';
 import { Enrollment } from 'src/enrollments/schemas/enrollment.schema';
+import { TeacherAttendanceService } from 'src/teacher-attendance/teacher-attendance.service';
 
 @Injectable()
 export class DashboardsService {
+  private readonly logger = new Logger(DashboardsService.name);
+
   constructor(
     @InjectModel(School.name) private schoolModel: Model<School>,
     @InjectModel(Student.name) private studentModel: Model<Student>,
@@ -28,7 +31,24 @@ export class DashboardsService {
     private financialRecordModel: Model<StudentFinancialRecord>,
     @InjectModel(Enrollment.name)
     private enrollmentModel: Model<Enrollment>,
+    // The teachers' tile — the same snapshot as GET /teacher-attendance/today.
+    // Optional so a hand-built service in a unit test still works.
+    @Optional() private teacherAttendance?: TeacherAttendanceService,
   ) {}
+
+  /**
+   * Today's teacher attendance for the home screen, or null. Never throws:
+   * a dashboard must not go blank because one tile could not be read.
+   */
+  private async getTeachersToday(schoolId?: string) {
+    if (!this.teacherAttendance || !schoolId) return null;
+    try {
+      return await this.teacherAttendance.getTodaySnapshot(undefined, { schoolId });
+    } catch (error: any) {
+      this.logger.error(`Could not read teachers today: ${error?.message}`);
+      return null;
+    }
+  }
 
   /**
    * A class belongs to one academic year, so counting every class ever created
@@ -89,6 +109,7 @@ export class DashboardsService {
       expensesAggregate,
       financialRecords,
       todayAttendanceCount,
+      teachersToday,
     ] = await Promise.all([
       studentYearFilter
         ? this.studentModel.countDocuments(studentYearFilter)
@@ -113,6 +134,7 @@ export class DashboardsService {
       ]),
       this.financialRecordModel.find().lean(),
       this.getTodayAttendanceCount(),
+      this.getTeachersToday(schoolId),
     ]);
 
     const totalExpenses = expensesAggregate[0]?.totalAmount || 0;
@@ -149,11 +171,14 @@ export class DashboardsService {
         totalExpenses,
         netIncome,
       },
+      // Student absence rows, as before — existing screens read it.
       attendanceToday: todayAttendanceCount,
+      // Teachers: expected, present, late, not in yet / absent, and rates.
+      teachersToday,
     };
   }
 
-  async getManagerDashboard(userPermissions: string[]) {
+  async getManagerDashboard(userPermissions: string[], schoolId?: string) {
     const isOwnerOrAll = userPermissions.includes('*');
     // Login emits school.<entity>.read/create/update/delete — never `.manage`.
     // Gating on `.manage` hid every card but students from every manager.
@@ -203,6 +228,10 @@ export class DashboardsService {
     if (canRead('attendance')) {
       const todayAttendance = await this.getTodayAttendanceCount();
       result.metrics.attendanceToday = todayAttendance;
+    }
+
+    if (canRead('teacherAttendance')) {
+      result.metrics.teachersToday = await this.getTeachersToday(schoolId);
     }
 
     if (canRead('financial')) {

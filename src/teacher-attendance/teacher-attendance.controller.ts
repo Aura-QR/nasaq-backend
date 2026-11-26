@@ -27,6 +27,7 @@ import { CreateManualTeacherAttendanceDto } from './dto/create-manual-teacher-at
 import { QueryTeacherAttendanceDto } from './dto/query-teacher-attendance.dto';
 import { CheckOutTeacherAttendanceDto } from './dto/check-out-teacher-attendance.dto';
 import { SummaryTeacherAttendanceDto } from './dto/summary-teacher-attendance.dto';
+import { MyAttendanceStatsDto } from './dto/my-attendance-stats.dto';
 import { SubmitLateReasonDto } from './dto/submit-late-reason.dto';
 import { UpdateTeacherAttendanceDto } from './dto/update-teacher-attendance.dto';
 import { extractClientIp, TeacherAttendanceService } from './teacher-attendance.service';
@@ -318,6 +319,21 @@ export class TeacherAttendanceController {
     return this.teacherAttendanceService.submitLateReason(user, dto);
   }
 
+  // A literal path: above @Get('me') and every ':id' route.
+  @Get('me/stats')
+  @Roles(Role.TEACHER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'حضوري — نسبة حضوري وانضباطي وأيام غيابي',
+    description:
+      'من بداية الترم الحالي حتى اليوم افتراضيًا (آخر 30 يومًا إن لم يوجد ترم). ' +
+      'الحساب نفسه الذي يقرؤه تقرير المدرسة. الفترة لا تتجاوز 366 يومًا.',
+  })
+  @ApiResponse({ status: 400, description: 'فترة مقلوبة أو أطول من 366 يومًا' })
+  async getMyStats(@CurrentUser() user: any, @Query() query: MyAttendanceStatsDto) {
+    return this.teacherAttendanceService.getMyStats(user, query);
+  }
+
   @Get('me')
   @Roles(Role.TEACHER)
   @HttpCode(HttpStatus.OK)
@@ -343,6 +359,24 @@ export class TeacherAttendanceController {
     @Body() dto: CreateManualTeacherAttendanceDto,
   ) {
     return this.teacherAttendanceService.createManual(user, dto);
+  }
+
+  @CheckAbilities({ action: 'read', subject: 'TeacherAttendance' })
+  @Get('today')
+  @Roles(Role.OWNER, Role.MANAGER, Role.SUPERVISOR, Role.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'حضور المعلمين في يوم — حضر 17 من 20',
+    description:
+      'قبل نهاية اليوم الدراسي من لم يسجّل «لم يسجّل بعد» لا غائب (absent = null)؛ ' +
+      'بعد نهايته يصبح غائبًا. يوم العطلة: isWorkingDay = false وبقية الحقول null.',
+  })
+  @ApiQuery({ name: 'date', required: false, description: 'YYYY-MM-DD, today in the school timezone by default' })
+  async getToday(@CurrentUser() user: any, @Query('date') date?: string) {
+    if (date !== undefined && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date)))) {
+      throw new BadRequestException('التاريخ غير صالح، استخدم YYYY-MM-DD');
+    }
+    return this.teacherAttendanceService.getTodaySnapshot(date, user);
   }
 
   @CheckAbilities({ action: 'read', subject: 'TeacherAttendance' })

@@ -39,6 +39,9 @@ export const NOTIFICATION_TYPES = [
   // Sent to the teacher after the school day ends, when she recorded no
   // attendance — the absence's equivalent of late_reason_required.
   'teacher_absence_excuse_required',
+  // A teacher's unexcused days in the term reached teacherAbsenceAlertDays.
+  // To the admins only — the teacher was already asked for an excuse.
+  'teacher_absence_limit_reached',
   // What a supervisor saw in a classroom, the teacher's account of it, and
   // the school's ruling. Period-level, unlike the three above, which are the
   // day.

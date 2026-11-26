@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -8,6 +8,7 @@ import { TeacherAttendance } from './schemas/teacher-attendance.schema';
 import { TeacherAbsenceExcuse } from './schemas/teacher-absence-excuse.schema';
 import { TeacherAbsenceNotice } from './schemas/teacher-absence-notice.schema';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TeacherAttendanceService } from './teacher-attendance.service';
 import { resolveDaySchedule } from '../attendance/attendance.utils';
 import { tenantLocalStorage } from '../tenancy/tenant-storage';
 import { dayLabel, schoolDayHasEnded, schoolNow, worksOn } from './teacher-presence.util';
@@ -45,6 +46,9 @@ export class TeacherAbsenceSweepService {
     @InjectModel(TeacherAbsenceNotice.name)
     private readonly noticeModel: Model<TeacherAbsenceNotice>,
     private readonly notifications: NotificationsService,
+    // حد غياب المعلمين is checked against the report's own numbers. Optional
+    // so a hand-built sweep in a unit test still works without it.
+    @Optional() private readonly attendance?: TeacherAttendanceService,
   ) {}
 
   @Cron('*/15 * * * *', { name: 'teacher-absence-sweep' })
@@ -90,11 +94,11 @@ export class TeacherAbsenceSweepService {
 
     const schoolId = String(school._id);
     return tenantLocalStorage.run({ schoolId, isAdminContext: false }, () =>
-      this.notifyAbsent(clock.date),
+      this.notifyAbsent(clock.date, schoolId, now),
     );
   }
 
-  private async notifyAbsent(date: Date): Promise<number> {
+  private async notifyAbsent(date: Date, schoolId?: string, now: Date = new Date()): Promise<number> {
     const [teachers, present, explained, noticed] = await Promise.all([
       this.teacherModel.find({ isActive: true }).select('_id name workDays hireDate').lean().exec(),
       this.attendanceModel.find({ date }).select('teacherId').lean().exec(),
@@ -154,6 +158,17 @@ export class TeacherAbsenceSweepService {
         sent++;
       } catch (error: any) {
         this.logger.error(`Could not notify ${teacher._id} for ${label}: ${error?.message}`);
+      }
+
+      // Then, once per teacher per day (the notice above guarantees it): has
+      // this absence brought her to the school's limit for the term? Admins
+      // only — she has just been asked for an excuse. Never throws.
+      if (this.attendance && schoolId) {
+        try {
+          await this.attendance.alertTeacherAbsenceLimit(teacher, date, schoolId, now);
+        } catch (error: any) {
+          this.logger.error(`Absence-limit check failed for ${teacher._id}: ${error?.message}`);
+        }
       }
     }
 
