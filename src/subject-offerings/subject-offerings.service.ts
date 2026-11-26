@@ -54,6 +54,9 @@ export class SubjectOfferingsService {
     if (!updated) {
       throw new NotFoundException(`Subject offering with ID ${id} not found`);
     }
+    if (dto.assessmentType !== undefined) {
+      await this.spreadAssessmentType([String(updated._id)]);
+    }
     return updated;
   }
 
@@ -101,17 +104,87 @@ export class SubjectOfferingsService {
               ...(entry.slotPreference !== undefined
                 ? { slotPreference: entry.slotPreference }
                 : {}),
+              // Same rule: absent means "not edited here", null means
+              // "back to the subject's type".
+              ...(entry.assessmentType !== undefined
+                ? { assessmentType: entry.assessmentType }
+                : {}),
             },
           },
         },
       })),
     );
 
+    const assessmentChanged = dto.entries
+      .filter((e) => e.assessmentType !== undefined)
+      .map((e) => e.subjectOfferingId);
+    const otherTermsUpdated = await this.spreadAssessmentType(assessmentChanged);
+
     return {
       message: `${dto.entries.length} subject offerings updated`,
       matched: result.matchedCount,
       modified: result.modifiedCount,
+      otherTermsUpdated,
     };
+  }
+
+  /**
+   * Copies each offering's assessment type to the same subject and grade in
+   * the other terms of its academic year.
+   *
+   * Offerings are per term, but the ministry sets the assessment type per
+   * grade for the whole year. Without this a school that sets «أولى ابتدائي —
+   * لغتي: تقويم مستمر» in term one finds term two still on the subject's
+   * default, and the register changes shape halfway through the year.
+   *
+   * updateMany, not bulkWrite, so the tenant plugin scopes every write.
+   * Returns how many other offerings changed.
+   */
+  private async spreadAssessmentType(offeringIds: string[]): Promise<number> {
+    if (!offeringIds.length) return 0;
+
+    const offerings: any[] = await this.subjectOfferingModel
+      .find({ _id: { $in: offeringIds.map((id) => new mongoose.Types.ObjectId(id)) } })
+      .select('subjectId gradeLevelId termId assessmentType')
+      .lean()
+      .exec();
+
+    const yearTerms = new Map<string, mongoose.Types.ObjectId[]>();
+    let changed = 0;
+
+    for (const offering of offerings) {
+      const term: any = await this.termModel
+        .findById(offering.termId)
+        .select('academicYearId')
+        .lean()
+        .exec();
+      if (!term?.academicYearId) continue;
+
+      const yearId = String(term.academicYearId);
+      if (!yearTerms.has(yearId)) {
+        const terms = await this.termModel
+          .find({ academicYearId: term.academicYearId })
+          .select('_id')
+          .lean()
+          .exec();
+        yearTerms.set(yearId, terms.map((t: any) => t._id));
+      }
+
+      const result = await this.subjectOfferingModel
+        .updateMany(
+          {
+            _id: { $ne: offering._id },
+            subjectId: offering.subjectId,
+            gradeLevelId: offering.gradeLevelId,
+            termId: { $in: yearTerms.get(yearId) },
+          },
+          { $set: { assessmentType: offering.assessmentType ?? null } },
+        )
+        .exec();
+      changed += result.modifiedCount ?? 0;
+    }
+
+    return changed;
   }
 
   /**

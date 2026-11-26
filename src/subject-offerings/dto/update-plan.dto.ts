@@ -44,6 +44,24 @@ export class PlanEntryDto {
   @IsOptional()
   @IsIn(SLOT_PREFERENCES)
   slotPreference?: (typeof SLOT_PREFERENCES)[number];
+
+  /**
+   * Ministry template: this grade's assessment type when it differs from the
+   * subject's — Arabic continuous in grade 1, with a final exam from grade 4.
+   * null goes back to the subject's own type. Omitted leaves it untouched.
+   *
+   * It is a property of the grade for the whole year, so saving it on one
+   * term's offering also sets the same subject and grade in the year's other
+   * terms (see SubjectOfferingsService.spreadAssessmentType).
+   */
+  @ApiPropertyOptional({
+    description: "Override the subject's assessment type for this grade; null — the subject's",
+    enum: ['continuous', 'final_exam'],
+    nullable: true,
+  })
+  @IsOptional()
+  @IsIn(['continuous', 'final_exam', null])
+  assessmentType?: 'continuous' | 'final_exam' | null;
 }
 
 /**
